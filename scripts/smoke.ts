@@ -1,13 +1,25 @@
 /* Headless simulation smoke test: generate a world, exercise actions, and
    advance ~80 years, asserting invariants and catching exceptions. */
 import { generateWorld } from '../src/sim/world';
-import { advanceYear, netWorth } from '../src/sim/engine';
+import { advanceDay, advanceWeek, advanceYear, netWorth } from '../src/sim/engine';
 import { resolveChoice } from '../src/sim/events';
 import { RNG } from '../src/sim/rng';
 import * as A from '../src/sim/actions';
 import { buyShares, marketCap } from '../src/sim/market';
 import { datingPool, propose, haveChild, nameSuccessor } from '../src/sim/family';
 import { INDUSTRIES } from '../src/data/industries';
+
+/** Resolve any pending yearly choice events by auto-picking the first choice. */
+function resolvePending() {
+  for (const ev of state.pendingEvents) {
+    const rng = new RNG(state.seed);
+    rng.state = state.rngState;
+    resolveChoice(state, ev, ev.choices[0], rng);
+    state.rngState = rng.state;
+    events++;
+  }
+  state.pendingEvents = [];
+}
 
 let state = generateWorld({ playerName: 'Test Tycoon', gender: 'male', seedText: 'smoke-seed-1' });
 
@@ -27,19 +39,35 @@ A.joinParty(state, state.countries[0].parties[0]?.id ?? 'x');
 
 let errors = 0;
 let events = 0;
+let dailyFlavorCount = 0;
+
+// Exercise the new lifestyle actions once, early.
+for (const kind of ['book_club', 'therapy', 'adopt_pet', 'road_trip', 'volunteer', 'seminar', 'spa_day', 'blog'] as const) {
+  A.doActivity(state, kind);
+}
 
 for (let y = 0; y < 82 && state.player.alive; y++) {
   try {
-    state = advanceYear(state);
-    // Auto-resolve any events by picking the first choice.
-    for (const ev of state.pendingEvents) {
-      const rng = new RNG(state.seed);
-      rng.state = state.rngState;
-      resolveChoice(state, ev, ev.choices[0], rng);
-      state.rngState = rng.state;
-      events++;
+    if (y === 0) {
+      // Years 0-1: advance day-by-day to thoroughly exercise the daily tick + year rollover.
+      for (let d = 0; d < 365 && state.player.alive; d++) {
+        const res = advanceDay(state);
+        state = res.state;
+        dailyFlavorCount += res.headlines.length;
+      }
+    } else if (y === 1 || y === 2) {
+      // Years 2-3: advance week-by-week until the calendar rolls into the next year.
+      let rolled = false;
+      for (let w = 0; w < 53 && state.player.alive && !rolled; w++) {
+        const res = advanceWeek(state);
+        state = res.state;
+        dailyFlavorCount += res.headlines.length;
+        if (res.rolledIntoNewYear) rolled = true;
+      }
+    } else {
+      state = advanceYear(state);
     }
-    state.pendingEvents = [];
+    resolvePending();
 
     // Periodically buy a stock and run for office.
     if (y === 5) {
@@ -111,14 +139,17 @@ console.log('  spouse:', state.player.spouseId ? state.npcs[state.player.spouseI
 console.log('  children:', state.player.children.length, 'divorces:', state.player.divorceCount);
 console.log('  successors named:', Object.values(state.companies).filter((c) => c.successorId).length);
 console.log('  total patents granted:', Object.values(state.companies).reduce((s, c) => s + c.patents, 0));
-console.log('  world event ever fired (pandemic possible, random):', state.worldEvent ? state.worldEvent.type : 'none active at end');
+console.log('  world event active at end:', state.worldEvent ? state.worldEvent.type : 'none');
 console.log('  generation:', state.generation);
+console.log('  daily flavor events fired (day/week ticks):', dailyFlavorCount);
+console.log('  calendarDay at end:', state.calendarDay);
 console.log('  errors:', errors);
 
 // Invariant checks
 const bad: string[] = [];
 if (Number.isNaN(nw)) bad.push('net worth is NaN');
 if (Number.isNaN(state.player.money)) bad.push('money is NaN');
+if (Number.isNaN(state.calendarDay) || state.calendarDay < 0 || state.calendarDay > 364) bad.push(`calendarDay out of range: ${state.calendarDay}`);
 for (const c of state.countries) {
   if (Number.isNaN(c.economy.gdp)) bad.push(`${c.name} gdp NaN`);
   if (Number.isNaN(c.economy.stockIndex)) bad.push(`${c.name} stockIndex NaN`);

@@ -173,6 +173,7 @@ export function nameSuccessor(state: GameState, companyId: string, childId: stri
   if (!child || !p.children.includes(childId)) return { ok: false, message: 'Not your child.' };
   if (child.age < 18) return { ok: false, message: `${child.name} is too young to run a business.` };
   company.successorId = childId;
+  if (!state.achievements.includes('dynasty_founder')) state.achievements.push('dynasty_founder');
   log(state, `${child.name} was named successor of ${company.name}.`, 'business');
   return { ok: true, message: `${child.name} is now in line to inherit ${company.name}.` };
 }

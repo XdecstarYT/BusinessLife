@@ -12,6 +12,14 @@ const ACHIEVEMENTS: Record<string, { label: string; icon: string }> = {
   billionaire: { label: 'Billionaire', icon: '🤑' },
   centenarian: { label: 'Centenarian', icon: '🎂' },
   founded_party: { label: 'Party Founder', icon: '🏛️' },
+  married: { label: 'Married', icon: '💍' },
+  big_family: { label: 'Big Family', icon: '👨‍👩‍👧‍👦' },
+  first_company: { label: 'Founder', icon: '🚀' },
+  ipo_ceo: { label: 'IPO\'d a Company', icon: '📈' },
+  dynasty_founder: { label: 'Dynasty Founder', icon: '👑' },
+  jailbird: { label: 'Survived Prison', icon: '⛓️' },
+  coalition_builder: { label: 'Coalition Builder', icon: '🤝' },
+  philanthropist: { label: 'Philanthropist', icon: '❤️' },
 };
 
 export function Stats() {
@@ -74,6 +82,7 @@ export function Stats() {
 
       <SectionHeader title="Career Highlights" />
       <Card className="p-4 space-y-2 text-sm">
+        <Row label="Days lived" value={((state.year - state.startYear) * 365 + state.calendarDay + 1).toLocaleString()} />
         <Row label="Companies founded" value={String(p.companies.length)} />
         <Row label="Properties owned" value={String(p.properties.length)} />
         <Row label="Stock positions" value={String(p.portfolio.length)} />

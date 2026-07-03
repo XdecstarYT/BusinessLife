@@ -3,7 +3,27 @@ import { useState } from 'react';
 import { useGame } from '../../store/gameStore';
 import { Badge, BarList, Card, LineChart, Modal, SectionHeader, StatBar } from '../components';
 import { money, num, pct, signedPct } from '../format';
-import type { Country } from '../../sim/types';
+import type { Country, WorldEvent } from '../../sim/types';
+
+const WORLD_EVENT_INFO: Record<WorldEvent['type'], { emoji: string; label: string; desc: string; tone: 'bad' | 'good' }> = {
+  pandemic: { emoji: '🦠', label: 'Global Pandemic', desc: 'Tourism, airlines and entertainment are hit hard; health and remote-work industries are up.', tone: 'bad' },
+  trade_war: { emoji: '⚔️', label: 'Global Trade War', desc: 'Exporters and shippers are squeezed by tariffs; inflation is running hotter than usual.', tone: 'bad' },
+  tech_boom: { emoji: '🚀', label: 'Tech Boom', desc: 'Tech, AI and software stocks are surging; business confidence is elevated worldwide.', tone: 'good' },
+};
+
+function WorldEventBanner({ event }: { event: WorldEvent }) {
+  const info = WORLD_EVENT_INFO[event.type];
+  return (
+    <Card className={`p-4 mb-4 border-2 ${info.tone === 'bad' ? 'border-rose-400' : 'border-emerald-400'}`}>
+      <div className="flex items-center gap-2 mb-1">
+        <span className="text-2xl">{info.emoji}</span>
+        <span className="font-extrabold">{info.label}</span>
+        <Badge tone={info.tone}>{event.yearsLeft} yr left</Badge>
+      </div>
+      <p className="text-sm text-slate-500 dark:text-slate-400">{info.desc}</p>
+    </Card>
+  );
+}
 
 export function World() {
   const { state } = useGame();
@@ -14,6 +34,7 @@ export function World() {
 
   return (
     <div>
+      {state.worldEvent && <WorldEventBanner event={state.worldEvent} />}
       <SectionHeader title={`${home.flag} ${home.name} Economy`} />
       <div className="grid grid-cols-2 gap-3">
         <Metric label="GDP" value={money(e.gdp * 1e9, home.currencySymbol)} />

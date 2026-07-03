@@ -228,6 +228,7 @@ export function generateWorld(config: NewGameConfig): GameState {
     gameOver: null,
     worldEvent: null,
     generation: 1,
+    calendarDay: 0,
   };
 
   // Public + private NPC companies per country (more in the player's home).

@@ -485,7 +485,7 @@ export interface EventConditions {
   hasSpouse?: boolean;
   hasChildren?: boolean;
   businessPublic?: boolean; // has an active company that is publicly listed
-  duringWorldEvent?: 'pandemic';
+  duringWorldEvent?: 'pandemic' | 'trade_war' | 'tech_boom';
 }
 
 export interface EventTemplate {
@@ -519,6 +519,21 @@ export interface FiredEvent {
   subjectCompanyId: string | null;
   subjectNpcId: string | null;
   amount: number; // resolved {amount} placeholder value
+}
+
+/**
+ * Lightweight flavor events for daily/weekly advancement: small guaranteed
+ * effects, no player choice, auto-resolved and just logged/toasted so the
+ * player can fast-forward days or weeks without a wall of blocking modals.
+ * The big choice-driven EventTemplate pool above still fires only once a
+ * year, when the calendar rolls over.
+ */
+export interface DailyEventTemplate {
+  id: string;
+  weight: number;
+  text: string;
+  effects: EffectSpec;
+  conditions?: Pick<EventConditions, 'minAge' | 'maxAge' | 'minMoney' | 'employed' | 'hasBusiness' | 'hasSpouse' | 'hasChildren' | 'hasStocks'>;
 }
 
 // ---------------------------------------------------------------------------
@@ -557,7 +572,7 @@ export interface GameOverInfo {
 }
 
 export interface WorldEvent {
-  type: 'pandemic';
+  type: 'pandemic' | 'trade_war' | 'tech_boom';
   yearsLeft: number;
   severity: number; // 0..1
 }
@@ -585,6 +600,7 @@ export interface GameState {
   gameOver: GameOverInfo | null;
   worldEvent: WorldEvent | null;
   generation: number; // dynasty counter; increments when an heir inherits and play continues
+  calendarDay: number; // 0..364, days elapsed in the current year via daily/weekly advancement
 }
 
 // ---------------------------------------------------------------------------

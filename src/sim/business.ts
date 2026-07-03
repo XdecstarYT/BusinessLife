@@ -131,7 +131,7 @@ export function tickCompany(c: Company, ctx: CompanyTickContext): CompanyTickRes
     else if (tag === 'oil' && (ind.tags.includes('transport') || ind.tags.includes('airline'))) commodityMult -= idx * 0.25;
   }
 
-  // Global world events (e.g. a pandemic) hit or help industries by tag.
+  // Global world events (pandemic / trade war / tech boom) hit or help industries by tag.
   let worldEventMult = 1;
   const worldEvent = state.worldEvent;
   if (worldEvent?.type === 'pandemic') {
@@ -140,6 +140,13 @@ export function tickCompany(c: Company, ctx: CompanyTickContext): CompanyTickRes
       worldEventMult -= worldEvent.severity * 0.45;
     }
     if (ind.tags.includes('platform') || ind.tags.includes('software')) worldEventMult += worldEvent.severity * 0.15;
+  } else if (worldEvent?.type === 'trade_war') {
+    if (ind.tags.includes('export')) worldEventMult -= worldEvent.severity * 0.35;
+    if (ind.tags.includes('shipping') || ind.tags.includes('airline')) worldEventMult -= worldEvent.severity * 0.15;
+  } else if (worldEvent?.type === 'tech_boom') {
+    if (ind.tags.includes('tech') || ind.tags.includes('ai') || ind.tags.includes('software') || ind.tags.includes('platform')) {
+      worldEventMult += worldEvent.severity * 0.3;
+    }
   }
 
   const growthPotential = cycle * confidence * lawMult * priceFit * marketingPower * qualityPull * managerMult * moraleMult * commodityMult * worldEventMult * noise;

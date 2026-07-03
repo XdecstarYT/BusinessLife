@@ -16,6 +16,9 @@ import { generateNews } from './news';
 import { INDUSTRY_BY_ID } from '../data/industries';
 import { distributeEstate, tickFamily } from './family';
 import { tickWorldEvents } from './worldEvents';
+import { tryFireDailyEvent } from './dailyEvents';
+
+const SPECIAL_BIRTHDAYS = new Set([18, 21, 25, 30, 40, 50, 60, 65, 70, 75, 80, 90, 100]);
 
 export function log(state: GameState, text: string, kind: LifeLogEntry['kind'] = 'info'): void {
   state.lifeLog.push({ year: state.year, age: state.player.age, text, kind });
@@ -45,7 +48,10 @@ function tickPlayerLife(state: GameState, rng: RNG): void {
     p.inJailYears--;
     p.happiness = clamp100(p.happiness - 6);
     p.reputation = clamp100(p.reputation - 2);
-    if (p.inJailYears === 0) log(state, 'You were released from prison.', 'milestone');
+    if (p.inJailYears === 0) {
+      log(state, 'You were released from prison.', 'milestone');
+      if (!state.achievements.includes('jailbird')) state.achievements.push('jailbird');
+    }
     return; // No job/study/campaign progression inside.
   }
 
@@ -258,6 +264,10 @@ export function advanceYear(state: GameState): GameState {
 
   state.year++;
   state.player.age++;
+  state.calendarDay = 0;
+  if (SPECIAL_BIRTHDAYS.has(state.player.age) && state.player.alive) {
+    log(state, `🎂 You turn ${state.player.age} today.`, 'milestone');
+  }
 
   // 1. World economy
   tickCommodities(state, rng);
@@ -331,11 +341,71 @@ export function advanceYear(state: GameState): GameState {
     if (hit && !state.achievements.includes(key)) {
       state.achievements.push(key);
       if (key === 'millionaire') log(state, '🏆 You are a millionaire!', 'milestone');
+      if (key === 'deca_millionaire') log(state, '🏆 Your net worth passed $10 million.', 'milestone');
       if (key === 'billionaire') log(state, '🏆 BILLIONAIRE. You have joined the ten-figure club.', 'milestone');
+      if (key === 'centenarian') log(state, '🏆 You turned 100 years old.', 'milestone');
     }
   }
 
   if (state.lifeLog.length > 600) state.lifeLog.splice(0, state.lifeLog.length - 600);
   state.rngState = rng.state;
   return state;
+}
+
+// ---------------------------------------------------------------------------
+// Daily / weekly advancement — lightweight, non-blocking ticks that let the
+// player fast-forward between the "big" yearly decisions. A day never fires
+// the full economy/company/politics simulation; it only rolls a small chance
+// of a small flavor event and a tiny stat drift. When enough days accumulate
+// to complete a year, the existing advanceYear() runs exactly once and the
+// calendar resets — so the yearly simulation stays authoritative either way.
+// ---------------------------------------------------------------------------
+
+export interface DailyTickResult {
+  state: GameState;
+  headlines: string[]; // flavor lines from the day(s) advanced, for a toast — never blocking
+  rolledIntoNewYear: boolean;
+}
+
+function tickOneDay(state: GameState): { headline: string | null; rolledIntoNewYear: boolean } {
+  if (state.gameOver) return { headline: null, rolledIntoNewYear: false };
+  const rng = new RNG(state.seed);
+  rng.state = state.rngState;
+
+  state.calendarDay++;
+  let headline: string | null = null;
+  const p = state.player;
+  if (p.alive && p.inJailYears <= 0) {
+    headline = tryFireDailyEvent(state, rng);
+    p.happiness = clamp100(p.happiness + rng.range(-0.3, 0.3));
+    p.health = clamp100(p.health + rng.range(-0.15, 0.15));
+  }
+  if (headline) log(state, headline, 'info');
+  state.rngState = rng.state;
+
+  let rolledIntoNewYear = false;
+  if (state.calendarDay >= 365 && !state.gameOver) {
+    rolledIntoNewYear = true;
+    advanceYear(state);
+  }
+  return { headline, rolledIntoNewYear };
+}
+
+/** Advance a single day. Cheap enough to call repeatedly without UI lag. */
+export function advanceDay(state: GameState): DailyTickResult {
+  const res = tickOneDay(state);
+  return { state, headlines: res.headline ? [res.headline] : [], rolledIntoNewYear: res.rolledIntoNewYear };
+}
+
+/** Advance seven days in one call; rolls into a new year mid-week if the calendar completes. */
+export function advanceWeek(state: GameState): DailyTickResult {
+  const headlines: string[] = [];
+  let rolledIntoNewYear = false;
+  for (let i = 0; i < 7; i++) {
+    if (state.gameOver) break;
+    const res = tickOneDay(state);
+    if (res.headline) headlines.push(res.headline);
+    if (res.rolledIntoNewYear) rolledIntoNewYear = true;
+  }
+  return { state, headlines, rolledIntoNewYear };
 }

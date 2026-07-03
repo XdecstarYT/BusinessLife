@@ -139,6 +139,7 @@ export function startCompany(state: GameState, industryId: string, name: string,
   state.companies[co.id] = co;
   p.companies.push(co.id);
   p.reputation = clamp100(p.reputation + 2);
+  if (!state.achievements.includes('first_company')) state.achievements.push('first_company');
   commit(state, rng);
   log(state, `🚀 Founded ${co.name}, a ${ind.name} company, with $${funding.toLocaleString()} in capital.`, 'business');
   return { ok: true, message: `${co.name} is open for business!` };
@@ -195,6 +196,7 @@ export function takeCompanyPublic(state: GameState, companyId: string): ActionRe
   if (c.revenue < 5_000_000) return { ok: false, message: 'Company needs $5m+ revenue to IPO.' };
   const rng = withRng(state);
   const raised = doIPO(c, rng);
+  if (!state.achievements.includes('ipo_ceo')) state.achievements.push('ipo_ceo');
   commit(state, rng);
   log(state, `📈 ${c.name} went public, raising $${Math.round(raised).toLocaleString()}. You retain ${Math.round(c.playerSharePct * 100)}%.`, 'business');
   return { ok: true, message: `IPO complete — $${Math.round(raised).toLocaleString()} raised.` };
@@ -596,6 +598,7 @@ export function negotiateCoalition(state: GameState, partnerPartyId: string): Ac
   if (p.politicalCapital < 10) return { ok: false, message: 'Needs at least 10 political capital.' };
   p.politicalCapital = clamp(p.politicalCapital - 10, 0, 100);
   home.coalitionPartnerId = partnerPartyId;
+  if (!state.achievements.includes('coalition_builder')) state.achievements.push('coalition_builder');
   log(state, `🤝 Formed a governing coalition with the ${partner.name}.`, 'politics');
   return { ok: true, message: `Coalition formed with the ${partner.name}.` };
 }
@@ -604,7 +607,13 @@ export function negotiateCoalition(state: GameState, partnerPartyId: string): Ac
 // Lifestyle / misc
 // ---------------------------------------------------------------------------
 
-export function doActivity(state: GameState, kind: 'vacation' | 'gym' | 'doctor' | 'charity' | 'party' | 'meditate'): ActionResult {
+export type ActivityKind =
+  | 'vacation' | 'gym' | 'doctor' | 'charity' | 'party' | 'meditate'
+  | 'book_club' | 'therapy' | 'adopt_pet' | 'learn_instrument' | 'road_trip'
+  | 'art_collecting' | 'wine_tasting' | 'poker_night' | 'volunteer' | 'seminar'
+  | 'spa_day' | 'home_improvement' | 'blog' | 'learn_language';
+
+export function doActivity(state: GameState, kind: ActivityKind): ActionResult {
   const p = state.player;
   const rng = withRng(state);
   let msg = '';
@@ -639,6 +648,7 @@ export function doActivity(state: GameState, kind: 'vacation' | 'gym' | 'doctor'
       p.karma = clamp100(p.karma + 8);
       p.reputation = clamp100(p.reputation + 2);
       p.popularity = clamp100(p.popularity + 1);
+      if (!state.achievements.includes('philanthropist')) state.achievements.push('philanthropist');
       msg = `Donated $${Math.round(amt).toLocaleString()} to charity.`;
       break;
     }
@@ -656,6 +666,144 @@ export function doActivity(state: GameState, kind: 'vacation' | 'gym' | 'doctor'
       p.health = clamp100(p.health + 2);
       p.smarts = clamp100(p.smarts + 1);
       msg = 'A calmer, sharper mind.';
+      break;
+    }
+    case 'book_club': {
+      p.money -= 200;
+      p.smarts = clamp100(p.smarts + 2);
+      p.happiness = clamp100(p.happiness + 2);
+      p.skills[SK.foreignLanguages] = clamp100((p.skills[SK.foreignLanguages] ?? 0) + 1);
+      msg = 'A lively book club discussion sharpened your mind.';
+      break;
+    }
+    case 'therapy': {
+      const cost = 4_000;
+      if (cost > p.money) return { ok: false, message: 'Cannot afford therapy sessions.' };
+      p.money -= cost;
+      p.happiness = clamp100(p.happiness + 8);
+      p.health = clamp100(p.health + 3);
+      msg = 'A year of therapy left you feeling lighter and clearer-headed.';
+      break;
+    }
+    case 'adopt_pet': {
+      const cost = 500;
+      if (cost > p.money) return { ok: false, message: 'Cannot afford the adoption fee.' };
+      p.money -= cost;
+      p.happiness = clamp100(p.happiness + 8);
+      p.karma = clamp100(p.karma + 2);
+      msg = 'You adopted a pet. Life is better with a companion around.';
+      break;
+    }
+    case 'learn_instrument': {
+      p.money -= 600;
+      p.happiness = clamp100(p.happiness + 3);
+      p.charisma = clamp100(p.charisma + 1);
+      msg = 'You picked up a new instrument. Progress is slow but satisfying.';
+      break;
+    }
+    case 'road_trip': {
+      const cost = 2_000;
+      if (cost > p.money) return { ok: false, message: 'Cannot afford the trip.' };
+      p.money -= cost;
+      p.happiness = clamp100(p.happiness + 7);
+      p.health = clamp100(p.health + 1);
+      msg = 'An open-road trip cleared your head.';
+      break;
+    }
+    case 'art_collecting': {
+      const cost = 5_000;
+      if (cost > p.money) return { ok: false, message: 'Not enough to collect art seriously.' };
+      p.money -= cost;
+      p.skills[SK.artCollecting] = clamp100((p.skills[SK.artCollecting] ?? 0) + 10);
+      p.happiness = clamp100(p.happiness + 3);
+      p.reputation = clamp100(p.reputation + 1);
+      msg = 'You added a striking new piece to your collection.';
+      break;
+    }
+    case 'wine_tasting': {
+      const cost = 300;
+      if (cost > p.money) return { ok: false, message: 'Cannot afford the tasting.' };
+      p.money -= cost;
+      p.skills[SK.wineTasting] = clamp100((p.skills[SK.wineTasting] ?? 0) + 8);
+      p.happiness = clamp100(p.happiness + 3);
+      msg = 'An evening of wine tasting refined your palate.';
+      break;
+    }
+    case 'poker_night': {
+      const buyIn = 500;
+      if (buyIn > p.money) return { ok: false, message: 'Cannot afford to buy in.' };
+      p.money -= buyIn;
+      p.skills[SK.poker] = clamp100((p.skills[SK.poker] ?? 0) + 10);
+      const skillLvl = p.skills[SK.poker] ?? 0;
+      if (rng.chance(0.35 + skillLvl * 0.003)) {
+        const winnings = buyIn * rng.range(1.5, 4);
+        p.money += winnings;
+        p.happiness = clamp100(p.happiness + 4);
+        msg = `Poker night paid off — you won $${Math.round(winnings).toLocaleString()}.`;
+      } else {
+        p.happiness = clamp100(p.happiness - 1);
+        msg = 'Poker night was rough. You lost your buy-in.';
+      }
+      break;
+    }
+    case 'volunteer': {
+      p.karma = clamp100(p.karma + 6);
+      p.reputation = clamp100(p.reputation + 1);
+      p.happiness = clamp100(p.happiness + 3);
+      msg = 'A year of volunteering left the community — and you — better off.';
+      break;
+    }
+    case 'seminar': {
+      const cost = 800;
+      if (cost > p.money) return { ok: false, message: 'Cannot afford the seminar.' };
+      p.money -= cost;
+      p.smarts = clamp100(p.smarts + 2);
+      p.skills[SK.economics] = clamp100((p.skills[SK.economics] ?? 0) + 8);
+      msg = 'A professional seminar expanded your thinking.';
+      break;
+    }
+    case 'spa_day': {
+      const cost = 400;
+      if (cost > p.money) return { ok: false, message: 'Cannot afford a spa day.' };
+      p.money -= cost;
+      p.happiness = clamp100(p.happiness + 6);
+      p.health = clamp100(p.health + 3);
+      msg = 'A relaxing spa day recharged you.';
+      break;
+    }
+    case 'home_improvement': {
+      const cost = 3_000;
+      if (cost > p.money) return { ok: false, message: 'Cannot afford renovations.' };
+      p.money -= cost;
+      p.happiness = clamp100(p.happiness + 3);
+      if (p.properties.length > 0) {
+        p.properties[0].value *= 1.03;
+        msg = `Renovations boosted the value of ${p.properties[0].name}.`;
+      } else {
+        msg = 'You spruced up your living space.';
+      }
+      break;
+    }
+    case 'blog': {
+      p.skills[SK.writing] = clamp100((p.skills[SK.writing] ?? 0) + 8);
+      p.happiness = clamp100(p.happiness + 2);
+      if (rng.chance(0.15)) {
+        const earnings = rng.range(500, 5_000);
+        p.money += earnings;
+        p.reputation = clamp100(p.reputation + 2);
+        msg = `Your blog found an audience — it earned $${Math.round(earnings).toLocaleString()} in ad revenue.`;
+      } else {
+        msg = 'You kept up your blog this year. A modest but loyal readership.';
+      }
+      break;
+    }
+    case 'learn_language': {
+      const cost = 600;
+      if (cost > p.money) return { ok: false, message: 'Cannot afford language lessons.' };
+      p.money -= cost;
+      p.skills[SK.foreignLanguages] = clamp100((p.skills[SK.foreignLanguages] ?? 0) + 10);
+      p.smarts = clamp100(p.smarts + 1);
+      msg = 'You made real progress learning a new language.';
       break;
     }
   }

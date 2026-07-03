@@ -6,7 +6,7 @@
 import { create } from 'zustand';
 import type { EventChoice, FiredEvent, GameState } from '../sim/types';
 import { generateWorld, type NewGameConfig } from '../sim/world';
-import { advanceYear } from '../sim/engine';
+import { advanceDay, advanceWeek, advanceYear } from '../sim/engine';
 import { resolveChoice } from '../sim/events';
 import { RNG } from '../sim/rng';
 import * as actions from '../sim/actions';
@@ -65,6 +65,8 @@ interface GameStoreState {
   // gameplay
   setScreen: (s: Screen) => void;
   nextYear: () => void;
+  nextDay: () => void;
+  nextWeek: () => void;
   chooseEvent: (choice: EventChoice) => void;
   dismissEventResult: () => void;
   toggleDark: () => void;
@@ -169,6 +171,43 @@ export const useGame = create<GameStoreState>((set, get) => ({
       screen: 'life',
     });
     void saveGame(AUTOSAVE_ID, next, true);
+  },
+
+  nextDay: () => {
+    const s = get().state;
+    if (!s || s.gameOver) return;
+    if (get().eventQueue.length > 0 || get().activeEvent) {
+      get().toast('Resolve your current event first.', 'err');
+      return;
+    }
+    const res = advanceDay(s);
+    const queue = res.state.pendingEvents ?? [];
+    set({
+      state: { ...res.state },
+      eventQueue: queue.slice(1),
+      activeEvent: queue[0] ?? null,
+    });
+    for (const h of res.headlines) get().toast(h);
+    void saveGame(AUTOSAVE_ID, res.state, true);
+  },
+
+  nextWeek: () => {
+    const s = get().state;
+    if (!s || s.gameOver) return;
+    if (get().eventQueue.length > 0 || get().activeEvent) {
+      get().toast('Resolve your current event first.', 'err');
+      return;
+    }
+    const res = advanceWeek(s);
+    const queue = res.state.pendingEvents ?? [];
+    set({
+      state: { ...res.state },
+      eventQueue: queue.slice(1),
+      activeEvent: queue[0] ?? null,
+    });
+    for (const h of res.headlines.slice(0, 3)) get().toast(h);
+    if (res.headlines.length > 3) get().toast(`+${res.headlines.length - 3} more small moments this week`);
+    void saveGame(AUTOSAVE_ID, res.state, true);
   },
 
   chooseEvent: (choice) => {

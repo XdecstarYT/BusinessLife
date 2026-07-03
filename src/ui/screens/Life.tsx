@@ -48,7 +48,7 @@ const LOG_TONE: Record<string, string> = {
 };
 
 export function Life() {
-  const { state, setScreen, nextYear, run, eventQueue, activeEvent } = useGame();
+  const { state, setScreen, nextYear, nextDay, nextWeek, run, eventQueue, activeEvent } = useGame();
   if (!state) return null;
   const p = state.player;
   const home = state.countries.find((c) => c.id === p.countryId)!;
@@ -80,13 +80,30 @@ export function Life() {
               <IconSpark className="w-8 h-8" />
             </div>
           </div>
-          <Button
-            onClick={nextYear}
-            className="w-full mt-4 bg-white! text-brand-700! hover:bg-white/90! font-extrabold"
-            size="lg"
-          >
-            {pendingCount > 0 ? `Resolve ${pendingCount} event${pendingCount > 1 ? 's' : ''} first` : `Advance to ${state.year + 1} →`}
-          </Button>
+          <div className="flex items-center justify-between text-xs opacity-80 mt-4 mb-1">
+            <span>Day {state.calendarDay + 1} of 365</span>
+            <span>{Math.round(((state.calendarDay + 1) / 365) * 100)}% through {state.year}</span>
+          </div>
+          <div className="h-1.5 rounded-full bg-white/20 overflow-hidden mb-3">
+            <div className="h-full bg-white rounded-full transition-all" style={{ width: `${((state.calendarDay + 1) / 365) * 100}%` }} />
+          </div>
+          {pendingCount > 0 ? (
+            <Button disabled className="w-full bg-white/60! text-brand-700! font-extrabold" size="lg">
+              Resolve {pendingCount} event{pendingCount > 1 ? 's' : ''} first
+            </Button>
+          ) : (
+            <div className="grid grid-cols-3 gap-2">
+              <Button onClick={nextDay} className="bg-white/15! text-white! hover:bg-white/25! font-bold">
+                +1 Day
+              </Button>
+              <Button onClick={nextWeek} className="bg-white/15! text-white! hover:bg-white/25! font-bold">
+                +1 Week
+              </Button>
+              <Button onClick={nextYear} className="bg-white! text-brand-700! hover:bg-white/90! font-extrabold">
+                Year {state.year + 1} →
+              </Button>
+            </div>
+          )}
         </div>
       </Card>
 
@@ -140,6 +157,20 @@ export function Life() {
         <Pill label="🧘 Meditate" onClick={() => run(doActivity, 'meditate')} />
         <Pill label="🎉 Party" onClick={() => run(doActivity, 'party')} />
         <Pill label="❤️ Charity" onClick={() => run(doActivity, 'charity')} />
+        <Pill label="📚 Book Club" onClick={() => run(doActivity, 'book_club')} />
+        <Pill label="🛋️ Therapy" onClick={() => run(doActivity, 'therapy')} />
+        <Pill label="🐶 Adopt Pet" onClick={() => run(doActivity, 'adopt_pet')} />
+        <Pill label="🎸 Instrument" onClick={() => run(doActivity, 'learn_instrument')} />
+        <Pill label="🚗 Road Trip" onClick={() => run(doActivity, 'road_trip')} />
+        <Pill label="🖼️ Art Collecting" onClick={() => run(doActivity, 'art_collecting')} />
+        <Pill label="🍷 Wine Tasting" onClick={() => run(doActivity, 'wine_tasting')} />
+        <Pill label="🃏 Poker Night" onClick={() => run(doActivity, 'poker_night')} />
+        <Pill label="🤝 Volunteer" onClick={() => run(doActivity, 'volunteer')} />
+        <Pill label="🎓 Seminar" onClick={() => run(doActivity, 'seminar')} />
+        <Pill label="💆 Spa Day" onClick={() => run(doActivity, 'spa_day')} />
+        <Pill label="🔨 Home Improve" onClick={() => run(doActivity, 'home_improvement')} />
+        <Pill label="✍️ Blog" onClick={() => run(doActivity, 'blog')} />
+        <Pill label="🗣️ Language" onClick={() => run(doActivity, 'learn_language')} />
       </PillRow>
 
       {/* Life log */}

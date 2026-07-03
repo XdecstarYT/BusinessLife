@@ -277,6 +277,57 @@ export const LAWS: LawDef[] = [
   law('sovereign_wealth_fund', 'Sovereign Wealth Fund', 'Governance', 'Invest resource revenues for the future.',
     { budgetBalance: -0.004, stability: 3, businessConfidence: 3 },
     { left: 0.5, right: 0.4, business: 0.4, workers: 0.4 }, 3),
+
+  // ----------------------------------------------------------- Agriculture
+  law('farm_subsidies', 'Farm Subsidies Program', 'Agriculture', 'Direct payments to support farm incomes.',
+    { budgetBalance: -0.005, industryTagModifiers: { agriculture: 0.1 } },
+    { left: 0.4, right: 0.4, business: 0.3, workers: 0.3 }, 2),
+  law('gmo_labeling', 'GMO Labeling Requirement', 'Agriculture', 'Mandatory labeling of genetically modified food.',
+    { consumerConfidence: 3, industryTagModifiers: { agriculture: -0.02, food: -0.01 } },
+    { left: 0.6, right: -0.2, business: -0.3, workers: 0.1 }, 2),
+
+  // -------------------------------------------------------------- Consumer
+  law('right_to_repair', 'Right to Repair Act', 'Consumer', 'Manufacturers must supply parts and manuals for repairs.',
+    { consumerConfidence: 5, industryTagModifiers: { tech: -0.03, consumer: 0.02 } },
+    { left: 0.6, right: 0.1, business: -0.5, workers: 0.2 }, 3),
+
+  // ------------------------------------------------------------ Technology
+  law('net_neutrality', 'Net Neutrality Rules', 'Technology', 'ISPs must treat all internet traffic equally.',
+    { consumerConfidence: 3, industryTagModifiers: { telecom: -0.04, platform: 0.02 } },
+    { left: 0.7, right: -0.3, business: -0.2, workers: 0.2 }, 2),
+
+  // ---------------------------------------------------------------- Labor
+  law('paid_sick_leave', 'Paid Sick Leave Mandate', 'Labor', 'Guaranteed paid sick days for all employees.',
+    { budgetBalance: -0.002, consumerConfidence: 4, businessConfidence: -3 },
+    { left: 0.8, right: -0.3, business: -0.5, workers: 0.8 }, 4),
+
+  // ------------------------------------------------------------ Environment
+  law('renewables_mandate', 'Renewable Portfolio Standard', 'Environment', 'Utilities must source a rising share of power from renewables.',
+    { climateRisk: -2, industryTagModifiers: { green: 0.15, utility: -0.03, coal: -0.1, oil: -0.05 } },
+    { left: 0.8, right: -0.4, business: -0.2, workers: 0.1 }, 1),
+
+  // -------------------------------------------------------- Immigration
+  law('startup_visa', 'Startup Visa Program', 'Immigration', 'Fast-track visas for founders who commit capital and hire locally.',
+    { gdpGrowth: 0.003, industryTagModifiers: { tech: 0.06 }, businessConfidence: 5 },
+    { left: 0.2, right: 0.3, business: 0.8, workers: -0.2 }, -1),
+
+  // ------------------------------------------------------------- Taxation
+  law('digital_services_tax', 'Digital Services Tax', 'Taxation', 'Levy on the revenue of large platform and software companies.',
+    { budgetBalance: 0.006, industryTagModifiers: { platform: -0.08, software: -0.03 } },
+    { left: 0.7, right: -0.4, business: -0.7, workers: 0.4 }, 3),
+  law('stock_buyback_tax', 'Stock Buyback Tax', 'Taxation', 'Excise tax on corporate share buybacks.',
+    { budgetBalance: 0.003, businessConfidence: -3 },
+    { left: 0.7, right: -0.5, business: -0.6, workers: 0.3 }, 1),
+
+  // -------------------------------------------------------- Infrastructure
+  law('rural_infrastructure_fund', 'Rural Infrastructure Fund', 'Infrastructure', 'Roads, water and power upgrades for rural regions.',
+    { budgetBalance: -0.005, infrastructure: 3, industryTagModifiers: { agriculture: 0.03, construction: 0.05 } },
+    { left: 0.5, right: 0.4, business: 0.3, workers: 0.5 }, 3),
+
+  // -------------------------------------------------------------- Business
+  law('space_industry_incentives', 'Space Industry Incentives', 'Business', 'Tax credits and launch-site support for space companies.',
+    { budgetBalance: -0.003, industryTagModifiers: { space: 0.2 }, businessConfidence: 2 },
+    { left: 0.0, right: 0.5, business: 0.7, workers: 0.1 }, 0),
 ];
 
 export const LAW_BY_ID: Record<string, LawDef> = Object.fromEntries(LAWS.map((l) => [l.id, l]));
