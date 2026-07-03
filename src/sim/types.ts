@@ -39,12 +39,35 @@ export interface Holding {
 export interface PropertyAsset {
   id: string;
   name: string;
-  kind: 'apartment' | 'house' | 'mansion' | 'commercial' | 'land' | 'island';
+  kind: 'apartment' | 'house' | 'mansion' | 'commercial' | 'land' | 'island' | 'penthouse';
   cityId: string;
   value: number;
   purchasePrice: number;
-  rentalYield: number; // fraction of value per year, 0 if not rented
+  rentalYield: number; // fraction of value per year, 0 if not rented out
+  baseRentalYield: number; // remembered yield so toggling rental status is reversible
   mortgage: number; // outstanding principal
+  insured: boolean;
+}
+
+export interface Bond {
+  id: string;
+  countryId: string;
+  principal: number;
+  rate: number; // fixed annual coupon
+  yearsLeft: number;
+}
+
+export interface ForexPosition {
+  id: string;
+  countryId: string; // the foreign currency being speculated on
+  notional: number; // position size in home currency
+  entryRate: number; // country.economy.exchangeRate at entry
+  short: boolean; // betting the foreign currency weakens vs home
+}
+
+export interface LifeInsurancePolicy {
+  monthlyPremium: number; // deducted yearly as premium*12
+  payout: number;
 }
 
 export interface PersonalLoan {
@@ -119,11 +142,18 @@ export interface Player {
   portfolio: Holding[];
   properties: PropertyAsset[];
   loans: PersonalLoan[];
+  bonds: Bond[];
+  forexPositions: ForexPosition[];
+  lifeInsurance: LifeInsurancePolicy | null;
 
   relationships: Relationship[];
   spouseId: string | null; // NPC id; also present in relationships as kind 'spouse'
   children: string[]; // NPC ids; also present in relationships as kind 'child'
   divorceCount: number;
+  mentorId: string | null; // NPC id; also present in relationships as kind 'mentor'
+  rivalId: string | null; // NPC id; also present in relationships as kind 'rival'
+  crimeFamilyId: string | null; // NPC id of the boss, if the player has joined organized crime
+  crimeRank: number; // 0 = not in the family, 1..5 = rank climbed
   partyId: string | null;
   office: Office | null;
   politicalCapital: number; // spend to pass laws, gain from wins
@@ -369,6 +399,7 @@ export interface Company {
 
   patents: number; // granted patents; each pays a small royalty and dings a rival
   cyberDefense: number; // 0..100, reduces breach/lawsuit risk
+  supplyChainResilience: number; // 0..100, dampens commodity-price exposure
   successorId: string | null; // player's child (NPC id) designated to inherit this company
 
   status: CompanyStatus;
@@ -440,6 +471,7 @@ export interface EffectSpec {
   companyMorale?: number;
   companySharePctDelta?: number; // dilutes/restores the player's stake in the subject company
   loseCompany?: boolean; // subject company is lost entirely (hostile takeover succeeds)
+  propertyValuePct?: number; // applied to every owned property's value; insured properties take half the hit if negative
   jobPerformance?: number;
   criminalRecord?: number;
   jailYears?: number;
@@ -484,8 +516,12 @@ export interface EventConditions {
   track?: PlayerJob['track'];
   hasSpouse?: boolean;
   hasChildren?: boolean;
+  hasProperty?: boolean;
   businessPublic?: boolean; // has an active company that is publicly listed
   duringWorldEvent?: 'pandemic' | 'trade_war' | 'tech_boom';
+  inCrimeFamily?: boolean;
+  hasMentor?: boolean;
+  hasRival?: boolean;
 }
 
 export interface EventTemplate {

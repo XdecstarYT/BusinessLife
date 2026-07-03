@@ -544,6 +544,70 @@ ev({
   ],
   amount: { min: 5_000, max: 100_000, pctOfMoney: 0.15 },
 });
+ev({
+  id: 'world_olympics', category: 'world', weight: 4,
+  text: 'The Olympics are underway this year, with {country} among the nations competing for glory.',
+  choices: [
+    { label: 'Attend as a spectator', effects: { money: -3_000, happiness: 6 } },
+    { label: 'Sponsor an athlete through your company', effects: { companyCash: -40_000, companyBrand: 6, reputation: 2 }, },
+    { label: 'Watch from home', effects: { happiness: 2 } },
+  ],
+});
+ev({
+  id: 'world_sci_breakthrough', category: 'world', weight: 4,
+  text: 'Researchers announce a major breakthrough in {industry}, dominating headlines worldwide.',
+  choices: [
+    { label: 'Invest in the trend early', skillCheck: { skillId: SK.research, bonusPerLevel: 0.004 }, outcomes: [
+      { chance: 0.45, text: 'You got in ahead of the curve.', effects: { moneyPct: 0.05 } },
+      { chance: 0.55, text: 'The hype faded faster than expected.', effects: { moneyPct: -0.02 } },
+    ] },
+    { label: 'Just enjoy the news', effects: { smarts: 1 } },
+  ],
+});
+ev({
+  id: 'world_global_summit', category: 'world', weight: 4, conditions: { inOffice: ['head_of_state', 'dictator', 'monarch'] },
+  text: 'World leaders convene for an emergency summit on the global economy, and {country} has a seat at the table.',
+  choices: [
+    { label: 'Attend personally and negotiate', skillCheck: { skillId: SK.diplomacy, bonusPerLevel: 0.006 }, outcomes: [
+      { chance: 0.6, text: 'Your leadership at the summit was widely praised.', effects: { popularity: 6, influence: 4 } },
+      { chance: 0.4, text: 'You were sidelined by bigger powers.', effects: { popularity: -2 } },
+    ] },
+    { label: 'Send a senior minister instead', effects: { politicalCapital: 1 } },
+    { label: 'Skip it — domestic priorities first', effects: { popularity: -3, approvalOfGovernment: -2 } },
+  ],
+});
+ev({
+  id: 'world_disaster_direct', category: 'world', weight: 3,
+  text: 'A severe natural disaster strikes {city} directly, and your neighborhood did not escape unscathed.',
+  choices: [
+    { label: 'Help with relief efforts personally', effects: { karma: 6, happiness: -2, health: -2, reputation: 2 } },
+    { label: 'Donate to the recovery fund', effects: { money: -8_000, karma: 4, popularity: 1 } },
+    { label: 'Focus on your own recovery', effects: { moneyPct: -0.02, happiness: -4 } },
+  ],
+});
+ev({
+  id: 'world_esports_championship', category: 'world', weight: 3,
+  text: 'A major international esports championship is being held in {city} this year.',
+  choices: [
+    { label: 'Attend the finals', effects: { money: -500, happiness: 3 } },
+    { label: 'Sponsor the event through your company', effects: { companyCash: -25_000, companyBrand: 5 } },
+    { label: "Not really your scene", effects: {} },
+  ],
+});
+ev({
+  id: 'realestate_market_shift', category: 'world', weight: 4, conditions: { hasProperty: true },
+  text: 'The real estate market is moving fast — {country} property values are in flux.',
+  choices: [
+    { label: 'Ride it out', outcomes: [
+      { chance: 0.5, text: 'A boom lifted every property you own.', effects: { propertyValuePct: 0.12 } },
+      { chance: 0.5, text: 'A correction hit the market hard. Insured properties fared better.', effects: { propertyValuePct: -0.15 } },
+    ] },
+    { label: 'Sell down your exposure now', skillCheck: { skillId: SK.realEstate, bonusPerLevel: 0.005 }, outcomes: [
+      { chance: 0.5, text: 'Good timing — you avoided the worst of the dip.', effects: { propertyValuePct: -0.03 } },
+      { chance: 0.5, text: 'You sold right before a rally. Frustrating.', effects: { propertyValuePct: 0.02, happiness: -2 } },
+    ] },
+  ],
+});
 
 // ---------------------------------------------------------------------------
 // MARKETS & INVESTING
@@ -860,6 +924,45 @@ ev({
     ] },
   ],
 });
+ev({
+  id: 'crime_family_dispute', category: 'crime', weight: 4, conditions: { inCrimeFamily: true },
+  text: 'Two capos in the family are feuding and both want your loyalty.',
+  choices: [
+    { label: 'Back the ambitious one', skillCheck: { skillId: SK.streetSmarts, bonusPerLevel: 0.005 }, outcomes: [
+      { chance: 0.55, text: 'He came out on top. You are rewarded.', effects: { money: 25_000, notoriety: 2 } },
+      { chance: 0.45, text: 'He lost. You are on thin ice with the family now.', effects: { notoriety: 4, happiness: -4 } },
+    ] },
+    { label: 'Back the cautious one', effects: { notoriety: 1, karma: -2 } },
+    { label: 'Stay neutral', skillCheck: { skillId: SK.evasion, bonusPerLevel: 0.005 }, outcomes: [
+      { chance: 0.6, text: 'You threaded the needle without picking a side.', effects: {} },
+      { chance: 0.4, text: 'Neutrality just annoyed both of them.', effects: { notoriety: 2, happiness: -2 } },
+    ] },
+  ],
+});
+ev({
+  id: 'crime_informant_approach', category: 'crime', weight: 3, conditions: { inCrimeFamily: true, minNotoriety: 15 },
+  text: 'A federal agent quietly approaches you with an offer: turn informant and walk away clean.',
+  choices: [
+    { label: 'Refuse and report it to the family', effects: { notoriety: 3, karma: -3 } },
+    { label: 'Consider it — buy some time', effects: { happiness: -3 } },
+    { label: 'Take the deal', outcomes: [
+      { chance: 0.5, text: 'Your testimony brought down the family. You walked free.', effects: { karma: 8, notoriety: -20, money: -20_000 } },
+      { chance: 0.5, text: 'Word got out before the case was built. You are now a marked man.', effects: { notoriety: 15, happiness: -10, health: -5 } },
+    ] },
+  ],
+});
+ev({
+  id: 'crime_stash_house_raid', category: 'crime', weight: 3, conditions: { inCrimeFamily: true },
+  text: 'Police raided a stash house connected to your operation. Your name might come up.',
+  choices: [
+    { label: 'Lay low for a while', effects: { notoriety: -2, happiness: -2 } },
+    { label: 'Lawyer up preemptively', effects: { money: -15_000, notoriety: -1 } },
+    { label: 'Do nothing', outcomes: [
+      { chance: 0.6, text: 'Your name never came up.', effects: {} },
+      { chance: 0.4, text: 'Investigators traced it back to you.', effects: { criminalRecord: 1, jailYears: 2 } },
+    ] },
+  ],
+});
 
 // ---------------------------------------------------------------------------
 // WORLD & SOCIETY (no player choice pressure; flavor + small effects)
@@ -964,6 +1067,49 @@ ev({
     { label: 'Pull strings with the dean', effects: { influence: -2, karma: -2, happiness: 2 } },
     { label: 'Let them face the consequences', effects: { karma: 4, happiness: -2 } },
     { label: 'Hire them a good lawyer', effects: { money: -15_000, happiness: 1 } },
+  ],
+});
+
+// ---------------------------------------------------------------------------
+// MENTORS & RIVALS
+// ---------------------------------------------------------------------------
+ev({
+  id: 'mentor_advice', category: 'life', weight: 5, conditions: { hasMentor: true },
+  text: '{npc} invites you for coffee and offers some hard-won career advice.',
+  choices: [
+    { label: 'Listen closely', effects: { smarts: 2, skillXp: [SK.strategy, 10], happiness: 2 } },
+    { label: 'Politely tune out', effects: { happiness: -1 } },
+  ],
+});
+ev({
+  id: 'mentor_opportunity', category: 'career', weight: 3, conditions: { hasMentor: true },
+  text: '{npc} pulls a string on your behalf, opening a door that would otherwise stay shut.',
+  choices: [
+    { label: 'Take the opportunity', effects: { influence: 4, reputation: 2, money: 5_000 } },
+    { label: 'Insist on earning it yourself', effects: { karma: 3, smarts: 1 } },
+  ],
+});
+ev({
+  id: 'rival_sabotage', category: 'business', weight: 4, conditions: { hasRival: true },
+  text: 'You catch wind that {npc} has been badmouthing you to mutual contacts.',
+  choices: [
+    { label: 'Confront them publicly', skillCheck: { skillId: SK.debate, bonusPerLevel: 0.005 }, outcomes: [
+      { chance: 0.5, text: 'You came out looking sharp; they looked petty.', effects: { reputation: 3, popularity: 1 } },
+      { chance: 0.5, text: 'It turned into an ugly public spat.', effects: { reputation: -3, happiness: -3 } },
+    ] },
+    { label: 'Undermine them quietly in return', effects: { karma: -4, notoriety: 2 } },
+    { label: 'Ignore it and focus on your own work', effects: { karma: 2, smarts: 1 } },
+  ],
+});
+ev({
+  id: 'rival_escalation', category: 'life', weight: 3, conditions: { hasRival: true },
+  text: 'Your rivalry with {npc} has become the talk of the town.',
+  choices: [
+    { label: 'Escalate — go for the win', effects: { happiness: -2, reputation: 2, notoriety: 1 } },
+    { label: 'Try to make peace', skillCheck: { skillId: SK.persuasion, bonusPerLevel: 0.005 }, outcomes: [
+      { chance: 0.5, text: 'A surprising truce. The feud is over.', effects: { happiness: 6, karma: 4 } },
+      { chance: 0.5, text: 'They rebuffed your olive branch.', effects: { happiness: -3 } },
+    ] },
   ],
 });
 

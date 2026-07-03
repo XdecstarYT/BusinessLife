@@ -1,16 +1,36 @@
-/** Assets screen: property market, owned property, personal loans. */
+/** Assets screen: property market, owned property, loans, bonds, forex, insurance. */
 import { useState } from 'react';
 import { useGame } from '../../store/gameStore';
-import { buyProperty, propertyListings, sellProperty, takeLoan } from '../../sim/actions';
-import { Badge, Button, Card, Pill, PillRow, SectionHeader } from '../components';
+import {
+  buyBond,
+  buyLifeInsurance,
+  buyProperty,
+  cancelLifeInsurance,
+  closeForexPosition,
+  openForexPosition,
+  propertyListings,
+  renovateProperty,
+  sellBondEarly,
+  sellProperty,
+  takeLoan,
+  toggleRentalStatus,
+  togglePropertyInsurance,
+} from '../../sim/actions';
+import { Badge, Button, Card, Field, Pill, PillRow, SectionHeader } from '../components';
 import { money, moneyFull, pct } from '../format';
 import type { PropertyAsset } from '../../sim/types';
 
 export function Assets() {
   const { state, run } = useGame();
-  const [tab, setTab] = useState<'owned' | 'buy' | 'loans'>('owned');
+  const [tab, setTab] = useState<'owned' | 'buy' | 'loans' | 'bonds' | 'forex' | 'insurance'>('owned');
   const [loanAmt, setLoanAmt] = useState(50_000);
   const [loanYears, setLoanYears] = useState(10);
+  const [bondAmt, setBondAmt] = useState(20_000);
+  const [bondYears, setBondYears] = useState(5);
+  const [bondCountry, setBondCountry] = useState('');
+  const [fxAmt, setFxAmt] = useState(10_000);
+  const [fxCountry, setFxCountry] = useState('');
+  const [premium, setPremium] = useState(200);
   if (!state) return null;
   const p = state.player;
   const home = state.countries.find((c) => c.id === p.countryId)!;
@@ -36,6 +56,9 @@ export function Assets() {
         <Pill label={`Owned (${p.properties.length})`} active={tab === 'owned'} onClick={() => setTab('owned')} />
         <Pill label="Buy Property" active={tab === 'buy'} onClick={() => setTab('buy')} />
         <Pill label={`Loans (${p.loans.length})`} active={tab === 'loans'} onClick={() => setTab('loans')} />
+        <Pill label={`Bonds (${p.bonds.length})`} active={tab === 'bonds'} onClick={() => setTab('bonds')} />
+        <Pill label={`Forex (${p.forexPositions.length})`} active={tab === 'forex'} onClick={() => setTab('forex')} />
+        <Pill label="Insurance" active={tab === 'insurance'} onClick={() => setTab('insurance')} />
       </PillRow>
 
       {tab === 'owned' && (
@@ -44,7 +67,14 @@ export function Assets() {
             <Card className="p-6 text-center text-slate-500 dark:text-slate-400">No property yet. Real estate builds passive rental income and appreciates with the housing market.</Card>
           )}
           {p.properties.map((prop) => (
-            <PropertyCard key={prop.id} prop={prop} onSell={() => run(sellProperty, prop.id)} />
+            <PropertyCard
+              key={prop.id}
+              prop={prop}
+              onSell={() => run(sellProperty, prop.id)}
+              onRenovate={() => run(renovateProperty, prop.id)}
+              onToggleRental={() => run(toggleRentalStatus, prop.id)}
+              onToggleInsurance={() => run(togglePropertyInsurance, prop.id)}
+            />
           ))}
         </div>
       )}
@@ -95,11 +125,136 @@ export function Assets() {
           ))}
         </div>
       )}
+
+      {tab === 'bonds' && (
+        <div className="mt-4 space-y-3">
+          <Card className="p-5">
+            <div className="font-bold mb-3">Buy a Government Bond</div>
+            <p className="text-xs text-slate-400 mb-3">Fixed annual coupon, principal returned at maturity. Safer than stocks, lower return.</p>
+            <Field label="Country">
+              <select
+                value={bondCountry || home.id}
+                onChange={(e) => setBondCountry(e.target.value)}
+                className="w-full rounded-2xl bg-slate-100 dark:bg-ink-800 border border-transparent px-4 py-3 text-slate-900 dark:text-white"
+              >
+                {state.countries.map((c) => (
+                  <option key={c.id} value={c.id}>{c.flag} {c.name} — {pct(c.economy.interestRate + 0.01)}</option>
+                ))}
+              </select>
+            </Field>
+            <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-3 block">Amount: {moneyFull(bondAmt)}</label>
+            <input type="range" min={1_000} max={Math.max(1000, Math.round(p.money))} value={bondAmt} onChange={(e) => setBondAmt(Number(e.target.value))} className="w-full mt-1 mb-3" />
+            <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Term: {bondYears} years</label>
+            <input type="range" min={1} max={20} value={bondYears} onChange={(e) => setBondYears(Number(e.target.value))} className="w-full mt-1 mb-3" />
+            <Button className="w-full" onClick={() => run(buyBond, bondCountry || home.id, bondAmt, bondYears)}>Buy Bond</Button>
+          </Card>
+          {p.bonds.map((b) => {
+            const country = state.countries.find((c) => c.id === b.countryId);
+            return (
+              <Card key={b.id} className="p-4 flex justify-between items-center">
+                <div>
+                  <div className="font-bold">{country?.flag} {country?.name} Bond</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">{pct(b.rate)} coupon · {b.yearsLeft} yrs left</div>
+                </div>
+                <div className="text-right shrink-0">
+                  <div className="font-bold">{money(b.principal)}</div>
+                  <button className="text-xs text-rose-500 font-semibold" onClick={() => run(sellBondEarly, b.id)}>Redeem early</button>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      {tab === 'forex' && (
+        <div className="mt-4 space-y-3">
+          <Card className="p-5">
+            <div className="font-bold mb-3">Speculate on a Currency</div>
+            <p className="text-xs text-slate-400 mb-3">Go long if you think a currency will strengthen, short if you think it will weaken.</p>
+            <Field label="Currency">
+              <select
+                value={fxCountry || state.countries[0].id}
+                onChange={(e) => setFxCountry(e.target.value)}
+                className="w-full rounded-2xl bg-slate-100 dark:bg-ink-800 border border-transparent px-4 py-3 text-slate-900 dark:text-white"
+              >
+                {state.countries.map((c) => (
+                  <option key={c.id} value={c.id}>{c.flag} {c.currency}</option>
+                ))}
+              </select>
+            </Field>
+            <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-3 block">Amount: {moneyFull(fxAmt)}</label>
+            <input type="range" min={1_000} max={Math.max(1000, Math.round(p.money))} value={fxAmt} onChange={(e) => setFxAmt(Number(e.target.value))} className="w-full mt-1 mb-3" />
+            <div className="grid grid-cols-2 gap-2">
+              <Button variant="soft" onClick={() => run(openForexPosition, fxCountry || state.countries[0].id, fxAmt, false)}>Go Long</Button>
+              <Button variant="soft" onClick={() => run(openForexPosition, fxCountry || state.countries[0].id, fxAmt, true)}>Go Short</Button>
+            </div>
+          </Card>
+          {p.forexPositions.map((f) => {
+            const country = state.countries.find((c) => c.id === f.countryId);
+            const currentRate = country?.economy.exchangeRate ?? f.entryRate;
+            const ratio = currentRate / f.entryRate;
+            const pl = (f.short ? f.notional * (2 - ratio) : f.notional * ratio) - f.notional;
+            return (
+              <Card key={f.id} className="p-4 flex justify-between items-center">
+                <div>
+                  <div className="font-bold flex items-center gap-2">
+                    {country?.flag} {country?.currency}
+                    <Badge tone={f.short ? 'warn' : 'brand'}>{f.short ? 'SHORT' : 'LONG'}</Badge>
+                  </div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">{money(f.notional)} notional</div>
+                </div>
+                <div className="text-right shrink-0">
+                  <div className={`font-bold ${pl >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>{pl >= 0 ? '+' : ''}{money(pl)}</div>
+                  <button className="text-xs text-brand-500 font-semibold" onClick={() => run(closeForexPosition, f.id)}>Close</button>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      {tab === 'insurance' && (
+        <div className="mt-4 space-y-3">
+          {p.lifeInsurance ? (
+            <Card className="p-5">
+              <div className="font-bold mb-1">Active Policy</div>
+              <div className="text-sm text-slate-500 dark:text-slate-400 mb-3">
+                {money(p.lifeInsurance.monthlyPremium)}/month · {money(p.lifeInsurance.payout)} payout to your family
+              </div>
+              <Button variant="danger" size="sm" onClick={() => run(cancelLifeInsurance)}>Cancel Policy</Button>
+            </Card>
+          ) : (
+            <Card className="p-5">
+              <div className="font-bold mb-3">Life Insurance</div>
+              <p className="text-xs text-slate-400 mb-3">Pays your spouse and children a lump sum when you die.</p>
+              <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Monthly premium: {moneyFull(premium)}</label>
+              <input type="range" min={50} max={5_000} step={50} value={premium} onChange={(e) => setPremium(Number(e.target.value))} className="w-full mt-1 mb-2" />
+              <div className="text-xs text-slate-400 mb-3">Payout: {money(premium * 240)}</div>
+              <Button className="w-full" onClick={() => run(buyLifeInsurance, premium)}>Take Out Policy</Button>
+            </Card>
+          )}
+          <Card className="p-4 text-xs text-slate-500 dark:text-slate-400">
+            Company insurance is managed per-business from the Business tab's strategy panel.
+          </Card>
+        </div>
+      )}
     </div>
   );
 }
 
-function PropertyCard({ prop, onSell }: { prop: PropertyAsset; onSell: () => void }) {
+function PropertyCard({
+  prop,
+  onSell,
+  onRenovate,
+  onToggleRental,
+  onToggleInsurance,
+}: {
+  prop: PropertyAsset;
+  onSell: () => void;
+  onRenovate: () => void;
+  onToggleRental: () => void;
+  onToggleInsurance: () => void;
+}) {
   const appreciation = prop.value / prop.purchasePrice - 1;
   return (
     <Card className="p-4">
@@ -117,11 +272,19 @@ function PropertyCard({ prop, onSell }: { prop: PropertyAsset; onSell: () => voi
           </div>
         </div>
       </div>
-      <div className="flex items-center justify-between mt-3">
-        <div className="flex gap-2">
-          {prop.mortgage > 0 && <Badge tone="warn">Mortgage {money(prop.mortgage)}</Badge>}
-          {prop.rentalYield > 0 && <Badge tone="good">Rented</Badge>}
-        </div>
+      <div className="flex items-center gap-2 mt-2 flex-wrap">
+        {prop.mortgage > 0 && <Badge tone="warn">Mortgage {money(prop.mortgage)}</Badge>}
+        {prop.rentalYield > 0 && <Badge tone="good">Rented</Badge>}
+        {prop.insured && <Badge tone="brand">Insured</Badge>}
+      </div>
+      <div className="grid grid-cols-2 gap-2 mt-3">
+        <Button size="sm" variant="soft" onClick={onRenovate}>🔨 Renovate</Button>
+        {prop.kind !== 'land' && (
+          <Button size="sm" variant="soft" onClick={onToggleRental}>{prop.rentalYield > 0 ? 'Move In' : 'Rent Out'}</Button>
+        )}
+        <Button size="sm" variant={prop.insured ? 'primary' : 'soft'} onClick={onToggleInsurance}>
+          {prop.insured ? 'Insured' : 'Insure'}
+        </Button>
         <Button size="sm" variant="danger" onClick={onSell}>Sell</Button>
       </div>
     </Card>

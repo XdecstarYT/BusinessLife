@@ -1,9 +1,10 @@
 /** World screen: macro dashboard, countries, diplomacy, commodities. */
 import { useState } from 'react';
 import { useGame } from '../../store/gameStore';
-import { Badge, BarList, Card, LineChart, Modal, SectionHeader, StatBar } from '../components';
+import { Badge, BarList, Button, Card, LineChart, Modal, SectionHeader, StatBar } from '../components';
 import { money, num, pct, signedPct } from '../format';
 import type { Country, WorldEvent } from '../../sim/types';
+import { declareWar, imposeSanctions, liftSanctions, sendForeignAid, signPeaceTreaty, signTradeAgreement } from '../../sim/actions';
 
 const WORLD_EVENT_INFO: Record<WorldEvent['type'], { emoji: string; label: string; desc: string; tone: 'bad' | 'good' }> = {
   pandemic: { emoji: '🦠', label: 'Global Pandemic', desc: 'Tourism, airlines and entertainment are hit hard; health and remote-work industries are up.', tone: 'bad' },
@@ -97,9 +98,15 @@ export function World() {
 }
 
 function CountryModal({ country, onClose }: { country: Country; onClose: () => void }) {
-  const { state } = useGame();
+  const { state, run } = useGame();
   if (!state) return null;
   const leader = country.leaderId === 'player' ? state.player.name : country.leaderId ? state.npcs[country.leaderId]?.name : 'Vacant';
+  const home = state.countries.find((c) => c.id === state.player.countryId)!;
+  const isForeign = country.id !== home.id;
+  const isLeader = home.leaderId === 'player';
+  const relation = home.relations[country.id] ?? 0;
+  const atWar = home.atWarWith.includes(country.id);
+  const sanctioned = home.sanctionsOn.includes(country.id);
   return (
     <Modal open onClose={onClose} title={`${country.flag} ${country.name}`}>
       <div className="flex flex-wrap gap-2 mb-4">
@@ -136,6 +143,35 @@ function CountryModal({ country, onClose }: { country: Country; onClose: () => v
         <div className="mt-4">
           <div className="font-bold mb-2">Laws in force ({country.lawsInForce.length})</div>
           <div className="text-xs text-slate-500 dark:text-slate-400">{country.lawsInForce.length} statutes shaping this economy.</div>
+        </div>
+      )}
+
+      {isForeign && (
+        <div className="mt-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="font-bold">Diplomacy</span>
+            <Badge tone={relation > 20 ? 'good' : relation < -20 ? 'bad' : 'neutral'}>Relations {Math.round(relation)}</Badge>
+          </div>
+          {atWar && <Badge tone="bad">⚔️ At War</Badge>}
+          {sanctioned && <Badge tone="warn">🚫 Sanctioned</Badge>}
+          {!isLeader ? (
+            <p className="text-xs text-slate-400 mt-2">Become head of state of {home.name} to conduct foreign policy.</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-2 mt-2">
+              {atWar ? (
+                <Button size="sm" onClick={() => run(signPeaceTreaty, country.id)} className="col-span-2">🕊️ Sign Peace Treaty</Button>
+              ) : (
+                <Button size="sm" variant="danger" onClick={() => run(declareWar, country.id)}>⚔️ Declare War</Button>
+              )}
+              {sanctioned ? (
+                <Button size="sm" variant="soft" onClick={() => run(liftSanctions, country.id)}>Lift Sanctions</Button>
+              ) : (
+                <Button size="sm" variant="soft" onClick={() => run(imposeSanctions, country.id)}>🚫 Sanction</Button>
+              )}
+              <Button size="sm" variant="soft" onClick={() => run(sendForeignAid, country.id)}>🤲 Send Aid (10 PC)</Button>
+              <Button size="sm" variant="soft" onClick={() => run(signTradeAgreement, country.id)}>🤝 Trade Deal (10 PC)</Button>
+            </div>
+          )}
         </div>
       )}
     </Modal>

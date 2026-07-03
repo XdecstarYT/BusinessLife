@@ -208,6 +208,23 @@ export function tickFamily(state: GameState, rng: RNG): void {
       log(state, `Your marriage has grown distant. ${state.npcs[p.spouseId]?.name} may not stay much longer.`, 'bad');
     }
   }
+
+  // A mentor passes on a little wisdom each year, if still alive.
+  if (p.mentorId) {
+    const mentor = state.npcs[p.mentorId];
+    if (mentor?.alive) {
+      p.smarts = clamp100(p.smarts + 0.5);
+      p.influence = clamp100(p.influence + 0.5);
+    } else {
+      log(state, 'Your mentor has passed away. Their guidance stays with you.', 'bad');
+      p.mentorId = null;
+    }
+  }
+  // A rival keeps the pressure on; if they die, the rivalry ends.
+  if (p.rivalId && !state.npcs[p.rivalId]?.alive) {
+    log(state, 'Your rival has passed away. The rivalry is over.', 'info');
+    p.rivalId = null;
+  }
 }
 
 /** On the player's death, pass companies to named successors and cash to the family. */
@@ -244,5 +261,97 @@ export function distributeEstate(state: GameState): string[] {
   if (p.properties.length > 0 && heirs.length > 0) {
     notes.push(`${p.properties.length} propert${p.properties.length > 1 ? 'ies' : 'y'} passed to your family.`);
   }
+  if (p.lifeInsurance && heirs.length > 0) {
+    const share = p.lifeInsurance.payout / heirs.length;
+    for (const id of heirs) state.npcs[id]!.wealth += share;
+    notes.push(`Your life insurance paid out $${Math.round(p.lifeInsurance.payout).toLocaleString()} to your family.`);
+  }
   return notes;
+}
+
+// ---------------------------------------------------------------------------
+// Relationships: mentors, rivals, and general networking
+// ---------------------------------------------------------------------------
+
+export interface RelationResult {
+  ok: boolean;
+  message: string;
+}
+
+/** A handful of NPCs the player could plausibly approach for mentorship or rivalry. */
+export function relationshipCandidates(state: GameState): NPC[] {
+  const p = state.player;
+  const excluded = new Set([p.mentorId, p.rivalId, p.spouseId, ...p.children].filter(Boolean));
+  return Object.values(state.npcs)
+    .filter((n) => n.alive && n.countryId === p.countryId && !excluded.has(n.id) && (n.role === 'executive' || n.role === 'politician' || n.role === 'investor' || n.role === 'celebrity'))
+    .sort((a, b) => b.competence - a.competence)
+    .slice(0, 8);
+}
+
+export function seekMentor(state: GameState): RelationResult {
+  const p = state.player;
+  if (p.mentorId) return { ok: false, message: 'You already have a mentor.' };
+  const rng = new RNG(state.seed);
+  rng.state = state.rngState;
+  const candidates = relationshipCandidates(state).filter((n) => n.age > p.age + 8);
+  if (!candidates.length) return { ok: false, message: 'Nobody suitable is willing to mentor you right now.' };
+  const candidate = rng.weighted(candidates, (n) => n.competence);
+  const chance = 0.3 + (p.charisma - 50) * 0.005 + (p.reputation - 50) * 0.003;
+  const accepted = rng.chance(Math.max(0.1, Math.min(0.8, chance)));
+  state.rngState = rng.state;
+  if (!accepted) {
+    p.happiness = Math.max(0, p.happiness - 2);
+    return { ok: false, message: `${candidate.name} declined to mentor you.` };
+  }
+  p.mentorId = candidate.id;
+  p.relationships.push({ npcId: candidate.id, kind: 'mentor', closeness: 60 });
+  candidate.opinionOfPlayer = Math.min(100, candidate.opinionOfPlayer + 20);
+  log(state, `${candidate.name} agreed to mentor you.`, 'good');
+  if (!state.achievements.includes('well_connected')) state.achievements.push('well_connected');
+  return { ok: true, message: `${candidate.name} is now your mentor.` };
+}
+
+export function declareRival(state: GameState, npcId: string): RelationResult {
+  const p = state.player;
+  if (p.rivalId) return { ok: false, message: 'You already have a rival.' };
+  const npc = state.npcs[npcId];
+  if (!npc || !npc.alive) return { ok: false, message: 'That person is unavailable.' };
+  p.rivalId = npcId;
+  p.relationships.push({ npcId, kind: 'rival', closeness: 10 });
+  npc.opinionOfPlayer = Math.max(-100, npc.opinionOfPlayer - 40);
+  log(state, `You made an enemy of ${npc.name}.`, 'bad');
+  if (!state.achievements.includes('arch_rival')) state.achievements.push('arch_rival');
+  return { ok: true, message: `${npc.name} is now your rival.` };
+}
+
+export function endRivalry(state: GameState): RelationResult {
+  const p = state.player;
+  if (!p.rivalId) return { ok: false, message: 'You have no rival.' };
+  const npc = state.npcs[p.rivalId];
+  p.relationships = p.relationships.filter((r) => r.npcId !== p.rivalId);
+  log(state, `You and ${npc?.name ?? 'your rival'} called a truce.`, 'good');
+  p.rivalId = null;
+  return { ok: true, message: 'Rivalry ended.' };
+}
+
+export function networking(state: GameState): RelationResult {
+  const p = state.player;
+  const rng = new RNG(state.seed);
+  rng.state = state.rngState;
+  const candidates = relationshipCandidates(state);
+  if (!candidates.length) {
+    state.rngState = rng.state;
+    return { ok: false, message: 'Nobody new to meet right now.' };
+  }
+  const npc = rng.pick(candidates);
+  const alreadyKnown = p.relationships.some((r) => r.npcId === npc.id);
+  if (!alreadyKnown) {
+    p.relationships.push({ npcId: npc.id, kind: rng.chance(0.5) ? 'friend' : 'ally', closeness: rng.int(30, 55) });
+  }
+  p.influence = Math.min(100, p.influence + 2);
+  p.charisma = Math.min(100, p.charisma + 1);
+  npc.opinionOfPlayer = Math.min(100, npc.opinionOfPlayer + 8);
+  state.rngState = rng.state;
+  log(state, `You made a valuable new connection: ${npc.name}.`, 'info');
+  return { ok: true, message: `Met ${npc.name} at a networking event.` };
 }

@@ -75,6 +75,7 @@ export function createCompany(opts: FoundCompanyOptions, rng: RNG): Company {
     politicalInfluence: 0,
     patents: 0,
     cyberDefense: rng.range(10, 30),
+    supplyChainResilience: rng.range(10, 30),
     successorId: null,
     status: 'active',
     history: [],
@@ -123,12 +124,15 @@ export function tickCompany(c: Company, ctx: CompanyTickContext): CompanyTickRes
   const moraleMult = 0.9 + (c.morale / 100) * 0.2;
   const noise = 1 + rng.normal(0, ind.volatility * 0.5);
 
-  // Commodity exposure: producers ride the price, consumers pay it.
+  // Commodity exposure: producers ride the price, consumers pay it. A diversified
+  // supply chain dampens the cost-side exposure (not the producer's market upside).
   let commodityMult = 1;
   for (const [tag, price] of Object.entries(e.commodities)) {
     const idx = (price - 100) / 100;
     if (ind.tags.includes(`commodity_${tag}`)) commodityMult += idx * 0.5;
-    else if (tag === 'oil' && (ind.tags.includes('transport') || ind.tags.includes('airline'))) commodityMult -= idx * 0.25;
+    else if (tag === 'oil' && (ind.tags.includes('transport') || ind.tags.includes('airline'))) {
+      commodityMult -= idx * 0.25 * (1 - c.supplyChainResilience / 200);
+    }
   }
 
   // Global world events (pandemic / trade war / tech boom) hit or help industries by tag.

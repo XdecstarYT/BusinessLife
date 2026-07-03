@@ -1,7 +1,19 @@
-/** Family & Dynasty: dating, marriage, children, succession planning. */
+/** Family & Dynasty: dating, marriage, children, succession planning, relationships. */
 import { useState } from 'react';
 import { useGame } from '../../store/gameStore';
-import { datingPool, divorce, haveChild, nameSuccessor, propose, type DatingCandidate } from '../../sim/family';
+import {
+  datingPool,
+  declareRival,
+  divorce,
+  endRivalry,
+  haveChild,
+  nameSuccessor,
+  networking,
+  propose,
+  relationshipCandidates,
+  seekMentor,
+  type DatingCandidate,
+} from '../../sim/family';
 import { Badge, Button, Card, Modal, SectionHeader } from '../components';
 import { money } from '../format';
 
@@ -9,12 +21,16 @@ export function Family() {
   const { state, run } = useGame();
   const [proposing, setProposing] = useState<DatingCandidate | null>(null);
   const [successorFor, setSuccessorFor] = useState<string | null>(null);
+  const [pickingRival, setPickingRival] = useState(false);
   if (!state) return null;
   const p = state.player;
   const spouse = p.spouseId ? state.npcs[p.spouseId] : null;
+  const mentor = p.mentorId ? state.npcs[p.mentorId] : null;
+  const rival = p.rivalId ? state.npcs[p.rivalId] : null;
   const children = p.children.map((id) => state.npcs[id]).filter((n): n is NonNullable<typeof n> => !!n);
   const candidates = !p.spouseId ? datingPool(state) : [];
   const companies = p.companies.map((id) => state.companies[id]).filter((c) => c?.status === 'active');
+  const friends = p.relationships.filter((r) => r.kind === 'friend' || r.kind === 'ally');
 
   return (
     <div>
@@ -105,6 +121,66 @@ export function Family() {
             ))}
           </div>
         </>
+      )}
+
+      <SectionHeader title="Relationships" action="Network" onAction={() => run(networking)} />
+      <div className="space-y-3 mb-4">
+        <Card className="p-4 flex items-center justify-between">
+          <div className="min-w-0 pr-2">
+            <div className="text-xs text-brand-500 uppercase font-bold">Mentor</div>
+            {mentor ? (
+              <div className="font-bold truncate" title={mentor.name}>{mentor.name}</div>
+            ) : (
+              <div className="text-sm text-slate-500 dark:text-slate-400">No mentor yet</div>
+            )}
+          </div>
+          {!mentor && <Button size="sm" variant="soft" onClick={() => run(seekMentor)}>Seek Mentor</Button>}
+        </Card>
+        <Card className="p-4 flex items-center justify-between">
+          <div className="min-w-0 pr-2">
+            <div className="text-xs text-rose-500 uppercase font-bold">Rival</div>
+            {rival ? (
+              <div className="font-bold truncate" title={rival.name}>{rival.name}</div>
+            ) : (
+              <div className="text-sm text-slate-500 dark:text-slate-400">No rival</div>
+            )}
+          </div>
+          {rival ? (
+            <Button size="sm" variant="soft" onClick={() => run(endRivalry)}>Make Peace</Button>
+          ) : (
+            <Button size="sm" variant="danger" onClick={() => setPickingRival(true)}>Declare Rival</Button>
+          )}
+        </Card>
+        {friends.length > 0 && (
+          <Card className="p-4">
+            <div className="text-xs text-slate-400 uppercase font-bold mb-2">Friends & Allies</div>
+            <div className="flex flex-wrap gap-2">
+              {friends.map((r) => (
+                <Badge key={r.npcId} tone={r.kind === 'ally' ? 'brand' : 'neutral'}>
+                  {state.npcs[r.npcId]?.name ?? 'Unknown'} · {r.closeness}
+                </Badge>
+              ))}
+            </div>
+          </Card>
+        )}
+      </div>
+
+      {pickingRival && (
+        <Modal open onClose={() => setPickingRival(false)} title="Declare a Rival">
+          <div className="space-y-2 max-h-[50vh] overflow-y-auto">
+            {relationshipCandidates(state).length === 0 && <p className="text-center text-slate-400 py-6">Nobody notable to rival right now.</p>}
+            {relationshipCandidates(state).map((n) => (
+              <button
+                key={n.id}
+                onClick={() => { run(declareRival, n.id); setPickingRival(false); }}
+                className="w-full text-left p-3 rounded-2xl bg-slate-100 dark:bg-ink-800 hover:bg-slate-200 dark:hover:bg-ink-700"
+              >
+                <div className="font-semibold truncate" title={n.name}>{n.name}</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Competence {n.competence} · {n.role}</div>
+              </button>
+            ))}
+          </div>
+        </Modal>
       )}
 
       {proposing && (

@@ -58,6 +58,10 @@ function conditionsMet(t: EventTemplate, state: GameState): boolean {
     if (!hasPublic) return false;
   }
   if (c.duringWorldEvent !== undefined && state.worldEvent?.type !== c.duringWorldEvent) return false;
+  if (c.inCrimeFamily !== undefined && (p.crimeFamilyId !== null) !== c.inCrimeFamily) return false;
+  if (c.hasMentor !== undefined && (p.mentorId !== null) !== c.hasMentor) return false;
+  if (c.hasRival !== undefined && (p.rivalId !== null) !== c.hasRival) return false;
+  if (c.hasProperty !== undefined && (p.properties.length > 0) !== c.hasProperty) return false;
   return true;
 }
 
@@ -100,11 +104,13 @@ export function fireEvents(state: GameState, rng: RNG): FiredEvent[] {
     if (t.conditions?.businessPublic !== undefined) {
       activeCompanies = activeCompanies.filter((id) => state.companies[id]?.isPublic === t.conditions!.businessPublic);
     }
-    const subjectCompanyId = t.category === 'business' && activeCompanies.length
-      ? rng.pick(activeCompanies)
-      : null;
+    const wantsCompany = t.category === 'business' || t.conditions?.hasBusiness || t.text.includes('{company}');
+    const subjectCompanyId = wantsCompany && activeCompanies.length ? rng.pick(activeCompanies) : null;
     const livingNpcs = Object.values(state.npcs).filter((n) => n.alive && n.countryId === p.countryId);
-    const subjectNpcId = t.text.includes('{npc}') && livingNpcs.length ? rng.pick(livingNpcs).id : null;
+    let subjectNpcId: string | null = null;
+    if (t.conditions?.hasMentor && p.mentorId && state.npcs[p.mentorId]?.alive) subjectNpcId = p.mentorId;
+    else if (t.conditions?.hasRival && p.rivalId && state.npcs[p.rivalId]?.alive) subjectNpcId = p.rivalId;
+    else if (t.text.includes('{npc}') && livingNpcs.length) subjectNpcId = rng.pick(livingNpcs).id;
 
     // Amount
     let amount = 0;
@@ -189,6 +195,12 @@ export function applyEffects(state: GameState, fx: EffectSpec, event: FiredEvent
       co.playerOwned = false;
       p.companies = p.companies.filter((id) => id !== co.id);
       logs.push(`You lost control of ${co.name} in the takeover, walking away with $${Math.round(payout).toLocaleString()}.`);
+    }
+  }
+  if (fx.propertyValuePct) {
+    for (const prop of p.properties) {
+      const pct = fx.propertyValuePct < 0 && prop.insured ? fx.propertyValuePct * 0.5 : fx.propertyValuePct;
+      prop.value = Math.max(10_000, prop.value * (1 + pct));
     }
   }
   return logs;

@@ -28,12 +28,20 @@ plain JSON you can export and re-import.
   unemployment, housing and equity indices, FX, government debt and shared commodity markets.
 - **Deep politics** — join or found a party, campaign for eight tiers of office (councillor to head of
   state) with rallies/ads/fundraising/consultants/polling, negotiate coalitions, appoint a cabinet, and
-  pass or repeal **93 laws** whose effects continuously reshape the economy. Elections, coups, sanctions
-  and wars unfold with or without you.
+  pass or repeal **93 laws** whose effects continuously reshape the economy. As head of state, conduct
+  real foreign policy: declare war, sign peace treaties, impose or lift sanctions, send foreign aid, and
+  sign trade agreements — on top of the elections, coups, sanctions and wars that unfold on their own.
 - **Family & dynasty** — date, marry, divorce, have children who age up as real NPCs, name a successor
-  to inherit a company, and pass your estate to your family when you die so the dynasty carries on.
-- **Corporate warfare** — patents that pay royalties and dent rivals, a cyber-defense lever, corporate
-  espionage against competitors, shareholder revolts, and hostile takeovers in both directions.
+  to inherit a company, and pass your estate (plus any life insurance payout) to your family when you die.
+- **Relationships** — find a mentor for a small yearly edge, network into new friends and allies, or
+  declare a rival and feud with them through dedicated events.
+- **Corporate warfare** — patents that pay royalties and dent rivals, a cyber-defense lever, a diversified
+  supply chain, corporate espionage, shareholder revolts, and hostile takeovers in both directions, plus
+  proactive business initiatives (brand deals, staff training, quality audits, preemptive recalls).
+- **The underworld** — join a crime family and climb five ranks through heists and protection rackets,
+  bribe a judge or attempt a prison escape if you're caught, or pay your way out and go straight.
+- **Financial markets, bonds, and forex** — beyond stocks: buy government bonds for fixed income, speculate
+  long or short on foreign currencies, insure your businesses and properties, and take out life insurance.
 - **Global world events** — a pandemic, a global trade war, or a tech boom can sweep the world economy,
   each with its own winners and losers by industry, its own news coverage, and its own event templates.
 - **20+ lifestyle activities** — from the gym and vacations to book clubs, therapy, adopting a pet, art
@@ -75,21 +83,27 @@ only moves when you tell it to, using the three buttons on the Life hub:
   the game until you decide. Whether you jump straight to a new year or accumulate days/weeks into one,
   the yearly simulation is authoritative and runs exactly once per year.
 
-- **Career** — study for degrees, take jobs from a live market, and grow skills (120 of them across 10
-  categories). Performance drives raises, promotions and layoffs.
+- **Career** — study for degrees (15 options), take jobs from a live market, and grow skills (120 of them
+  across 10 categories). Performance drives raises, promotions and layoffs.
 - **Business** — found companies in any of 219 industries, then tune strategy (marketing, R&D, pricing,
-  wages, automation, cyber-defense, dividends), invest or draw capital, IPO, or sell. Switch to the
-  **Rivals** tab to spy on competitors or launch a hostile takeover of a public company.
+  wages, automation, cyber-defense, dividends), invest or draw capital, IPO, or sell. Run one-off
+  initiatives (brand deals, staff training, supply-chain diversification, quality audits, proactive
+  recalls) and insure the business. Switch to the **Rivals** tab to spy on competitors, shake them down
+  if you're in the crime family, or launch a hostile takeover of a public company.
 - **Markets** — trade the stock exchange of your home nation; go long or short, collect dividends.
-- **Assets** — buy property (cash or mortgage) for rental income and appreciation, and take loans.
+- **Assets** — buy property (cash or mortgage, including penthouses) for rental income and appreciation,
+  renovate it, insure it, or move in yourself; take personal loans; buy government bonds; speculate long
+  or short on foreign currencies; take out life insurance for your family.
 - **Politics** — join/found a party, run for office, campaign (rallies, ads, consultants, polling),
-  negotiate coalitions, appoint a cabinet if you lead the country, and legislate. Whoever controls the
-  legislature — including you — passes laws that move the whole simulation.
+  negotiate coalitions, appoint a cabinet if you lead the country, and legislate. As head of state, use
+  the World screen to declare war, make peace, sanction or aid other nations, and sign trade deals.
 - **Family** — date and marry, have children who grow into real NPCs, name a successor for each company,
-  and build a multi-generation dynasty.
-- **World** — a macro dashboard, every nation's economy and government, diplomacy, commodities, and any
-  active global event (pandemic, trade war, or tech boom).
+  build a multi-generation dynasty, and manage your mentor/rival/friend relationships.
+- **World** — a macro dashboard, every nation's economy and government, diplomacy actions, commodities,
+  and any active global event (pandemic, trade war, or tech boom).
 - **News / Stats** — the dynamic wire, your net-worth curve, achievements and save tools.
+- **Underworld** — join a crime family and climb its ranks through heists and protection rackets, bribe
+  a judge or attempt a prison escape if caught, or pay your way out and go straight.
 - **Lifestyle** — 20+ quick activities on the Life hub, from the gym and charity to book clubs, therapy,
   adopting a pet, art collecting, wine tasting, poker nights, blogging and learning a language.
 

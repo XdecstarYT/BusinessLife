@@ -4,11 +4,18 @@ import { useGame } from '../../store/gameStore';
 import {
   investInCompany,
   attemptHostileTakeover,
+  diversifySupplyChain,
+  hireBrandAmbassador,
+  protectionRacket,
+  proactiveRecall,
+  qualityAudit,
+  runTrainingProgram,
   sellCompany,
   setCompanyLever,
   spyOnCompany,
   startCompany,
   takeCompanyPublic,
+  toggleCompanyInsurance,
   withdrawFromCompany,
   type CompanyLever,
 } from '../../sim/actions';
@@ -62,6 +69,11 @@ export function Business() {
                   <Button size="sm" variant="soft" onClick={() => run(spyOnCompany, c.id)}>🕵️ Espionage</Button>
                   <Button size="sm" disabled={!c.isPublic} onClick={() => setTakeoverTarget(c.id)}>🏴 Takeover</Button>
                 </div>
+                {state.player.crimeFamilyId && (
+                  <Button size="sm" variant="danger" className="w-full mt-2" onClick={() => run(protectionRacket, c.id)}>
+                    🔫 Shakedown
+                  </Button>
+                )}
               </Card>
             );
           })}
@@ -308,6 +320,28 @@ function ManageModal({ companyId, onClose }: { companyId: string; onClose: () =>
         {lever('automation', 'Automation', 0, 100, 5, (v) => `${Math.round(v)}%`)}
         {lever('cyberDefense', 'Cyber defense', 0, 100, 5, (v) => `${Math.round(v)}%`)}
         {c.isPublic && lever('dividendPayoutPct', 'Dividend payout', 0, 0.9, 0.05, (v) => pct(v, 0))}
+      </div>
+
+      <div className="flex items-center justify-between mt-4 bg-slate-100 dark:bg-ink-800 rounded-2xl px-4 py-3">
+        <div>
+          <div className="font-semibold text-sm">Business Insurance</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400">Costs ~1% of revenue/yr; covers 70% of lawsuit damages.</div>
+        </div>
+        <Button size="sm" variant={c.insured ? 'primary' : 'soft'} onClick={() => run(toggleCompanyInsurance, c.id)}>
+          {c.insured ? 'Insured' : 'Uninsured'}
+        </Button>
+      </div>
+
+      <div className="font-bold mt-5 mb-2">One-off Initiatives</div>
+      <div className="mb-2">
+        <StatBar label="Supply chain resilience" value={c.supplyChainResilience} />
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <Button size="sm" variant="soft" onClick={() => run(hireBrandAmbassador, c.id)}>🌟 Brand Deal</Button>
+        <Button size="sm" variant="soft" onClick={() => run(runTrainingProgram, c.id)}>🎓 Training</Button>
+        <Button size="sm" variant="soft" onClick={() => run(diversifySupplyChain, c.id)}>🔗 Diversify Supply</Button>
+        <Button size="sm" variant="soft" onClick={() => run(qualityAudit, c.id)}>✅ Quality Audit</Button>
+        <Button size="sm" variant="soft" className="col-span-2" onClick={() => run(proactiveRecall, c.id)}>⚠️ Proactive Recall</Button>
       </div>
 
       <div className="font-bold mt-5 mb-2">Capital</div>

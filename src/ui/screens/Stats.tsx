@@ -20,6 +20,12 @@ const ACHIEVEMENTS: Record<string, { label: string; icon: string }> = {
   jailbird: { label: 'Survived Prison', icon: '⛓️' },
   coalition_builder: { label: 'Coalition Builder', icon: '🤝' },
   philanthropist: { label: 'Philanthropist', icon: '❤️' },
+  crime_boss: { label: 'Crime Boss', icon: '🕶️' },
+  bond_investor: { label: 'Bond Investor', icon: '📜' },
+  diplomat: { label: 'Diplomat', icon: '🕊️' },
+  well_connected: { label: 'Well Connected', icon: '🌟' },
+  arch_rival: { label: 'Arch Rival', icon: '⚔️' },
+  forex_trader: { label: 'Forex Trader', icon: '💱' },
 };
 
 export function Stats() {

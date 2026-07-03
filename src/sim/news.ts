@@ -70,6 +70,11 @@ export function generateNews(state: GameState, rng: RNG, politicalHeadlines: str
     [`Viral trend: ${rng.pick(['silent networking dinners', 'micro-retirement', 'analogue Sundays', 'extreme frugality clubs'])} sweeps social media`, 0.1],
     [`${other.flag} Corruption trial grips ${other.name} as former minister testifies`, -0.3],
     [`Record ${rng.pick(['heatwave', 'floods', 'wildfires', 'storm season'])} tests emergency services in ${other.name}`, -0.5],
+    [`${other.flag} ${other.name} breaks ground on a record-setting ${rng.pick(['skyscraper', 'bridge', 'dam', 'stadium'])}`, 0.4],
+    [`Archaeologists in ${other.name} uncover a site rewriting local history`, 0.3],
+    [`${rng.pick(['A dockworkers', 'A teachers', 'An air-traffic controllers', 'A rail workers'])} strike disrupts ${other.name}`, -0.4],
+    [`${other.flag} ${other.name} announces a national holiday after a historic sporting win`, 0.6],
+    [`Cybersecurity researchers warn of a new threat targeting ${rng.pick(['banks', 'hospitals', 'utilities', 'airlines'])} worldwide`, -0.4],
   ] as const;
   const picked = rng.pick(colorTemplates);
   news.push(item(state, rng, rng.chance(0.5) ? 'world' : 'society', picked[0], picked[1]));

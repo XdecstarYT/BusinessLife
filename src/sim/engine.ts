@@ -188,6 +188,23 @@ function tickPlayerLife(state: GameState, rng: RNG): void {
     loan.yearsLeft--;
   }
   p.loans = p.loans.filter((l) => l.principal > 1 && l.yearsLeft > 0);
+
+  // Government bonds: pay a fixed coupon each year, then return principal at maturity.
+  for (const bond of p.bonds) {
+    p.money += bond.principal * bond.rate;
+    bond.yearsLeft--;
+  }
+  const maturing = p.bonds.filter((b) => b.yearsLeft <= 0);
+  for (const bond of maturing) {
+    p.money += bond.principal;
+    const country = state.countries.find((c) => c.id === bond.countryId);
+    log(state, `A $${Math.round(bond.principal).toLocaleString()} bond from ${country?.name ?? 'a foreign government'} matured.`, 'money');
+  }
+  p.bonds = p.bonds.filter((b) => b.yearsLeft > 0);
+
+  // Life insurance premium (payout is handled in family.ts's distributeEstate on death).
+  if (p.lifeInsurance) p.money -= p.lifeInsurance.monthlyPremium * 12;
+
   for (const prop of p.properties) {
     prop.value = Math.max(10_000, prop.value * (e.housingIndex / Math.max(1, e.history.length >= 2 ? e.history[e.history.length - 2].housingIndex : 100)));
     if (prop.rentalYield > 0) p.money += prop.value * prop.rentalYield * 0.85; // net of costs

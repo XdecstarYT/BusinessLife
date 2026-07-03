@@ -6,7 +6,7 @@
  */
 import type { ReactNode } from 'react';
 import { useGame, type Screen } from '../../store/gameStore';
-import { doActivity } from '../../sim/actions';
+import { attemptPrisonEscape, bribeJudge, CRIME_RANK_TITLES, doActivity, goStraight, heist, joinCrimeFamily } from '../../sim/actions';
 import { netWorth } from '../../sim/engine';
 import { Badge, Button, Card, CircleTile, Pill, PillRow, SectionHeader, StatBar } from '../components';
 import { money } from '../format';
@@ -131,7 +131,21 @@ export function Life() {
         {p.criminalRecord > 0 && <Badge tone="bad">Record ×{p.criminalRecord}</Badge>}
         {p.partyId && <Badge tone="brand">{home.parties.find((x) => x.id === p.partyId)?.name}</Badge>}
         <Badge tone="good">PC {Math.round(p.politicalCapital)}</Badge>
+        {p.crimeFamilyId && <Badge tone="bad">🕶️ {CRIME_RANK_TITLES[p.crimeRank]}</Badge>}
       </PillRow>
+
+      {p.inJailYears > 0 && (
+        <Card className="p-4 mt-4 border-2 border-rose-400">
+          <div className="flex items-center justify-between mb-2">
+            <span className="font-extrabold">🔒 In Prison</span>
+            <Badge tone="bad">{p.inJailYears} yr{p.inJailYears > 1 ? 's' : ''} left</Badge>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <Button size="sm" variant="soft" onClick={() => run(bribeJudge)}>💵 Bribe Judge</Button>
+            <Button size="sm" variant="danger" onClick={() => run(attemptPrisonEscape)}>🏃 Attempt Escape</Button>
+          </div>
+        </Card>
+      )}
 
       {/* Hub grid — circular icon tiles */}
       <SectionHeader title="Manage" />
@@ -171,6 +185,18 @@ export function Life() {
         <Pill label="🔨 Home Improve" onClick={() => run(doActivity, 'home_improvement')} />
         <Pill label="✍️ Blog" onClick={() => run(doActivity, 'blog')} />
         <Pill label="🗣️ Language" onClick={() => run(doActivity, 'learn_language')} />
+      </PillRow>
+
+      <SectionHeader title="Underworld" />
+      <PillRow>
+        {!p.crimeFamilyId ? (
+          <Pill label="🕶️ Join Crime Family" onClick={() => run(joinCrimeFamily)} />
+        ) : (
+          <>
+            <Pill label="💰 Heist" onClick={() => run(heist)} />
+            <Pill label="🚪 Go Straight" onClick={() => run(goStraight)} />
+          </>
+        )}
       </PillRow>
 
       {/* Life log */}

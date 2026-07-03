@@ -7,6 +7,7 @@ import { RNG } from '../src/sim/rng';
 import * as A from '../src/sim/actions';
 import { buyShares, marketCap } from '../src/sim/market';
 import { datingPool, propose, haveChild, nameSuccessor } from '../src/sim/family';
+import * as F from '../src/sim/family';
 import { INDUSTRIES } from '../src/data/industries';
 
 /** Resolve any pending yearly choice events by auto-picking the first choice. */
@@ -119,6 +120,61 @@ for (let y = 0; y < 82 && state.player.alive; y++) {
         A.attemptHostileTakeover(state, rivalPublic.id, marketCap(rivalPublic) * 0.9);
       }
     }
+    // --- V4: financial instruments ---
+    if (y === 8) {
+      A.buyBond(state, state.player.countryId, 20_000, 5);
+      A.buyLifeInsurance(state, 200);
+      const co = state.player.companies[0];
+      if (co) A.toggleCompanyInsurance(state, co);
+      const other = state.countries.find((c) => c.id !== state.player.countryId);
+      if (other) A.openForexPosition(state, other.id, 10_000, false);
+    }
+    if (y === 9 && state.player.bonds.length) A.sellBondEarly(state, state.player.bonds[0].id);
+    if (y === 9 && state.player.forexPositions.length) A.closeForexPosition(state, state.player.forexPositions[0].id);
+    // --- V4: diplomacy (only meaningful if the player ends up leading their country) ---
+    if (y === 45) {
+      const home = state.countries.find((c) => c.id === state.player.countryId)!;
+      const other = state.countries.find((c) => c.id !== home.id)!;
+      if (home.leaderId === 'player') {
+        A.sendForeignAid(state, other.id);
+        A.signTradeAgreement(state, other.id);
+        A.imposeSanctions(state, other.id);
+        A.liftSanctions(state, other.id);
+      }
+    }
+    // --- V4: crime & underworld ---
+    if (y === 12) A.joinCrimeFamily(state);
+    if (y === 13 && state.player.crimeFamilyId) A.heist(state);
+    if (y === 14 && state.player.crimeFamilyId) {
+      const target = Object.values(state.companies).find((c) => c.status === 'active' && !c.playerOwned && c.countryId === state.player.countryId);
+      if (target) A.protectionRacket(state, target.id);
+    }
+    if (y === 15 && state.player.crimeFamilyId) A.goStraight(state);
+    if (state.player.inJailYears > 0 && y % 2 === 0) A.bribeJudge(state);
+    // --- V4: relationships ---
+    if (y === 16) F.seekMentor(state);
+    if (y === 17) F.networking(state);
+    if (y === 18 && !state.player.rivalId) {
+      const candidates = F.relationshipCandidates(state);
+      if (candidates.length) F.declareRival(state, candidates[0].id);
+    }
+    if (y === 19 && state.player.rivalId) F.endRivalry(state);
+    // --- V4: real estate depth ---
+    if (y === 21 && state.player.properties.length) {
+      const prop = state.player.properties[0];
+      A.renovateProperty(state, prop.id);
+      A.toggleRentalStatus(state, prop.id);
+      A.togglePropertyInsurance(state, prop.id);
+    }
+    // --- V4: business mechanics ---
+    if (y === 22 && state.player.companies.length) {
+      const co = state.player.companies[0];
+      A.hireBrandAmbassador(state, co);
+      A.runTrainingProgram(state, co);
+      A.diversifySupplyChain(state, co);
+      A.qualityAudit(state, co);
+      A.proactiveRecall(state, co);
+    }
   } catch (e) {
     errors++;
     console.error(`ERROR in year ${state.year}:`, (e as Error).message);
@@ -143,6 +199,10 @@ console.log('  world event active at end:', state.worldEvent ? state.worldEvent.
 console.log('  generation:', state.generation);
 console.log('  daily flavor events fired (day/week ticks):', dailyFlavorCount);
 console.log('  calendarDay at end:', state.calendarDay);
+console.log('  crime rank:', state.player.crimeRank, 'in family:', !!state.player.crimeFamilyId);
+console.log('  mentor:', state.player.mentorId ? state.npcs[state.player.mentorId]?.name ?? 'unknown' : 'none');
+console.log('  rival:', state.player.rivalId ? state.npcs[state.player.rivalId]?.name ?? 'unknown' : 'none');
+console.log('  bonds:', state.player.bonds.length, 'forex positions:', state.player.forexPositions.length, 'life insurance:', !!state.player.lifeInsurance);
 console.log('  errors:', errors);
 
 // Invariant checks
