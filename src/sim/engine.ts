@@ -14,6 +14,8 @@ import { campaignWinChance, OFFICE_SPEC_BY_KIND, tickNPCs, tickPolitics } from '
 import { fireEvents } from './events';
 import { generateNews } from './news';
 import { INDUSTRY_BY_ID } from '../data/industries';
+import { distributeEstate, tickFamily } from './family';
+import { tickWorldEvents } from './worldEvents';
 
 export function log(state: GameState, text: string, kind: LifeLogEntry['kind'] = 'info'): void {
   state.lifeLog.push({ year: state.year, age: state.player.age, text, kind });
@@ -225,13 +227,24 @@ function gameOverCheck(state: GameState): void {
     `Criminal convictions: ${p.criminalRecord}.`,
     `Karma: ${Math.round(p.karma)}/100.`,
   ];
+  const estateNotes = distributeEstate(state);
+  if (estateNotes.length) summary.push(...estateNotes);
+  const reason =
+    p.health <= 5
+      ? 'Your health gave out.'
+      : p.age >= 75
+        ? 'You died of old age.'
+        : p.age >= 50
+          ? 'An unexpected illness took you before your time.'
+          : 'Tragedy struck — your life was cut short unexpectedly.';
   state.gameOver = {
-    reason: p.health <= 5 ? 'Your health gave out.' : 'You died of old age.',
+    reason,
     summary,
     finalNetWorth: worth,
     finalAge: p.age,
   };
   log(state, `You died at age ${p.age}. ${state.gameOver.reason}`, 'milestone');
+  for (const note of estateNotes) log(state, note, 'milestone');
 }
 
 /**
@@ -248,7 +261,8 @@ export function advanceYear(state: GameState): GameState {
 
   // 1. World economy
   tickCommodities(state, rng);
-  const politicalHeadlines: string[] = [];
+  const worldEventHeadlines = tickWorldEvents(state, rng);
+  const politicalHeadlines: string[] = [...worldEventHeadlines];
   for (const country of state.countries) {
     const res = tickEconomy(state, country, rng);
     if (res.crisis === 'crash' && country.isPlayerHome) politicalHeadlines.push(`Stock market crash wipes billions off ${country.name} shares`);
@@ -279,6 +293,7 @@ export function advanceYear(state: GameState): GameState {
 
   // 4. The player's own year
   tickPlayerLife(state, rng);
+  if (state.player.alive) tickFamily(state, rng);
 
   // 5. Player company income: dividends from private profitable companies
   const p = state.player;

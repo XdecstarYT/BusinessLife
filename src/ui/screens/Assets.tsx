@@ -54,14 +54,14 @@ export function Assets() {
           <p className="text-xs text-slate-400 px-1">Housing index: {Math.round(home.economy.housingIndex)} · mortgage rate ≈ {pct(home.economy.interestRate + 0.02)}</p>
           {listings.map((l, i) => (
             <Card key={i} className="p-4">
-              <div className="flex justify-between items-start">
-                <div>
-                  <div className="font-bold">{l.name}</div>
-                  <div className="text-xs text-slate-500 dark:text-slate-400 capitalize">
+              <div className="flex justify-between items-start gap-2">
+                <div className="min-w-0">
+                  <div className="font-bold truncate" title={l.name}>{l.name}</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400 capitalize truncate">
                     {l.kind} · {l.rentalYield > 0 ? `${pct(l.rentalYield)} rental yield` : 'no rental income'}
                   </div>
                 </div>
-                <div className="font-extrabold text-brand-500">{money(l.value)}</div>
+                <div className="font-extrabold text-brand-500 shrink-0">{money(l.value)}</div>
               </div>
               <div className="grid grid-cols-2 gap-2 mt-3">
                 <Button size="sm" variant="soft" onClick={() => run(buyProperty, l, false)}>Buy Cash</Button>
@@ -103,14 +103,14 @@ function PropertyCard({ prop, onSell }: { prop: PropertyAsset; onSell: () => voi
   const appreciation = prop.value / prop.purchasePrice - 1;
   return (
     <Card className="p-4">
-      <div className="flex justify-between items-start">
-        <div>
-          <div className="font-bold">{prop.name}</div>
-          <div className="text-xs text-slate-500 dark:text-slate-400 capitalize">
+      <div className="flex justify-between items-start gap-2">
+        <div className="min-w-0">
+          <div className="font-bold truncate" title={prop.name}>{prop.name}</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 capitalize truncate">
             {prop.kind} · bought at {money(prop.purchasePrice)}
           </div>
         </div>
-        <div className="text-right">
+        <div className="text-right shrink-0">
           <div className="font-extrabold">{money(prop.value)}</div>
           <div className={`text-xs font-semibold ${appreciation >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
             {appreciation >= 0 ? '+' : ''}{pct(appreciation)}

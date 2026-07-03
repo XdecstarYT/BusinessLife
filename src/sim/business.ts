@@ -73,6 +73,9 @@ export function createCompany(opts: FoundCompanyOptions, rng: RNG): Company {
     lawsuits: 0,
     insured: false,
     politicalInfluence: 0,
+    patents: 0,
+    cyberDefense: rng.range(10, 30),
+    successorId: null,
     status: 'active',
     history: [],
   };
@@ -128,7 +131,18 @@ export function tickCompany(c: Company, ctx: CompanyTickContext): CompanyTickRes
     else if (tag === 'oil' && (ind.tags.includes('transport') || ind.tags.includes('airline'))) commodityMult -= idx * 0.25;
   }
 
-  const growthPotential = cycle * confidence * lawMult * priceFit * marketingPower * qualityPull * managerMult * moraleMult * commodityMult * noise;
+  // Global world events (e.g. a pandemic) hit or help industries by tag.
+  let worldEventMult = 1;
+  const worldEvent = state.worldEvent;
+  if (worldEvent?.type === 'pandemic') {
+    if (ind.tags.includes('health')) worldEventMult += worldEvent.severity * 0.4;
+    if (ind.tags.includes('tourism') || ind.tags.includes('airline') || ind.tags.includes('entertainment')) {
+      worldEventMult -= worldEvent.severity * 0.45;
+    }
+    if (ind.tags.includes('platform') || ind.tags.includes('software')) worldEventMult += worldEvent.severity * 0.15;
+  }
+
+  const growthPotential = cycle * confidence * lawMult * priceFit * marketingPower * qualityPull * managerMult * moraleMult * commodityMult * worldEventMult * noise;
   c.revenue = Math.max(1000, c.revenue * clamp(growthPotential, 0.4, 2.2));
 
   // --- Costs ----------------------------------------------------------------
@@ -168,11 +182,31 @@ export function tickCompany(c: Company, ctx: CompanyTickContext): CompanyTickRes
   }
   if (c.unionized) c.salaryLevel = Math.max(c.salaryLevel, 1.05);
 
-  // Random lawsuits in regulated industries.
-  if (rng.chance(ind.regulationSensitivity * 0.06)) {
+  // Patents: heavy, sustained R&D occasionally lands a patent. Each pays a
+  // small ongoing royalty and dings a same-industry rival's brand a touch.
+  const patentChance = c.rdPct > 0.08 ? c.rdPct * ind.techIntensity * 0.15 : 0;
+  if (rng.chance(patentChance)) {
+    c.patents++;
+    headline = headline ?? `${c.name} is granted a new patent`;
+    const rivals = Object.values(state.companies).filter(
+      (r) => r.status === 'active' && r.industryId === c.industryId && r.id !== c.id,
+    );
+    if (rivals.length) rng.pick(rivals).brand = clamp100(rng.pick(rivals).brand - rng.range(1, 4));
+  }
+  if (c.patents > 0) c.cash += c.patents * c.revenue * 0.004;
+
+  // Random lawsuits and breaches in regulated/risky industries; cyber defense mitigates both.
+  const riskShield = 1 - (c.cyberDefense / 100) * 0.6;
+  if (rng.chance(ind.regulationSensitivity * 0.06 * riskShield)) {
     c.lawsuits++;
     const damages = c.revenue * rng.range(0.01, 0.08);
     c.cash -= c.insured ? damages * 0.3 : damages;
+  }
+  if (ind.techIntensity > 0.5 && rng.chance(0.025 * riskShield)) {
+    const damages = c.revenue * rng.range(0.02, 0.1);
+    c.cash -= damages;
+    c.brand = clamp100(c.brand - rng.range(2, 8));
+    headline = headline ?? `${c.name} discloses a data breach`;
   }
 
   // --- Debt & bankruptcy ---------------------------------------------------------

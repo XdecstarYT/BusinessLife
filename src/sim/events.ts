@@ -7,6 +7,7 @@ import type { EffectSpec, EventChoice, EventTemplate, FiredEvent, GameState } fr
 import { clamp, clamp100 } from './types';
 import { EVENT_TEMPLATES } from '../data/events';
 import { INDUSTRY_BY_ID } from '../data/industries';
+import { companyValuation } from './business';
 import type { RNG } from './rng';
 
 function conditionsMet(t: EventTemplate, state: GameState): boolean {
@@ -50,6 +51,13 @@ function conditionsMet(t: EventTemplate, state: GameState): boolean {
   if (c.hasStocks !== undefined && (p.portfolio.length > 0) !== c.hasStocks) return false;
   if (c.studying !== undefined && (p.studying !== null) !== c.studying) return false;
   if (c.track !== undefined && p.job?.track !== c.track) return false;
+  if (c.hasSpouse !== undefined && (p.spouseId !== null) !== c.hasSpouse) return false;
+  if (c.hasChildren !== undefined && (p.children.length > 0) !== c.hasChildren) return false;
+  if (c.businessPublic !== undefined) {
+    const hasPublic = p.companies.some((id) => state.companies[id]?.status === 'active' && state.companies[id]?.isPublic === c.businessPublic);
+    if (!hasPublic) return false;
+  }
+  if (c.duringWorldEvent !== undefined && state.worldEvent?.type !== c.duringWorldEvent) return false;
   return true;
 }
 
@@ -88,7 +96,10 @@ export function fireEvents(state: GameState, rng: RNG): FiredEvent[] {
 
     // Subjects
     const p = state.player;
-    const activeCompanies = p.companies.filter((id) => state.companies[id]?.status === 'active');
+    let activeCompanies = p.companies.filter((id) => state.companies[id]?.status === 'active');
+    if (t.conditions?.businessPublic !== undefined) {
+      activeCompanies = activeCompanies.filter((id) => state.companies[id]?.isPublic === t.conditions!.businessPublic);
+    }
     const subjectCompanyId = t.category === 'business' && activeCompanies.length
       ? rng.pick(activeCompanies)
       : null;
@@ -170,6 +181,15 @@ export function applyEffects(state: GameState, fx: EffectSpec, event: FiredEvent
     if (fx.companyBrand) co.brand = clamp100(co.brand + fx.companyBrand);
     if (fx.companyQuality) co.quality = clamp100(co.quality + fx.companyQuality);
     if (fx.companyMorale) co.morale = clamp100(co.morale + fx.companyMorale);
+    if (fx.companySharePctDelta) co.playerSharePct = clamp(co.playerSharePct + fx.companySharePctDelta, 0.05, 1);
+    if (fx.loseCompany) {
+      const payout = companyValuation(co) * co.playerSharePct * 0.9;
+      p.money += payout;
+      co.status = 'sold';
+      co.playerOwned = false;
+      p.companies = p.companies.filter((id) => id !== co.id);
+      logs.push(`You lost control of ${co.name} in the takeover, walking away with $${Math.round(payout).toLocaleString()}.`);
+    }
   }
   return logs;
 }

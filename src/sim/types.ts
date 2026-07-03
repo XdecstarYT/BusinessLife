@@ -121,6 +121,9 @@ export interface Player {
   loans: PersonalLoan[];
 
   relationships: Relationship[];
+  spouseId: string | null; // NPC id; also present in relationships as kind 'spouse'
+  children: string[]; // NPC ids; also present in relationships as kind 'child'
+  divorceCount: number;
   partyId: string | null;
   office: Office | null;
   politicalCapital: number; // spend to pass laws, gain from wins
@@ -130,6 +133,7 @@ export interface Player {
     warChest: number;
     momentum: number; // -50..50 swing on top of fundamentals
     yearsToElection: number;
+    consultantHired: boolean; // boosts momentum gains from campaign actions
   };
 }
 
@@ -274,11 +278,16 @@ export interface Country {
   atWarWith: string[];
   sanctionsOn: string[]; // countries this one sanctions
   lawsInForce: string[]; // law ids currently enacted
+  cabinet: Record<string, string>; // portfolio key -> NPC id or 'player'
+  coalitionPartnerId: string | null; // party id propping up the governing party/player
   economy: Economy;
   states: CountryState[];
   cities: City[];
   isPlayerHome: boolean;
 }
+
+export const CABINET_PORTFOLIOS = ['Finance', 'Foreign Affairs', 'Defense', 'Health', 'Education', 'Justice'] as const;
+export type CabinetPortfolio = (typeof CABINET_PORTFOLIOS)[number];
 
 // ---------------------------------------------------------------------------
 // Business
@@ -358,6 +367,10 @@ export interface Company {
   insured: boolean;
   politicalInfluence: number; // 0..100 lobbying muscle
 
+  patents: number; // granted patents; each pays a small royalty and dings a rival
+  cyberDefense: number; // 0..100, reduces breach/lawsuit risk
+  successorId: string | null; // player's child (NPC id) designated to inherit this company
+
   status: CompanyStatus;
   history: CompanyHistoryPoint[];
 }
@@ -425,6 +438,8 @@ export interface EffectSpec {
   companyBrand?: number;
   companyQuality?: number;
   companyMorale?: number;
+  companySharePctDelta?: number; // dilutes/restores the player's stake in the subject company
+  loseCompany?: boolean; // subject company is lost entirely (hostile takeover succeeds)
   jobPerformance?: number;
   criminalRecord?: number;
   jailYears?: number;
@@ -467,6 +482,10 @@ export interface EventConditions {
   studying?: boolean;
   minInfluence?: number;
   track?: PlayerJob['track'];
+  hasSpouse?: boolean;
+  hasChildren?: boolean;
+  businessPublic?: boolean; // has an active company that is publicly listed
+  duringWorldEvent?: 'pandemic';
 }
 
 export interface EventTemplate {
@@ -537,6 +556,12 @@ export interface GameOverInfo {
   finalAge: number;
 }
 
+export interface WorldEvent {
+  type: 'pandemic';
+  yearsLeft: number;
+  severity: number; // 0..1
+}
+
 export interface GameState {
   version: number;
   saveName: string;
@@ -558,6 +583,8 @@ export interface GameState {
   achievements: string[];
   netWorthHistory: NetWorthPoint[];
   gameOver: GameOverInfo | null;
+  worldEvent: WorldEvent | null;
+  generation: number; // dynasty counter; increments when an heir inherits and play continues
 }
 
 // ---------------------------------------------------------------------------

@@ -437,6 +437,113 @@ ev({
     { label: 'Pay your taxes', effects: { karma: 4, reputation: 1 } },
   ],
 });
+ev({
+  id: 'biz_shareholder_revolt', category: 'business', weight: 4, conditions: { hasBusiness: true, businessPublic: true },
+  text: 'Institutional shareholders of {company} are furious about weak returns and demand change.',
+  choices: [
+    { label: 'Promise a special dividend to calm them', effects: { companyCash: -150_000, reputation: 1 } },
+    { label: 'Dilute your stake to bring in new capital', effects: { companySharePctDelta: -0.1, companyCash: 300_000 } },
+    { label: 'Stand firm and defend your strategy', skillCheck: { skillId: SK.negotiation, bonusPerLevel: 0.005 }, outcomes: [
+      { chance: 0.5, text: 'Your conviction won them over.', effects: { reputation: 3 } },
+      { chance: 0.5, text: 'They voted to strip some of your board control.', effects: { companySharePctDelta: -0.15, reputation: -3 } },
+    ] },
+  ],
+});
+ev({
+  id: 'biz_hostile_takeover_attempt', category: 'business', weight: 3, conditions: { hasBusiness: true, businessPublic: true },
+  text: 'A rival conglomerate has launched a hostile bid for {company}, quietly buying up shares on the open market.',
+  choices: [
+    { label: 'Fight it off with a costly share buyback', effects: { companyCash: -500_000, reputation: 1 } },
+    { label: 'Rally loyal shareholders to your side', skillCheck: { skillId: SK.negotiation, bonusPerLevel: 0.006 }, outcomes: [
+      { chance: 0.6, text: 'Loyalists held the line. The bid collapsed.', effects: { reputation: 2 } },
+      { chance: 0.4, text: 'The raiders won control. You were bought out.', effects: { loseCompany: true } },
+    ] },
+    { label: 'Negotiate a graceful buyout', effects: { loseCompany: true, happiness: 2 } },
+  ],
+});
+ev({
+  id: 'biz_espionage_target', category: 'business', weight: 3, conditions: { hasBusiness: true },
+  text: 'A private investigator hints that a rival in your industry has left its R&D lab poorly secured.',
+  choices: [
+    { label: "That's their problem, not an invitation", effects: { karma: 2 } },
+    { label: 'File it away for later (visit Business tab to act on it)', effects: { smarts: 1 } },
+  ],
+});
+
+// ---------------------------------------------------------------------------
+// FAMILY & DYNASTY
+// ---------------------------------------------------------------------------
+ev({
+  id: 'fam_meet_someone', category: 'family', weight: 5, conditions: { minAge: 18, hasSpouse: false },
+  text: 'You keep running into {npc} at the same coffee shop in {city}. There is definitely a spark.',
+  choices: [
+    { label: 'Ask them out (visit the Family tab to pursue this)', effects: { happiness: 3, charisma: 1 } },
+    { label: 'Keep it professional', effects: {} },
+  ],
+});
+ev({
+  id: 'fam_inlaws', category: 'family', weight: 4, conditions: { hasSpouse: true },
+  text: "Your in-laws are visiting for the holidays and have Opinions about how you're living your life.",
+  choices: [
+    { label: 'Host a lavish dinner to win them over', effects: { money: -3_000, happiness: 4 } },
+    { label: 'Grin and bear it', effects: { happiness: -2 } },
+    { label: 'Set firm boundaries', skillCheck: { skillId: SK.persuasion, bonusPerLevel: 0.005 }, outcomes: [
+      { chance: 0.55, text: 'They respected it, eventually.', effects: { happiness: 3 } },
+      { chance: 0.45, text: 'It caused a rift that lingered.', effects: { happiness: -5 } },
+    ] },
+  ],
+});
+ev({
+  id: 'fam_private_school', category: 'family', weight: 4, conditions: { hasChildren: true },
+  text: 'A prestigious private school offers your child a place, tuition {amount} a year.',
+  amount: { min: 8_000, max: 30_000 },
+  choices: [
+    { label: 'Enroll them', effects: { moneyAmountMult: -1, happiness: 2, karma: 1 } },
+    { label: 'Public school is fine', effects: {} },
+  ],
+});
+ev({
+  id: 'fam_sibling_rivalry', category: 'family', weight: 3, conditions: { hasChildren: true },
+  text: 'Your children are squabbling over your attention — and, they suspect, your will.',
+  choices: [
+    { label: 'Sit them down and talk it out', effects: { happiness: 2, karma: 2 } },
+    { label: 'Let them work it out themselves', effects: {} },
+    { label: 'Promise to split everything equally', effects: { karma: 3, happiness: 1 } },
+  ],
+});
+ev({
+  id: 'fam_spouse_career', category: 'family', weight: 4, conditions: { hasSpouse: true },
+  text: 'Your spouse wants to pursue their own ambitious career move, which would mean less time for the family.',
+  choices: [
+    { label: 'Support them fully', effects: { happiness: 4, karma: 3 } },
+    { label: 'Ask them to wait', effects: { happiness: -3 } },
+  ],
+});
+
+// ---------------------------------------------------------------------------
+// GLOBAL WORLD EVENTS (pandemic-specific colour)
+// ---------------------------------------------------------------------------
+ev({
+  id: 'world_pandemic_lockdown', category: 'world', weight: 8, conditions: { duringWorldEvent: 'pandemic' }, once: false,
+  text: 'Authorities in {country} are weighing new restrictions as the outbreak strains hospitals.',
+  choices: [
+    { label: 'Stock up on essentials', effects: { money: -1_500, health: 2 } },
+    { label: 'Volunteer at a community support drive', effects: { karma: 6, reputation: 2, happiness: 3 } },
+    { label: 'Carry on as normal', effects: { health: -2 } },
+  ],
+});
+ev({
+  id: 'world_pandemic_vaccine', category: 'world', weight: 3, conditions: { duringWorldEvent: 'pandemic', minMoney: 20_000 },
+  text: 'Biotech firms racing for a vaccine are raising capital at a premium.',
+  choices: [
+    { label: 'Invest {amount}', outcomes: [
+      { chance: 0.5, text: 'The vaccine succeeded and the stock soared.', effects: { moneyAmountMult: 2.5 } },
+      { chance: 0.5, text: 'The trial failed. Total loss.', effects: { moneyAmountMult: -1 } },
+    ] },
+    { label: 'Too risky', effects: {} },
+  ],
+  amount: { min: 5_000, max: 100_000, pctOfMoney: 0.15 },
+});
 
 // ---------------------------------------------------------------------------
 // MARKETS & INVESTING

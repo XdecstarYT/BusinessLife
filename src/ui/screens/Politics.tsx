@@ -2,24 +2,29 @@
 import { useState } from 'react';
 import { useGame } from '../../store/gameStore';
 import {
+  appointMinister,
   availableOffices,
+  cabinetCandidates,
   campaignAction,
+  dismissMinister,
   foundParty,
   joinParty,
   launchCampaign,
   leaveParty,
+  negotiateCoalition,
   proposeLaw,
   proposedLaws,
   repealLaw,
 } from '../../sim/actions';
 import { campaignWinChance } from '../../sim/politics';
 import { LAW_CATEGORIES } from '../../data/laws';
+import { CABINET_PORTFOLIOS, type CabinetPortfolio } from '../../sim/types';
 import { Badge, Button, Card, Field, Modal, Pill, PillRow, SectionHeader, StatBar, TextInput } from '../components';
 import { money, moneyFull, pct } from '../format';
 
 export function Politics() {
   const { state, run } = useGame();
-  const [tab, setTab] = useState<'status' | 'office' | 'laws' | 'party'>('status');
+  const [tab, setTab] = useState<'status' | 'office' | 'laws' | 'party' | 'cabinet'>('status');
   if (!state) return null;
   const p = state.player;
   const home = state.countries.find((c) => c.id === p.countryId)!;
@@ -34,6 +39,7 @@ export function Politics() {
         <Pill label="Office" active={tab === 'office'} onClick={() => setTab('office')} />
         <Pill label="Legislation" active={tab === 'laws'} onClick={() => setTab('laws')} />
         <Pill label="Party" active={tab === 'party'} onClick={() => setTab('party')} />
+        {isLeader && <Pill label="Cabinet" active={tab === 'cabinet'} onClick={() => setTab('cabinet')} />}
       </PillRow>
 
       {tab === 'status' && (
@@ -80,6 +86,15 @@ export function Politics() {
                 <Button size="sm" variant="soft" onClick={() => run(campaignAction, 'doorknock')}>🚪 Doorknock</Button>
                 <Button size="sm" variant="soft" onClick={() => run(campaignAction, 'ads')}>📺 Ads ($50k)</Button>
                 <Button size="sm" variant="soft" onClick={() => run(campaignAction, 'fundraise')}>💰 Fundraise</Button>
+                <Button size="sm" variant="soft" onClick={() => run(campaignAction, 'polling')}>📊 Polling ($15k)</Button>
+                <Button
+                  size="sm"
+                  variant={p.campaign.consultantHired ? 'ghost' : 'soft'}
+                  disabled={p.campaign.consultantHired}
+                  onClick={() => run(campaignAction, 'consultant')}
+                >
+                  {p.campaign.consultantHired ? '✅ Consultant Hired' : '🎯 Hire Consultant ($100k)'}
+                </Button>
               </div>
             </Card>
           )}
@@ -109,6 +124,7 @@ export function Politics() {
       {tab === 'office' && <OfficeTab />}
       {tab === 'laws' && <LawsTab />}
       {tab === 'party' && <PartyTab party={party} />}
+      {tab === 'cabinet' && <CabinetTab />}
     </div>
   );
 }
@@ -234,23 +250,50 @@ function PartyTab({ party }: { party: { id: string; name: string; ideology: numb
       {party ? (
         <Card className="p-5">
           <div className="text-xs text-brand-500 uppercase font-bold mb-1">Your Party</div>
-          <div className="font-extrabold text-lg">{party.name}</div>
+          <div className="font-extrabold text-lg truncate" title={party.name}>{party.name}</div>
           <div className="text-sm text-slate-500 dark:text-slate-400 mb-3">
             {ideologyLabel(party.ideology)} · {pct(party.support / 100, 0)} support · {party.seats} seats
             {party.id === p.partyId && home.parties.find((x) => x.id === party.id)?.leaderId === 'player' && ' · You lead it'}
           </div>
           <Button size="sm" variant="ghost" onClick={() => run(leaveParty)}>Leave Party</Button>
         </Card>
-      ) : (
+      ) : null}
+
+      {party && party.seats / home.totalSeats < 0.5 && (
+        <Card className="p-5">
+          <div className="font-bold mb-1">Coalition</div>
+          {home.coalitionPartnerId ? (
+            <div className="text-sm text-slate-500 dark:text-slate-400">
+              Governing in coalition with the <span className="font-semibold">{home.parties.find((x) => x.id === home.coalitionPartnerId)?.name}</span>.
+            </div>
+          ) : (
+            <>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
+                Your party doesn't hold a majority ({party.seats}/{home.totalSeats} seats). Negotiate a coalition to guarantee votes on legislation.
+              </p>
+              <div className="space-y-2">
+                {home.parties.filter((x) => x.id !== party.id).map((x) => (
+                  <div key={x.id} className="flex items-center justify-between bg-slate-100 dark:bg-ink-800 rounded-xl px-3 py-2">
+                    <span className="text-sm font-semibold truncate pr-2" title={x.name}>{x.name} ({x.seats} seats)</span>
+                    <Button size="sm" onClick={() => run(negotiateCoalition, x.id)}>Negotiate (10 PC)</Button>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </Card>
+      )}
+
+      {!party && (
         <>
           <p className="text-sm text-slate-500 dark:text-slate-400 px-1">Join a party to unlock higher offices, or found your own (needs 25+ influence and $250k).</p>
           {home.parties.map((pt) => (
-            <Card key={pt.id} className="p-4 flex justify-between items-center">
-              <div>
-                <div className="font-bold">{pt.name}</div>
-                <div className="text-xs text-slate-500 dark:text-slate-400">{ideologyLabel(pt.ideology)} · {pt.seats} seats · {pct(pt.support / 100, 0)}</div>
+            <Card key={pt.id} className="p-4 flex justify-between items-center gap-2">
+              <div className="min-w-0">
+                <div className="font-bold truncate" title={pt.name}>{pt.name}</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400 truncate">{ideologyLabel(pt.ideology)} · {pt.seats} seats · {pct(pt.support / 100, 0)}</div>
               </div>
-              <Button size="sm" onClick={() => run(joinParty, pt.id)}>Join</Button>
+              <Button size="sm" className="shrink-0" onClick={() => run(joinParty, pt.id)}>Join</Button>
             </Card>
           ))}
           <Button variant="soft" className="w-full" onClick={() => setFounding(true)}>+ Found Your Own Party</Button>
@@ -280,4 +323,56 @@ function ideologyLabel(v: number): string {
   if (v < 20) return 'Centrist';
   if (v < 60) return 'Center-Right';
   return 'Far Right';
+}
+
+function CabinetTab() {
+  const { state, run } = useGame();
+  const [appointing, setAppointing] = useState<CabinetPortfolio | null>(null);
+  if (!state) return null;
+  const p = state.player;
+  const home = state.countries.find((c) => c.id === p.countryId)!;
+  const candidates = cabinetCandidates(state);
+
+  return (
+    <div className="mt-4 space-y-2">
+      <p className="text-xs text-slate-400 px-1">Ministers nudge their portfolio's national stats each year based on competence and integrity.</p>
+      {CABINET_PORTFOLIOS.map((portfolio) => {
+        const npcId = home.cabinet[portfolio];
+        const minister = npcId ? state.npcs[npcId] : null;
+        return (
+          <Card key={portfolio} className="p-4 flex items-center justify-between">
+            <div className="min-w-0 pr-2">
+              <div className="font-bold">{portfolio}</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                {minister ? `${minister.name} · competence ${minister.competence}` : 'Vacant'}
+              </div>
+            </div>
+            {minister ? (
+              <Button size="sm" variant="danger" onClick={() => run(dismissMinister, portfolio)}>Dismiss</Button>
+            ) : (
+              <Button size="sm" onClick={() => setAppointing(portfolio)}>Appoint</Button>
+            )}
+          </Card>
+        );
+      })}
+
+      {appointing && (
+        <Modal open onClose={() => setAppointing(null)} title={`Appoint Minister for ${appointing}`}>
+          <div className="space-y-2 max-h-[50vh] overflow-y-auto">
+            {candidates.length === 0 && <p className="text-center text-slate-400 py-6">No available politicians right now.</p>}
+            {candidates.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => { run(appointMinister, appointing, c.id); setAppointing(null); }}
+                className="w-full text-left p-3 rounded-2xl bg-slate-100 dark:bg-ink-800 hover:bg-slate-200 dark:hover:bg-ink-700"
+              >
+                <div className="font-semibold truncate" title={c.name}>{c.name}</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Competence {c.competence} · Integrity {c.integrity}</div>
+              </button>
+            ))}
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
 }

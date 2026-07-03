@@ -32,7 +32,8 @@ export type Screen =
   | 'politics'
   | 'world'
   | 'news'
-  | 'stats';
+  | 'stats'
+  | 'family';
 
 interface Toast {
   id: number;

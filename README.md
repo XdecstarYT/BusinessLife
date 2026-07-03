@@ -23,14 +23,22 @@ plain JSON you can export and re-import.
 - **Macro-economy** — business-cycle regimes (boom to depression), a Taylor-rule central bank, inflation,
   unemployment, housing and equity indices, FX, government debt and shared commodity markets.
 - **Deep politics** — join or found a party, campaign for eight tiers of office (councillor to head of
-  state), fundraise, rally, run attack ads, and pass or repeal **80 laws** whose effects continuously
-  reshape the economy. Elections, coalitions, coups, sanctions and wars unfold with or without you.
+  state) with rallies/ads/fundraising/consultants/polling, negotiate coalitions, appoint a cabinet, and
+  pass or repeal **80 laws** whose effects continuously reshape the economy. Elections, coups, sanctions
+  and wars unfold with or without you.
+- **Family & dynasty** — date, marry, divorce, have children who age up as real NPCs, name a successor
+  to inherit a company, and pass your estate to your family when you die so the dynasty carries on.
+- **Corporate warfare** — patents that pay royalties and dent rivals, a cyber-defense lever, corporate
+  espionage against competitors, shareholder revolts, and hostile takeovers in both directions.
+- **Global world events** — a pandemic can sweep the world economy, hammering tourism/airlines/entertainment
+  while lifting health and remote-work industries, with its own news coverage and event templates.
 - **Thousands of scenarios** — a data-driven event engine resolves placeholders ({company}, {npc},
   {amount}, ...) against live state, with skill-checked, probabilistic outcomes, so a compact template
   set produces an enormous variety of situations.
 - **Dynamic news** synthesised from what actually happened that year, plus a personal life log.
-- **Light and dark mode**, a mobile-first UI of circular icon tiles, pill chips, featured cards and
-  canvas charts, with a bottom tab bar.
+- **Light and dark mode**, a mobile-first UI (with wider desktop breakpoints and safe-area support for
+  notched devices) of circular icon tiles, pill chips, featured cards and canvas charts, with a bottom
+  tab bar.
 - **Unlimited saves** in IndexedDB (localStorage fallback), autosave every year, and JSON export/import.
 
 ## Play
@@ -55,15 +63,21 @@ happens to the clock until you press **Advance Year** on the Life hub.
 - **Career** — study for degrees, take jobs from a live market, and grow skills (120 of them across 10
   categories). Performance drives raises, promotions and layoffs.
 - **Business** — found companies in any of 200+ industries, then tune strategy (marketing, R&D, pricing,
-  wages, automation, dividends), invest or draw capital, IPO, or sell.
+  wages, automation, cyber-defense, dividends), invest or draw capital, IPO, or sell. Switch to the
+  **Rivals** tab to spy on competitors or launch a hostile takeover of a public company.
 - **Markets** — trade the stock exchange of your home nation; go long or short, collect dividends.
 - **Assets** — buy property (cash or mortgage) for rental income and appreciation, and take loans.
-- **Politics** — join/found a party, run for office, campaign, and legislate. Whoever controls the
+- **Politics** — join/found a party, run for office, campaign (rallies, ads, consultants, polling),
+  negotiate coalitions, appoint a cabinet if you lead the country, and legislate. Whoever controls the
   legislature — including you — passes laws that move the whole simulation.
-- **World** — a macro dashboard, every nation's economy and government, diplomacy, and commodities.
+- **Family** — date and marry, have children who grow into real NPCs, name a successor for each company,
+  and build a multi-generation dynasty.
+- **World** — a macro dashboard, every nation's economy and government, diplomacy, commodities, and any
+  active global event (like a pandemic).
 - **News / Stats** — the dynamic wire, your net-worth curve, achievements and save tools.
 
-Life ends when you do — from old age or collapsing health — with a summary of everything you built.
+Life ends when you do — from old age, illness, or misfortune — with a summary of everything you built,
+and your estate (companies with a named successor, cash, property) passes to your spouse and children.
 
 ## Architecture
 
@@ -81,7 +95,9 @@ src/
     economy.ts         Macro cycle, rates, inflation, assets, commodities, demographics
     business.ts        Company simulation and valuation
     market.ts          Stock exchange, trading, shorting, dividends
-    politics.ts        Office ladder, elections, legislation, geopolitics, NPC lives
+    politics.ts        Office ladder, elections, legislation, cabinet, coalitions, geopolitics, NPC lives
+    family.ts          Dating, marriage, children, succession planning, estate distribution
+    worldEvents.ts      Global events (pandemic) layered on the per-country economy
     events.ts          Event matching, placeholder resolution, effect application
     news.ts            Dynamic headline generation
     actions.ts         The player "verbs" the UI calls between years
@@ -94,10 +110,10 @@ src/
   store/
     gameStore.ts       Zustand store wrapping engine + actions
     persistence.ts     IndexedDB saves (localStorage fallback), export/import
-  ui/                  Mobile-first React UI (light + dark)
+  ui/                  Mobile-first React UI (light + dark, desktop breakpoints, safe-area aware)
     components.tsx     Cards, pills, circular tiles, stat bars, canvas charts
     AppShell.tsx       Top bar + bottom tab navigation
-    screens/           Life, Career, Business, Market, Assets, Politics, World, News, Stats
+    screens/           Life, Career, Business, Market, Assets, Politics, Family, World, News, Stats
 ```
 
 ### Modding

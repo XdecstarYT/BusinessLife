@@ -3,33 +3,96 @@ import { useState } from 'react';
 import { useGame } from '../../store/gameStore';
 import {
   investInCompany,
+  attemptHostileTakeover,
   sellCompany,
   setCompanyLever,
+  spyOnCompany,
   startCompany,
   takeCompanyPublic,
   withdrawFromCompany,
   type CompanyLever,
 } from '../../sim/actions';
 import { companyValuation } from '../../sim/business';
+import { marketCap } from '../../sim/market';
 import { Badge, Button, Card, LineChart, Modal, Pill, PillRow, SectionHeader, StatBar, TextInput } from '../components';
 import { money, moneyFull, pct } from '../format';
 import { INDUSTRIES, INDUSTRY_BY_ID } from '../../data/industries';
 import type { Company } from '../../sim/types';
 
 export function Business() {
-  const { state } = useGame();
+  const { state, run } = useGame();
   const [founding, setFounding] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
+  const [view, setView] = useState<'mine' | 'rivals'>('mine');
+  const [takeoverTarget, setTakeoverTarget] = useState<string | null>(null);
   if (!state) return null;
   const p = state.player;
   const companies = p.companies.map((id) => state.companies[id]).filter((c): c is Company => !!c && c.status === 'active');
   const totalRevenue = companies.reduce((s, c) => s + c.revenue, 0);
   const totalProfit = companies.reduce((s, c) => s + c.profit, 0);
+  const rivals = Object.values(state.companies).filter(
+    (c) => c.status === 'active' && c.countryId === p.countryId && !c.playerOwned,
+  );
 
   return (
     <div>
       <SectionHeader title="Business Empire" action="Found" onAction={() => setFounding(true)} />
+      <PillRow>
+        <Pill label="My Companies" active={view === 'mine'} onClick={() => setView('mine')} />
+        <Pill label={`Rivals (${rivals.length})`} active={view === 'rivals'} onClick={() => setView('rivals')} />
+      </PillRow>
 
+      {view === 'rivals' ? (
+        <div className="mt-3 space-y-2">
+          <p className="text-xs text-slate-400 px-1">
+            Spy for a competitive edge, or launch a hostile takeover to seize a public rival outright (needs an offer worth 60%+ of market cap).
+          </p>
+          {rivals.map((c) => {
+            const ind = INDUSTRY_BY_ID[c.industryId];
+            return (
+              <Card key={c.id} className="p-4">
+                <div className="flex justify-between items-start mb-2">
+                  <div className="min-w-0 pr-2">
+                    <div className="font-bold truncate" title={c.name}>{c.name}</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 truncate">{ind?.name} · cap {money(marketCap(c))}</div>
+                  </div>
+                  {c.isPublic ? <Badge tone="brand">Public</Badge> : <Badge>Private</Badge>}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button size="sm" variant="soft" onClick={() => run(spyOnCompany, c.id)}>🕵️ Espionage</Button>
+                  <Button size="sm" disabled={!c.isPublic} onClick={() => setTakeoverTarget(c.id)}>🏴 Takeover</Button>
+                </div>
+              </Card>
+            );
+          })}
+          {rivals.length === 0 && <Card className="p-6 text-center text-slate-500 dark:text-slate-400">No rival companies found in your country yet.</Card>}
+        </div>
+      ) : (
+        <BusinessMineView companies={companies} totalRevenue={totalRevenue} totalProfit={totalProfit} onFound={() => setFounding(true)} onSelect={setSelected} />
+      )}
+
+      <FoundModal open={founding} onClose={() => setFounding(false)} />
+      {selected && <ManageModal companyId={selected} onClose={() => setSelected(null)} />}
+      {takeoverTarget && <TakeoverModal companyId={takeoverTarget} onClose={() => setTakeoverTarget(null)} />}
+    </div>
+  );
+}
+
+function BusinessMineView({
+  companies,
+  totalRevenue,
+  totalProfit,
+  onFound,
+  onSelect,
+}: {
+  companies: Company[];
+  totalRevenue: number;
+  totalProfit: number;
+  onFound: () => void;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <div className="mt-3">
       {companies.length > 0 && (
         <div className="grid grid-cols-3 gap-3 mb-4">
           <MiniStat label="Companies" value={String(companies.length)} />
@@ -42,7 +105,7 @@ export function Business() {
         <Card className="p-6 text-center">
           <div className="text-4xl mb-2">🏢</div>
           <p className="text-slate-500 dark:text-slate-400 mb-4">You don't own any companies yet. Found one to start building your empire — 200+ industries await.</p>
-          <Button onClick={() => setFounding(true)}>Found a Company</Button>
+          <Button onClick={onFound}>Found a Company</Button>
         </Card>
       ) : (
         <div className="space-y-3">
@@ -50,11 +113,11 @@ export function Business() {
             const ind = INDUSTRY_BY_ID[c.industryId];
             const revHist = c.history.map((h) => h.revenue);
             return (
-              <Card key={c.id} className="p-4" onClick={() => setSelected(c.id)}>
+              <Card key={c.id} className="p-4" onClick={() => onSelect(c.id)}>
                 <div className="flex justify-between items-start mb-2">
                   <div className="min-w-0">
-                    <div className="font-extrabold truncate">{c.name}</div>
-                    <div className="text-xs text-slate-500 dark:text-slate-400">{ind?.name} · {ind?.sector}</div>
+                    <div className="font-extrabold truncate" title={c.name}>{c.name}</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 truncate">{ind?.name} · {ind?.sector}</div>
                   </div>
                   <div className="text-right shrink-0">
                     {c.isPublic ? <Badge tone="brand">Public</Badge> : <Badge>Private</Badge>}
@@ -82,20 +145,17 @@ export function Business() {
           })}
         </div>
       )}
-
-      <FoundModal open={founding} onClose={() => setFounding(false)} />
-      {selected && <ManageModal companyId={selected} onClose={() => setSelected(null)} />}
     </div>
   );
+}
 
-  function MiniStat({ label, value, tone }: { label: string; value: string; tone?: 'good' | 'bad' }) {
-    return (
-      <Card className="p-3 text-center">
-        <div className="text-[11px] text-slate-400">{label}</div>
-        <div className={`font-extrabold ${tone === 'good' ? 'text-emerald-500' : tone === 'bad' ? 'text-rose-500' : ''}`}>{value}</div>
-      </Card>
-    );
-  }
+function MiniStat({ label, value, tone }: { label: string; value: string; tone?: 'good' | 'bad' }) {
+  return (
+    <Card className="p-3 text-center">
+      <div className="text-[11px] text-slate-400">{label}</div>
+      <div className={`font-extrabold ${tone === 'good' ? 'text-emerald-500' : tone === 'bad' ? 'text-rose-500' : ''}`}>{value}</div>
+    </Card>
+  );
 }
 
 function FoundModal({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -134,11 +194,11 @@ function FoundModal({ open, onClose }: { open: boolean; onClose: () => void }) {
                 onClick={() => pick(i.id)}
                 className="w-full text-left p-3 rounded-2xl bg-slate-100 dark:bg-ink-800 hover:bg-slate-200 dark:hover:bg-ink-700"
               >
-                <div className="flex justify-between">
-                  <span className="font-semibold">{i.name}</span>
-                  <span className="text-sm font-bold text-brand-500">{money(i.startupCost)}</span>
+                <div className="flex justify-between gap-2">
+                  <span className="font-semibold truncate min-w-0" title={i.name}>{i.name}</span>
+                  <span className="text-sm font-bold text-brand-500 shrink-0">{money(i.startupCost)}</span>
                 </div>
-                <div className="text-xs text-slate-500 dark:text-slate-400">
+                <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
                   {i.sector} · margin {pct(i.baseMargin, 0)} · {i.tags.slice(0, 3).join(', ')}
                 </div>
               </button>
@@ -224,6 +284,8 @@ function ManageModal({ companyId, onClose }: { companyId: string; onClose: () =>
         <Row label="Debt" value={money(c.debt)} tone={c.debt > 0 ? 'bad' : undefined} />
         <Row label="Employees" value={c.employees.toLocaleString()} />
         <Row label="Market share" value={pct(c.marketShare, 2)} />
+        <Row label="Patents" value={String(c.patents)} />
+        <Row label="Lawsuits" value={String(c.lawsuits)} tone={c.lawsuits > 0 ? 'bad' : undefined} />
       </div>
 
       <div className="grid grid-cols-2 gap-3 mb-4">
@@ -244,6 +306,7 @@ function ManageModal({ companyId, onClose }: { companyId: string; onClose: () =>
         {lever('priceLevel', 'Pricing', 0.7, 1.5, 0.05, (v) => (v < 0.95 ? 'Discount' : v > 1.15 ? 'Premium' : 'Market'))}
         {lever('salaryLevel', 'Wages', 0.85, 1.4, 0.05, (v) => (v < 0.95 ? 'Low' : v > 1.15 ? 'Generous' : 'Market'))}
         {lever('automation', 'Automation', 0, 100, 5, (v) => `${Math.round(v)}%`)}
+        {lever('cyberDefense', 'Cyber defense', 0, 100, 5, (v) => `${Math.round(v)}%`)}
         {c.isPublic && lever('dividendPayoutPct', 'Dividend payout', 0, 0.9, 0.05, (v) => pct(v, 0))}
       </div>
 
@@ -287,4 +350,43 @@ function ManageModal({ companyId, onClose }: { companyId: string; onClose: () =>
       </div>
     );
   }
+}
+
+function TakeoverModal({ companyId, onClose }: { companyId: string; onClose: () => void }) {
+  const { state, run } = useGame();
+  const c = state?.companies[companyId];
+  const cap = c ? Math.max(1, marketCap(c)) : 1;
+  const [offer, setOffer] = useState(Math.round(cap * 0.65));
+  if (!state || !c) return null;
+  const ratio = offer / cap;
+
+  return (
+    <Modal open onClose={onClose} title={`Hostile Takeover: ${c.name}`}>
+      <div className="flex items-center gap-2 mb-4">
+        <Badge tone="brand">Market cap {money(cap)}</Badge>
+        <Badge tone={ratio >= 0.6 ? 'good' : 'bad'}>{pct(ratio, 0)} of cap</Badge>
+      </div>
+      <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Offer: {moneyFull(offer)}</label>
+      <input
+        type="range"
+        min={Math.round(cap * 0.3)}
+        max={Math.round(Math.min(state.player.money, cap * 1.5))}
+        value={offer}
+        onChange={(e) => setOffer(Number(e.target.value))}
+        className="w-full mt-1 mb-4"
+      />
+      <p className="text-xs text-slate-400 mb-4">Needs 60%+ of market cap to be taken seriously. A failed bid still costs a 5% due-diligence fee.</p>
+      <Button
+        className="w-full"
+        size="lg"
+        disabled={offer > state.player.money}
+        onClick={() => {
+          const r = run(attemptHostileTakeover, companyId, offer);
+          if (r.ok) onClose();
+        }}
+      >
+        Launch Bid for {money(offer)}
+      </Button>
+    </Modal>
+  );
 }

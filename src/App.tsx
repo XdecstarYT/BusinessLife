@@ -14,6 +14,7 @@ import { Politics } from './ui/screens/Politics';
 import { World } from './ui/screens/World';
 import { News } from './ui/screens/News';
 import { Stats } from './ui/screens/Stats';
+import { Family } from './ui/screens/Family';
 
 export default function App() {
   const { state, screen, darkMode } = useGame();
@@ -45,6 +46,7 @@ export default function App() {
           {screen === 'world' && <World />}
           {screen === 'news' && <News />}
           {screen === 'stats' && <Stats />}
+          {screen === 'family' && <Family />}
         </div>
       </AppShell>
       <EventModal />

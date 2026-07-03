@@ -5,7 +5,8 @@ import { advanceYear, netWorth } from '../src/sim/engine';
 import { resolveChoice } from '../src/sim/events';
 import { RNG } from '../src/sim/rng';
 import * as A from '../src/sim/actions';
-import { buyShares } from '../src/sim/market';
+import { buyShares, marketCap } from '../src/sim/market';
+import { datingPool, propose, haveChild, nameSuccessor } from '../src/sim/family';
 import { INDUSTRIES } from '../src/data/industries';
 
 let state = generateWorld({ playerName: 'Test Tycoon', gender: 'male', seedText: 'smoke-seed-1' });
@@ -52,6 +53,44 @@ for (let y = 0; y < 82 && state.player.alive; y++) {
       const listings = A.propertyListings(state);
       A.buyProperty(state, listings[0], true);
     }
+    if (y === 3 && !state.player.spouseId) {
+      const candidates = datingPool(state);
+      let tries = 0;
+      while (!state.player.spouseId && tries < candidates.length) {
+        propose(state, candidates[tries]);
+        tries++;
+      }
+    }
+    if (y === 6 && state.player.spouseId) haveChild(state);
+    if (y === 25 && state.player.children.length && state.player.companies.length) {
+      const adultChild = state.player.children.map((id) => state.npcs[id]).find((c) => c && c.age >= 18);
+      const co = state.player.companies[0];
+      if (adultChild && co) nameSuccessor(state, co, adultChild.id);
+    }
+    if (y === 30) {
+      const rival = Object.values(state.companies).find(
+        (c) => c.status === 'active' && !c.playerOwned && c.countryId === state.player.countryId,
+      );
+      if (rival) A.spyOnCompany(state, rival.id);
+    }
+    if (y === 35) {
+      const home = state.countries.find((c) => c.id === state.player.countryId)!;
+      if (home.leaderId === 'player') {
+        const cands = A.cabinetCandidates(state);
+        if (cands.length) A.appointMinister(state, 'Finance', cands[0].id);
+      } else if (state.player.partyId) {
+        const other = home.parties.find((p) => p.id !== state.player.partyId);
+        if (other) A.negotiateCoalition(state, other.id);
+      }
+    }
+    if (y === 40) {
+      const rivalPublic = Object.values(state.companies).find(
+        (c) => c.status === 'active' && c.isPublic && !c.playerOwned && c.countryId === state.player.countryId,
+      );
+      if (rivalPublic) {
+        A.attemptHostileTakeover(state, rivalPublic.id, marketCap(rivalPublic) * 0.9);
+      }
+    }
   } catch (e) {
     errors++;
     console.error(`ERROR in year ${state.year}:`, (e as Error).message);
@@ -68,6 +107,12 @@ console.log('  companies still active:', Object.values(state.companies).filter((
 console.log('  news items:', state.news.length);
 console.log('  life log:', state.lifeLog.length);
 console.log('  achievements:', state.achievements.join(', ') || 'none');
+console.log('  spouse:', state.player.spouseId ? state.npcs[state.player.spouseId]?.name : 'none');
+console.log('  children:', state.player.children.length, 'divorces:', state.player.divorceCount);
+console.log('  successors named:', Object.values(state.companies).filter((c) => c.successorId).length);
+console.log('  total patents granted:', Object.values(state.companies).reduce((s, c) => s + c.patents, 0));
+console.log('  world event ever fired (pandemic possible, random):', state.worldEvent ? state.worldEvent.type : 'none active at end');
+console.log('  generation:', state.generation);
 console.log('  errors:', errors);
 
 // Invariant checks

@@ -43,18 +43,18 @@ export function World() {
       <div className="space-y-2">
         {[...state.countries].sort((a, b) => b.economy.gdp - a.economy.gdp).map((c) => (
           <Card key={c.id} className="p-3 flex items-center gap-3" onClick={() => setSelected(c.id)}>
-            <span className="text-2xl">{c.flag}</span>
+            <span className="text-2xl shrink-0">{c.flag}</span>
             <div className="flex-1 min-w-0">
-              <div className="font-bold flex items-center gap-2">
-                {c.name}
+              <div className="font-bold flex items-center gap-2 min-w-0">
+                <span className="truncate" title={c.name}>{c.name}</span>
                 {c.isPlayerHome && <Badge tone="brand">Home</Badge>}
                 {c.atWarWith.length > 0 && <Badge tone="bad">⚔️ War</Badge>}
               </div>
-              <div className="text-xs text-slate-500 dark:text-slate-400">
+              <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
                 {num(c.population / 1e6)}M people · {money(c.economy.gdp * 1e9)} GDP · {c.system}
               </div>
             </div>
-            <div className={`text-sm font-bold ${c.economy.gdpGrowth >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+            <div className={`text-sm font-bold shrink-0 ${c.economy.gdpGrowth >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
               {signedPct(c.economy.gdpGrowth)}
             </div>
           </Card>

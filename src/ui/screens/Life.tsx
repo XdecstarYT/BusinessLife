@@ -31,6 +31,7 @@ const HUB: { screen: Screen; label: string; Icon: (p: { className?: string }) =>
   { screen: 'market', label: 'Markets', Icon: IconMarket },
   { screen: 'assets', label: 'Assets', Icon: IconAssets },
   { screen: 'politics', label: 'Politics', Icon: IconPolitics },
+  { screen: 'family', label: 'Family', Icon: IconHeart },
   { screen: 'world', label: 'World', Icon: IconWorld },
   { screen: 'news', label: 'News', Icon: IconNews },
   { screen: 'stats', label: 'Stats', Icon: IconStats },
@@ -58,6 +59,7 @@ export function Life() {
   const badgeFor = (s: Screen): string | number | undefined => {
     if (s === 'business') return p.companies.filter((id) => state.companies[id]?.status === 'active').length || undefined;
     if (s === 'politics') return p.office ? '★' : p.campaign ? '!' : undefined;
+    if (s === 'family') return p.spouseId ? '💍' : undefined;
     return undefined;
   };
 

@@ -103,6 +103,11 @@ export interface LawVoteEstimate {
 export function estimateLawVote(state: GameState, country: Country, law: LawDef): LawVoteEstimate {
   let supportSeats = 0;
   for (const party of country.parties) {
+    // A coalition partner votes with the government on discipline, not conscience.
+    if (country.coalitionPartnerId === party.id) {
+      supportSeats += party.seats * 0.85;
+      continue;
+    }
     // Left parties weight `left` bloc, right parties `right`; business/worker blocs mix in.
     const leftW = clamp01((50 - party.ideology) / 100);
     const rightW = 1 - leftW;
@@ -140,6 +145,27 @@ export function tickPolitics(state: GameState, country: Country, rng: RNG): stri
   // If the player leads the country, their popularity tracks approval.
   if (playerIsLeader) {
     state.player.popularity = clamp100(state.player.popularity * 0.7 + country.approvalOfGovernment * 0.3);
+  }
+
+  // Cabinet ministers (player-led governments only) nudge their portfolio's stat each year.
+  if (playerIsLeader) {
+    for (const [portfolio, npcId] of Object.entries(country.cabinet)) {
+      const minister = npcId === 'player' ? null : state.npcs[npcId];
+      if (npcId !== 'player' && (!minister || !minister.alive)) continue;
+      const competence = minister ? minister.competence : state.player.smarts;
+      const integrity = minister ? minister.integrity : state.player.karma;
+      const pull = (competence - 50) * 0.03;
+      if (portfolio === 'Finance') country.economy.businessConfidence = clamp100(country.economy.businessConfidence + pull);
+      else if (portfolio === 'Health') country.healthcare = clamp100(country.healthcare + pull);
+      else if (portfolio === 'Education') country.education = clamp100(country.education + pull);
+      else if (portfolio === 'Defense') country.militaryPower = clamp100(country.militaryPower + pull);
+      else if (portfolio === 'Justice') country.corruption = clamp100(country.corruption - (integrity - 50) * 0.03);
+      else if (portfolio === 'Foreign Affairs') {
+        for (const otherId of Object.keys(country.relations)) {
+          country.relations[otherId] = clamp(country.relations[otherId] + pull * 0.3, -100, 100);
+        }
+      }
+    }
   }
 
   // Party support drifts with approval (governing party) and noise.

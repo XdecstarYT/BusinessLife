@@ -28,10 +28,10 @@ export function Career() {
         <div className="mt-4 space-y-4">
           {p.job ? (
             <Card className="p-5">
-              <div className="flex justify-between items-start">
-                <div>
-                  <div className="font-extrabold text-lg">{p.job.title}</div>
-                  <div className="text-sm text-slate-500 dark:text-slate-400">{p.job.employerName}</div>
+              <div className="flex justify-between items-start gap-2">
+                <div className="min-w-0">
+                  <div className="font-extrabold text-lg truncate" title={p.job.title}>{p.job.title}</div>
+                  <div className="text-sm text-slate-500 dark:text-slate-400 truncate" title={p.job.employerName}>{p.job.employerName}</div>
                 </div>
                 <Badge tone="good">{money(p.job.salary)}/yr</Badge>
               </div>

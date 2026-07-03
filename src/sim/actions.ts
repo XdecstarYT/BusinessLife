@@ -4,15 +4,16 @@
  * and eligibility so the UI can surface clean errors. RNG-consuming actions
  * advance the persisted stream so outcomes stay deterministic on replay.
  */
-import type { GameState, Gender, OfficeKind, PropertyAsset } from './types';
-import { clamp, clamp100 } from './types';
+import type { CabinetPortfolio, Company, GameState, Gender, OfficeKind, PropertyAsset } from './types';
+import { CABINET_PORTFOLIOS, clamp, clamp100 } from './types';
 import { RNG } from './rng';
 import { INDUSTRY_BY_ID, INDUSTRIES } from '../data/industries';
 import { LAW_BY_ID } from '../data/laws';
+import { SK } from '../data/skills';
 import { makeCompanyName, makePartyName } from '../data/names';
 import { createCompany, nextCompanyId, companyValuation } from './business';
-import { doIPO } from './market';
-import { OFFICE_SPEC_BY_KIND, eligibleFor, estimateLawVote } from './politics';
+import { doIPO, marketCap } from './market';
+import { OFFICE_SPEC_BY_KIND, campaignWinChance, eligibleFor, estimateLawVote } from './politics';
 import { log } from './engine';
 
 export interface ActionResult {
@@ -165,21 +166,21 @@ export function withdrawFromCompany(state: GameState, companyId: string, amount:
   return { ok: true, message: `Drew $${amount.toLocaleString()} from ${c.name}.` };
 }
 
-export type CompanyLever = 'marketingPct' | 'rdPct' | 'priceLevel' | 'salaryLevel' | 'dividendPayoutPct' | 'automation';
+export type CompanyLever = 'marketingPct' | 'rdPct' | 'priceLevel' | 'salaryLevel' | 'dividendPayoutPct' | 'automation' | 'cyberDefense';
 
 export function setCompanyLever(state: GameState, companyId: string, lever: CompanyLever, value: number): ActionResult {
   const c = state.companies[companyId];
   if (!c || !c.playerOwned) return { ok: false, message: 'Not your company.' };
   const bounds: Record<CompanyLever, [number, number]> = {
-    marketingPct: [0, 0.25], rdPct: [0, 0.25], priceLevel: [0.7, 1.5], salaryLevel: [0.85, 1.4], dividendPayoutPct: [0, 0.9], automation: [0, 100],
+    marketingPct: [0, 0.25], rdPct: [0, 0.25], priceLevel: [0.7, 1.5], salaryLevel: [0.85, 1.4], dividendPayoutPct: [0, 0.9], automation: [0, 100], cyberDefense: [0, 100],
   };
   const [lo, hi] = bounds[lever];
-  if (lever === 'automation') {
-    // Automation costs capital to raise.
-    const delta = clamp(value, lo, hi) - c.automation;
+  if (lever === 'automation' || lever === 'cyberDefense') {
+    // Automation/security both cost capital to raise.
+    const delta = clamp(value, lo, hi) - c[lever];
     if (delta > 0) {
-      const cost = delta * c.revenue * 0.01;
-      if (cost > c.cash) return { ok: false, message: 'Not enough company cash to automate.' };
+      const cost = delta * c.revenue * (lever === 'automation' ? 0.01 : 0.006);
+      if (cost > c.cash) return { ok: false, message: 'Not enough company cash for that.' };
       c.cash -= cost;
     }
   }
@@ -212,6 +213,81 @@ export function sellCompany(state: GameState, companyId: string): ActionResult {
   p.companies = p.companies.filter((id) => id !== companyId);
   log(state, `Sold ${c.name} for $${Math.round(value).toLocaleString()} (net of tax).`, 'money');
   return { ok: true, message: `Sold ${c.name} for $${Math.round(value - tax).toLocaleString()}.` };
+}
+
+/** Corporate espionage: steal trade secrets from a rival, at real legal risk. */
+export function spyOnCompany(state: GameState, targetCompanyId: string): ActionResult {
+  const p = state.player;
+  const target = state.companies[targetCompanyId];
+  if (!target || target.status !== 'active' || target.playerOwned) return { ok: false, message: 'Invalid target.' };
+  const cost = Math.round(20_000 + target.revenue * 0.002);
+  if (cost > p.money) return { ok: false, message: `Espionage costs $${cost.toLocaleString()}.` };
+  const rng = withRng(state);
+  p.money -= cost;
+  const skill = (p.skills[SK.hacking] ?? 0) * 0.6 + (p.skills[SK.streetSmarts] ?? 0) * 0.4;
+  const chance = clamp(0.35 + skill * 0.005 - target.cyberDefense * 0.003, 0.05, 0.85);
+  const success = rng.chance(chance);
+  commit(state, rng);
+  if (success) {
+    const beneficiaries = p.companies
+      .map((id) => state.companies[id])
+      .filter((co): co is Company => !!co && co.status === 'active' && co.industryId === target.industryId);
+    for (const b of beneficiaries) {
+      b.quality = clamp100(b.quality + 6);
+      b.brand = clamp100(b.brand + 3);
+    }
+    target.brand = clamp100(target.brand - 5);
+    target.quality = clamp100(target.quality - 3);
+    p.notoriety = clamp100(p.notoriety + 4);
+    log(state, `🕵️ Corporate espionage against ${target.name} paid off.`, 'business');
+    return {
+      ok: true,
+      message: beneficiaries.length
+        ? `Stole trade secrets from ${target.name}.`
+        : `Learned about ${target.name}'s operations, but have no company in that industry to use it.`,
+    };
+  }
+  p.notoriety = clamp100(p.notoriety + 8);
+  p.reputation = clamp100(p.reputation - 6);
+  const founder = target.founderId !== 'player' ? state.npcs[target.founderId] : null;
+  if (founder) founder.opinionOfPlayer = clamp(founder.opinionOfPlayer - 40, -100, 100);
+  if (rng.chance(0.3)) p.criminalRecord++;
+  log(state, `🚨 Your corporate espionage attempt against ${target.name} was exposed.`, 'bad');
+  return { ok: false, message: `Caught red-handed spying on ${target.name}.` };
+}
+
+/** Attempt to acquire an NPC-owned public company by outbidding the market. */
+export function attemptHostileTakeover(state: GameState, targetCompanyId: string, offerAmount: number): ActionResult {
+  const p = state.player;
+  const target = state.companies[targetCompanyId];
+  if (!target || target.status !== 'active' || target.playerOwned || !target.isPublic) {
+    return { ok: false, message: 'Not a valid takeover target.' };
+  }
+  if (offerAmount > p.money) return { ok: false, message: 'You cannot afford that offer.' };
+  const cap = Math.max(1, marketCap(target));
+  const ratio = offerAmount / cap;
+  if (ratio < 0.6) return { ok: false, message: 'Offer is too low to be taken seriously (needs 60%+ of market cap).' };
+  const rng = withRng(state);
+  const skill = (p.skills[SK.negotiation] ?? 0) * 0.4 + p.influence * 0.4;
+  const chance = clamp(0.1 + (ratio - 1) * 0.6 + skill * 0.003, 0.05, 0.9);
+  const success = rng.chance(chance);
+  const dueDiligenceFee = offerAmount * 0.05;
+  if (!success) {
+    p.money -= dueDiligenceFee;
+    commit(state, rng);
+    log(state, `Your takeover bid for ${target.name} was rebuffed by the board.`, 'bad');
+    return { ok: false, message: `${target.name}'s board rejected your bid.` };
+  }
+  p.money -= offerAmount;
+  target.playerOwned = true;
+  target.playerSharePct = clamp(0.51 + (ratio - 1) * 0.2, 0.51, 0.95);
+  target.founderId = 'player';
+  p.companies.push(target.id);
+  p.reputation = clamp100(p.reputation + 3);
+  p.influence = clamp100(p.influence + 2);
+  commit(state, rng);
+  log(state, `🏴 Hostile takeover complete: you now control ${target.name}.`, 'business');
+  return { ok: true, message: `Acquired ${target.name}!` };
 }
 
 // ---------------------------------------------------------------------------
@@ -344,36 +420,44 @@ export function launchCampaign(state: GameState, officeKind: OfficeKind, warChes
       ? home.states.find((s) => s.cityIds.includes(p.cityId))?.name ?? home.name
       : home.name;
   p.money -= warChest;
-  p.campaign = { officeKind, regionName: region, warChest, momentum: 0, yearsToElection: officeKind === 'head_of_state' || officeKind === 'governor' ? 1 : 0 };
+  p.campaign = {
+    officeKind,
+    regionName: region,
+    warChest,
+    momentum: 0,
+    yearsToElection: officeKind === 'head_of_state' || officeKind === 'governor' ? 1 : 0,
+    consultantHired: false,
+  };
   log(state, `📣 Launched a campaign for ${spec.title} of ${region} with a $${warChest.toLocaleString()} war chest.`, 'politics');
   return { ok: true, message: `Campaign for ${spec.title} underway.` };
 }
 
 /** Discretionary campaign activities that spend money/PC for momentum. */
-export function campaignAction(state: GameState, kind: 'ads' | 'rally' | 'doorknock' | 'fundraise'): ActionResult {
+export function campaignAction(state: GameState, kind: 'ads' | 'rally' | 'doorknock' | 'fundraise' | 'consultant' | 'polling'): ActionResult {
   const p = state.player;
   if (!p.campaign) return { ok: false, message: 'No active campaign.' };
   const rng = withRng(state);
+  const boost = p.campaign.consultantHired ? 1.25 : 1;
   let msg = '';
   switch (kind) {
     case 'ads': {
       const cost = 50_000;
       if (p.money < cost) return { ok: false, message: 'Not enough for an ad blitz.' };
       p.money -= cost;
-      const gain = 3 + (p.skills['media_public_relations'] ?? 0) * 0.05 + rng.range(0, 3);
+      const gain = (3 + (p.skills['media_public_relations'] ?? 0) * 0.05 + rng.range(0, 3)) * boost;
       p.campaign.momentum = clamp(p.campaign.momentum + gain, -50, 50);
       msg = `Ran attack ads. Momentum +${gain.toFixed(0)}.`;
       break;
     }
     case 'rally': {
-      const gain = 2 + p.charisma * 0.05 + (p.skills['politics_public_speaking'] ?? 0) * 0.04 + rng.range(-1, 3);
+      const gain = (2 + p.charisma * 0.05 + (p.skills['politics_public_speaking'] ?? 0) * 0.04 + rng.range(-1, 3)) * boost;
       p.campaign.momentum = clamp(p.campaign.momentum + gain, -50, 50);
       p.health = clamp100(p.health - 1);
       msg = `Held a rally. Momentum +${gain.toFixed(0)}.`;
       break;
     }
     case 'doorknock': {
-      const gain = 1.5 + (p.skills['politics_grassroots_organizing'] ?? 0) * 0.04 + rng.range(-0.5, 2);
+      const gain = (1.5 + (p.skills['politics_grassroots_organizing'] ?? 0) * 0.04 + rng.range(-0.5, 2)) * boost;
       p.campaign.momentum = clamp(p.campaign.momentum + gain, -50, 50);
       p.popularity = clamp100(p.popularity + 0.5);
       msg = `Knocked on doors. Momentum +${gain.toFixed(1)}, popularity nudged up.`;
@@ -383,6 +467,23 @@ export function campaignAction(state: GameState, kind: 'ads' | 'rally' | 'doorkn
       const raised = 20_000 + p.influence * 4_000 + (p.skills['business_fundraising'] ?? 0) * 2_000 * rng.range(0.5, 1.5);
       p.campaign.warChest += raised;
       msg = `Fundraiser brought in $${Math.round(raised).toLocaleString()}.`;
+      break;
+    }
+    case 'consultant': {
+      const cost = 100_000;
+      if (p.campaign.consultantHired) return { ok: false, message: 'You already have a campaign consultant.' };
+      if (p.money < cost) return { ok: false, message: 'Cannot afford a top consultant ($100,000).' };
+      p.money -= cost;
+      p.campaign.consultantHired = true;
+      msg = 'Hired a top campaign consultant. All future momentum gains +25%.';
+      break;
+    }
+    case 'polling': {
+      const cost = 15_000;
+      if (p.money < cost) return { ok: false, message: 'Not enough for a polling firm.' };
+      p.money -= cost;
+      const chance = campaignWinChance(state, rng);
+      msg = `Internal polling puts you at ${Math.round(chance * 100)}% to win.`;
       break;
     }
   }
@@ -451,6 +552,52 @@ export function repealLaw(state: GameState, lawId: string): ActionResult {
   home.lawsInForce = home.lawsInForce.filter((id) => id !== lawId);
   log(state, `Repealed the ${law.name}.`, 'politics');
   return { ok: true, message: `${law.name} repealed.` };
+}
+
+/** NPC politicians in the player's home country, eligible for cabinet appointment. */
+export function cabinetCandidates(state: GameState) {
+  const p = state.player;
+  return Object.values(state.npcs).filter((n) => n.alive && n.countryId === p.countryId && n.role === 'politician');
+}
+
+export function appointMinister(state: GameState, portfolio: CabinetPortfolio, npcId: string): ActionResult {
+  const p = state.player;
+  const home = state.countries.find((c) => c.id === p.countryId)!;
+  if (home.leaderId !== 'player') return { ok: false, message: 'Only the head of state appoints ministers.' };
+  if (!CABINET_PORTFOLIOS.includes(portfolio)) return { ok: false, message: 'Unknown portfolio.' };
+  const npc = state.npcs[npcId];
+  if (!npc || !npc.alive) return { ok: false, message: 'Candidate unavailable.' };
+  home.cabinet[portfolio] = npcId;
+  log(state, `Appointed ${npc.name} as Minister for ${portfolio}.`, 'politics');
+  return { ok: true, message: `${npc.name} appointed Minister for ${portfolio}.` };
+}
+
+export function dismissMinister(state: GameState, portfolio: CabinetPortfolio): ActionResult {
+  const p = state.player;
+  const home = state.countries.find((c) => c.id === p.countryId)!;
+  if (home.leaderId !== 'player') return { ok: false, message: 'Only the head of state reshuffles cabinet.' };
+  if (!home.cabinet[portfolio]) return { ok: false, message: 'That portfolio is vacant.' };
+  const name = state.npcs[home.cabinet[portfolio]]?.name ?? 'The minister';
+  delete home.cabinet[portfolio];
+  log(state, `${name} was dismissed from the cabinet.`, 'politics');
+  return { ok: true, message: `${name} dismissed.` };
+}
+
+export function negotiateCoalition(state: GameState, partnerPartyId: string): ActionResult {
+  const p = state.player;
+  const home = state.countries.find((c) => c.id === p.countryId)!;
+  if (home.totalSeats === 0) return { ok: false, message: 'No legislature to form a coalition in.' };
+  if (!p.partyId) return { ok: false, message: 'Join or found a party first.' };
+  const myParty = home.parties.find((x) => x.id === p.partyId);
+  if (!myParty) return { ok: false, message: 'Party not found.' };
+  if (myParty.seats / home.totalSeats >= 0.5) return { ok: false, message: 'Your party already holds a majority.' };
+  const partner = home.parties.find((x) => x.id === partnerPartyId);
+  if (!partner || partner.id === p.partyId) return { ok: false, message: 'Invalid coalition partner.' };
+  if (p.politicalCapital < 10) return { ok: false, message: 'Needs at least 10 political capital.' };
+  p.politicalCapital = clamp(p.politicalCapital - 10, 0, 100);
+  home.coalitionPartnerId = partnerPartyId;
+  log(state, `🤝 Formed a governing coalition with the ${partner.name}.`, 'politics');
+  return { ok: true, message: `Coalition formed with the ${partner.name}.` };
 }
 
 // ---------------------------------------------------------------------------

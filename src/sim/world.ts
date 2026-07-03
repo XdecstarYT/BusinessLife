@@ -187,6 +187,8 @@ export function generateWorld(config: NewGameConfig): GameState {
       atWarWith: [],
       sanctionsOn: [],
       lawsInForce: [],
+      cabinet: {},
+      coalitionPartnerId: null,
       economy: initEconomy(seed, rng),
       states,
       cities,
@@ -224,6 +226,8 @@ export function generateWorld(config: NewGameConfig): GameState {
     achievements: [],
     netWorthHistory: [],
     gameOver: null,
+    worldEvent: null,
+    generation: 1,
   };
 
   // Public + private NPC companies per country (more in the player's home).
@@ -304,6 +308,9 @@ export function generateWorld(config: NewGameConfig): GameState {
     properties: [],
     loans: [],
     relationships: [],
+    spouseId: null,
+    children: [],
+    divorceCount: 0,
     partyId: null,
     office: null,
     politicalCapital: 0,

@@ -129,12 +129,13 @@ function PortfolioView({ onSelect }: { onSelect: (id: string) => void }) {
           const mv = c.sharePrice * Math.abs(h.shares);
           const pl = isShort ? (h.costBasis - c.sharePrice) * -h.shares : (c.sharePrice - h.costBasis) * h.shares;
           return (
-            <Card key={h.companyId} className="p-3 flex items-center justify-between" onClick={() => onSelect(h.companyId)}>
+            <Card key={h.companyId} className="p-3 flex items-center justify-between gap-2" onClick={() => onSelect(h.companyId)}>
               <div className="min-w-0">
-                <div className="font-bold truncate flex items-center gap-2">
-                  {c.name} {isShort && <Badge tone="warn">SHORT</Badge>}
+                <div className="font-bold flex items-center gap-2 min-w-0">
+                  <span className="truncate" title={c.name}>{c.name}</span>
+                  {isShort && <Badge tone="warn">SHORT</Badge>}
                 </div>
-                <div className="text-xs text-slate-500 dark:text-slate-400">
+                <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
                   {num(Math.abs(h.shares))} sh @ {money(h.costBasis)} → {money(c.sharePrice)}
                 </div>
               </div>
