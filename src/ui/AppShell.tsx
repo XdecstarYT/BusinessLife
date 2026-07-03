@@ -1,26 +1,53 @@
 /**
  * App chrome: a sticky top bar (identity, cash, year, theme toggle) and a
- * bottom tab bar in the style of the reference. The tab bar exposes the five
- * primary sections; secondary sections are reached from the Life hub grid.
+ * bottom tab bar in the style of the reference. The bar covers the four most
+ * frequent sections plus a "More" tab that opens a sheet listing every
+ * remaining screen — so every screen is reachable in at most two taps from
+ * anywhere in the app, not just from the Life hub grid.
  */
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useGame, type Screen } from '../store/gameStore';
 import { money } from './format';
-import { IconBusiness, IconLife, IconMarket, IconMoon, IconPolitics, IconSun, IconWorld } from './icons';
+import {
+  IconAssets,
+  IconBusiness,
+  IconCareer,
+  IconHeart,
+  IconLife,
+  IconMarket,
+  IconMenu,
+  IconMoon,
+  IconNews,
+  IconPolitics,
+  IconStats,
+  IconSun,
+  IconWorld,
+} from './icons';
+import { Modal } from './components';
 
 const TABS: { screen: Screen; label: string; Icon: (p: { className?: string }) => ReactNode }[] = [
   { screen: 'life', label: 'Life', Icon: IconLife },
   { screen: 'business', label: 'Business', Icon: IconBusiness },
   { screen: 'market', label: 'Markets', Icon: IconMarket },
   { screen: 'politics', label: 'Politics', Icon: IconPolitics },
+];
+
+const MORE_SCREENS: { screen: Screen; label: string; Icon: (p: { className?: string }) => ReactNode }[] = [
+  { screen: 'career', label: 'Career', Icon: IconCareer },
+  { screen: 'assets', label: 'Assets', Icon: IconAssets },
+  { screen: 'family', label: 'Family', Icon: IconHeart },
   { screen: 'world', label: 'World', Icon: IconWorld },
+  { screen: 'news', label: 'News', Icon: IconNews },
+  { screen: 'stats', label: 'Stats', Icon: IconStats },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { state, screen, setScreen, darkMode, toggleDark, toMenu } = useGame();
+  const [moreOpen, setMoreOpen] = useState(false);
   if (!state) return <>{children}</>;
   const p = state.player;
   const home = state.countries.find((c) => c.id === p.countryId)!;
+  const inMore = MORE_SCREENS.some((m) => m.screen === screen);
 
   return (
     <div className="min-h-full flex flex-col bg-slate-50 dark:bg-ink-900 text-slate-900 dark:text-white">
@@ -77,8 +104,39 @@ export function AppShell({ children }: { children: ReactNode }) {
               </button>
             );
           })}
+          <button
+            onClick={() => setMoreOpen(true)}
+            className={`flex flex-col items-center gap-0.5 py-2.5 px-0.5 flex-1 min-w-0 ${
+              inMore ? 'text-brand-500' : 'text-slate-400 dark:text-slate-500'
+            }`}
+          >
+            <IconMenu className="w-6 h-6 shrink-0" />
+            <span className="text-[10px] sm:text-[11px] font-semibold w-full text-center leading-tight">More</span>
+          </button>
         </div>
       </nav>
+
+      {/* "More" sheet: every remaining screen, reachable from anywhere */}
+      <Modal open={moreOpen} onClose={() => setMoreOpen(false)} title="More">
+        <div className="grid grid-cols-3 gap-4">
+          {MORE_SCREENS.map(({ screen: s, label, Icon }) => (
+            <button
+              key={s}
+              onClick={() => { setScreen(s); setMoreOpen(false); }}
+              className="flex flex-col items-center gap-2"
+            >
+              <div
+                className={`w-14 h-14 rounded-full flex items-center justify-center ${
+                  screen === s ? 'bg-brand-500 text-white' : 'bg-slate-100 dark:bg-ink-800 text-slate-600 dark:text-slate-300'
+                }`}
+              >
+                <Icon className="w-6 h-6" />
+              </div>
+              <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">{label}</span>
+            </button>
+          ))}
+        </div>
+      </Modal>
     </div>
   );
 }
