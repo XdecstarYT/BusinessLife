@@ -76,11 +76,14 @@ function generateParties(rng: RNG, seed: { ideologyLean: number }, totalSeats: n
   return parties;
 }
 
+export type Scenario = 'modern' | 'recession' | 'boom' | 'crisis';
+
 export interface NewGameConfig {
   playerName: string;
   gender: Gender;
   seedText: string;
   startYear?: number;
+  scenario?: Scenario;
 }
 
 export function generateWorld(config: NewGameConfig): GameState {
@@ -189,10 +192,14 @@ export function generateWorld(config: NewGameConfig): GameState {
       lawsInForce: [],
       cabinet: {},
       coalitionPartnerId: null,
-      economy: initEconomy(seed, rng),
+      economy: initEconomy(seed, rng, config.scenario ?? 'modern'),
       states,
       cities,
       isPlayerHome: !!seed.isPlayerHome,
+      budgetAllocations: { Finance: 16.67, 'Foreign Affairs': 16.67, Defense: 16.67, Health: 16.67, Education: 16.67, Justice: 16.65 },
+      infrastructureProjects: [],
+      intelCapability: rng.range(15, 40),
+      taxAdjustments: {},
     };
     countries.push(country);
   }
@@ -322,7 +329,10 @@ export function generateWorld(config: NewGameConfig): GameState {
     partyId: null,
     office: null,
     politicalCapital: 0,
+    politicalHeirId: null,
+    advisors: [],
     campaign: null,
+    lastElectionResult: null,
   };
   // Parents
   for (const kind of ['parent', 'parent'] as const) {

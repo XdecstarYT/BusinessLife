@@ -97,7 +97,12 @@ export interface Office {
   termYears: number;
   yearsInOffice: number;
   yearsInOfficeTotal: number;
+  promises: ManifestoPromise[];
+  promiseBaseline: Partial<Record<ManifestoPromise, number>>;
 }
+
+export const MANIFESTO_PROMISES = ['tax_cuts', 'healthcare', 'education', 'jobs', 'crime_reduction', 'infrastructure'] as const;
+export type ManifestoPromise = (typeof MANIFESTO_PROMISES)[number];
 
 export interface PlayerJob {
   title: string;
@@ -157,6 +162,8 @@ export interface Player {
   partyId: string | null;
   office: Office | null;
   politicalCapital: number; // spend to pass laws, gain from wins
+  politicalHeirId: string | null; // NPC id (adult child) designated to inherit party/popularity on death
+  advisors: Advisor[]; // up to 3 hired AI advisors offering recommendations that can be wrong
   campaign: null | {
     officeKind: OfficeKind;
     regionName: string;
@@ -164,7 +171,17 @@ export interface Player {
     momentum: number; // -50..50 swing on top of fundamentals
     yearsToElection: number;
     consultantHired: boolean; // boosts momentum gains from campaign actions
+    promises: ManifestoPromise[]; // manifesto pledges made at launch, tracked for fulfillment in office
   };
+  lastElectionResult: ElectionResult | null; // transient: set on resolution, cleared once the UI shows it
+}
+
+export interface ElectionResult {
+  won: boolean;
+  officeTitle: string;
+  regionName: string;
+  playerSharePct: number; // estimated vote share, 0..100
+  rivalSharePct: number;
 }
 
 export type NPCRole =
@@ -314,10 +331,30 @@ export interface Country {
   states: CountryState[];
   cities: City[];
   isPlayerHome: boolean;
+  budgetAllocations: Record<CabinetPortfolio, number>; // share of budget per portfolio, sums to 100
+  infrastructureProjects: InfrastructureProject[];
+  intelCapability: number; // 0..100, national intelligence agency strength
+  taxAdjustments: Partial<TaxRates>; // player-set direct rate offsets, layered on top of legislated rates
 }
 
 export const CABINET_PORTFOLIOS = ['Finance', 'Foreign Affairs', 'Defense', 'Health', 'Education', 'Justice'] as const;
 export type CabinetPortfolio = (typeof CABINET_PORTFOLIOS)[number];
+
+export type InfrastructureKind = 'roads' | 'rail' | 'airport' | 'power' | 'internet';
+
+export interface InfrastructureProject {
+  id: string;
+  kind: InfrastructureKind;
+  yearsLeft: number;
+  totalYears: number;
+}
+
+export type AdvisorSpecialty = 'economy' | 'military' | 'diplomacy';
+
+export interface Advisor {
+  specialty: AdvisorSpecialty;
+  accuracy: number; // 0..100, chance their recommendation actually pans out
+}
 
 // ---------------------------------------------------------------------------
 // Business
@@ -398,8 +435,11 @@ export interface Company {
   politicalInfluence: number; // 0..100 lobbying muscle
 
   patents: number; // granted patents; each pays a small royalty and dings a rival
+  trademarks: number; // filed trademarks; small ongoing brand-growth bonus
   cyberDefense: number; // 0..100, reduces breach/lawsuit risk
   supplyChainResilience: number; // 0..100, dampens commodity-price exposure
+  hqTier: number; // 0=Basic Office, 1=Campus, 2=Tower, 3=Megacomplex
+  culture: 'traditional' | 'flexible' | 'remote' | 'startup';
   successorId: string | null; // player's child (NPC id) designated to inherit this company
 
   status: CompanyStatus;
@@ -478,6 +518,7 @@ export interface EffectSpec {
   loseJob?: boolean;
   campaignMomentum?: number;
   approvalOfGovernment?: number;
+  achievement?: string; // unlocks this achievement id if not already held
 }
 
 export interface EventOutcome {
@@ -605,6 +646,7 @@ export interface GameOverInfo {
   summary: string[];
   finalNetWorth: number;
   finalAge: number;
+  legacyScore: number; // 0..100, a rough composite of wealth, dynasty, office and achievements
 }
 
 export interface WorldEvent {

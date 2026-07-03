@@ -5,8 +5,10 @@ import {
   datingPool,
   declareRival,
   divorce,
+  dynastyScore,
   endRivalry,
   haveChild,
+  namePoliticalHeir,
   nameSuccessor,
   networking,
   propose,
@@ -14,7 +16,7 @@ import {
   seekMentor,
   type DatingCandidate,
 } from '../../sim/family';
-import { Badge, Button, Card, Modal, SectionHeader } from '../components';
+import { Badge, Button, Card, Modal, SectionHeader, StatBar } from '../components';
 import { money } from '../format';
 
 export function Family() {
@@ -45,6 +47,13 @@ export function Family() {
           <div className="font-extrabold">{children.filter((c) => c.alive).length}</div>
         </Card>
       </div>
+
+      <Card className="p-4 mb-4">
+        <StatBar label="Dynasty Score" value={dynastyScore(state)} />
+        <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+          How well positioned your family is to carry your legacy forward: heirs named, generations, and marriage.
+        </div>
+      </Card>
 
       {spouse ? (
         <Card className="p-5 mb-4">
@@ -98,11 +107,19 @@ export function Family() {
                     Age {child.age} {child.age >= 18 ? '· Adult' : '· Minor'}
                   </div>
                 </div>
-                {child.alive && child.age >= 18 && companies.length > 0 && (
-                  <Button size="sm" variant="soft" onClick={() => setSuccessorFor(child.id)}>
-                    Name Successor
-                  </Button>
-                )}
+                <div className="flex flex-col gap-1 items-end">
+                  {child.alive && child.age >= 18 && companies.length > 0 && (
+                    <Button size="sm" variant="soft" onClick={() => setSuccessorFor(child.id)}>
+                      Name Successor
+                    </Button>
+                  )}
+                  {child.alive && child.age >= 18 && (p.partyId || p.office) && p.politicalHeirId !== child.id && (
+                    <Button size="sm" variant="soft" onClick={() => run(namePoliticalHeir, child.id)}>
+                      Name Political Heir
+                    </Button>
+                  )}
+                  {p.politicalHeirId === child.id && <Badge tone="brand">Political Heir</Badge>}
+                </div>
               </Card>
             ))}
           </div>

@@ -6,7 +6,7 @@ import { resolveChoice } from '../src/sim/events';
 import { RNG } from '../src/sim/rng';
 import * as A from '../src/sim/actions';
 import { buyShares, marketCap } from '../src/sim/market';
-import { datingPool, propose, haveChild, nameSuccessor } from '../src/sim/family';
+import { datingPool, propose, haveChild, nameSuccessor, namePoliticalHeir, dynastyScore } from '../src/sim/family';
 import * as F from '../src/sim/family';
 import { INDUSTRIES } from '../src/data/industries';
 
@@ -76,7 +76,12 @@ for (let y = 0; y < 82 && state.player.alive; y++) {
       if (pub) buyShares(state, pub.id, 100_000);
     }
     if (y === 10 && state.player.money > 50_000) {
-      A.launchCampaign(state, 'councillor', 10_000);
+      A.launchCampaign(state, 'councillor', 10_000, ['tax_cuts', 'jobs']);
+    }
+    if (y === 11 && state.player.campaign) {
+      A.campaignAction(state, 'debate');
+      A.holdPressConference(state);
+      A.seekCelebrityEndorsement(state);
     }
     if (y === 20) {
       const listings = A.propertyListings(state);
@@ -175,6 +180,36 @@ for (let y = 0; y < 82 && state.player.alive; y++) {
       A.qualityAudit(state, co);
       A.proactiveRecall(state, co);
     }
+    // --- V5: corporate culture & HQ tiers ---
+    if (y === 26 && state.player.companies.length) {
+      const co = state.player.companies[0];
+      A.upgradeHQ(state, co);
+      A.setCompanyCulture(state, co, 'startup');
+      A.runGraduateProgram(state, co);
+      A.runLeadershipProgram(state, co);
+      A.fileTrademark(state, co);
+    }
+    // --- V5: political dynasty extension ---
+    if (y === 27 && state.player.children.length && (state.player.partyId || state.player.office)) {
+      const adultChild = state.player.children.map((id) => state.npcs[id]).find((c) => c && c.age >= 18);
+      if (adultChild) namePoliticalHeir(state, adultChild.id);
+    }
+    // --- V5: government & economy tools (only meaningful when leading the country) ---
+    if (y === 45) {
+      const home = state.countries.find((c) => c.id === state.player.countryId)!;
+      if (home.leaderId === 'player') {
+        A.setBudgetAllocation(state, 'Health', 25);
+        A.setTaxRate(state, 'income', 32);
+        A.launchInfrastructureProject(state, 'roads');
+        A.hireAdvisor(state, 'economy');
+        const advisor = state.player.advisors.find((a) => a.specialty === 'economy');
+        if (advisor) A.advisorRecommendation(state, advisor);
+        A.fundIntelligenceAgency(state, 50_000);
+        A.counterEspionage(state);
+        const other = state.countries.find((c) => c.id !== home.id);
+        if (other) A.gatherIntelligence(state, other.id);
+      }
+    }
   } catch (e) {
     errors++;
     console.error(`ERROR in year ${state.year}:`, (e as Error).message);
@@ -203,6 +238,11 @@ console.log('  crime rank:', state.player.crimeRank, 'in family:', !!state.playe
 console.log('  mentor:', state.player.mentorId ? state.npcs[state.player.mentorId]?.name ?? 'unknown' : 'none');
 console.log('  rival:', state.player.rivalId ? state.npcs[state.player.rivalId]?.name ?? 'unknown' : 'none');
 console.log('  bonds:', state.player.bonds.length, 'forex positions:', state.player.forexPositions.length, 'life insurance:', !!state.player.lifeInsurance);
+console.log('  companies at HQ tier > 0:', Object.values(state.companies).filter((c) => c.hqTier > 0).length);
+console.log('  political heir:', state.player.politicalHeirId ? state.npcs[state.player.politicalHeirId]?.name : 'none', '· dynasty score:', dynastyScore(state));
+console.log('  advisors hired:', state.player.advisors.length);
+console.log('  trademarks filed:', Object.values(state.companies).reduce((s, c) => s + c.trademarks, 0));
+console.log('  companies acquired via NPC mergers:', Object.values(state.companies).filter((c) => c.status === 'acquired').length);
 console.log('  errors:', errors);
 
 // Invariant checks

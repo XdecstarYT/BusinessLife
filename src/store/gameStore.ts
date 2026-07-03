@@ -69,6 +69,7 @@ interface GameStoreState {
   nextWeek: () => void;
   chooseEvent: (choice: EventChoice) => void;
   dismissEventResult: () => void;
+  dismissElectionResult: () => void;
   toggleDark: () => void;
   toast: (text: string, tone?: 'ok' | 'err') => void;
 
@@ -236,6 +237,13 @@ export const useGame = create<GameStoreState>((set, get) => ({
   },
 
   toggleDark: () => set({ darkMode: !get().darkMode }),
+
+  dismissElectionResult: () => {
+    const s = get().state;
+    if (!s) return;
+    s.player.lastElectionResult = null;
+    commit(get, set);
+  },
 
   toast: (text, tone = 'ok') => {
     const id = ++toastId;

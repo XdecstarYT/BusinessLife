@@ -4,18 +4,25 @@ import { useGame } from '../../store/gameStore';
 import {
   investInCompany,
   attemptHostileTakeover,
+  CULTURE_INFO,
   diversifySupplyChain,
+  fileTrademark,
   hireBrandAmbassador,
+  HQ_TIERS,
   protectionRacket,
   proactiveRecall,
   qualityAudit,
+  runGraduateProgram,
+  runLeadershipProgram,
   runTrainingProgram,
   sellCompany,
+  setCompanyCulture,
   setCompanyLever,
   spyOnCompany,
   startCompany,
   takeCompanyPublic,
   toggleCompanyInsurance,
+  upgradeHQ,
   withdrawFromCompany,
   type CompanyLever,
 } from '../../sim/actions';
@@ -332,6 +339,35 @@ function ManageModal({ companyId, onClose }: { companyId: string; onClose: () =>
         </Button>
       </div>
 
+      <div className="font-bold mt-5 mb-2">Headquarters</div>
+      <Card className="p-3 mb-2">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="font-semibold text-sm">{HQ_TIERS[c.hqTier].name}</div>
+            <div className="text-xs text-slate-500 dark:text-slate-400">{HQ_TIERS[c.hqTier].blurb}</div>
+          </div>
+          {c.hqTier < 3 && (
+            <Button size="sm" variant="soft" onClick={() => run(upgradeHQ, c.id)}>
+              Upgrade
+            </Button>
+          )}
+        </div>
+      </Card>
+      <div className="font-bold mb-2">Culture</div>
+      <div className="grid grid-cols-2 gap-2 mb-1">
+        {(Object.keys(CULTURE_INFO) as Company['culture'][]).map((k) => (
+          <Button
+            key={k}
+            size="sm"
+            variant={c.culture === k ? 'primary' : 'soft'}
+            onClick={() => run(setCompanyCulture, c.id, k)}
+          >
+            {CULTURE_INFO[k].label}
+          </Button>
+        ))}
+      </div>
+      <div className="text-xs text-slate-500 dark:text-slate-400 mb-2">{CULTURE_INFO[c.culture].blurb}</div>
+
       <div className="font-bold mt-5 mb-2">One-off Initiatives</div>
       <div className="mb-2">
         <StatBar label="Supply chain resilience" value={c.supplyChainResilience} />
@@ -339,9 +375,12 @@ function ManageModal({ companyId, onClose }: { companyId: string; onClose: () =>
       <div className="grid grid-cols-2 gap-2">
         <Button size="sm" variant="soft" onClick={() => run(hireBrandAmbassador, c.id)}>🌟 Brand Deal</Button>
         <Button size="sm" variant="soft" onClick={() => run(runTrainingProgram, c.id)}>🎓 Training</Button>
+        <Button size="sm" variant="soft" onClick={() => run(runGraduateProgram, c.id)}>🎓 Graduate Program</Button>
+        <Button size="sm" variant="soft" onClick={() => run(runLeadershipProgram, c.id)}>🏆 Leadership Program</Button>
         <Button size="sm" variant="soft" onClick={() => run(diversifySupplyChain, c.id)}>🔗 Diversify Supply</Button>
         <Button size="sm" variant="soft" onClick={() => run(qualityAudit, c.id)}>✅ Quality Audit</Button>
-        <Button size="sm" variant="soft" className="col-span-2" onClick={() => run(proactiveRecall, c.id)}>⚠️ Proactive Recall</Button>
+        <Button size="sm" variant="soft" onClick={() => run(fileTrademark, c.id)}>™️ File Trademark ({c.trademarks}/5)</Button>
+        <Button size="sm" variant="soft" onClick={() => run(proactiveRecall, c.id)}>⚠️ Proactive Recall</Button>
       </div>
 
       <div className="font-bold mt-5 mb-2">Capital</div>

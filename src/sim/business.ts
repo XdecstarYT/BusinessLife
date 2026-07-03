@@ -74,8 +74,11 @@ export function createCompany(opts: FoundCompanyOptions, rng: RNG): Company {
     insured: false,
     politicalInfluence: 0,
     patents: 0,
+    trademarks: 0,
     cyberDefense: rng.range(10, 30),
     supplyChainResilience: rng.range(10, 30),
+    hqTier: 0,
+    culture: 'flexible',
     successorId: null,
     status: 'active',
     history: [],
@@ -120,8 +123,14 @@ export function tickCompany(c: Company, ctx: CompanyTickContext): CompanyTickRes
     : 1 - (c.priceLevel - 1) * (1.4 - (c.brand + c.quality) / 250);
   const marketingPower = 1 + Math.sqrt(clamp01(c.marketingPct)) * 0.55;
   const qualityPull = 0.75 + ((c.quality + c.customerSatisfaction) / 200) * 0.5;
-  const managerMult = 0.85 + (c.managerQuality / 100) * 0.3;
-  const moraleMult = 0.9 + (c.morale / 100) * 0.2;
+  // HQ tier (0=Basic Office..3=Megacomplex) lifts manager effectiveness and morale
+  // ceiling but costs more upkeep. Culture is a set of tradeoffs, not a straight bonus.
+  const hqBonus = c.hqTier * 0.025;
+  const cultureOverheadMult = c.culture === 'remote' ? 0.82 : c.culture === 'traditional' ? 1.08 : c.culture === 'startup' ? 0.92 : 1;
+  const cultureMoraleNoise = c.culture === 'remote' || c.culture === 'startup' ? 5 : 3;
+  const cultureRdBoost = c.culture === 'startup' ? 1.15 : 1;
+  const managerMult = 0.85 + (c.managerQuality / 100) * 0.3 + hqBonus;
+  const moraleMult = 0.9 + (c.morale / 100) * 0.2 + hqBonus * 0.6;
   const noise = 1 + rng.normal(0, ind.volatility * 0.5);
 
   // Commodity exposure: producers ride the price, consumers pay it. A diversified
@@ -166,7 +175,8 @@ export function tickCompany(c: Company, ctx: CompanyTickContext): CompanyTickRes
   const marketingCost = c.revenue * c.marketingPct;
   const rdCost = c.revenue * c.rdPct;
   const interest = c.debt * c.debtRate;
-  const overheads = c.assets * 0.04 + (c.insured ? c.revenue * 0.01 : 0);
+  const hqOverhead = c.hqTier * c.assets * 0.006;
+  const overheads = c.assets * 0.04 * cultureOverheadMult + hqOverhead + (c.insured ? c.revenue * 0.01 : 0);
   c.expenses = laborCost + inputCost + marketingCost + rdCost + interest + overheads;
 
   const pretax = c.revenue - c.expenses;
@@ -175,15 +185,15 @@ export function tickCompany(c: Company, ctx: CompanyTickContext): CompanyTickRes
   c.cash += c.profit;
 
   // --- Soft stats -------------------------------------------------------------
-  const rdPower = c.rdPct * (1 + ind.techIntensity);
+  const rdPower = c.rdPct * (1 + ind.techIntensity) * cultureRdBoost;
   c.quality = clamp100(c.quality + rdPower * 90 - 2 + rng.range(-2, 2));
-  c.brand = clamp100(c.brand + c.marketingPct * 40 - 1.5 + (c.customerSatisfaction - 50) * 0.05 + rng.range(-1.5, 1.5));
+  c.brand = clamp100(c.brand + c.marketingPct * 40 - 1.5 + (c.customerSatisfaction - 50) * 0.05 + c.hqTier * 0.4 + c.trademarks * 0.3 + rng.range(-1.5, 1.5));
   c.customerSatisfaction = clamp100(
     c.customerSatisfaction * 0.6 + (c.quality * 0.5 + (1.1 - c.priceLevel) * 40 + 30) * 0.4 + rng.range(-4, 4),
   );
   const salaryHappiness = (c.salaryLevel - 1) * 30;
-  c.morale = clamp100(c.morale * 0.7 + (50 + salaryHappiness + (c.managerQuality - 50) * 0.3 - (c.automation > 60 ? 8 : 0)) * 0.3 + rng.range(-3, 3));
-  c.managerQuality = clamp100(c.managerQuality + rng.range(-2, 3));
+  c.morale = clamp100(c.morale * 0.7 + (50 + salaryHappiness + (c.managerQuality - 50) * 0.3 - (c.automation > 60 ? 8 : 0) + c.hqTier * 2) * 0.3 + rng.range(-cultureMoraleNoise, cultureMoraleNoise));
+  c.managerQuality = clamp100(c.managerQuality + rng.range(-2, c.culture === 'traditional' ? 5 : 3));
   c.esg = clamp100(c.esg + rng.range(-2, 2));
 
   // Unionization pressure when morale is low in labor-heavy industries.
@@ -264,4 +274,34 @@ export function npcManageCompany(c: Company, rng: RNG): void {
   }
   if (c.morale < 45 && rng.chance(0.5)) c.salaryLevel = clamp(c.salaryLevel + 0.05, 0.85, 1.4);
   if (rng.chance(0.2)) c.priceLevel = clamp(c.priceLevel + rng.range(-0.05, 0.05), 0.75, 1.45);
+}
+
+/** Competitor AI depth: NPC-owned companies occasionally consolidate within an
+ * industry/country, with the stronger firm absorbing a smaller rival. Player
+ * companies are never a merger party here (see attemptHostileTakeover for that). */
+export function tickMergers(state: GameState, rng: RNG): string[] {
+  const headlines: string[] = [];
+  const groups = new Map<string, Company[]>();
+  for (const c of Object.values(state.companies)) {
+    if (c.status !== 'active' || c.playerOwned) continue;
+    const key = `${c.countryId}|${c.industryId}`;
+    const list = groups.get(key);
+    if (list) list.push(c);
+    else groups.set(key, [c]);
+  }
+  for (const list of groups.values()) {
+    if (list.length < 2 || !rng.chance(0.05)) continue;
+    const sorted = [...list].sort((a, b) => b.revenue - a.revenue);
+    const acquirer = sorted[0];
+    const target = rng.pick(sorted.slice(1));
+    if (!target || target.status !== 'active') continue;
+    acquirer.revenue += target.revenue * 0.55;
+    acquirer.employees += Math.round(target.employees * 0.7);
+    acquirer.assets += target.assets * 0.6;
+    acquirer.marketShare = Math.min(1, acquirer.marketShare + target.marketShare);
+    acquirer.brand = clamp100(acquirer.brand + 3);
+    target.status = 'acquired';
+    headlines.push(`${acquirer.name} acquires rival ${target.name} in a market consolidation.`);
+  }
+  return headlines;
 }

@@ -3,6 +3,8 @@ import { useEffect } from 'react';
 import { useGame } from './store/gameStore';
 import { AppShell } from './ui/AppShell';
 import { EventModal } from './ui/EventModal';
+import { ElectionResultModal } from './ui/ElectionResultModal';
+import { TutorialOverlay } from './ui/TutorialOverlay';
 import { GameOver, Toasts } from './ui/Overlays';
 import { Menu } from './ui/screens/Menu';
 import { Life } from './ui/screens/Life';
@@ -50,6 +52,8 @@ export default function App() {
         </div>
       </AppShell>
       <EventModal />
+      <ElectionResultModal />
+      <TutorialOverlay />
       <GameOver />
       <Toasts />
     </>

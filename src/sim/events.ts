@@ -177,6 +177,7 @@ export function applyEffects(state: GameState, fx: EffectSpec, event: FiredEvent
   if (fx.campaignMomentum && p.campaign) {
     p.campaign.momentum = clamp(p.campaign.momentum + fx.campaignMomentum, -50, 50);
   }
+  if (fx.achievement && !state.achievements.includes(fx.achievement)) state.achievements.push(fx.achievement);
   if (fx.approvalOfGovernment) {
     const country = state.countries.find((k) => k.id === p.countryId)!;
     country.approvalOfGovernment = clamp100(country.approvalOfGovernment + fx.approvalOfGovernment);

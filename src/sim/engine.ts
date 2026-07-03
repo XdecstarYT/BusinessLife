@@ -8,13 +8,13 @@ import type { GameState, LifeLogEntry } from './types';
 import { clamp, clamp100 } from './types';
 import { RNG } from './rng';
 import { tickCommodities, tickEconomy } from './economy';
-import { npcManageCompany, tickCompany, companyValuation } from './business';
+import { npcManageCompany, tickCompany, tickMergers, companyValuation } from './business';
 import { tickStock, portfolioValue } from './market';
-import { campaignWinChance, OFFICE_SPEC_BY_KIND, tickNPCs, tickPolitics } from './politics';
+import { campaignWinChance, OFFICE_SPEC_BY_KIND, promiseFulfillment, promiseMetricValue, tickNPCs, tickPolitics } from './politics';
 import { fireEvents } from './events';
 import { generateNews } from './news';
 import { INDUSTRY_BY_ID } from '../data/industries';
-import { distributeEstate, tickFamily } from './family';
+import { distributeEstate, dynastyScore, tickFamily } from './family';
 import { tickWorldEvents } from './worldEvents';
 import { tryFireDailyEvent } from './dailyEvents';
 
@@ -112,11 +112,33 @@ function tickPlayerLife(state: GameState, rng: RNG): void {
     }
     // Term end: face re-election or step down (dictators/monarchs don't).
     if (p.office.kind !== 'dictator' && p.office.kind !== 'monarch' && p.office.yearsInOffice >= p.office.termYears) {
-      const winChance = clamp(0.35 + (p.popularity - 45) / 100 + (home.approvalOfGovernment - 45) / 200, 0.05, 0.95);
-      if (rng.chance(winChance)) {
+      const fulfillment = p.office.promises.length ? promiseFulfillment(p.office, home) : [];
+      const fulfilledRatio = fulfillment.length ? fulfillment.filter((f) => f.fulfilled).length / fulfillment.length : 0.5;
+      const winChance = clamp(
+        0.35 + (p.popularity - 45) / 100 + (home.approvalOfGovernment - 45) / 200 + (fulfilledRatio - 0.5) * 0.15,
+        0.05,
+        0.95,
+      );
+      const won = rng.chance(winChance);
+      state.player.lastElectionResult = {
+        won,
+        officeTitle: p.office.title,
+        regionName: p.office.regionName,
+        playerSharePct: Math.round(winChance * 100),
+        rivalSharePct: Math.round((1 - winChance) * 100),
+      };
+      if (won) {
         p.office.yearsInOffice = 0;
+        for (const promise of p.office.promises) p.office.promiseBaseline[promise] = promiseMetricValue(home, promise);
         log(state, `Re-elected as ${p.office.title} for another ${p.office.termYears}-year term.`, 'politics');
         p.politicalCapital = clamp(p.politicalCapital + 5, 0, 100);
+        if (fulfillment.length) {
+          const kept = fulfillment.filter((f) => f.fulfilled).length;
+          log(state, `Manifesto scorecard: kept ${kept}/${fulfillment.length} promises.`, 'politics');
+          if (kept === fulfillment.length && !state.achievements.includes('manifesto_keeper')) {
+            state.achievements.push('manifesto_keeper');
+          }
+        }
       } else {
         log(state, `You lost re-election and left office as ${p.office.title}.`, 'bad');
         if (p.office.kind === 'head_of_state' && home.leaderId === 'player') {
@@ -146,7 +168,16 @@ function tickPlayerLife(state: GameState, rng: RNG): void {
     if (p.campaign.yearsToElection <= 0) {
       const chance = campaignWinChance(state, rng);
       const spec = OFFICE_SPEC_BY_KIND[p.campaign.officeKind];
-      if (rng.chance(chance)) {
+      const promises = p.campaign.promises;
+      const won = rng.chance(chance);
+      state.player.lastElectionResult = {
+        won,
+        officeTitle: spec.title,
+        regionName: p.campaign.regionName,
+        playerSharePct: Math.round(chance * 100),
+        rivalSharePct: Math.round((1 - chance) * 100),
+      };
+      if (won) {
         p.office = {
           kind: spec.kind,
           title: spec.title,
@@ -154,6 +185,8 @@ function tickPlayerLife(state: GameState, rng: RNG): void {
           termYears: spec.termYears,
           yearsInOffice: 0,
           yearsInOfficeTotal: p.office?.kind === spec.kind ? p.office.yearsInOfficeTotal : 0,
+          promises,
+          promiseBaseline: Object.fromEntries(promises.map((pr) => [pr, promiseMetricValue(home, pr)])),
         };
         if (!state.achievements.includes(`office:${spec.kind}`)) state.achievements.push(`office:${spec.kind}`);
         p.popularity = clamp100(p.popularity + 8);
@@ -238,6 +271,21 @@ function tickPlayerLife(state: GameState, rng: RNG): void {
   }
 }
 
+/** A rough 0..100 composite of wealth, dynasty, office and achievements at death. */
+function computeLegacyScore(state: GameState, worth: number): number {
+  const p = state.player;
+  let score = 0;
+  score += clamp(Math.log10(Math.max(1, worth)) * 3, 0, 25);
+  score += Math.min(20, state.achievements.length * 1.5);
+  score += dynastyScore(state) * 0.25;
+  const officeAchievements = state.achievements.filter((a) => a.startsWith('office:'));
+  if (officeAchievements.some((a) => a === 'office:head_of_state')) score += 20;
+  else if (officeAchievements.some((a) => a === 'office:minister' || a === 'office:governor')) score += 12;
+  else if (officeAchievements.length) score += 6;
+  score += Math.min(10, p.companies.length * 2);
+  return Math.round(clamp(score, 0, 100));
+}
+
 function gameOverCheck(state: GameState): void {
   const p = state.player;
   if (p.alive) return;
@@ -260,14 +308,17 @@ function gameOverCheck(state: GameState): void {
         : p.age >= 50
           ? 'An unexpected illness took you before your time.'
           : 'Tragedy struck — your life was cut short unexpectedly.';
+  const legacyScore = computeLegacyScore(state, worth);
   state.gameOver = {
     reason,
     summary,
     finalNetWorth: worth,
     finalAge: p.age,
+    legacyScore,
   };
   log(state, `You died at age ${p.age}. ${state.gameOver.reason}`, 'milestone');
   for (const note of estateNotes) log(state, note, 'milestone');
+  log(state, `Legacy score: ${legacyScore}/100.`, 'milestone');
 }
 
 /**
@@ -317,6 +368,7 @@ export function advanceYear(state: GameState): GameState {
     }
     tickStock(company, state, rng);
   }
+  businessHeadlines.push(...tickMergers(state, rng));
 
   // 4. The player's own year
   tickPlayerLife(state, rng);

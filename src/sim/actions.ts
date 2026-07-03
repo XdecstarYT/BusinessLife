@@ -4,7 +4,7 @@
  * and eligibility so the UI can surface clean errors. RNG-consuming actions
  * advance the persisted stream so outcomes stay deterministic on replay.
  */
-import type { CabinetPortfolio, Company, GameState, Gender, OfficeKind, PropertyAsset } from './types';
+import type { Advisor, AdvisorSpecialty, CabinetPortfolio, Company, GameState, Gender, InfrastructureKind, ManifestoPromise, OfficeKind, PropertyAsset, TaxRates } from './types';
 import { CABINET_PORTFOLIOS, clamp, clamp100 } from './types';
 import { RNG } from './rng';
 import { INDUSTRY_BY_ID, INDUSTRIES } from '../data/industries';
@@ -525,6 +525,116 @@ export function proactiveRecall(state: GameState, companyId: string): ActionResu
   return { ok: true, message: 'Recall handled proactively — customers noticed the diligence.' };
 }
 
+// ---------------------------------------------------------------------------
+// Corporate HQ tiers & culture
+// ---------------------------------------------------------------------------
+
+export const HQ_TIERS = [
+  { tier: 0, name: 'Basic Office', blurb: 'A modest office suite. No special perks.' },
+  { tier: 1, name: 'Campus', blurb: 'A dedicated campus — modest morale and brand lift.' },
+  { tier: 2, name: 'Tower', blurb: 'A signature tower — strong morale, management and brand lift.' },
+  { tier: 3, name: 'Megacomplex', blurb: 'A flagship megacomplex — the strongest morale, management and brand lift money can buy.' },
+] as const;
+
+export const CULTURE_INFO: Record<Company['culture'], { label: string; blurb: string }> = {
+  traditional: { label: 'Traditional', blurb: 'Faster management growth, steadier morale, higher overhead.' },
+  flexible: { label: 'Flexible', blurb: 'A balanced, no-drawback default.' },
+  remote: { label: 'Remote-First', blurb: 'Lower overhead, but morale swings harder year to year.' },
+  startup: { label: 'Startup', blurb: 'R&D hits harder, but morale is volatile and overhead runs lean.' },
+};
+
+export function upgradeHQ(state: GameState, companyId: string): ActionResult {
+  const c = state.companies[companyId];
+  if (!c || !c.playerOwned || c.status !== 'active') return { ok: false, message: 'Not your company.' };
+  if (c.hqTier >= 3) return { ok: false, message: 'Already at the top HQ tier.' };
+  const cost = (c.hqTier + 1) * Math.max(50_000, c.revenue * 0.25);
+  if (cost > c.cash) return { ok: false, message: `Needs $${Math.round(cost).toLocaleString()} in company cash.` };
+  c.cash -= cost;
+  c.hqTier++;
+  const tierName = HQ_TIERS[c.hqTier].name;
+  if (c.hqTier >= 3 && !state.achievements.includes('hq_megacomplex')) state.achievements.push('hq_megacomplex');
+  log(state, `${c.name} moved into a new ${tierName} HQ.`, 'business');
+  return { ok: true, message: `Upgraded to ${tierName}.` };
+}
+
+export function setCompanyCulture(state: GameState, companyId: string, culture: Company['culture']): ActionResult {
+  const c = state.companies[companyId];
+  if (!c || !c.playerOwned || c.status !== 'active') return { ok: false, message: 'Not your company.' };
+  if (c.culture === culture) return { ok: false, message: 'That is already the culture.' };
+  const cost = Math.max(5_000, c.revenue * 0.005);
+  if (cost > c.cash) return { ok: false, message: `Needs $${Math.round(cost).toLocaleString()} to restructure.` };
+  c.cash -= cost;
+  c.culture = culture;
+  log(state, `${c.name} adopted a ${CULTURE_INFO[culture].label.toLowerCase()} workplace culture.`, 'business');
+  return { ok: true, message: `Culture set to ${CULTURE_INFO[culture].label}.` };
+}
+
+export function runGraduateProgram(state: GameState, companyId: string): ActionResult {
+  const c = state.companies[companyId];
+  if (!c || !c.playerOwned || c.status !== 'active') return { ok: false, message: 'Not your company.' };
+  const cost = Math.max(35_000, c.revenue * 0.04);
+  if (cost > c.cash) return { ok: false, message: `Needs $${Math.round(cost).toLocaleString()} in company cash.` };
+  c.cash -= cost;
+  c.managerQuality = clamp100(c.managerQuality + 12);
+  c.quality = clamp100(c.quality + 4);
+  log(state, `${c.name} launched a graduate development program.`, 'business');
+  return { ok: true, message: 'Graduate program complete. Management and quality improved.' };
+}
+
+export function runLeadershipProgram(state: GameState, companyId: string): ActionResult {
+  const c = state.companies[companyId];
+  if (!c || !c.playerOwned || c.status !== 'active') return { ok: false, message: 'Not your company.' };
+  const cost = Math.max(80_000, c.revenue * 0.08);
+  if (cost > c.cash) return { ok: false, message: `Needs $${Math.round(cost).toLocaleString()} in company cash.` };
+  c.cash -= cost;
+  c.managerQuality = clamp100(c.managerQuality + 20);
+  c.morale = clamp100(c.morale + 12);
+  c.brand = clamp100(c.brand + 5);
+  log(state, `${c.name} ran an executive leadership program.`, 'business');
+  return { ok: true, message: 'Leadership program complete. Management, morale and brand all improved.' };
+}
+
+export function fileTrademark(state: GameState, companyId: string): ActionResult {
+  const c = state.companies[companyId];
+  if (!c || !c.playerOwned || c.status !== 'active') return { ok: false, message: 'Not your company.' };
+  if (c.trademarks >= 5) return { ok: false, message: 'Already holds the maximum useful trademarks.' };
+  const cost = Math.max(5_000, c.revenue * 0.003);
+  if (cost > c.cash) return { ok: false, message: `Needs $${Math.round(cost).toLocaleString()} in company cash.` };
+  c.cash -= cost;
+  c.trademarks++;
+  c.brand = clamp100(c.brand + 1);
+  if (c.trademarks >= 5 && !state.achievements.includes('trademark_portfolio')) state.achievements.push('trademark_portfolio');
+  log(state, `${c.name} filed a new trademark.`, 'business');
+  return { ok: true, message: `Trademark filed for ${c.name}.` };
+}
+
+/** A political extension of the existing celebrity/brand-ambassador system: courting a
+ * celebrity endorsement for an active campaign instead of a company. */
+export function seekCelebrityEndorsement(state: GameState): ActionResult {
+  const p = state.player;
+  if (!p.campaign) return { ok: false, message: 'You need an active campaign to seek an endorsement.' };
+  const cost = 30_000;
+  if (p.money < cost) return { ok: false, message: `Needs $${cost.toLocaleString()}.` };
+  const celeb = Object.values(state.npcs).find((n) => n.alive && n.countryId === p.countryId && n.role === 'celebrity');
+  if (!celeb) return { ok: false, message: 'No notable celebrities in your country right now.' };
+  const rng = withRng(state);
+  p.money -= cost;
+  const chance = clamp(0.5 + (p.reputation - 50) * 0.004 + celeb.opinionOfPlayer * 0.002, 0.15, 0.9);
+  const success = rng.chance(chance);
+  commit(state, rng);
+  if (success) {
+    const gain = rng.range(4, 9);
+    p.campaign.momentum = clamp(p.campaign.momentum + gain, -50, 50);
+    p.popularity = clamp100(p.popularity + 2);
+    if (!state.achievements.includes('celebrity_backed')) state.achievements.push('celebrity_backed');
+    log(state, `⭐ ${celeb.name} publicly endorsed your campaign.`, 'politics');
+    return { ok: true, message: `${celeb.name} endorsed you! Momentum +${gain.toFixed(0)}.` };
+  }
+  p.campaign.momentum = clamp(p.campaign.momentum - 3, -50, 50);
+  log(state, `${celeb.name} declined to endorse you — and said so publicly.`, 'bad');
+  return { ok: false, message: `${celeb.name} publicly turned you down.` };
+}
+
 export function buyLifeInsurance(state: GameState, monthlyPremium: number): ActionResult {
   const p = state.player;
   if (p.lifeInsurance) return { ok: false, message: 'You already have a life insurance policy.' };
@@ -609,7 +719,7 @@ function OFFICE_LADDER_WITH_ELIGIBILITY(state: GameState) {
   });
 }
 
-export function launchCampaign(state: GameState, officeKind: OfficeKind, warChest: number): ActionResult {
+export function launchCampaign(state: GameState, officeKind: OfficeKind, warChest: number, promises: ManifestoPromise[] = []): ActionResult {
   const p = state.player;
   if (p.campaign) return { ok: false, message: 'You are already campaigning.' };
   const spec = OFFICE_SPEC_BY_KIND[officeKind];
@@ -630,13 +740,14 @@ export function launchCampaign(state: GameState, officeKind: OfficeKind, warChes
     momentum: 0,
     yearsToElection: officeKind === 'head_of_state' || officeKind === 'governor' ? 1 : 0,
     consultantHired: false,
+    promises: promises.slice(0, 3),
   };
   log(state, `📣 Launched a campaign for ${spec.title} of ${region} with a $${warChest.toLocaleString()} war chest.`, 'politics');
   return { ok: true, message: `Campaign for ${spec.title} underway.` };
 }
 
 /** Discretionary campaign activities that spend money/PC for momentum. */
-export function campaignAction(state: GameState, kind: 'ads' | 'rally' | 'doorknock' | 'fundraise' | 'consultant' | 'polling'): ActionResult {
+export function campaignAction(state: GameState, kind: 'ads' | 'rally' | 'doorknock' | 'fundraise' | 'consultant' | 'polling' | 'debate'): ActionResult {
   const p = state.player;
   if (!p.campaign) return { ok: false, message: 'No active campaign.' };
   const rng = withRng(state);
@@ -689,9 +800,47 @@ export function campaignAction(state: GameState, kind: 'ads' | 'rally' | 'doorkn
       msg = `Internal polling puts you at ${Math.round(chance * 100)}% to win.`;
       break;
     }
+    case 'debate': {
+      const skill = (p.skills[SK.debate] ?? 0) * 0.7 + p.charisma * 0.3;
+      const chance = clamp(0.4 + skill * 0.004, 0.1, 0.85);
+      const success = rng.chance(chance);
+      const swing = (4 + rng.range(0, 4)) * boost;
+      if (success) {
+        p.campaign.momentum = clamp(p.campaign.momentum + swing, -50, 50);
+        if (!state.achievements.includes('debate_winner')) state.achievements.push('debate_winner');
+        commit(state, rng);
+        return { ok: true, message: `You won the debate. Momentum +${swing.toFixed(0)}.` };
+      }
+      p.campaign.momentum = clamp(p.campaign.momentum - swing * 0.6, -50, 50);
+      commit(state, rng);
+      return { ok: false, message: `Your opponent won the exchange. Momentum -${(swing * 0.6).toFixed(0)}.` };
+    }
   }
   commit(state, rng);
   return { ok: true, message: msg };
+}
+
+/** A stump-speech-adjacent action for anyone campaigning or in office; can backfire. */
+export function holdPressConference(state: GameState): ActionResult {
+  const p = state.player;
+  if (!p.office && !p.campaign) return { ok: false, message: 'You need to hold office or be campaigning to call a press conference.' };
+  const rng = withRng(state);
+  const skill = (p.skills[SK.debate] ?? 0) * 0.5 + (p.skills['media_public_relations'] ?? 0) * 0.5;
+  const chance = clamp(0.5 + skill * 0.004 + (p.charisma - 50) * 0.003, 0.15, 0.9);
+  const success = rng.chance(chance);
+  commit(state, rng);
+  if (success) {
+    const gain = rng.range(2, 5);
+    p.popularity = clamp100(p.popularity + gain);
+    if (p.campaign) p.campaign.momentum = clamp(p.campaign.momentum + gain, -50, 50);
+    log(state, '🎤 Your press conference landed well with the media.', 'politics');
+    return { ok: true, message: 'Press conference was a hit.' };
+  }
+  const loss = rng.range(1, 4);
+  p.popularity = clamp100(p.popularity - loss);
+  if (p.campaign) p.campaign.momentum = clamp(p.campaign.momentum - loss, -50, 50);
+  log(state, '📰 A reporter caught you off guard at your press conference.', 'bad');
+  return { ok: false, message: 'The press conference went sideways.' };
 }
 
 export function proposedLaws(state: GameState) {
@@ -905,6 +1054,157 @@ export function signTradeAgreement(state: GameState, targetCountryId: string): A
   if (!state.achievements.includes('diplomat')) state.achievements.push('diplomat');
   log(state, `🤝 You signed a trade agreement with ${target.name}.`, 'politics');
   return { ok: true, message: `Trade agreement signed with ${target.name}.` };
+}
+
+// ---------------------------------------------------------------------------
+// Government & economy tools — head-of-state powers
+// ---------------------------------------------------------------------------
+
+export function setBudgetAllocation(state: GameState, portfolio: CabinetPortfolio, sharePct: number): ActionResult {
+  const { home, error } = requireLeadership(state);
+  if (error) return error;
+  const target = clamp(sharePct, 2, 60);
+  const others = CABINET_PORTFOLIOS.filter((p) => p !== portfolio);
+  const otherTotal = others.reduce((s, p) => s + home.budgetAllocations[p], 0);
+  const remaining = 100 - target;
+  home.budgetAllocations[portfolio] = target;
+  if (otherTotal > 0) {
+    for (const p of others) home.budgetAllocations[p] = (home.budgetAllocations[p] / otherTotal) * remaining;
+  }
+  log(state, `Adjusted the ${portfolio} budget allocation to ${target.toFixed(1)}%.`, 'politics');
+  return { ok: true, message: `${portfolio} now receives ${target.toFixed(1)}% of the budget.` };
+}
+
+export function setTaxRate(state: GameState, tax: keyof TaxRates, ratePct: number): ActionResult {
+  const { home, error } = requireLeadership(state);
+  if (error) return error;
+  const rate = clamp(ratePct / 100, 0, 0.7);
+  const current = home.economy.taxRates[tax];
+  const existingAdj = home.taxAdjustments[tax] ?? 0;
+  home.taxAdjustments[tax] = clamp(existingAdj + (rate - current), -0.35, 0.35);
+  log(state, `Set the direct ${tax} tax rate target to ${Math.round(rate * 100)}%.`, 'politics');
+  return { ok: true, message: `${tax} tax rate target set to ${Math.round(rate * 100)}%.` };
+}
+
+const INFRA_SPECS: Record<InfrastructureKind, { capitalCost: number; budgetHit: number; years: number }> = {
+  roads: { capitalCost: 15, budgetHit: 0.01, years: 2 },
+  rail: { capitalCost: 20, budgetHit: 0.015, years: 3 },
+  airport: { capitalCost: 25, budgetHit: 0.02, years: 3 },
+  power: { capitalCost: 18, budgetHit: 0.012, years: 2 },
+  internet: { capitalCost: 15, budgetHit: 0.01, years: 2 },
+};
+
+export function launchInfrastructureProject(state: GameState, kind: InfrastructureKind): ActionResult {
+  const { home, error } = requireLeadership(state);
+  if (error) return error;
+  if (home.infrastructureProjects.some((p) => p.kind === kind)) return { ok: false, message: `A ${kind} project is already underway.` };
+  const spec = INFRA_SPECS[kind];
+  const p = state.player;
+  if (p.politicalCapital < spec.capitalCost) return { ok: false, message: `Needs ${spec.capitalCost} political capital.` };
+  p.politicalCapital = clamp(p.politicalCapital - spec.capitalCost, 0, 100);
+  home.economy.budgetBalance = clamp(home.economy.budgetBalance - spec.budgetHit, -0.2, 0.1);
+  home.infrastructureProjects.push({ id: `infra-${home.id}-${kind}-${state.year}`, kind, yearsLeft: spec.years, totalYears: spec.years });
+  log(state, `🏗️ ${home.name} broke ground on a new ${kind} project.`, 'politics');
+  return { ok: true, message: `${kind} project underway, ${spec.years} year(s) to completion.` };
+}
+
+const ADVISOR_COST = 50_000;
+
+export function hireAdvisor(state: GameState, specialty: AdvisorSpecialty): ActionResult {
+  const p = state.player;
+  if (p.advisors.length >= 3) return { ok: false, message: 'You already have 3 advisors.' };
+  if (p.advisors.some((a) => a.specialty === specialty)) return { ok: false, message: `Already have a ${specialty} advisor.` };
+  if (p.money < ADVISOR_COST) return { ok: false, message: `Needs $${ADVISOR_COST.toLocaleString()}.` };
+  const rng = withRng(state);
+  p.money -= ADVISOR_COST;
+  const accuracy = rng.range(45, 90);
+  p.advisors.push({ specialty, accuracy });
+  if (p.advisors.length >= 3 && !state.achievements.includes('advisor_team')) state.achievements.push('advisor_team');
+  commit(state, rng);
+  log(state, `Hired a ${specialty} advisor.`, 'politics');
+  return { ok: true, message: `Advisor hired (self-reported ${Math.round(accuracy)}% reliable — take it with a grain of salt).` };
+}
+
+export function dismissAdvisor(state: GameState, specialty: AdvisorSpecialty): ActionResult {
+  const p = state.player;
+  if (!p.advisors.some((a) => a.specialty === specialty)) return { ok: false, message: 'No such advisor.' };
+  p.advisors = p.advisors.filter((a) => a.specialty !== specialty);
+  return { ok: true, message: 'Advisor dismissed.' };
+}
+
+/** A pure, non-mutating recommendation string — deliberately can be wrong, scaled by the advisor's accuracy. */
+export function advisorRecommendation(state: GameState, advisor: Advisor): string {
+  const home = state.countries.find((c) => c.id === state.player.countryId);
+  if (!home) return 'No data available.';
+  const roll = (state.year * 7 + Math.round(advisor.accuracy) * 3) % 100;
+  const isGood = roll < advisor.accuracy;
+  if (advisor.specialty === 'economy') {
+    const overheating = home.economy.inflation > 0.045;
+    const trueAdvice = overheating
+      ? 'Inflation is running hot — raise taxes or trim spending to cool demand.'
+      : 'Growth looks fragile — cut taxes or fund infrastructure to stimulate demand.';
+    const falseAdvice = overheating
+      ? 'Cut taxes now to keep growth strong.'
+      : 'Raise taxes — the economy is overheating.';
+    return isGood ? trueAdvice : falseAdvice;
+  }
+  if (advisor.specialty === 'military') {
+    const atWar = home.atWarWith.length > 0;
+    const trueAdvice = atWar
+      ? 'Seek a peace treaty — prolonged war is eroding stability.'
+      : 'Military spending looks adequate — hold steady.';
+    const falseAdvice = atWar ? 'Escalate the conflict — victory is within reach.' : 'Boost defense spending — a threat looms.';
+    return isGood ? trueAdvice : falseAdvice;
+  }
+  const isolated = Object.values(home.relations).every((r) => r < 10);
+  const trueAdvice = isolated
+    ? 'Relations are cold across the board — a trade agreement could thaw things.'
+    : 'Diplomatic standing looks solid — maintain current relationships.';
+  const falseAdvice = isolated ? 'Consider sanctions to project strength.' : 'Relations are fraying — brace for conflict.';
+  return isGood ? trueAdvice : falseAdvice;
+}
+
+export function fundIntelligenceAgency(state: GameState, amount: number): ActionResult {
+  const { home, error } = requireLeadership(state);
+  if (error) return error;
+  if (amount <= 0 || amount > state.player.money) return { ok: false, message: 'Invalid funding amount.' };
+  state.player.money -= amount;
+  home.intelCapability = clamp100(home.intelCapability + amount / 50_000);
+  log(state, `Invested $${amount.toLocaleString()} in the national intelligence agency.`, 'politics');
+  return { ok: true, message: `Intelligence capability now ${Math.round(home.intelCapability)}.` };
+}
+
+export function gatherIntelligence(state: GameState, targetCountryId: string): ActionResult {
+  const { home, error } = requireLeadership(state);
+  if (error) return error;
+  const target = state.countries.find((c) => c.id === targetCountryId);
+  if (!target || target.id === home.id) return { ok: false, message: 'Invalid target nation.' };
+  const rng = withRng(state);
+  const chance = clamp(0.3 + home.intelCapability / 200 - target.intelCapability / 300, 0.1, 0.9);
+  const success = rng.chance(chance);
+  commit(state, rng);
+  if (success) {
+    home.relations[target.id] = clamp((home.relations[target.id] ?? 0) + 5, -100, 100);
+    state.player.influence = clamp100(state.player.influence + 3);
+    if (!state.achievements.includes('intel_operative')) state.achievements.push('intel_operative');
+    log(state, `🕵️ Intelligence gathered on ${target.name} strengthened your negotiating position.`, 'politics');
+    return { ok: true, message: `Intelligence operation against ${target.name} succeeded.` };
+  }
+  home.relations[target.id] = clamp((home.relations[target.id] ?? 0) - 10, -100, 100);
+  log(state, `🚨 An intelligence operation against ${target.name} was exposed.`, 'bad');
+  return { ok: false, message: `The operation against ${target.name} was exposed.` };
+}
+
+export function counterEspionage(state: GameState): ActionResult {
+  const { home, error } = requireLeadership(state);
+  if (error) return error;
+  const cost = 20_000;
+  if (state.player.money < cost) return { ok: false, message: `Needs $${cost.toLocaleString()}.` };
+  state.player.money -= cost;
+  home.stability = clamp100(home.stability + 3);
+  home.intelCapability = clamp100(home.intelCapability + 5);
+  log(state, `Counter-espionage sweep strengthened national security.`, 'politics');
+  return { ok: true, message: 'Counter-espionage operation complete.' };
 }
 
 // ---------------------------------------------------------------------------

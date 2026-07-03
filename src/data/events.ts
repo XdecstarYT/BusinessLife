@@ -1038,6 +1038,33 @@ ev({
     { label: 'Decline', effects: {} },
   ],
 });
+ev({
+  id: 'honor_knighthood', category: 'media', weight: 2, once: true, conditions: { minReputation: 75, minAge: 40 },
+  text: 'In recognition of your contributions, the state offers to bestow a knighthood upon you.',
+  choices: [
+    { label: 'Accept the honor', effects: { reputation: 8, popularity: 5, influence: 4, achievement: 'knighted' } },
+    { label: 'Humbly decline', effects: { karma: 3 } },
+  ],
+});
+ev({
+  id: 'honor_hall_of_fame', category: 'business', weight: 2, once: true, conditions: { minMoney: 500_000_000, minReputation: 60 },
+  text: 'A prestigious business hall of fame wants to induct you for your industry impact.',
+  choices: [
+    { label: 'Accept induction', effects: { reputation: 10, influence: 3, achievement: 'hall_of_fame' } },
+    { label: 'Skip the ceremony', effects: {} },
+  ],
+});
+ev({
+  id: 'honor_civic_medal', category: 'life', weight: 3, conditions: { minAge: 30, minReputation: 20 },
+  text: 'A civic organization wants to award you a medal for outstanding community contribution.',
+  choices: [
+    { label: 'Attend the ceremony', outcomes: [
+      { chance: 0.7, text: 'A heartfelt night — the community truly appreciates you.', effects: { karma: 5, popularity: 3, happiness: 5 } },
+      { chance: 0.3, text: 'An awkward, overlong ceremony, but the sentiment was nice.', effects: { karma: 2, happiness: 1 } },
+    ] },
+    { label: "Can't make it", effects: { karma: -1 } },
+  ],
+});
 
 // ---------------------------------------------------------------------------
 // FAMILY

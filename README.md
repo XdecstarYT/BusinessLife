@@ -32,28 +32,44 @@ plain JSON you can export and re-import.
   real foreign policy: declare war, sign peace treaties, impose or lift sanctions, send foreign aid, and
   sign trade agreements — on top of the elections, coups, sanctions and wars that unfold on their own.
 - **Family & dynasty** — date, marry, divorce, have children who age up as real NPCs, name a successor
-  to inherit a company, and pass your estate (plus any life insurance payout) to your family when you die.
+  to inherit a company or a political heir to inherit your party and popularity, track a Dynasty Score, and
+  pass your estate (plus any life insurance payout) to your family when you die.
 - **Relationships** — find a mentor for a small yearly edge, network into new friends and allies, or
   declare a rival and feud with them through dedicated events.
-- **Corporate warfare** — patents that pay royalties and dent rivals, a cyber-defense lever, a diversified
-  supply chain, corporate espionage, shareholder revolts, and hostile takeovers in both directions, plus
-  proactive business initiatives (brand deals, staff training, quality audits, preemptive recalls).
+- **Corporate warfare** — patents and trademarks that pay off and dent rivals, a cyber-defense lever, a
+  diversified supply chain, corporate espionage, shareholder revolts, hostile takeovers in both directions,
+  and NPC-vs-NPC competitor mergers, plus proactive business initiatives (brand deals, tiered staff training
+  from apprenticeship to executive leadership, quality audits, preemptive recalls).
+- **Corporate culture & headquarters** — upgrade from a Basic Office to a Megacomplex for morale, brand and
+  management bonuses, and pick a culture (Traditional, Flexible, Remote-First, Startup) with real tradeoffs
+  between overhead, morale volatility and R&D output.
 - **The underworld** — join a crime family and climb five ranks through heists and protection rackets,
   bribe a judge or attempt a prison escape if you're caught, or pay your way out and go straight.
 - **Financial markets, bonds, and forex** — beyond stocks: buy government bonds for fixed income, speculate
-  long or short on foreign currencies, insure your businesses and properties, and take out life insurance.
+  long or short on foreign currencies, insure your businesses and properties, take out life insurance, and
+  watch a live scrolling stock ticker of the day's biggest movers.
+- **Head-of-state economic tools** — allocate the budget across six cabinet portfolios, set direct tax
+  rates, launch multi-year infrastructure projects (roads, rail, airports, power, internet), read a
+  trend-based economic forecast, hire up to three AI advisors whose advice can be wrong, and fund an
+  intelligence agency to gather intel or run counter-espionage on rival nations.
+- **Elections with real stakes** — pick manifesto promises at campaign launch and get judged on keeping them
+  at re-election time, hold press conferences and campaign debates, court celebrity endorsements, watch an
+  animated election-night results reveal, and track government approval by city.
 - **Global world events** — a pandemic, a global trade war, or a tech boom can sweep the world economy,
   each with its own winners and losers by industry, its own news coverage, and its own event templates.
 - **20+ lifestyle activities** — from the gym and vacations to book clubs, therapy, adopting a pet, art
   collecting, wine tasting, poker nights, volunteering, blogging and learning a language.
 - **Thousands of scenarios** — a data-driven event engine resolves placeholders ({company}, {npc},
   {amount}, ...) against live state, with skill-checked, probabilistic outcomes, plus 22 lightweight
-  daily flavor events for time-skipping, so a compact template set produces an enormous variety of
-  situations.
+  daily flavor events for time-skipping and honors/awards events (knighthoods, hall-of-fame induction,
+  civic medals), so a compact template set produces an enormous variety of situations.
+- **Meta progression** — a Legacy Score computed at game over from your wealth, dynasty, office and
+  achievements, a life timeline of every milestone you hit, 30+ achievements, and four starting-economy
+  scenarios (Modern, Boom, Recession, Crisis) to change the game you're playing from turn one.
 - **Dynamic news** synthesised from what actually happened that year, plus a personal life log.
 - **Light and dark mode**, a mobile-first UI (with wider desktop breakpoints and safe-area support for
   notched devices) of circular icon tiles, pill chips, featured cards and canvas charts, with a bottom
-  tab bar and a "More" sheet so every screen is reachable from anywhere.
+  tab bar, a "More" sheet so every screen is reachable from anywhere, and a light first-launch tutorial.
 - **Unlimited saves** in IndexedDB (localStorage fallback), autosave every year, and JSON export/import.
 
 ## Play
@@ -86,29 +102,36 @@ only moves when you tell it to, using the three buttons on the Life hub:
 - **Career** — study for degrees (15 options), take jobs from a live market, and grow skills (120 of them
   across 10 categories). Performance drives raises, promotions and layoffs.
 - **Business** — found companies in any of 219 industries, then tune strategy (marketing, R&D, pricing,
-  wages, automation, cyber-defense, dividends), invest or draw capital, IPO, or sell. Run one-off
-  initiatives (brand deals, staff training, supply-chain diversification, quality audits, proactive
-  recalls) and insure the business. Switch to the **Rivals** tab to spy on competitors, shake them down
-  if you're in the crime family, or launch a hostile takeover of a public company.
-- **Markets** — trade the stock exchange of your home nation; go long or short, collect dividends.
+  wages, automation, cyber-defense, dividends), invest or draw capital, IPO, or sell. Upgrade your HQ tier
+  and pick a corporate culture, run one-off initiatives (brand deals, tiered training programs,
+  supply-chain diversification, quality audits, trademark filings, proactive recalls) and insure the
+  business. Switch to the **Rivals** tab to spy on competitors, shake them down if you're in the crime
+  family, or launch a hostile takeover of a public company — NPC rivals merge and consolidate on their own.
+- **Markets** — trade the stock exchange of your home nation with a live scrolling ticker of top movers;
+  go long or short, collect dividends.
 - **Assets** — buy property (cash or mortgage, including penthouses) for rental income and appreciation,
   renovate it, insure it, or move in yourself; take personal loans; buy government bonds; speculate long
   or short on foreign currencies; take out life insurance for your family.
-- **Politics** — join/found a party, run for office, campaign (rallies, ads, consultants, polling),
-  negotiate coalitions, appoint a cabinet if you lead the country, and legislate. As head of state, use
-  the World screen to declare war, make peace, sanction or aid other nations, and sign trade deals.
-- **Family** — date and marry, have children who grow into real NPCs, name a successor for each company,
-  build a multi-generation dynasty, and manage your mentor/rival/friend relationships.
+- **Politics** — join/found a party, run for office with a manifesto of promises tracked through your term,
+  campaign (rallies, ads, debates, press conferences, celebrity endorsements, consultants, polling),
+  negotiate coalitions, appoint a cabinet if you lead the country, and legislate. Election night reveals an
+  animated results tally. As head of state, use the World screen to declare war, make peace, sanction or aid
+  other nations, sign trade deals, allocate the budget, set tax rates, launch infrastructure projects, hire
+  AI advisors, and run an intelligence agency.
+- **Family** — date and marry, have children who grow into real NPCs, name a business successor or a
+  political heir, track a Dynasty Score, and manage your mentor/rival/friend relationships.
 - **World** — a macro dashboard, every nation's economy and government, diplomacy actions, commodities,
   and any active global event (pandemic, trade war, or tech boom).
-- **News / Stats** — the dynamic wire, your net-worth curve, achievements and save tools.
+- **News / Stats** — the dynamic wire, your net-worth curve, 30+ achievements, a life timeline, and save
+  tools.
 - **Underworld** — join a crime family and climb its ranks through heists and protection rackets, bribe
   a judge or attempt a prison escape if caught, or pay your way out and go straight.
 - **Lifestyle** — 20+ quick activities on the Life hub, from the gym and charity to book clubs, therapy,
   adopting a pet, art collecting, wine tasting, poker nights, blogging and learning a language.
 
-Life ends when you do — from old age, illness, or misfortune — with a summary of everything you built,
-and your estate (companies with a named successor, cash, property) passes to your spouse and children.
+Life ends when you do — from old age, illness, or misfortune — with a Legacy Score summarizing your wealth,
+dynasty, office and achievements, and your estate (companies with a named successor, political heir, cash,
+property) passes to your spouse and children.
 
 ## Architecture
 
@@ -124,10 +147,12 @@ src/
     types.ts           All game types; GameState is the single source of truth
     world.ts           World generation from country seeds + the player
     economy.ts         Macro cycle, rates, inflation, assets, commodities, demographics
-    business.ts        Company simulation and valuation
+    business.ts        Company simulation, valuation, HQ tiers/culture, NPC merger consolidation
     market.ts          Stock exchange, trading, shorting, dividends
-    politics.ts        Office ladder, elections, legislation, cabinet, coalitions, geopolitics, NPC lives
-    family.ts          Dating, marriage, children, succession planning, estate distribution
+    politics.ts        Office ladder, elections, legislation, cabinet, coalitions, geopolitics, NPC lives,
+                       budget allocation, infrastructure projects, manifesto promise tracking
+    family.ts          Dating, marriage, children, succession planning (business + political), estate
+                       distribution, dynasty score
     worldEvents.ts      Global events (pandemic, trade war, tech boom) layered on the economy
     dailyEvents.ts     Matching/resolution for lightweight daily flavor events
     events.ts          Event matching, placeholder resolution, effect application
@@ -146,6 +171,8 @@ src/
   ui/                  Mobile-first React UI (light + dark, desktop breakpoints, safe-area aware)
     components.tsx     Cards, pills, circular tiles, stat bars, canvas charts
     AppShell.tsx       Top bar + bottom tab navigation + "More" sheet
+    ElectionResultModal.tsx  Animated election-night results reveal
+    TutorialOverlay.tsx      Light first-launch walkthrough (shown once per browser)
     screens/           Life, Career, Business, Market, Assets, Politics, Family, World, News, Stats
 ```
 

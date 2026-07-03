@@ -178,6 +178,31 @@ export function nameSuccessor(state: GameState, companyId: string, childId: stri
   return { ok: true, message: `${child.name} is now in line to inherit ${company.name}.` };
 }
 
+/** Designate an adult child to inherit the player's party membership and political standing. */
+export function namePoliticalHeir(state: GameState, childId: string): FamilyActionResult {
+  const p = state.player;
+  const child = state.npcs[childId];
+  if (!p.partyId && !p.office) return { ok: false, message: 'You have no political legacy to pass on yet.' };
+  if (!child || !p.children.includes(childId)) return { ok: false, message: 'Not your child.' };
+  if (child.age < 18) return { ok: false, message: `${child.name} is too young for politics.` };
+  p.politicalHeirId = childId;
+  if (!state.achievements.includes('political_dynasty')) state.achievements.push('political_dynasty');
+  log(state, `${child.name} was groomed as your political heir.`, 'politics');
+  return { ok: true, message: `${child.name} will inherit your political network.` };
+}
+
+/** A rough 0..100 measure of how well the player's dynasty is set up to outlast them. */
+export function dynastyScore(state: GameState): number {
+  const p = state.player;
+  let score = 0;
+  score += Math.min(30, p.children.filter((id) => state.npcs[id]?.alive).length * 10);
+  score += Object.values(state.companies).filter((c) => c.playerOwned && c.successorId).length * 12;
+  score += p.politicalHeirId ? 20 : 0;
+  score += Math.min(20, state.generation * 10);
+  score += p.spouseId ? 8 : 0;
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
 /** Called once a year from the engine: ages children through milestones. */
 export function tickFamily(state: GameState, rng: RNG): void {
   const p = state.player;
@@ -265,6 +290,13 @@ export function distributeEstate(state: GameState): string[] {
     const share = p.lifeInsurance.payout / heirs.length;
     for (const id of heirs) state.npcs[id]!.wealth += share;
     notes.push(`Your life insurance paid out $${Math.round(p.lifeInsurance.payout).toLocaleString()} to your family.`);
+  }
+  if (p.politicalHeirId && state.npcs[p.politicalHeirId]?.alive && (p.partyId || p.office)) {
+    const heir = state.npcs[p.politicalHeirId]!;
+    heir.partyId = p.partyId;
+    heir.popularity = clamp100(heir.popularity + p.popularity * 0.5);
+    heir.ambition = clamp100(heir.ambition + 20);
+    notes.push(`${heir.name} inherited your political network and standing.`);
   }
   return notes;
 }

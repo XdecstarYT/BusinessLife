@@ -26,18 +26,31 @@ const ACHIEVEMENTS: Record<string, { label: string; icon: string }> = {
   well_connected: { label: 'Well Connected', icon: '🌟' },
   arch_rival: { label: 'Arch Rival', icon: '⚔️' },
   forex_trader: { label: 'Forex Trader', icon: '💱' },
+  political_dynasty: { label: 'Political Dynasty', icon: '🏰' },
+  hq_megacomplex: { label: 'Megacomplex HQ', icon: '🏙️' },
+  trademark_portfolio: { label: 'Trademark Portfolio', icon: '™️' },
+  debate_winner: { label: 'Debate Winner', icon: '🎙️' },
+  celebrity_backed: { label: 'Celebrity Backed', icon: '⭐' },
+  intel_operative: { label: 'Intelligence Operative', icon: '🕵️' },
+  advisor_team: { label: 'Full Advisory Team', icon: '🧠' },
+  manifesto_keeper: { label: 'Manifesto Keeper', icon: '📜' },
+  nation_builder: { label: 'Nation Builder', icon: '🏗️' },
+  knighted: { label: 'Knighted', icon: '⚔️' },
+  hall_of_fame: { label: 'Hall of Fame', icon: '🏆' },
 };
 
 export function Stats() {
   const { state, save, exportCurrent, toast } = useGame();
   const [saveName, setSaveName] = useState('');
   const [saving, setSaving] = useState(false);
+  const [showTimeline, setShowTimeline] = useState(false);
   if (!state) return null;
   const p = state.player;
   const nw = netWorth(state);
   const nwHistory = state.netWorthHistory.map((h) => h.value);
   const offices = state.achievements.filter((a) => a.startsWith('office:')).map((a) => OFFICE_SPEC_BY_KIND[a.slice(7)]?.title).filter(Boolean);
   const badges = state.achievements.filter((a) => ACHIEVEMENTS[a]);
+  const timeline = state.lifeLog.filter((l) => l.kind === 'milestone');
 
   const doExport = () => {
     const data = exportCurrent();
@@ -108,6 +121,9 @@ export function Stats() {
         </>
       )}
 
+      <SectionHeader title="Legacy" />
+      <Button variant="soft" className="w-full mb-4" onClick={() => setShowTimeline(true)}>📖 View Life Timeline ({timeline.length})</Button>
+
       <SectionHeader title="Save" />
       <div className="grid grid-cols-2 gap-3">
         <Button variant="soft" onClick={() => setSaving(true)}>💾 Save Slot</Button>
@@ -123,6 +139,20 @@ export function Stats() {
         >
           Save Snapshot
         </Button>
+      </Modal>
+
+      <Modal open={showTimeline} onClose={() => setShowTimeline(false)} title="Life Timeline">
+        <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+          {timeline.length === 0 && <p className="text-center text-slate-400 py-6">No milestones yet — get out there and live a little.</p>}
+          {timeline.map((entry, i) => (
+            <div key={i} className="flex gap-3">
+              <div className="text-xs font-bold text-brand-500 w-14 shrink-0 pt-0.5">{entry.year}</div>
+              <div className="flex-1 text-sm text-slate-700 dark:text-slate-200 border-l-2 border-brand-200 dark:border-brand-900 pl-3 pb-3">
+                {entry.text}
+              </div>
+            </div>
+          ))}
+        </div>
       </Modal>
     </div>
   );

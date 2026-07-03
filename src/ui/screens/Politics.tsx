@@ -8,6 +8,7 @@ import {
   campaignAction,
   dismissMinister,
   foundParty,
+  holdPressConference,
   joinParty,
   launchCampaign,
   leaveParty,
@@ -15,12 +16,22 @@ import {
   proposeLaw,
   proposedLaws,
   repealLaw,
+  seekCelebrityEndorsement,
 } from '../../sim/actions';
-import { campaignWinChance } from '../../sim/politics';
+import { campaignWinChance, promiseFulfillment } from '../../sim/politics';
 import { LAW_CATEGORIES } from '../../data/laws';
-import { CABINET_PORTFOLIOS, type CabinetPortfolio } from '../../sim/types';
-import { Badge, Button, Card, Field, Modal, Pill, PillRow, SectionHeader, StatBar, TextInput } from '../components';
+import { BarList, Badge, Button, Card, Field, Modal, Pill, PillRow, SectionHeader, StatBar, TextInput } from '../components';
 import { money, moneyFull, pct } from '../format';
+import { CABINET_PORTFOLIOS, MANIFESTO_PROMISES, type CabinetPortfolio, type ManifestoPromise } from '../../sim/types';
+
+const PROMISE_LABELS: Record<ManifestoPromise, string> = {
+  tax_cuts: 'Cut Taxes',
+  healthcare: 'Boost Healthcare',
+  education: 'Expand Education',
+  jobs: 'Create Jobs',
+  crime_reduction: 'Fight Crime',
+  infrastructure: 'Build Infrastructure',
+};
 
 export function Politics() {
   const { state, run } = useGame();
@@ -81,12 +92,20 @@ export function Politics() {
                   <div className="h-full bg-brand-500" style={{ width: `${campaignWinChance(state) * 100}%` }} />
                 </div>
               </div>
+              {p.campaign.promises.length > 0 && (
+                <div className="flex flex-wrap gap-1 mb-3">
+                  {p.campaign.promises.map((pr) => <Badge key={pr}>{PROMISE_LABELS[pr]}</Badge>)}
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-2">
                 <Button size="sm" variant="soft" onClick={() => run(campaignAction, 'rally')}>📣 Rally</Button>
                 <Button size="sm" variant="soft" onClick={() => run(campaignAction, 'doorknock')}>🚪 Doorknock</Button>
                 <Button size="sm" variant="soft" onClick={() => run(campaignAction, 'ads')}>📺 Ads ($50k)</Button>
                 <Button size="sm" variant="soft" onClick={() => run(campaignAction, 'fundraise')}>💰 Fundraise</Button>
                 <Button size="sm" variant="soft" onClick={() => run(campaignAction, 'polling')}>📊 Polling ($15k)</Button>
+                <Button size="sm" variant="soft" onClick={() => run(campaignAction, 'debate')}>🎙️ Debate</Button>
+                <Button size="sm" variant="soft" onClick={() => run(holdPressConference)}>📰 Press Conference</Button>
+                <Button size="sm" variant="soft" onClick={() => run(seekCelebrityEndorsement)}>⭐ Celebrity Endorsement ($30k)</Button>
                 <Button
                   size="sm"
                   variant={p.campaign.consultantHired ? 'ghost' : 'soft'}
@@ -96,6 +115,27 @@ export function Politics() {
                   {p.campaign.consultantHired ? '✅ Consultant Hired' : '🎯 Hire Consultant ($100k)'}
                 </Button>
               </div>
+            </Card>
+          )}
+
+          {p.office && p.office.promises.length > 0 && (
+            <Card className="p-5">
+              <div className="font-bold mb-3">Manifesto Scorecard</div>
+              <div className="space-y-2">
+                {promiseFulfillment(p.office, home).map((f) => (
+                  <div key={f.promise} className="flex items-center justify-between text-sm">
+                    <span>{PROMISE_LABELS[f.promise]}</span>
+                    <Badge tone={f.fulfilled ? 'good' : 'bad'}>{f.fulfilled ? '✅ On track' : '❌ Off track'}</Badge>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          {p.office && !p.campaign && (
+            <Card className="p-5">
+              <div className="font-bold mb-3">Public Relations</div>
+              <Button size="sm" variant="soft" className="w-full" onClick={() => run(holdPressConference)}>📰 Hold Press Conference</Button>
             </Card>
           )}
 
@@ -118,6 +158,19 @@ export function Politics() {
               </div>
             )}
           </Card>
+
+          {home.cities.length > 0 && (
+            <Card className="p-5">
+              <div className="font-bold mb-3">Approval by City</div>
+              <BarList
+                items={home.cities.slice(0, 8).map((city) => ({
+                  label: city.name,
+                  value: Math.round(Math.max(0, Math.min(100, home.approvalOfGovernment + (50 - city.crime) * 0.2 - (city.costOfLiving - 1) * 20))),
+                  color: '#337dff',
+                }))}
+              />
+            </Card>
+          )}
         </div>
       )}
 
@@ -133,6 +186,7 @@ function OfficeTab() {
   const { state, run } = useGame();
   const [campaignFor, setCampaignFor] = useState<string | null>(null);
   const [warChest, setWarChest] = useState(0);
+  const [promises, setPromises] = useState<ManifestoPromise[]>([]);
   if (!state) return null;
   const p = state.player;
   const offices = availableOffices(state);
@@ -166,12 +220,27 @@ function OfficeTab() {
           </p>
           <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">War chest: {moneyFull(warChest)}</label>
           <input type="range" min={0} max={Math.round(p.money)} value={warChest} onChange={(e) => setWarChest(Number(e.target.value))} className="w-full mt-1 mb-4" />
+          <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">Manifesto promises (up to 3) — kept promises help re-election, broken ones hurt it.</div>
+          <div className="flex flex-wrap gap-2 mb-4">
+            {MANIFESTO_PROMISES.map((pr) => {
+              const active = promises.includes(pr);
+              return (
+                <button
+                  key={pr}
+                  onClick={() => setPromises((cur) => (active ? cur.filter((x) => x !== pr) : cur.length >= 3 ? cur : [...cur, pr]))}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold ${active ? 'bg-brand-500 text-white' : 'bg-slate-100 dark:bg-ink-800 text-slate-600 dark:text-slate-300'}`}
+                >
+                  {PROMISE_LABELS[pr]}
+                </button>
+              );
+            })}
+          </div>
           <Button
             className="w-full"
             size="lg"
             onClick={() => {
-              const r = run(launchCampaign, campaignFor as never, warChest);
-              if (r.ok) setCampaignFor(null);
+              const r = run(launchCampaign, campaignFor as never, warChest, promises);
+              if (r.ok) { setCampaignFor(null); setPromises([]); }
             }}
           >
             Launch Campaign

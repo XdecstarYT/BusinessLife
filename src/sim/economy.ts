@@ -9,23 +9,74 @@ import { clamp, clamp100 } from './types';
 import { LAW_BY_ID } from '../data/laws';
 import type { RNG } from './rng';
 import type { CountrySeed } from '../data/countries';
+import type { Scenario } from './world';
+
+interface ScenarioPreset {
+  regime: EconomicRegime;
+  gdpGrowth: [number, number];
+  inflation: [number, number];
+  unemployment: [number, number];
+  confidence: [number, number];
+  govDebtToGdp: [number, number];
+  stockIndex: number;
+}
+
+const SCENARIO_PRESETS: Record<Scenario, ScenarioPreset> = {
+  modern: {
+    regime: 'expansion',
+    gdpGrowth: [0.015, 0.035],
+    inflation: [0.015, 0.03],
+    unemployment: [0.04, 0.08],
+    confidence: [50, 70],
+    govDebtToGdp: [0.3, 0.9],
+    stockIndex: 100,
+  },
+  boom: {
+    regime: 'boom',
+    gdpGrowth: [0.04, 0.07],
+    inflation: [0.02, 0.045],
+    unemployment: [0.02, 0.045],
+    confidence: [70, 90],
+    govDebtToGdp: [0.2, 0.6],
+    stockIndex: 115,
+  },
+  recession: {
+    regime: 'recession',
+    gdpGrowth: [-0.02, 0],
+    inflation: [0.01, 0.025],
+    unemployment: [0.08, 0.14],
+    confidence: [25, 45],
+    govDebtToGdp: [0.6, 1.2],
+    stockIndex: 75,
+  },
+  crisis: {
+    regime: 'depression',
+    gdpGrowth: [-0.06, -0.02],
+    inflation: [0.03, 0.08],
+    unemployment: [0.12, 0.22],
+    confidence: [10, 30],
+    govDebtToGdp: [0.9, 1.6],
+    stockIndex: 50,
+  },
+};
 
 export const COMMODITIES = ['oil', 'gas', 'gold', 'grain', 'metals'] as const;
 
-export function initEconomy(seed: CountrySeed, rng: RNG): Economy {
+export function initEconomy(seed: CountrySeed, rng: RNG, scenario: Scenario = 'modern'): Economy {
   const gdp = (seed.population * seed.gdpPerCapita) / 1e9; // billions
+  const preset = SCENARIO_PRESETS[scenario];
   return {
     gdp,
-    gdpGrowth: rng.range(0.015, 0.035),
-    inflation: rng.range(0.015, 0.03),
+    gdpGrowth: rng.range(...preset.gdpGrowth),
+    inflation: rng.range(...preset.inflation),
     interestRate: rng.range(0.02, 0.045),
-    unemployment: rng.range(0.04, 0.08),
-    consumerConfidence: rng.range(50, 70),
-    businessConfidence: rng.range(50, 70),
+    unemployment: rng.range(...preset.unemployment),
+    consumerConfidence: rng.range(...preset.confidence),
+    businessConfidence: rng.range(...preset.confidence),
     housingIndex: 100,
-    stockIndex: 100,
+    stockIndex: preset.stockIndex,
     exchangeRate: 1,
-    govDebtToGdp: rng.range(0.3, 0.9),
+    govDebtToGdp: rng.range(...preset.govDebtToGdp),
     budgetBalance: rng.range(-0.04, 0.01),
     taxRates: {
       income: rng.range(0.3, 0.45),
@@ -34,7 +85,7 @@ export function initEconomy(seed: CountrySeed, rng: RNG): Economy {
       capitalGains: rng.range(0.15, 0.25),
     },
     minimumWage: seed.gdpPerCapita * rng.range(0.35, 0.5),
-    regime: 'expansion',
+    regime: preset.regime,
     yearsInRegime: rng.int(1, 4),
     commodities: Object.fromEntries(COMMODITIES.map((c) => [c, 100])),
     history: [],
@@ -158,10 +209,11 @@ export function tickEconomy(state: GameState, country: Country, rng: RNG): Econo
 
   // Law-driven structural tax changes are applied once at enactment; the
   // aggregate here nudges toward the legislated level so repeals also work.
-  const targetIncome = clamp(0.38 + (law.taxIncome ?? 0), 0.05, 0.7);
-  const targetCorp = clamp(0.25 + (law.taxCorporate ?? 0), 0.05, 0.6);
-  const targetSales = clamp(0.11 + (law.taxSales ?? 0), 0, 0.35);
-  const targetCg = clamp(0.2 + (law.taxCapitalGains ?? 0), 0, 0.5);
+  const adj = country.taxAdjustments;
+  const targetIncome = clamp(0.38 + (law.taxIncome ?? 0) + (adj.income ?? 0), 0.05, 0.7);
+  const targetCorp = clamp(0.25 + (law.taxCorporate ?? 0) + (adj.corporate ?? 0), 0.05, 0.6);
+  const targetSales = clamp(0.11 + (law.taxSales ?? 0) + (adj.sales ?? 0), 0, 0.35);
+  const targetCg = clamp(0.2 + (law.taxCapitalGains ?? 0) + (adj.capitalGains ?? 0), 0, 0.5);
   e.taxRates.income += (targetIncome - e.taxRates.income) * 0.5;
   e.taxRates.corporate += (targetCorp - e.taxRates.corporate) * 0.5;
   e.taxRates.sales += (targetSales - e.taxRates.sales) * 0.5;
@@ -212,6 +264,22 @@ export function tickEconomy(state: GameState, country: Country, rng: RNG): Econo
   if (e.history.length > 120) e.history.shift();
 
   return { regimeChanged: prevRegime !== e.regime, crisis };
+}
+
+/** A simple trend-extrapolation forecast for next year, derived from recent history. */
+export function economicForecast(e: Economy): { gdpGrowth: number; inflation: number; unemployment: number } {
+  const hist = e.history;
+  if (hist.length < 2) return { gdpGrowth: e.gdpGrowth, inflation: e.inflation, unemployment: e.unemployment };
+  const last = hist[hist.length - 1];
+  const prev = hist[hist.length - 2];
+  const growthTrend = last.gdpGrowth - prev.gdpGrowth;
+  const inflationTrend = last.inflation - prev.inflation;
+  const unemploymentTrend = last.unemployment - prev.unemployment;
+  return {
+    gdpGrowth: e.gdpGrowth + growthTrend * 0.5,
+    inflation: Math.max(0, e.inflation + inflationTrend * 0.5),
+    unemployment: Math.max(0.01, e.unemployment + unemploymentTrend * 0.5),
+  };
 }
 
 /** World commodity prices are shared: tick once per year on the first country. */

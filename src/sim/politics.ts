@@ -4,7 +4,7 @@
  * sanctions, wars). NPC politicians pursue their own careers; national
  * elections happen with or without the player.
  */
-import type { Country, GameState, LawDef, OfficeKind } from './types';
+import type { CabinetPortfolio, Country, GameState, LawDef, ManifestoPromise, Office, OfficeKind } from './types';
 import { clamp, clamp100 } from './types';
 import { LAW_BY_ID } from '../data/laws';
 import { SK } from '../data/skills';
@@ -128,6 +128,45 @@ function clamp01(v: number): number {
   return clamp(v, 0, 1);
 }
 
+const PROMISE_LOWER_IS_BETTER: Record<ManifestoPromise, boolean> = {
+  tax_cuts: true,
+  jobs: true, // metric is unemployment
+  crime_reduction: true,
+  healthcare: false,
+  education: false,
+  infrastructure: false,
+};
+
+/** Current real-world value of the metric a manifesto promise is judged against. */
+export function promiseMetricValue(country: Country, promise: ManifestoPromise): number {
+  switch (promise) {
+    case 'tax_cuts': return country.economy.taxRates.income;
+    case 'healthcare': return country.healthcare;
+    case 'education': return country.education;
+    case 'jobs': return country.economy.unemployment;
+    case 'infrastructure': return country.infrastructure;
+    case 'crime_reduction':
+      return country.cities.length ? country.cities.reduce((s, c) => s + c.crime, 0) / country.cities.length : 50;
+  }
+}
+
+export interface PromiseStatus {
+  promise: ManifestoPromise;
+  fulfilled: boolean;
+  changePct: number;
+}
+
+/** Judges each manifesto promise against how its metric moved since the office began. */
+export function promiseFulfillment(office: Office, country: Country): PromiseStatus[] {
+  return office.promises.map((promise) => {
+    const baseline = office.promiseBaseline[promise] ?? promiseMetricValue(country, promise);
+    const current = promiseMetricValue(country, promise);
+    const fulfilled = PROMISE_LOWER_IS_BETTER[promise] ? current < baseline : current > baseline;
+    const changePct = baseline !== 0 ? ((current - baseline) / Math.abs(baseline)) * 100 : 0;
+    return { promise, fulfilled, changePct };
+  });
+}
+
 /** Yearly political tick for one country. Returns notable headlines. */
 export function tickPolitics(state: GameState, country: Country, rng: RNG): string[] {
   const headlines: string[] = [];
@@ -148,24 +187,45 @@ export function tickPolitics(state: GameState, country: Country, rng: RNG): stri
   }
 
   // Cabinet ministers (player-led governments only) nudge their portfolio's stat each year.
+  // Budget allocation scales each portfolio's pull relative to an equal 16.67% baseline share.
   if (playerIsLeader) {
     for (const [portfolio, npcId] of Object.entries(country.cabinet)) {
       const minister = npcId === 'player' ? null : state.npcs[npcId];
       if (npcId !== 'player' && (!minister || !minister.alive)) continue;
       const competence = minister ? minister.competence : state.player.smarts;
       const integrity = minister ? minister.integrity : state.player.karma;
-      const pull = (competence - 50) * 0.03;
+      const share = country.budgetAllocations[portfolio as CabinetPortfolio] ?? 16.67;
+      const budgetMult = clamp(share / 16.67, 0.3, 2.5);
+      const pull = (competence - 50) * 0.03 * budgetMult;
       if (portfolio === 'Finance') country.economy.businessConfidence = clamp100(country.economy.businessConfidence + pull);
       else if (portfolio === 'Health') country.healthcare = clamp100(country.healthcare + pull);
       else if (portfolio === 'Education') country.education = clamp100(country.education + pull);
       else if (portfolio === 'Defense') country.militaryPower = clamp100(country.militaryPower + pull);
-      else if (portfolio === 'Justice') country.corruption = clamp100(country.corruption - (integrity - 50) * 0.03);
+      else if (portfolio === 'Justice') country.corruption = clamp100(country.corruption - (integrity - 50) * 0.03 * budgetMult);
       else if (portfolio === 'Foreign Affairs') {
         for (const otherId of Object.keys(country.relations)) {
           country.relations[otherId] = clamp(country.relations[otherId] + pull * 0.3, -100, 100);
         }
       }
     }
+  }
+
+  // Infrastructure projects funded via launchInfrastructureProject() complete over several years.
+  if (country.infrastructureProjects.length) {
+    const finished: string[] = [];
+    for (const proj of country.infrastructureProjects) {
+      proj.yearsLeft--;
+      if (proj.yearsLeft <= 0) {
+        country.infrastructure = clamp100(country.infrastructure + 8);
+        if (proj.kind === 'internet' || proj.kind === 'power') country.economy.businessConfidence = clamp100(country.economy.businessConfidence + 4);
+        if (proj.kind === 'roads' || proj.kind === 'rail') country.economy.gdpGrowth += 0.002;
+        if (proj.kind === 'airport') country.economy.businessConfidence = clamp100(country.economy.businessConfidence + 3);
+        headlines.push(`🏗️ ${country.name} completed a new ${proj.kind} project.`);
+        if (playerIsLeader && !state.achievements.includes('nation_builder')) state.achievements.push('nation_builder');
+        finished.push(proj.id);
+      }
+    }
+    if (finished.length) country.infrastructureProjects = country.infrastructureProjects.filter((p) => !finished.includes(p.id));
   }
 
   // Party support drifts with approval (governing party) and noise.

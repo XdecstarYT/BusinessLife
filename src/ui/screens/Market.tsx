@@ -46,6 +46,8 @@ export function Market() {
         </div>
       </Card>
 
+      <LiveTicker companies={listed} />
+
       <PillRow>
         <Pill label="Market" active={tab === 'market'} onClick={() => setTab('market')} />
         <Pill label={`Portfolio (${p.portfolio.length})`} active={tab === 'portfolio'} onClick={() => setTab('portfolio')} />
@@ -85,6 +87,41 @@ function yearGain(c: Company): number {
   const a = h[h.length - 2].sharePrice;
   const b = h[h.length - 1].sharePrice;
   return a && b ? b / a - 1 : 0;
+}
+
+/** A scrolling stock ticker strip: top movers, looping continuously. */
+function LiveTicker({ companies }: { companies: Company[] }) {
+  const movers = [...companies]
+    .sort((a, b) => Math.abs(yearGain(b)) - Math.abs(yearGain(a)))
+    .slice(0, 14);
+  if (movers.length === 0) return null;
+  const strip = (key: string) => (
+    <div key={key} className="flex items-center gap-5 shrink-0 pr-5">
+      {movers.map((c) => {
+        const gain = yearGain(c);
+        return (
+          <span key={`${key}-${c.id}`} className="text-xs font-semibold whitespace-nowrap">
+            <span className="text-slate-600 dark:text-slate-300">{c.name}</span>{' '}
+            <span className={gain >= 0 ? 'text-emerald-500' : 'text-rose-500'}>
+              {money(c.sharePrice)} {gain >= 0 ? '▲' : '▼'} {Math.abs(gain * 100).toFixed(1)}%
+            </span>
+          </span>
+        );
+      })}
+    </div>
+  );
+  return (
+    <div className="mb-4 overflow-hidden rounded-xl bg-slate-100 dark:bg-ink-800 py-2">
+      <style>{`
+        @keyframes ticker-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+        .ticker-track { animation: ticker-scroll 30s linear infinite; }
+      `}</style>
+      <div className="flex ticker-track w-max">
+        {strip('a')}
+        {strip('b')}
+      </div>
+    </div>
+  );
 }
 
 function StockRow({ c, onClick }: { c: Company; onClick: () => void }) {

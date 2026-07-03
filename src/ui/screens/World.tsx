@@ -3,8 +3,28 @@ import { useState } from 'react';
 import { useGame } from '../../store/gameStore';
 import { Badge, BarList, Button, Card, LineChart, Modal, SectionHeader, StatBar } from '../components';
 import { money, num, pct, signedPct } from '../format';
-import type { Country, WorldEvent } from '../../sim/types';
-import { declareWar, imposeSanctions, liftSanctions, sendForeignAid, signPeaceTreaty, signTradeAgreement } from '../../sim/actions';
+import { CABINET_PORTFOLIOS, type AdvisorSpecialty, type CabinetPortfolio, type Country, type InfrastructureKind, type WorldEvent } from '../../sim/types';
+import {
+  advisorRecommendation,
+  counterEspionage,
+  declareWar,
+  dismissAdvisor,
+  fundIntelligenceAgency,
+  gatherIntelligence,
+  hireAdvisor,
+  imposeSanctions,
+  launchInfrastructureProject,
+  liftSanctions,
+  sendForeignAid,
+  setBudgetAllocation,
+  setTaxRate,
+  signPeaceTreaty,
+  signTradeAgreement,
+} from '../../sim/actions';
+import { economicForecast } from '../../sim/economy';
+
+const INFRA_KINDS: InfrastructureKind[] = ['roads', 'rail', 'airport', 'power', 'internet'];
+const ADVISOR_SPECIALTIES: AdvisorSpecialty[] = ['economy', 'military', 'diplomacy'];
 
 const WORLD_EVENT_INFO: Record<WorldEvent['type'], { emoji: string; label: string; desc: string; tone: 'bad' | 'good' }> = {
   pandemic: { emoji: '🦠', label: 'Global Pandemic', desc: 'Tourism, airlines and entertainment are hit hard; health and remote-work industries are up.', tone: 'bad' },
@@ -170,10 +190,13 @@ function CountryModal({ country, onClose }: { country: Country; onClose: () => v
               )}
               <Button size="sm" variant="soft" onClick={() => run(sendForeignAid, country.id)}>🤲 Send Aid (10 PC)</Button>
               <Button size="sm" variant="soft" onClick={() => run(signTradeAgreement, country.id)}>🤝 Trade Deal (10 PC)</Button>
+              <Button size="sm" variant="soft" className="col-span-2" onClick={() => run(gatherIntelligence, country.id)}>🕵️ Gather Intelligence</Button>
             </div>
           )}
         </div>
       )}
+
+      {!isForeign && isLeader && <GovernmentTools country={country} />}
     </Modal>
   );
 
@@ -185,4 +208,146 @@ function CountryModal({ country, onClose }: { country: Country; onClose: () => v
       </div>
     );
   }
+}
+
+function GovernmentTools({ country }: { country: Country }) {
+  const { state, run } = useGame();
+  const [taxDraft, setTaxDraft] = useState<Record<string, number>>({});
+  if (!state) return null;
+  const forecast = economicForecast(country.economy);
+  const p = state.player;
+
+  return (
+    <div className="mt-5">
+      <SectionHeader title="Government & Economy" />
+
+      <div className="font-bold mb-2 text-sm">Budget Allocation</div>
+      <BarList
+        items={CABINET_PORTFOLIOS.map((portfolio) => ({
+          label: portfolio,
+          value: Math.round(country.budgetAllocations[portfolio]),
+          color: '#337dff',
+        }))}
+      />
+      <div className="grid grid-cols-3 gap-2 mt-2 mb-4">
+        {CABINET_PORTFOLIOS.map((portfolio) => (
+          <div key={portfolio} className="flex items-center justify-between bg-slate-100 dark:bg-ink-800 rounded-xl px-2 py-1.5">
+            <span className="text-[10px] font-semibold truncate">{portfolio}</span>
+            <div className="flex gap-1">
+              <button
+                className="w-5 h-5 rounded-full bg-slate-200 dark:bg-ink-700 text-xs font-bold"
+                onClick={() => run(setBudgetAllocation, portfolio as CabinetPortfolio, country.budgetAllocations[portfolio] - 3)}
+              >
+                -
+              </button>
+              <button
+                className="w-5 h-5 rounded-full bg-slate-200 dark:bg-ink-700 text-xs font-bold"
+                onClick={() => run(setBudgetAllocation, portfolio as CabinetPortfolio, country.budgetAllocations[portfolio] + 3)}
+              >
+                +
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="font-bold mb-2 text-sm">Direct Tax Rates</div>
+      <div className="grid grid-cols-2 gap-2 mb-4">
+        {(['income', 'corporate', 'sales', 'capitalGains'] as const).map((tax) => {
+          const current = Math.round(country.economy.taxRates[tax] * 100);
+          const draft = taxDraft[tax] ?? current;
+          return (
+            <div key={tax} className="bg-slate-100 dark:bg-ink-800 rounded-xl px-3 py-2">
+              <div className="flex justify-between text-xs mb-1">
+                <span className="capitalize font-semibold">{tax}</span>
+                <span className="font-bold text-brand-500">{draft}%</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={70}
+                value={draft}
+                onChange={(e) => setTaxDraft((d) => ({ ...d, [tax]: Number(e.target.value) }))}
+                onMouseUp={() => run(setTaxRate, tax, taxDraft[tax] ?? current)}
+                onTouchEnd={() => run(setTaxRate, tax, taxDraft[tax] ?? current)}
+                className="w-full"
+              />
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="font-bold mb-2 text-sm">Economic Forecast (next year)</div>
+      <div className="grid grid-cols-3 gap-2 mb-4 text-center text-sm">
+        <div className="bg-slate-100 dark:bg-ink-800 rounded-xl px-2 py-2">
+          <div className="text-[10px] text-slate-400">Growth</div>
+          <div className="font-bold">{signedPct(forecast.gdpGrowth)}</div>
+        </div>
+        <div className="bg-slate-100 dark:bg-ink-800 rounded-xl px-2 py-2">
+          <div className="text-[10px] text-slate-400">Inflation</div>
+          <div className="font-bold">{pct(forecast.inflation, 1)}</div>
+        </div>
+        <div className="bg-slate-100 dark:bg-ink-800 rounded-xl px-2 py-2">
+          <div className="text-[10px] text-slate-400">Unemployment</div>
+          <div className="font-bold">{pct(forecast.unemployment, 1)}</div>
+        </div>
+      </div>
+
+      <div className="font-bold mb-2 text-sm">Infrastructure Projects</div>
+      {country.infrastructureProjects.length > 0 && (
+        <div className="space-y-1 mb-2">
+          {country.infrastructureProjects.map((proj) => (
+            <div key={proj.id} className="flex justify-between text-xs bg-slate-100 dark:bg-ink-800 rounded-xl px-3 py-2">
+              <span className="capitalize font-semibold">{proj.kind}</span>
+              <span className="text-slate-500 dark:text-slate-400">{proj.yearsLeft}yr left</span>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="grid grid-cols-3 gap-2 mb-4">
+        {INFRA_KINDS.map((kind) => (
+          <Button
+            key={kind}
+            size="sm"
+            variant="soft"
+            disabled={country.infrastructureProjects.some((pr) => pr.kind === kind)}
+            onClick={() => run(launchInfrastructureProject, kind)}
+          >
+            {kind}
+          </Button>
+        ))}
+      </div>
+
+      <div className="font-bold mb-2 text-sm">AI Advisors</div>
+      <div className="space-y-2 mb-4">
+        {ADVISOR_SPECIALTIES.map((spec) => {
+          const advisor = p.advisors.find((a) => a.specialty === spec);
+          return (
+            <div key={spec} className="bg-slate-100 dark:bg-ink-800 rounded-xl px-3 py-2">
+              <div className="flex justify-between items-center">
+                <span className="capitalize font-semibold text-sm">{spec} Advisor</span>
+                {advisor ? (
+                  <Button size="sm" variant="ghost" onClick={() => run(dismissAdvisor, spec)}>Dismiss</Button>
+                ) : (
+                  <Button size="sm" variant="soft" onClick={() => run(hireAdvisor, spec)}>Hire ($50k)</Button>
+                )}
+              </div>
+              {advisor && (
+                <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">{advisorRecommendation(state, advisor)}</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="font-bold mb-2 text-sm">Intelligence Agency</div>
+      <Card className="p-3">
+        <StatBar label="Capability" value={country.intelCapability} />
+        <div className="grid grid-cols-2 gap-2 mt-3">
+          <Button size="sm" variant="soft" onClick={() => run(fundIntelligenceAgency, 50_000)}>Fund ($50k)</Button>
+          <Button size="sm" variant="soft" onClick={() => run(counterEspionage)}>Counter-Espionage ($20k)</Button>
+        </div>
+      </Card>
+    </div>
+  );
 }

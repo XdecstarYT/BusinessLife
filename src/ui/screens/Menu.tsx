@@ -5,7 +5,15 @@ import { AUTOSAVE_ID, type SaveSlotMeta } from '../../store/persistence';
 import { Button, Card, Field, Pill, TextInput } from '../components';
 import { money } from '../format';
 import type { Gender } from '../../sim/types';
+import type { Scenario } from '../../sim/world';
 import { IconBusiness, IconSpark, IconTrophy } from '../icons';
+
+const SCENARIOS: { id: Scenario; label: string; blurb: string }[] = [
+  { id: 'modern', label: 'Modern Era', blurb: 'A balanced, present-day economy — the default experience.' },
+  { id: 'boom', label: 'Boom Era', blurb: 'Start amid a red-hot economy: high growth, low unemployment, soaring markets.' },
+  { id: 'recession', label: 'Recession Era', blurb: 'Start in a downturn: weak growth, rising joblessness, depressed markets.' },
+  { id: 'crisis', label: 'Crisis Era', blurb: 'Start amid a full-blown crisis: contracting GDP, mass unemployment, a market crash.' },
+];
 
 export function Menu() {
   const { saves, refreshSaves, newGame, load, remove, importFrom, darkMode, toggleDark } = useGame();
@@ -13,6 +21,7 @@ export function Menu() {
   const [name, setName] = useState('');
   const [gender, setGender] = useState<Gender>('male');
   const [seed, setSeed] = useState('');
+  const [scenario, setScenario] = useState<Scenario>('modern');
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -23,7 +32,7 @@ export function Menu() {
   const manualSaves = saves.filter((s) => s.id !== AUTOSAVE_ID);
 
   const start = () => {
-    newGame({ playerName: name.trim() || 'Alex Morgan', gender, seedText: seed.trim() || `${Date.now()}` });
+    newGame({ playerName: name.trim() || 'Alex Morgan', gender, seedText: seed.trim() || `${Date.now()}`, scenario });
   };
 
   const onImport = (file: File) => {
@@ -123,6 +132,24 @@ export function Menu() {
               </Field>
               <Field label="World Seed (optional — same seed = same world)">
                 <TextInput value={seed} onChange={(e) => setSeed(e.target.value)} placeholder="leave blank for random" maxLength={32} />
+              </Field>
+              <Field label="Starting Economy">
+                <div className="grid grid-cols-2 gap-2">
+                  {SCENARIOS.map((s) => (
+                    <button
+                      key={s.id}
+                      onClick={() => setScenario(s.id)}
+                      className={`text-left p-2.5 rounded-xl border-2 ${
+                        scenario === s.id
+                          ? 'border-brand-500 bg-brand-500/10'
+                          : 'border-slate-200 dark:border-ink-700 bg-slate-50 dark:bg-ink-800'
+                      }`}
+                    >
+                      <div className="font-bold text-sm">{s.label}</div>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">{SCENARIOS.find((s) => s.id === scenario)?.blurb}</p>
               </Field>
             </div>
             <div className="flex gap-3 mt-6">
