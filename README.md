@@ -1,58 +1,121 @@
-# BusinessLife 💼
+# BusinessLife — Business & Politics Life Simulator
 
-A feature-rich, BitLife-style **business tycoon life simulator** that runs entirely in your browser. Dark, mobile-first UI with a floating pill navigation, serif display headings, and card-based layout.
+A deep, replayable life-simulation game about **business, politics and economics**, inspired by
+BitLife, Democracy 4, Capitalism Lab and Victoria 3 — but designed to be easy to pick up and play on
+your phone. Start at 18, take a decision each year, and press **Advance Year** to let a living world
+simulate forward around you. Build a business empire, get rich on the markets, climb the political
+ladder to run the country — or all three.
 
-**Play it:** just open `index.html` in any modern browser. No build step, no dependencies, no server. Progress auto-saves to `localStorage`.
+Everything runs **entirely in your browser**. No backend, no accounts, fully offline, and every save is
+plain JSON you can export and re-import.
 
-## The Game
+## Highlights
 
-You start at 18 with one of three origin stories — **Bootstrapper** ($5K), **Loan Taker** ($100K cash + $100K debt), or **Trust Fund** ($500K) — in one of 10 countries with different tax rates and costs of living. Every month is a turn; advance one month or a whole year at a time (spacebar advances a month). Build an empire before your health, happiness, or creditors catch up with you.
+- **Deterministic living world** — 12 fictional nations, dozens of states, ~150 cities, 400+ notable
+  NPCs and 170+ companies, all generated from a seed so the same seed reproduces the same world exactly.
+- **200+ industries** across 11 sectors, each with distinct economics (margins, cyclicality, capital and
+  labour intensity, tech and regulation sensitivity, commodity exposure).
+- **Full company simulation** — revenue emerges from the business cycle x your pricing, marketing, R&D,
+  wages, automation and brand x the laws in force x competition. IPO, pay dividends, get taken over,
+  unionise, face lawsuits and cyberattacks, or go bankrupt.
+- **Simulated stock exchange** — every listed company has fundamentals, analyst expectations, earnings
+  surprises, P/E ratios, dividends, short interest and institutional ownership. Buy, sell, and short-sell.
+- **Macro-economy** — business-cycle regimes (boom to depression), a Taylor-rule central bank, inflation,
+  unemployment, housing and equity indices, FX, government debt and shared commodity markets.
+- **Deep politics** — join or found a party, campaign for eight tiers of office (councillor to head of
+  state), fundraise, rally, run attack ads, and pass or repeal **80 laws** whose effects continuously
+  reshape the economy. Elections, coalitions, coups, sanctions and wars unfold with or without you.
+- **Thousands of scenarios** — a data-driven event engine resolves placeholders ({company}, {npc},
+  {amount}, ...) against live state, with skill-checked, probabilistic outcomes, so a compact template
+  set produces an enormous variety of situations.
+- **Dynamic news** synthesised from what actually happened that year, plus a personal life log.
+- **Light and dark mode**, a mobile-first UI of circular icon tiles, pill chips, featured cards and
+  canvas charts, with a bottom tab bar.
+- **Unlimited saves** in IndexedDB (localStorage fallback), autosave every year, and JSON export/import.
 
-## Features
+## Play
 
-### 🏢 Deep business simulation
-- **16 industries** to found companies in — coffee shops, SaaS, fintech, biotech, game studios, crypto exchanges, logistics, fashion labels and more — each with its own margins, volatility, capital requirements, growth ceilings, and key skill
-- **Run the company**: set monthly marketing & R&D budgets, pricing strategy (budget/standard/premium), and dividend payout policy
-- **Hire and fire** across 7 roles (associates, engineers, marketers, salespeople, executives) — each employee has a skill level and salary; morale, efficiency, brand, and quality all evolve monthly
-- **Grow**: expand locations/capacity (with market saturation ceilings), acquire competitors, raise venture rounds (Seed → Series D) that dilute your equity, and eventually **IPO** or sell the whole company
-- Businesses can hit crises, draw emergency credit, and go bankrupt
+```bash
+npm install
+npm run dev      # start the dev server, open the printed URL
+```
 
-### 📈 Markets & investing
-- Simulated **stock market** (8 tickers) and **crypto market** (4 coins) with drift, beta, and sentiment — prices move monthly with sparkline history
-- **Rental real estate** with tenants, vacancies, yields, upkeep, and appreciation
-- A **macro economic cycle** (expansion → boom → recession → recovery) that moves interest rates, valuations, demand, and asset prices
-- Personal loans with dynamic credit limits, capital gains & dividend taxes
+Build for production (static files, host anywhere):
 
-### 🧬 Life simulation
-- **Vitals**: health, happiness, energy, stress, reputation, fame — all drift and interact
-- **Education**: community college through MBA/PhD, gating the corporate career ladder
-- **Careers**: 19 jobs across 5 tracks with promotions, performance, and firings
-- **Relationships**: partners, marriage, divorce settlements, children (and their tuition), mentors, and business rivals
-- **Lifestyle**: homes, cars, yachts, jets, art, watches — happiness, prestige, upkeep, appreciation/depreciation
-- **10 repeatable activities** — gym, therapy, networking, courses, charity, vacations…
+```bash
+npm run build
+npm run preview
+```
 
-### 🎲 BitLife-style decision events
-17+ multi-choice random events with skill-dependent outcomes: elevator pitches to angels, poaching attempts, lawsuits, supply-chain collapses, PR scandals, acquisition offers, tax audits, insider-trading temptations, burnout, romance, and rivals talking trash in interviews.
+## How to play
 
-### 🏆 Meta
-- 16 achievements (Founder → Billionaire → Centenarian)
-- Full life log, lifetime stats, net-worth history, exits ledger
-- Death and bankruptcy endings with a final verdict on your life
+You begin at **18** with a little cash and some random aptitudes. Each screen lets you act; nothing
+happens to the clock until you press **Advance Year** on the Life hub.
 
-## Project structure
+- **Career** — study for degrees, take jobs from a live market, and grow skills (120 of them across 10
+  categories). Performance drives raises, promotions and layoffs.
+- **Business** — found companies in any of 200+ industries, then tune strategy (marketing, R&D, pricing,
+  wages, automation, dividends), invest or draw capital, IPO, or sell.
+- **Markets** — trade the stock exchange of your home nation; go long or short, collect dividends.
+- **Assets** — buy property (cash or mortgage) for rental income and appreciation, and take loans.
+- **Politics** — join/found a party, run for office, campaign, and legislate. Whoever controls the
+  legislature — including you — passes laws that move the whole simulation.
+- **World** — a macro dashboard, every nation's economy and government, diplomacy, and commodities.
+- **News / Stats** — the dynamic wire, your net-worth curve, achievements and save tools.
+
+Life ends when you do — from old age or collapsing health — with a summary of everything you built.
+
+## Architecture
+
+The simulation is a **pure, UI-free core** (`src/sim`) driven entirely by **data** (`src/data`), wrapped
+by a thin **Zustand store** (`src/store`) and a **React UI** (`src/ui`). The entire game is one
+serialisable `GameState` object plus the RNG stream state, which is what makes saves, export/import and
+deterministic replay trivial.
 
 ```
-index.html        app shell
-css/styles.css    the whole design system
-js/data.js        static content: industries, jobs, assets, events data
-js/util.js        RNG, formatting, DOM helpers
-js/state.js       game state + save/load
-js/economy.js     macro cycle, markets, real estate, loans, net worth
-js/business.js    company simulation: operations, hiring, funding, exits
-js/events.js      random decision events
-js/engine.js      monthly/yearly tick loop, achievements, death
-js/icons.js       nav SVG icons
-js/ui.js          render pipeline, modals, toasts, event popups
-js/screens.js     the five tabs + intro + game over
-js/main.js        bootstrap
+src/
+  sim/                 Pure simulation core (no React, worker-friendly)
+    rng.ts             Seeded deterministic RNG (mulberry32)
+    types.ts           All game types; GameState is the single source of truth
+    world.ts           World generation from country seeds + the player
+    economy.ts         Macro cycle, rates, inflation, assets, commodities, demographics
+    business.ts        Company simulation and valuation
+    market.ts          Stock exchange, trading, shorting, dividends
+    politics.ts        Office ladder, elections, legislation, geopolitics, NPC lives
+    events.ts          Event matching, placeholder resolution, effect application
+    news.ts            Dynamic headline generation
+    actions.ts         The player "verbs" the UI calls between years
+    engine.ts          advanceYear(): orchestrates one simulated year
+  data/                Data-driven content (the game is authored here)
+    industries.ts      209 industries across 11 sectors
+    laws.ts            80 laws with economic effects and bloc support
+    events.ts          Event templates -> thousands of scenarios
+    skills.ts          120 skills; countries.ts, names.ts, ...
+  store/
+    gameStore.ts       Zustand store wrapping engine + actions
+    persistence.ts     IndexedDB saves (localStorage fallback), export/import
+  ui/                  Mobile-first React UI (light + dark)
+    components.tsx     Cards, pills, circular tiles, stat bars, canvas charts
+    AppShell.tsx       Top bar + bottom tab navigation
+    screens/           Life, Career, Business, Market, Assets, Politics, World, News, Stats
 ```
+
+### Modding
+
+All gameplay content lives in `src/data` as plain arrays/objects. Add an industry, law or event by adding
+a row — the engine never hard-codes individual content, so mods and expansions are just data.
+
+## Tech
+
+React + TypeScript (strict) · Vite · Tailwind CSS v4 · Zustand · IndexedDB · HTML Canvas charts.
+
+## Development
+
+```bash
+npm run typecheck   # tsc --build, strict, zero errors
+npm run smoke       # headless: generate a world and simulate ~80 years, asserting no NaNs/errors
+npm run build       # type-check + production bundle
+```
+
+The simulation core is deliberately decoupled from React, so it can be exercised (and unit-tested)
+headlessly — see `scripts/smoke.ts`.
