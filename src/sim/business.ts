@@ -87,6 +87,10 @@ export function createCompany(opts: FoundCompanyOptions, rng: RNG): Company {
     franchiseCount: 0,
     loyaltyProgram: false,
     securityInvested: false,
+    moonshot: null,
+    ceoName: null,
+    ceoSkill: 0,
+    ceoSalary: 0,
     status: 'active',
     history: [],
   };
@@ -344,7 +348,9 @@ export function tickCompany(c: Company, ctx: CompanyTickContext): CompanyTickRes
 
 /** NPC-owned companies adjust their own strategy each year. */
 export function npcManageCompany(c: Company, rng: RNG): void {
-  if (c.playerOwned) return;
+  // Player-owned companies are hands-on by default, but a hired CEO (chairman mode)
+  // takes over day-to-day lever tuning just like an NPC founder would.
+  if (c.playerOwned && !c.ceoName) return;
   // Drift toward sensible settings with idiosyncratic style.
   if (c.profit < 0) {
     c.marketingPct = clamp(c.marketingPct - 0.01, 0.01, 0.2);

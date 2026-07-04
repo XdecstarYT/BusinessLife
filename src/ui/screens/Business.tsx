@@ -11,9 +11,11 @@ import {
   CULTURE_INFO,
   diversifySupplyChain,
   fileTrademark,
+  fireCEO,
   fireExecutive,
   franchiseCompany,
   hireBrandAmbassador,
+  hireCEO,
   hireExecutive,
   holdInvestorConference,
   HQ_TIERS,
@@ -41,6 +43,7 @@ import {
   spinOffCompany,
   spyOnCompany,
   startCompany,
+  startMoonshot,
   takeCompanyPublic,
   toggleCompanyInsurance,
   upgradeHQ,
@@ -446,6 +449,14 @@ function ManageModal({ companyId, onClose }: { companyId: string; onClose: () =>
         <Button size="sm" variant="soft" onClick={() => run(franchiseCompany, c.id)}>🏬 Franchise ({c.franchiseCount})</Button>
         <Button size="sm" variant="soft" onClick={() => run(raceForInnovation, c.id)}>🔬 Race for Innovation</Button>
         <Button size="sm" variant="soft" onClick={() => run(sponsorLocalSportsTeam, c.id)}>🏟️ Sponsor Sports Team</Button>
+        <Button size="sm" variant="soft" disabled={!!c.moonshot} onClick={() => run(startMoonshot, c.id)}>
+          {c.moonshot ? `🚀 Moonshot: ${c.moonshot.yearsLeft}yr left` : '🚀 Start Moonshot'}
+        </Button>
+        {c.ceoName ? (
+          <Button size="sm" variant="ghost" onClick={() => run(fireCEO, c.id)}>🪑 Dismiss CEO ({c.ceoName})</Button>
+        ) : (
+          <Button size="sm" variant="soft" onClick={() => run(hireCEO, c.id)}>🤝 Hire a CEO</Button>
+        )}
         {c.isPublic && (
           <Button size="sm" variant="soft" onClick={() => run(holdInvestorConference, c.id)}>📊 Investor Conference</Button>
         )}

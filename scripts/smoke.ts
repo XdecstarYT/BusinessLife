@@ -32,7 +32,7 @@ function resolvePending() {
   state.pendingEvents = [];
 }
 
-let state = generateWorld({ playerName: 'Test Tycoon', gender: 'male', seedText: 'smoke-seed-1' });
+let state = generateWorld({ playerName: 'Test Tycoon', gender: 'male', seedText: 'smoke-seed-3' });
 
 console.log('World generated:');
 console.log('  countries:', state.countries.length);
@@ -365,6 +365,25 @@ for (let y = 0; y < 82 && state.player.alive; y++) {
         A.fundNationalCyberDefense(state, 100_000);
       }
     }
+    // --- V11: crypto, banking, foundation, casino, memoir ---
+    if (y === 47 && state.player.money > 50_000) {
+      A.buyCrypto(state, 10_000);
+      A.depositSavings(state, 10_000);
+      A.openTermDeposit(state, 5_000, 3);
+      A.playCasino(state, 'blackjack', 1_000);
+      if (state.player.money > 300_000) A.foundCharityFoundation(state, 'Smoke Test Foundation');
+      A.writeMemoir(state, 'Smoke: A Life');
+    }
+    if (y === 48 && state.player.cryptoUnits > 0) A.sellCrypto(state, state.player.cryptoUnits / 2);
+    // --- V11: moonshot, CEO, global games, retirement ---
+    if (y === 49 && state.player.companies.length) {
+      const co = state.player.companies[0];
+      A.startMoonshot(state, co);
+      A.hireCEO(state, co);
+      const home = state.countries.find((c) => c.id === state.player.countryId)!;
+      if (home.leaderId === 'player') A.bidToHostGlobalGames(state);
+    }
+    if (y === 50 && state.player.age >= 60 && !state.player.retired) A.retire(state);
     // --- V6: continue as heir when a succession offer appears ---
     if (state.pendingSuccession && state.pendingSuccession.candidates.length) {
       state = continueAsHeir(state, state.pendingSuccession.candidates[0].npcId);
@@ -420,6 +439,12 @@ console.log('  companies with security invested:', Object.values(state.companies
 console.log('  home unrest:', Math.round(state.countries.find((c) => c.id === state.player.countryId)?.unrest ?? 0));
 console.log('  home cyber defense:', Math.round(state.countries.find((c) => c.id === state.player.countryId)?.cyberDefense ?? 0));
 console.log('  opposition leader assigned:', !!state.countries.find((c) => c.id === state.player.countryId)?.oppositionLeaderId);
+console.log('  crypto price:', Math.round(state.cryptoPrice), 'units held:', state.player.cryptoUnits.toFixed(4));
+console.log('  savings:', state.player.savingsBalance, 'term deposits:', state.player.termDeposits.length);
+console.log('  foundation:', state.player.foundation ? `${state.player.foundation.name} ($${Math.round(state.player.foundation.totalGiven)} given)` : 'none');
+console.log('  retired:', state.player.retired, 'pension:', state.player.pensionIncome);
+console.log('  memoir:', state.player.memoir?.title ?? 'none / expired');
+console.log('  CEOs hired:', Object.values(state.companies).filter((c) => c.ceoName).length, 'moonshots active:', Object.values(state.companies).filter((c) => c.moonshot).length);
 console.log('  errors:', errors);
 
 // Invariant checks

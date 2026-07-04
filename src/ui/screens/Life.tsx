@@ -6,7 +6,7 @@
  */
 import { useState, type ReactNode } from 'react';
 import { useGame, type Screen } from '../../store/gameStore';
-import { attemptPrisonEscape, bribeJudge, contestTerritory, CRIME_RANK_TITLES, doActivity, enterWitnessProtection, goStraight, heist, issuePublicApology, joinCrimeFamily } from '../../sim/actions';
+import { attemptPrisonEscape, bribeJudge, contestTerritory, CRIME_RANK_TITLES, doActivity, donateToFoundation, enterWitnessProtection, foundCharityFoundation, goStraight, heist, issuePublicApology, joinCrimeFamily, playCasino, retire, writeMemoir } from '../../sim/actions';
 import { netWorth } from '../../sim/engine';
 import { Badge, Button, Card, CircleTile, Pill, PillRow, SectionHeader, StatBar } from '../components';
 import { money } from '../format';
@@ -248,6 +248,47 @@ export function Life() {
           </>
         )}
       </PillRow>
+
+      <SectionHeader title="Casino" />
+      <PillRow>
+        <Pill label="🃏 Blackjack ($1k)" onClick={() => run(playCasino, 'blackjack', 1_000)} />
+        <Pill label="🎡 Roulette ($1k)" onClick={() => run(playCasino, 'roulette', 1_000)} />
+        <Pill label="🎰 Slots ($500)" onClick={() => run(playCasino, 'slots', 500)} />
+        <Pill label="🃏 Blackjack ($25k)" onClick={() => run(playCasino, 'blackjack', 25_000)} />
+      </PillRow>
+
+      <SectionHeader title="Legacy" />
+      <Card className="p-4 mb-4 space-y-3">
+        {p.foundation ? (
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="font-semibold text-sm">❤️ {p.foundation.name}</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400">Endowment {money(p.foundation.endowment)} · given {money(p.foundation.totalGiven)} to date</div>
+            </div>
+            <Button size="sm" variant="soft" onClick={() => run(donateToFoundation, 100_000)}>Endow $100k</Button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-slate-500 dark:text-slate-400 pr-2">Found a charitable foundation ($250k endowment). It grants 5% a year, building karma and reputation forever.</div>
+            <Button size="sm" variant="soft" onClick={() => run(foundCharityFoundation, '')}>Found</Button>
+          </div>
+        )}
+        {p.memoir ? (
+          <div className="text-xs text-slate-500 dark:text-slate-400">📖 "{p.memoir.title}" is earning {money(p.memoir.royaltyPerYear)}/yr in royalties for {p.memoir.yearsLeft} more year(s).</div>
+        ) : (
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-slate-500 dark:text-slate-400 pr-2">Write your memoir (age 35+). Royalties for 5 years, scaled by your fame — and infamy.</div>
+            <Button size="sm" variant="soft" onClick={() => run(writeMemoir, '')}>Publish</Button>
+          </div>
+        )}
+        {!p.retired && p.age >= 60 && (
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-slate-500 dark:text-slate-400 pr-2">Formally retire: quit working with a pension based on your final salary.</div>
+            <Button size="sm" variant="soft" onClick={() => run(retire)}>🌅 Retire</Button>
+          </div>
+        )}
+        {p.retired && <div className="text-xs text-emerald-500 font-semibold">🌅 Retired · pension {money(p.pensionIncome)}/yr</div>}
+      </Card>
 
       {p.challenge && (
         <>

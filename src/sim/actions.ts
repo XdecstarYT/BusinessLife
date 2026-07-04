@@ -2775,4 +2775,222 @@ export function donateToPoliticalParty(state: GameState, partyId: string, amount
   return { ok: true, message: `${party.name}'s polling ticked up.` };
 }
 
+// ---------------------------------------------------------------------------
+// V11: crypto, banking, foundation, retirement, casino, memoir, global games,
+// moonshots, hired CEOs
+// ---------------------------------------------------------------------------
+
+export function buyCrypto(state: GameState, amount: number): ActionResult {
+  const p = state.player;
+  if (amount <= 0 || amount > p.money) return { ok: false, message: 'Invalid amount.' };
+  const units = amount / state.cryptoPrice;
+  p.money -= amount;
+  p.cryptoUnits += units;
+  log(state, `Bought ${units.toFixed(4)} crypto at $${Math.round(state.cryptoPrice).toLocaleString()}.`, 'money');
+  if (!state.achievements.includes('crypto_trader')) state.achievements.push('crypto_trader');
+  return { ok: true, message: `Bought ${units.toFixed(4)} units.` };
+}
+
+export function sellCrypto(state: GameState, units: number): ActionResult {
+  const p = state.player;
+  if (units <= 0 || units > p.cryptoUnits) return { ok: false, message: 'Not enough crypto.' };
+  const proceeds = units * state.cryptoPrice;
+  p.cryptoUnits -= units;
+  p.money += proceeds;
+  log(state, `Sold ${units.toFixed(4)} crypto for $${Math.round(proceeds).toLocaleString()}.`, 'money');
+  return { ok: true, message: `Sold for $${Math.round(proceeds).toLocaleString()}.` };
+}
+
+export function depositSavings(state: GameState, amount: number): ActionResult {
+  const p = state.player;
+  if (amount <= 0 || amount > p.money) return { ok: false, message: 'Invalid amount.' };
+  p.money -= amount;
+  p.savingsBalance += amount;
+  return { ok: true, message: `Deposited $${Math.round(amount).toLocaleString()} into savings.` };
+}
+
+export function withdrawSavings(state: GameState, amount: number): ActionResult {
+  const p = state.player;
+  if (amount <= 0 || amount > p.savingsBalance) return { ok: false, message: 'Not enough in savings.' };
+  p.savingsBalance -= amount;
+  p.money += amount;
+  return { ok: true, message: `Withdrew $${Math.round(amount).toLocaleString()}.` };
+}
+
+export function openTermDeposit(state: GameState, amount: number, years: number): ActionResult {
+  const p = state.player;
+  if (amount < 1_000 || amount > p.money) return { ok: false, message: 'Needs at least $1,000 you can spare.' };
+  const yrs = clamp(Math.round(years), 1, 10);
+  const home = state.countries.find((c) => c.id === p.countryId)!;
+  const rate = home.economy.interestRate + 0.005 + yrs * 0.002;
+  p.money -= amount;
+  p.termDeposits.push({ id: `td_${state.year}_${p.termDeposits.length}`, principal: amount, rate, yearsLeft: yrs });
+  log(state, `Opened a ${yrs}-year term deposit at ${(rate * 100).toFixed(1)}%.`, 'money');
+  return { ok: true, message: `Locked in ${(rate * 100).toFixed(1)}% for ${yrs} years.` };
+}
+
+export function foundCharityFoundation(state: GameState, name: string): ActionResult {
+  const p = state.player;
+  if (p.foundation) return { ok: false, message: 'You already run a foundation.' };
+  const cost = 250_000;
+  if (p.money < cost) return { ok: false, message: `Needs $${cost.toLocaleString()} to endow a foundation.` };
+  p.money -= cost;
+  p.foundation = { name: name.trim() || `The ${p.name.split(' ').pop()} Foundation`, endowment: cost, totalGiven: 0 };
+  p.karma = clamp100(p.karma + 5);
+  p.reputation = clamp100(p.reputation + 3);
+  if (!state.achievements.includes('foundation_founder')) state.achievements.push('foundation_founder');
+  log(state, `❤️ You founded ${p.foundation.name} with a $${cost.toLocaleString()} endowment.`, 'milestone');
+  return { ok: true, message: `${p.foundation.name} is established.` };
+}
+
+export function donateToFoundation(state: GameState, amount: number): ActionResult {
+  const p = state.player;
+  if (!p.foundation) return { ok: false, message: 'Found a foundation first.' };
+  if (amount <= 0 || amount > p.money) return { ok: false, message: 'Invalid amount.' };
+  p.money -= amount;
+  p.foundation.endowment += amount;
+  p.karma = clamp100(p.karma + Math.min(5, amount / 100_000));
+  log(state, `Endowed ${p.foundation.name} with a further $${Math.round(amount).toLocaleString()}.`, 'money');
+  return { ok: true, message: 'Endowment increased.' };
+}
+
+export function retire(state: GameState): ActionResult {
+  const p = state.player;
+  if (p.retired) return { ok: false, message: 'You are already retired.' };
+  if (p.age < 60) return { ok: false, message: 'Retirement opens at age 60.' };
+  const lastSalary = p.job?.salary ?? 0;
+  const officeSalary = p.office ? 50_000 : 0;
+  p.pensionIncome = Math.round(Math.max(12_000, (lastSalary + officeSalary) * 0.45));
+  p.retired = true;
+  p.job = null;
+  p.happiness = clamp100(p.happiness + 8);
+  if (!state.achievements.includes('retired')) state.achievements.push('retired');
+  log(state, `🌅 You formally retired. Pension: $${p.pensionIncome.toLocaleString()}/yr.`, 'milestone');
+  return { ok: true, message: `Retired with a $${p.pensionIncome.toLocaleString()}/yr pension.` };
+}
+
+export type CasinoGame = 'blackjack' | 'roulette' | 'slots';
+
+export function playCasino(state: GameState, game: CasinoGame, stake: number): ActionResult {
+  const p = state.player;
+  if (stake <= 0 || stake > p.money) return { ok: false, message: 'Invalid stake.' };
+  const rng = withRng(state);
+  p.money -= stake;
+  const pokerEdge = (p.skills[SK.poker] ?? 0) / 100;
+  let winChance: number;
+  let payoutMult: number;
+  if (game === 'blackjack') {
+    winChance = clamp(0.46 + pokerEdge * 0.08, 0.3, 0.56);
+    payoutMult = 2;
+  } else if (game === 'roulette') {
+    winChance = 0.47;
+    payoutMult = 2;
+  } else {
+    winChance = 0.12;
+    payoutMult = 8;
+  }
+  const won = rng.chance(winChance);
+  commit(state, rng);
+  p.skills[SK.poker] = clamp100((p.skills[SK.poker] ?? 0) + 1);
+  if (won) {
+    const winnings = Math.round(stake * payoutMult);
+    p.money += winnings;
+    p.happiness = clamp100(p.happiness + 3);
+    if (winnings - stake >= 50_000 && !state.achievements.includes('high_roller')) state.achievements.push('high_roller');
+    log(state, `🎰 Won $${(winnings - stake).toLocaleString()} at the casino (${game}).`, 'money');
+    return { ok: true, message: `You won $${(winnings - stake).toLocaleString()}!` };
+  }
+  p.happiness = clamp100(p.happiness - 2);
+  log(state, `🎰 Lost $${stake.toLocaleString()} at the casino (${game}).`, 'bad');
+  return { ok: true, message: `The house took your $${stake.toLocaleString()}.` };
+}
+
+export function writeMemoir(state: GameState, title: string): ActionResult {
+  const p = state.player;
+  if (p.memoir) return { ok: false, message: 'Your current memoir is still selling.' };
+  if (p.age < 35) return { ok: false, message: 'You need a bit more life to write about — come back at 35.' };
+  const fame = p.reputation + p.popularity + p.notoriety * 1.5;
+  const rng = withRng(state);
+  const royaltyPerYear = Math.round(Math.max(5_000, fame * rng.range(400, 900)));
+  commit(state, rng);
+  p.memoir = { title: title.trim() || `${p.name}: My Story`, yearsLeft: 5, royaltyPerYear };
+  p.happiness = clamp100(p.happiness + 4);
+  p.reputation = clamp100(p.reputation + 2);
+  const bestseller = royaltyPerYear >= 60_000;
+  if (bestseller && !state.achievements.includes('bestselling_author')) state.achievements.push('bestselling_author');
+  log(state, `📖 You published "${p.memoir.title}"${bestseller ? ' — an instant bestseller' : ''}. Royalties: $${royaltyPerYear.toLocaleString()}/yr for 5 years.`, 'milestone');
+  return { ok: true, message: bestseller ? 'A bestseller! Strong royalties locked in.' : 'Published. Modest royalties will trickle in.' };
+}
+
+export function bidToHostGlobalGames(state: GameState): ActionResult {
+  const { home, error } = requireLeadership(state);
+  if (error) return error;
+  if (home.globalGamesYear !== null) return { ok: false, message: 'Your nation is already preparing to host.' };
+  const p = state.player;
+  const cost = 25;
+  if (p.politicalCapital < cost) return { ok: false, message: `Needs ${cost} political capital.` };
+  p.politicalCapital = clamp(p.politicalCapital - cost, 0, 100);
+  const rng = withRng(state);
+  const chance = clamp(0.3 + (home.infrastructure - 50) * 0.005 + (home.stability - 50) * 0.004, 0.1, 0.75);
+  const won = rng.chance(chance);
+  commit(state, rng);
+  if (!won) {
+    p.popularity = clamp100(p.popularity - 2);
+    log(state, `Your Global Games bid was passed over for a rival nation.`, 'bad');
+    return { ok: false, message: 'The bid failed this cycle.' };
+  }
+  home.globalGamesYear = state.year + 5;
+  p.popularity = clamp100(p.popularity + 5);
+  logHistory(state, `🏟️ ${home.name} wins the bid to host the Global Games in ${home.globalGamesYear}`);
+  log(state, `🏟️ ${home.name} won the bid to host the Global Games in ${home.globalGamesYear}!`, 'politics');
+  return { ok: true, message: `Hosting the Global Games in ${home.globalGamesYear}.` };
+}
+
+export function startMoonshot(state: GameState, companyId: string): ActionResult {
+  const c = state.companies[companyId];
+  if (!c || !c.playerOwned || c.status !== 'active') return { ok: false, message: 'Not your company.' };
+  if (c.moonshot) return { ok: false, message: 'A moonshot is already underway.' };
+  const cost = Math.max(200_000, c.revenue * 0.25);
+  if (cost > c.cash) return { ok: false, message: `Needs $${Math.round(cost).toLocaleString()} in company cash committed over the project.` };
+  const rng = withRng(state);
+  const years = rng.int(3, 5);
+  commit(state, rng);
+  c.moonshot = { yearsLeft: years, invested: cost };
+  log(state, `🚀 ${c.name} committed $${Math.round(cost).toLocaleString()} to a ${years}-year moonshot project.`, 'business');
+  return { ok: true, message: `Moonshot underway: ${years} years, $${Math.round(cost).toLocaleString()} committed.` };
+}
+
+export function hireCEO(state: GameState, companyId: string): ActionResult {
+  const c = state.companies[companyId];
+  if (!c || !c.playerOwned || c.status !== 'active') return { ok: false, message: 'Not your company.' };
+  if (c.ceoName) return { ok: false, message: `${c.ceoName} already runs ${c.name}.` };
+  const rng = withRng(state);
+  const skill = Math.round(rng.range(55, 92));
+  const salary = Math.round(Math.max(120_000, c.revenue * 0.015) * (skill / 70));
+  if (salary * 1.5 > c.cash) {
+    commit(state, rng);
+    return { ok: false, message: `The company can't afford a credible CEO (~$${salary.toLocaleString()}/yr).` };
+  }
+  const ceoName = makePersonName(rng, rng.chance(0.5) ? 'male' : 'female');
+  commit(state, rng);
+  c.ceoName = ceoName;
+  c.ceoSkill = skill;
+  c.ceoSalary = salary;
+  if (!state.achievements.includes('chairman')) state.achievements.push('chairman');
+  log(state, `🤝 ${ceoName} hired as CEO of ${c.name} (skill ${skill}, $${salary.toLocaleString()}/yr). You move to the chairman's seat.`, 'business');
+  return { ok: true, message: `${ceoName} now runs ${c.name} day-to-day.` };
+}
+
+export function fireCEO(state: GameState, companyId: string): ActionResult {
+  const c = state.companies[companyId];
+  if (!c || !c.playerOwned || c.status !== 'active' || !c.ceoName) return { ok: false, message: 'No CEO to dismiss.' };
+  const severance = Math.round(c.ceoSalary * 0.5);
+  c.cash -= severance;
+  log(state, `${c.ceoName} was dismissed as CEO of ${c.name} ($${severance.toLocaleString()} severance). You are back in charge.`, 'business');
+  c.ceoName = null;
+  c.ceoSkill = 0;
+  c.ceoSalary = 0;
+  return { ok: true, message: 'You are back running the company directly.' };
+}
+
 export const NEW_GAME_GENDERS: Gender[] = ['male', 'female'];

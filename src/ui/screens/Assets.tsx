@@ -7,7 +7,9 @@ import {
   buyProperty,
   cancelLifeInsurance,
   closeForexPosition,
+  depositSavings,
   openForexPosition,
+  openTermDeposit,
   propertyListings,
   refinanceMortgage,
   refinancePersonalLoan,
@@ -17,6 +19,7 @@ import {
   takeLoan,
   toggleRentalStatus,
   togglePropertyInsurance,
+  withdrawSavings,
 } from '../../sim/actions';
 import { buyLuxuryAsset, divestCelebrityStake, investInCelebrityBrand, LUXURY_CATALOG, sellLuxuryAsset } from '../../sim/lifestyle';
 import { Badge, Button, Card, Field, Pill, PillRow, SectionHeader } from '../components';
@@ -25,7 +28,9 @@ import type { PropertyAsset } from '../../sim/types';
 
 export function Assets() {
   const { state, run } = useGame();
-  const [tab, setTab] = useState<'owned' | 'buy' | 'loans' | 'bonds' | 'forex' | 'insurance' | 'lifestyle' | 'celebrities'>('owned');
+  const [tab, setTab] = useState<'owned' | 'buy' | 'loans' | 'bonds' | 'forex' | 'insurance' | 'lifestyle' | 'celebrities' | 'banking'>('owned');
+  const [bankAmt, setBankAmt] = useState(5_000);
+  const [tdYears, setTdYears] = useState(3);
   const [loanAmt, setLoanAmt] = useState(50_000);
   const [loanYears, setLoanYears] = useState(10);
   const [bondAmt, setBondAmt] = useState(20_000);
@@ -64,7 +69,46 @@ export function Assets() {
         <Pill label="Insurance" active={tab === 'insurance'} onClick={() => setTab('insurance')} />
         <Pill label={`Lifestyle (${p.luxuryAssets.length})`} active={tab === 'lifestyle'} onClick={() => setTab('lifestyle')} />
         <Pill label={`Celebrities (${p.celebrityStakes.length})`} active={tab === 'celebrities'} onClick={() => setTab('celebrities')} />
+        <Pill label="🏦 Banking" active={tab === 'banking'} onClick={() => setTab('banking')} />
       </PillRow>
+
+      {tab === 'banking' && (
+        <div className="mt-4 space-y-3">
+          <Card className="p-4">
+            <div className="flex justify-between items-center mb-3">
+              <div>
+                <div className="font-bold">Savings Account</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Earns the policy rate minus 1% ({pct(Math.max(0, home.economy.interestRate - 0.01))}/yr), fully liquid.</div>
+              </div>
+              <div className="font-extrabold text-emerald-500">{money(p.savingsBalance)}</div>
+            </div>
+            <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Amount: {moneyFull(bankAmt)}</label>
+            <input type="range" min={500} max={Math.max(500, Math.round(Math.max(p.money, p.savingsBalance)))} step={500} value={bankAmt} onChange={(e) => setBankAmt(Number(e.target.value))} className="w-full mt-1 mb-3" />
+            <div className="grid grid-cols-2 gap-2">
+              <Button variant="soft" onClick={() => run(depositSavings, bankAmt)}>Deposit</Button>
+              <Button variant="soft" onClick={() => run(withdrawSavings, Math.min(p.savingsBalance, bankAmt))}>Withdraw</Button>
+            </div>
+          </Card>
+
+          <Card className="p-4">
+            <div className="font-bold mb-1">Term Deposits</div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Lock money away at a fixed rate — longer terms pay a small premium. Interest compounds annually until maturity.</p>
+            <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Term: {tdYears} years ({pct(home.economy.interestRate + 0.005 + tdYears * 0.002)}/yr)</label>
+            <input type="range" min={1} max={10} value={tdYears} onChange={(e) => setTdYears(Number(e.target.value))} className="w-full mt-1 mb-3" />
+            <Button className="w-full" variant="soft" onClick={() => run(openTermDeposit, bankAmt, tdYears)}>Open Term Deposit ({moneyFull(bankAmt)})</Button>
+          </Card>
+
+          {p.termDeposits.map((td) => (
+            <Card key={td.id} className="p-4 flex justify-between items-center">
+              <div>
+                <div className="font-bold">Term Deposit</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">{pct(td.rate)} fixed · matures in {td.yearsLeft} yr</div>
+              </div>
+              <Badge tone="good">{money(td.principal)}</Badge>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {tab === 'owned' && (
         <div className="mt-4 space-y-3">

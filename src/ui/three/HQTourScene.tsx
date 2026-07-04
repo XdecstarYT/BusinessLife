@@ -23,9 +23,10 @@ export function HQTourScene({ hqTier, employees, morale, culture }: HQTourSceneP
 
   useThreeScene(
     ref,
-    ({ scene, camera }) => {
+    ({ scene, camera, addStars }) => {
       scene.background = null;
-      scene.fog = new THREE.Fog(0x0b1220, 12, 30);
+      scene.fog = new THREE.Fog(0x0b1220, 12, 45);
+      addStars(180);
 
       const ambient = new THREE.AmbientLight(0xffffff, 0.55);
       scene.add(ambient);

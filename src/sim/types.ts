@@ -66,6 +66,25 @@ export interface CelebrityStake {
   stakePct: number; // 0..1
 }
 
+export interface TermDeposit {
+  id: string;
+  principal: number;
+  rate: number; // fixed at opening
+  yearsLeft: number;
+}
+
+export interface CharityFoundation {
+  name: string;
+  endowment: number; // invested corpus; grants ~5% per year
+  totalGiven: number; // lifetime grants distributed
+}
+
+export interface Memoir {
+  title: string;
+  yearsLeft: number; // remaining royalty years
+  royaltyPerYear: number;
+}
+
 export interface Bond {
   id: string;
   countryId: string;
@@ -215,6 +234,13 @@ export interface Player {
   prAgencyHired: boolean; // ongoing retainer that softens negative reputation/popularity/happiness hits
   luxuryAssets: LuxuryAsset[]; // billionaire lifestyle purchases: jets, yachts, islands, sports teams, racehorses, art
   celebrityStakes: CelebrityStake[]; // equity-like stakes in a celebrity NPC's earning power
+  cryptoUnits: number; // holdings of the world's single (volatile) cryptocurrency
+  savingsBalance: number; // bank savings account earning the policy rate minus a spread
+  termDeposits: TermDeposit[]; // locked deposits at a fixed rate until maturity
+  foundation: CharityFoundation | null; // personal charitable foundation, once founded
+  retired: boolean; // formally retired from employment
+  pensionIncome: number; // yearly pension once retired, based on career at retirement
+  memoir: Memoir | null; // published autobiography paying royalties for a few years
   campaign: null | {
     officeKind: OfficeKind;
     regionName: string;
@@ -399,6 +425,7 @@ export interface Country {
   unrest: number; // 0..100, active protest/strike movement intensity
   cyberDefense: number; // 0..100, national cyber defense strength; dampens cyberattack severity
   oppositionLeaderId: string | null; // NPC id; reactively critiques the player's government and adapts
+  globalGamesYear: number | null; // year this nation hosts the Global Games, if a bid was won
 }
 
 export const CABINET_PORTFOLIOS = ['Finance', 'Foreign Affairs', 'Defense', 'Health', 'Education', 'Justice'] as const;
@@ -524,9 +551,18 @@ export interface Company {
   franchiseCount: number; // franchised locations; each pays a small ongoing royalty
   loyaltyProgram: boolean; // a membership/rewards program lifting retention and brand
   securityInvested: boolean; // loss-prevention investment; eliminates retail shrinkage at an ongoing cost
+  moonshot: Moonshot | null; // a multi-year, high-risk R&D bet
+  ceoName: string | null; // hired professional CEO running day-to-day (chairman mode)
+  ceoSkill: number; // 0..100
+  ceoSalary: number; // yearly, paid from company cash
 
   status: CompanyStatus;
   history: CompanyHistoryPoint[];
+}
+
+export interface Moonshot {
+  yearsLeft: number;
+  invested: number; // total committed; burned over the project's life
 }
 
 export type ExecutiveRole = 'cfo' | 'coo' | 'cmo';
@@ -782,6 +818,8 @@ export interface GameState {
   yearRecap: YearRecap | null; // transient: set after each advanceYear(), cleared once the UI shows it
   pendingSuccession: SuccessionOffer | null; // transient: set on death when a will/heir continuation is available
   worldHistory: WorldHistoryEntry[]; // sparse chronicle of major world-level milestones, spans generations
+  cryptoPrice: number; // the world's single cryptocurrency, priced in the home currency
+  cryptoHistory: number[]; // recent yearly closes for charting
 }
 
 export interface SuccessionCandidate {

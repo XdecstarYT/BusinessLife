@@ -83,6 +83,17 @@ const ACHIEVEMENTS: Record<string, { label: string; icon: string }> = {
   unbreakable: { label: 'Unbreakable', icon: '💪' },
   jetsetter: { label: 'Jetsetter', icon: '✈️' },
   island_life: { label: 'Island Life', icon: '🏝️' },
+  crypto_trader: { label: 'Crypto Trader', icon: '🪙' },
+  crypto_millionaire: { label: 'Crypto Millionaire', icon: '🪙' },
+  foundation_founder: { label: 'Foundation Founder', icon: '🏛️' },
+  foundation_million: { label: 'Million-Dollar Giver', icon: '💝' },
+  retired: { label: 'Retired', icon: '🌅' },
+  high_roller: { label: 'High Roller', icon: '🎰' },
+  bestselling_author: { label: 'Bestselling Author', icon: '📖' },
+  games_host: { label: 'Global Games Host', icon: '🏟️' },
+  company_of_the_year: { label: 'Company of the Year', icon: '🏆' },
+  moonshot_landed: { label: 'Moonshot Landed', icon: '🚀' },
+  chairman: { label: 'Chairman', icon: '🪑' },
 };
 
 export function Stats() {

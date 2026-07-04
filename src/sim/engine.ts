@@ -4,7 +4,7 @@
  * player's own life (job, study, office, campaign, assets) → events → news.
  * Pure function of (state, rng): UI-free and worker-friendly.
  */
-import type { GameState, LifeLogEntry, Player } from './types';
+import type { Country, GameState, LifeLogEntry, Player } from './types';
 import { clamp, clamp100 } from './types';
 import { RNG } from './rng';
 import { tickCommodities, tickEconomy } from './economy';
@@ -37,6 +37,9 @@ const MAJOR_HEADLINE_MARKERS = ['WAR:', 'Peace:', 'COUP', 'wins the', 'retains p
 export function netWorth(state: GameState): number {
   const p = state.player;
   let total = p.money + portfolioValue(state) - p.marginDebt + p.dirtyMoney;
+  total += p.savingsBalance + p.cryptoUnits * state.cryptoPrice;
+  for (const td of p.termDeposits) total += td.principal;
+  for (const lux of p.luxuryAssets) total += lux.value;
   for (const prop of p.properties) total += prop.value - prop.mortgage;
   for (const loan of p.loans) total -= loan.principal;
   for (const id of p.companies) {
@@ -78,6 +81,164 @@ function tickChallenge(state: GameState, rng: RNG): void {
     log(state, `⌛ Challenge expired: ${c.description}.`, 'bad');
     p.happiness = clamp100(p.happiness - 3);
     p.challenge = null;
+  }
+}
+
+/** Crypto: a single, very volatile global asset with boom/bust dynamics riding world sentiment. */
+function tickCrypto(state: GameState, rng: RNG): void {
+  const home = state.countries.find((c) => c.isPlayerHome)!;
+  const sentiment = (home.economy.businessConfidence - 50) * 0.002;
+  const boostFromTechBoom = state.worldEvent?.type === 'tech_boom' ? 0.15 : 0;
+  const hitFromBankCollapse = state.worldEvent?.type === 'banking_collapse' ? -0.2 : 0;
+  const drift = rng.range(-0.35, 0.45) + sentiment + boostFromTechBoom + hitFromBankCollapse;
+  state.cryptoPrice = clamp(state.cryptoPrice * (1 + drift), 50, 5_000_000);
+  state.cryptoHistory.push(Math.round(state.cryptoPrice));
+  if (state.cryptoHistory.length > 120) state.cryptoHistory.shift();
+}
+
+/** Savings interest, term-deposit maturity, foundation grants, pension, memoir royalties. */
+function tickPersonalFinance(state: GameState, rng: RNG): void {
+  const p = state.player;
+  const home = state.countries.find((c) => c.id === p.countryId)!;
+  const savingsRate = Math.max(0, home.economy.interestRate - 0.01);
+  if (p.savingsBalance > 0) p.savingsBalance = Math.round(p.savingsBalance * (1 + savingsRate));
+
+  for (const td of [...p.termDeposits]) {
+    td.yearsLeft--;
+    if (td.yearsLeft <= 0) {
+      const matured = Math.round(td.principal * (1 + td.rate));
+      p.money += matured;
+      p.termDeposits = p.termDeposits.filter((x) => x.id !== td.id);
+      log(state, `A term deposit matured, paying out $${matured.toLocaleString()}.`, 'money');
+    } else {
+      td.principal = Math.round(td.principal * (1 + td.rate));
+    }
+  }
+
+  if (p.foundation) {
+    const f = p.foundation;
+    f.endowment = Math.round(f.endowment * (1 + rng.range(0.02, 0.06)));
+    const grants = Math.round(f.endowment * 0.05);
+    if (grants > 0) {
+      f.endowment -= grants;
+      f.totalGiven += grants;
+      p.karma = clamp100(p.karma + 2);
+      p.reputation = clamp100(p.reputation + 1);
+      p.popularity = clamp100(p.popularity + 0.5);
+      if (f.totalGiven >= 1_000_000 && !state.achievements.includes('foundation_million')) {
+        state.achievements.push('foundation_million');
+        log(state, `🏆 The ${f.name} has now given away over $1 million.`, 'milestone');
+      }
+    }
+  }
+
+  if (p.retired && p.pensionIncome > 0 && p.alive) {
+    p.money += p.pensionIncome;
+  }
+
+  if (p.memoir) {
+    p.money += p.memoir.royaltyPerYear;
+    p.memoir.yearsLeft--;
+    if (p.memoir.yearsLeft <= 0) {
+      log(state, `Royalties from "${p.memoir.title}" have run their course.`, 'info');
+      p.memoir = null;
+    }
+  }
+}
+
+/** Annual industry awards: the home nation's standout company is honored each year. */
+function tickIndustryAwards(state: GameState, rng: RNG): string[] {
+  const home = state.countries.find((c) => c.isPlayerHome)!;
+  const candidates = Object.values(state.companies).filter(
+    (c) => c.status === 'active' && c.countryId === home.id && c.history.length >= 2,
+  );
+  if (candidates.length < 3) return [];
+  const scored = candidates
+    .map((c) => {
+      const a = c.history[c.history.length - 2].revenue;
+      const b = c.history[c.history.length - 1].revenue;
+      return { c, growth: a > 0 ? b / a - 1 : 0 };
+    })
+    .sort((x, y) => y.growth - x.growth);
+  const winner = scored[0].c;
+  winner.brand = clamp100(winner.brand + 5);
+  winner.morale = clamp100(winner.morale + 4);
+  if (winner.playerOwned) {
+    state.player.reputation = clamp100(state.player.reputation + 5);
+    if (!state.achievements.includes('company_of_the_year')) state.achievements.push('company_of_the_year');
+    log(state, `🏆 ${winner.name} was named Company of the Year!`, 'milestone');
+  }
+  void rng;
+  return [`🏆 ${winner.name} named ${home.name}'s Company of the Year`];
+}
+
+/** Global Games: a won bid builds for several years, then the hosting year pays off. */
+function tickGlobalGames(state: GameState, country: Country): string[] {
+  if (country.globalGamesYear === null) return [];
+  const headlines: string[] = [];
+  if (state.year < country.globalGamesYear) {
+    country.economy.budgetBalance = clamp(country.economy.budgetBalance - 0.005, -0.3, 0.1);
+    country.infrastructure = clamp100(country.infrastructure + 1.5);
+  } else if (state.year === country.globalGamesYear) {
+    country.economy.businessConfidence = clamp100(country.economy.businessConfidence + 10);
+    country.economy.consumerConfidence = clamp100(country.economy.consumerConfidence + 8);
+    country.stability = clamp100(country.stability + 4);
+    headlines.push(`🏟️ The Global Games open in ${country.name} to worldwide fanfare`);
+    if (country.leaderId === 'player') {
+      state.player.popularity = clamp100(state.player.popularity + 10);
+      state.player.reputation = clamp100(state.player.reputation + 6);
+      if (!state.achievements.includes('games_host')) state.achievements.push('games_host');
+      log(state, `🏟️ Your nation hosted the Global Games — a triumph on the world stage.`, 'milestone');
+    }
+    country.globalGamesYear = null;
+  }
+  return headlines;
+}
+
+/** Moonshot R&D projects burn cash yearly and resolve at the end: breakthrough or bust. */
+function tickMoonshots(state: GameState, rng: RNG): void {
+  for (const c of Object.values(state.companies)) {
+    if (c.status !== 'active' || !c.moonshot) continue;
+    const burn = c.moonshot.invested / Math.max(1, c.moonshot.yearsLeft + 1);
+    c.cash -= burn;
+    c.moonshot.yearsLeft--;
+    if (c.moonshot.yearsLeft <= 0) {
+      const country = state.countries.find((k) => k.id === c.countryId)!;
+      const chance = clamp(0.35 + c.rdPct * 1.2 + (country.researchLevel / 100) * 0.2, 0.15, 0.7);
+      if (rng.chance(chance)) {
+        c.patents += 3;
+        c.quality = clamp100(c.quality + 10);
+        c.brand = clamp100(c.brand + 8);
+        c.revenue *= 1.15;
+        if (c.playerOwned) {
+          if (!state.achievements.includes('moonshot_landed')) state.achievements.push('moonshot_landed');
+          log(state, `🚀 ${c.name}'s moonshot paid off — a genuine breakthrough!`, 'milestone');
+        }
+      } else if (c.playerOwned) {
+        log(state, `💥 ${c.name}'s moonshot project ended in failure. The R&D is a sunk cost.`, 'bad');
+      }
+      c.moonshot = null;
+    }
+  }
+}
+
+/** Hired CEOs: paid from company cash, pull managerQuality toward their skill, and may quit. */
+function tickCEOs(state: GameState, rng: RNG): void {
+  for (const c of Object.values(state.companies)) {
+    if (c.status !== 'active' || !c.ceoName || !c.playerOwned) continue;
+    c.cash -= c.ceoSalary;
+    c.managerQuality = clamp100(c.managerQuality * 0.7 + c.ceoSkill * 0.3);
+    if (c.cash < 0 && rng.chance(0.4)) {
+      log(state, `${c.ceoName} resigned as CEO of ${c.name} — the company can no longer afford them.`, 'bad');
+      c.ceoName = null;
+      c.ceoSkill = 0;
+      c.ceoSalary = 0;
+    } else if (rng.chance(0.04)) {
+      log(state, `${c.ceoName} was poached from ${c.name} by a rival firm.`, 'bad');
+      c.ceoName = null;
+      c.ceoSkill = 0;
+      c.ceoSalary = 0;
+    }
   }
 }
 
@@ -460,6 +621,15 @@ export function continueAsHeir(state: GameState, npcId: string): GameState {
     marginDebt: 0,
     drip: false,
     challenge: null,
+    cryptoUnits: 0,
+    savingsBalance: 0,
+    termDeposits: [],
+    foundation: null,
+    retired: false,
+    pensionIncome: 0,
+    memoir: null,
+    luxuryAssets: [],
+    celebrityStakes: [],
   };
   delete state.npcs[npcId];
   state.player = newPlayer;
@@ -511,6 +681,9 @@ export function advanceYear(state: GameState): GameState {
       if (MAJOR_HEADLINE_MARKERS.some((m) => h.includes(m))) logHistory(state, h);
     }
     politicalHeadlines.push(...countryHeadlines);
+    const gamesHeadlines = tickGlobalGames(state, country);
+    for (const h of gamesHeadlines) logHistory(state, h);
+    politicalHeadlines.push(...gamesHeadlines);
   }
   politicalHeadlines.push(...tickNPCs(state, rng));
 
@@ -531,6 +704,10 @@ export function advanceYear(state: GameState): GameState {
   }
   businessHeadlines.push(...tickMergers(state, rng));
   businessHeadlines.push(...tickCorporateSabotage(state, rng));
+  businessHeadlines.push(...tickIndustryAwards(state, rng));
+  tickMoonshots(state, rng);
+  tickCEOs(state, rng);
+  tickCrypto(state, rng);
   for (const l of checkLimitOrders(state)) log(state, l, 'money');
   for (const l of tickMargin(state)) log(state, l, 'bad');
 
@@ -539,6 +716,7 @@ export function advanceYear(state: GameState): GameState {
   if (state.player.alive) tickFamily(state, rng);
   if (state.player.alive) tickChallenge(state, rng);
   if (state.player.alive) for (const h of tickLifestyleAssets(state, rng)) log(state, h, 'money');
+  if (state.player.alive) tickPersonalFinance(state, rng);
 
   // 5. Player company income: dividends from private profitable companies
   const p = state.player;
@@ -614,6 +792,7 @@ export function advanceYear(state: GameState): GameState {
     ['unbreakable', p.health >= 90 && p.age >= 80],
     ['jetsetter', p.luxuryAssets.some((a) => a.kind === 'private_jet')],
     ['island_life', p.luxuryAssets.some((a) => a.kind === 'island')],
+    ['crypto_millionaire', p.cryptoUnits * state.cryptoPrice >= 1e6],
   ];
   const MILESTONE_LOG: Record<string, string> = {
     millionaire: '🏆 You are a millionaire!',
@@ -655,6 +834,7 @@ export function advanceYear(state: GameState): GameState {
     unbreakable: '🏆 Peak health at 80 years old.',
     jetsetter: '🏆 You own a private jet.',
     island_life: '🏆 You own a private island.',
+    crypto_millionaire: '🏆 Your crypto holdings passed $1 million.',
   };
   for (const [key, hit] of milestones) {
     if (hit && !state.achievements.includes(key)) {

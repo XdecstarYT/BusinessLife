@@ -15,12 +15,13 @@ export function ElectionMapScene({ regionalBreakdown }: ElectionMapSceneProps) {
 
   useThreeScene(
     ref,
-    ({ scene, camera }) => {
-      scene.fog = new THREE.Fog(0x0b1220, 8, 20);
+    ({ scene, camera, addStars, makeLabel }) => {
+      scene.fog = new THREE.Fog(0x0b1220, 8, 40);
       scene.add(new THREE.AmbientLight(0xffffff, 0.6));
       const sun = new THREE.DirectionalLight(0xffffff, 1);
       sun.position.set(5, 8, 4);
       scene.add(sun);
+      addStars();
 
       const floor = new THREE.Mesh(
         new THREE.CircleGeometry(6, 48),
@@ -43,6 +44,10 @@ export function ElectionMapScene({ regionalBreakdown }: ElectionMapSceneProps) {
         mesh.scale.y = 0.01;
         scene.add(mesh);
         bars.push({ mesh, targetHeight, growth: 0 });
+
+        const label = makeLabel(`${r.cityName} · ${r.playerSharePct}%`, 0.55);
+        label.position.set(Math.cos(angle) * radius, targetHeight + 0.6, Math.sin(angle) * radius);
+        scene.add(label);
       });
 
       camera.position.set(0, 5, 8);

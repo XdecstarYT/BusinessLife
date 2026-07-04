@@ -21,12 +21,17 @@ export function TradeNetworkScene({ homeName, routes }: TradeNetworkSceneProps) 
 
   useThreeScene(
     ref,
-    ({ scene, camera }) => {
-      scene.fog = new THREE.Fog(0x0b1220, 10, 24);
+    ({ scene, camera, addStars, makeLabel }) => {
+      scene.fog = new THREE.Fog(0x0b1220, 10, 45);
       scene.add(new THREE.AmbientLight(0xffffff, 0.6));
       const sun = new THREE.DirectionalLight(0xffffff, 1);
       sun.position.set(6, 10, 4);
       scene.add(sun);
+      addStars();
+
+      const homeLabel = makeLabel(homeName, 0.65);
+      homeLabel.position.set(0, 1.1, 0);
+      scene.add(homeLabel);
 
       const floor = new THREE.Mesh(
         new THREE.CircleGeometry(8, 48),
@@ -54,6 +59,10 @@ export function TradeNetworkScene({ homeName, routes }: TradeNetworkSceneProps) 
         const node = new THREE.Mesh(new THREE.SphereGeometry(0.3, 16, 16), new THREE.MeshStandardMaterial({ color: nodeColor }));
         node.position.copy(target);
         scene.add(node);
+
+        const nationLabel = makeLabel(route.atWar ? `${route.name} ⚔` : route.name, 0.5);
+        nationLabel.position.set(target.x, 0.85, target.z);
+        scene.add(nationLabel);
 
         const routeColor = route.atWar ? 0x7f1d1d : 0x334155;
         const lineGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), target]);

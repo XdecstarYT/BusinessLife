@@ -24,7 +24,7 @@ export function SupplyChainScene({ supplyChainResilience, revenue }: SupplyChain
 
   useThreeScene(
     ref,
-    ({ scene, camera }) => {
+    ({ scene, camera, makeLabel }) => {
       scene.fog = new THREE.Fog(0x0b1220, 8, 18);
       scene.add(new THREE.AmbientLight(0xffffff, 0.6));
       const sun = new THREE.DirectionalLight(0xffffff, 1);
@@ -40,6 +40,10 @@ export function SupplyChainScene({ supplyChainResilience, revenue }: SupplyChain
         mesh.position.copy(pos);
         scene.add(mesh);
         nodePositions.push(pos);
+
+        const label = makeLabel(stage.label, 0.42);
+        label.position.set(pos.x, -0.75, pos.z);
+        scene.add(label);
 
         // connecting rail
         if (i > 0) {

@@ -9,6 +9,7 @@ import { CABINET_PORTFOLIOS, type AdvisorSpecialty, type CabinetPortfolio, type 
 import {
   advisorRecommendation,
   attendSummit,
+  bidToHostGlobalGames,
   cabinetCandidates,
   callReferendum,
   cancelLobbyingFirm,
@@ -116,6 +117,7 @@ export function World() {
         </Suspense>
         <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 text-center">
           Air and shipping traffic scales with diplomatic relations; routes to nations you're at war with are severed.
+          Drag to rotate · scroll or pinch to zoom.
         </p>
       </Card>
 
@@ -517,6 +519,18 @@ function GovernmentTools({ country }: { country: Country }) {
       <Card className="p-3 mb-4 flex items-center justify-between">
         <div className="text-xs text-slate-500 dark:text-slate-400 pr-2">15 PC. Warms relations with every nation you aren't at war with, with a chance of a diplomatic breakthrough.</div>
         <Button size="sm" variant="soft" onClick={() => run(attendSummit)}>Attend</Button>
+      </Card>
+
+      <div className="font-bold mb-2 text-sm">🏟️ Global Games</div>
+      <Card className="p-3 mb-4 flex items-center justify-between">
+        {country.globalGamesYear !== null ? (
+          <div className="text-xs text-emerald-500 font-semibold">Hosting the Global Games in {country.globalGamesYear} — infrastructure building now, big payoff on opening year.</div>
+        ) : (
+          <>
+            <div className="text-xs text-slate-500 dark:text-slate-400 pr-2">25 PC to bid. Winning means 5 years of buildup costs, then a huge confidence, stability and popularity boost.</div>
+            <Button size="sm" variant="soft" onClick={() => run(bidToHostGlobalGames)}>Bid</Button>
+          </>
+        )}
       </Card>
 
       {nominating && (

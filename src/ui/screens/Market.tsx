@@ -2,6 +2,7 @@
 import { useMemo, useState } from 'react';
 import { useGame } from '../../store/gameStore';
 import { buyOnMargin, buyShares, cancelLimitOrder, coverShort, marketCap, peRatio, placeLimitOrder, sellShares, shortShares, portfolioValue, toggleDrip } from '../../sim/market';
+import { buyCrypto, sellCrypto } from '../../sim/actions';
 import { Badge, Button, Card, LineChart, Modal, Pill, PillRow, SectionHeader } from '../components';
 import { money, moneyFull, num, signedPct } from '../format';
 import { INDUSTRY_BY_ID } from '../../data/industries';
@@ -9,7 +10,7 @@ import type { Company } from '../../sim/types';
 
 export function Market() {
   const { state } = useGame();
-  const [tab, setTab] = useState<'market' | 'portfolio'>('market');
+  const [tab, setTab] = useState<'market' | 'portfolio' | 'crypto'>('market');
   const [sector, setSector] = useState('all');
   const [sort, setSort] = useState<'cap' | 'gain' | 'pe'>('cap');
   const [selected, setSelected] = useState<string | null>(null);
@@ -51,9 +52,12 @@ export function Market() {
       <PillRow>
         <Pill label="Market" active={tab === 'market'} onClick={() => setTab('market')} />
         <Pill label={`Portfolio (${p.portfolio.length})`} active={tab === 'portfolio'} onClick={() => setTab('portfolio')} />
+        <Pill label="🪙 Crypto" active={tab === 'crypto'} onClick={() => setTab('crypto')} />
       </PillRow>
 
-      {tab === 'market' ? (
+      {tab === 'crypto' && <CryptoView />}
+
+      {tab === 'market' && (
         <>
           <PillRow>
             {sectors.map((s) => (
@@ -72,9 +76,8 @@ export function Market() {
             ))}
           </div>
         </>
-      ) : (
-        <PortfolioView onSelect={(id) => setSelected(id)} />
       )}
+      {tab === 'portfolio' && <PortfolioView onSelect={(id) => setSelected(id)} />}
 
       {selected && <TradeModal companyId={selected} onClose={() => setSelected(null)} />}
     </div>
@@ -318,4 +321,53 @@ function TradeModal({ companyId, onClose }: { companyId: string; onClose: () => 
       </div>
     );
   }
+}
+
+function CryptoView() {
+  const { state, run } = useGame();
+  const [amount, setAmount] = useState(1_000);
+  if (!state) return null;
+  const p = state.player;
+  const holdingsValue = p.cryptoUnits * state.cryptoPrice;
+  const hist = state.cryptoHistory.length ? state.cryptoHistory : [state.cryptoPrice];
+  const yearMove = hist.length >= 2 ? hist[hist.length - 1] / hist[hist.length - 2] - 1 : 0;
+
+  return (
+    <div className="mt-4 space-y-3">
+      <Card className="p-4">
+        <div className="flex justify-between items-center mb-1">
+          <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">🪙 NovaCoin</span>
+          <div className="text-right">
+            <div className="font-extrabold">{money(state.cryptoPrice)}</div>
+            <div className={`text-xs font-semibold ${yearMove >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>{signedPct(yearMove, 1)} /yr</div>
+          </div>
+        </div>
+        <div className="h-16">
+          <LineChart data={hist} height={64} color="#f59e0b" />
+        </div>
+        <p className="text-[11px] text-slate-400 mt-2">Extremely volatile — swings of ±35-45% a year are normal, amplified by tech booms and banking crises.</p>
+      </Card>
+
+      <Card className="p-4">
+        <div className="flex justify-between text-sm mb-3">
+          <span className="text-slate-500 dark:text-slate-400">Your holdings</span>
+          <span className="font-bold">{p.cryptoUnits.toFixed(4)} units · {money(holdingsValue)}</span>
+        </div>
+        <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Amount: {moneyFull(amount)}</label>
+        <input
+          type="range"
+          min={100}
+          max={Math.max(100, Math.round(Math.max(p.money, holdingsValue)))}
+          step={100}
+          value={amount}
+          onChange={(e) => setAmount(Number(e.target.value))}
+          className="w-full mt-1 mb-3"
+        />
+        <div className="grid grid-cols-2 gap-2">
+          <Button variant="soft" onClick={() => run(buyCrypto, amount)}>Buy</Button>
+          <Button variant="soft" onClick={() => run(sellCrypto, Math.min(p.cryptoUnits, amount / state.cryptoPrice))}>Sell</Button>
+        </div>
+      </Card>
+    </div>
+  );
 }

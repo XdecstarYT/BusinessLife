@@ -213,6 +213,7 @@ export function generateWorld(config: NewGameConfig): GameState {
       unrest: rng.range(5, 20),
       cyberDefense: rng.range(25, 55),
       oppositionLeaderId: null,
+      globalGamesYear: null,
     };
     countries.push(country);
   }
@@ -254,6 +255,8 @@ export function generateWorld(config: NewGameConfig): GameState {
     yearRecap: null,
     pendingSuccession: null,
     worldHistory: [],
+    cryptoPrice: rng.range(800, 3_000),
+    cryptoHistory: [],
   };
 
   // Public + private NPC companies per country (more in the player's home).
@@ -366,6 +369,13 @@ export function generateWorld(config: NewGameConfig): GameState {
     prAgencyHired: false,
     luxuryAssets: [],
     celebrityStakes: [],
+    cryptoUnits: 0,
+    savingsBalance: 0,
+    termDeposits: [],
+    foundation: null,
+    retired: false,
+    pensionIncome: 0,
+    memoir: null,
   };
   // Parents
   for (const kind of ['parent', 'parent'] as const) {

@@ -63,10 +63,23 @@ plain JSON you can export and re-import.
   contest rival turf for a bigger cut, launder illicit proceeds through a front business, bribe a judge or
   attempt a prison escape if you're caught, pay your way out and go straight, or enter witness protection to
   wipe your record at a steep cost.
-- **Financial markets, bonds, and forex** — beyond stocks: buy government bonds for fixed income, speculate
-  long or short on foreign currencies, trade on margin, enable dividend reinvestment (DRIP), set standing
-  limit orders, insure your businesses and properties, take out life insurance, and watch a live scrolling
-  stock ticker of the day's biggest movers.
+- **Financial markets, bonds, crypto, and forex** — beyond stocks: buy government bonds for fixed income,
+  speculate long or short on foreign currencies, trade on margin, enable dividend reinvestment (DRIP), set
+  standing limit orders, ride NovaCoin — a single, wildly volatile cryptocurrency amplified by tech booms
+  and banking crises — insure your businesses and properties, take out life insurance, and watch a live
+  scrolling stock ticker of the day's biggest movers.
+- **Personal banking & retirement** — park cash in a savings account earning the policy rate, lock in
+  fixed-rate term deposits for one to ten years, and once you turn 60, formally retire on a pension
+  scaled to your final salary.
+- **Charity foundation & memoirs** — endow a personal charitable foundation that grants 5% of its corpus
+  every year (building karma and reputation for life), publish a memoir whose 5-year royalties scale with
+  your fame and infamy, and hit the casino for blackjack, roulette or slots (your poker skill helps).
+- **Chairman mode & moonshots** — hire a professional CEO to run a company day-to-day while you sit as
+  chairman (they can be poached or quit if the money runs out), and commit big money to multi-year
+  moonshot R&D projects that either break through — patents, quality, brand, a revenue jump — or burn out.
+- **The Global Games & industry awards** — as head of state, bid to host the Global Games (five years of
+  buildup costs, a triumphant payoff), while every year the sim crowns the home nation's fastest-growing
+  firm Company of the Year — including yours.
 - **Head-of-state tools** — allocate the budget across six cabinet portfolios, set direct tax rates, launch
   multi-year infrastructure and mega projects (roads, rail, airports, power, internet, a national space
   program, bridges, tunnels, a bullet train network, a stadium, a dam), set
@@ -118,16 +131,18 @@ plain JSON you can export and re-import.
   a political party, issue a public apology to shed notoriety, or take a career sabbatical.
 - **Meta progression** — a Legacy Score computed at game over from your wealth, dynasty, office and
   achievements (with a New Game+ bonus into your next life), a life timeline of every milestone you hit,
-  77+ achievements, a Year in Review recap after every year, random mid-game challenges with cash rewards,
+  88+ achievements, a Year in Review recap after every year, random mid-game challenges with cash rewards,
   a Casual/Standard/Iron Man difficulty choice, and four starting-economy scenarios (Modern, Boom, Recession,
   Crisis) to change the game you're playing from turn one.
 - **Dynamic news** synthesised from what actually happened that year, plus a personal life log and an
   animated election-night results reveal with a city-by-city vote breakdown.
-- **Ambient 3D visualizations** (three.js, lazy-loaded so they never cost you bytes until you open them) —
-  tour your company's headquarters as it grows from a Basic Office to a Megacomplex with employees
+- **Interactive 3D visualizations** (three.js, lazy-loaded so they never cost you bytes until you open
+  them) — tour your company's headquarters as it grows from a Basic Office to a Megacomplex with employees
   wandering the campus, watch a live supply-chain flow from source to consumer, see the election-night
   city breakdown as a growing bar chart, and view your nation's air/shipping network as animated routes
   whose traffic scales with diplomatic relations (severed instantly for any nation you're at war with).
+  Every scene supports drag-to-rotate and scroll/pinch zoom, with floating name labels on cities, nations
+  and supply-chain stages, all under a starfield backdrop.
 - **Light and dark mode**, a mobile-first UI (with wider desktop breakpoints and safe-area support for
   notched devices) of circular icon tiles, pill chips, featured cards and canvas charts, with a bottom
   tab bar, a "More" sheet so every screen is reachable from anywhere, and a light first-launch tutorial.
@@ -192,7 +207,7 @@ only moves when you tell it to, using the three buttons on the Life hub:
   unrest), diplomacy actions, commodities, national debt/cyber-defense tools, and any active global event
   (pandemic, trade war, tech boom, oil crisis, banking collapse, or AI disruption).
 - **News / Stats** — the dynamic wire (now with editorials, investigative pieces, interviews and election
-  coverage) plus a World History chronicle tab, your net-worth curve, 77+ achievements, a life timeline,
+  coverage) plus a World History chronicle tab, your net-worth curve, 88+ achievements, a life timeline,
   and save tools.
 - **Underworld** — join a crime family and climb its ranks through heists and protection rackets, contest
   rival turf, launder illicit proceeds through a front business, bribe a judge or attempt a prison escape if
