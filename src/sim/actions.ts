@@ -2644,4 +2644,135 @@ export function takeLoan(state: GameState, amount: number, years: number): Actio
   return { ok: true, message: `Loan approved at ${(rate * 100).toFixed(1)}%.` };
 }
 
+// ---------------------------------------------------------------------------
+// V10: small standalone actions across systems
+// ---------------------------------------------------------------------------
+
+export function renameCompany(state: GameState, companyId: string, newName: string): ActionResult {
+  const c = state.companies[companyId];
+  if (!c || !c.playerOwned || c.status !== 'active') return { ok: false, message: 'Not your company.' };
+  const trimmed = newName.trim();
+  if (!trimmed) return { ok: false, message: 'Enter a name.' };
+  const oldName = c.name;
+  c.name = trimmed.slice(0, 40);
+  log(state, `${oldName} was renamed to ${c.name}.`, 'business');
+  return { ok: true, message: `Renamed to ${c.name}.` };
+}
+
+export function refinanceMortgage(state: GameState, propertyId: string): ActionResult {
+  const p = state.player;
+  const prop = p.properties.find((x) => x.id === propertyId);
+  if (!prop || prop.mortgage <= 0) return { ok: false, message: 'No mortgage on this property to refinance.' };
+  const home = state.countries.find((c) => c.id === p.countryId)!;
+  const fee = Math.max(500, prop.mortgage * 0.01);
+  if (fee > p.money) return { ok: false, message: `Needs $${Math.round(fee).toLocaleString()} in closing fees.` };
+  p.money -= fee;
+  const newRate = home.economy.interestRate + 0.02;
+  log(state, `Refinanced the mortgage on ${prop.name} at ${(newRate * 100).toFixed(1)}%.`, 'money');
+  return { ok: true, message: `Refinanced at ${(newRate * 100).toFixed(1)}%.` };
+}
+
+export function refinancePersonalLoan(state: GameState, loanId: string): ActionResult {
+  const p = state.player;
+  const loan = p.loans.find((x) => x.id === loanId);
+  if (!loan) return { ok: false, message: 'Loan not found.' };
+  const home = state.countries.find((c) => c.id === p.countryId)!;
+  const newRate = home.economy.interestRate + 0.04 + (p.criminalRecord > 0 ? 0.03 : 0);
+  if (newRate >= loan.rate) return { ok: false, message: 'Current rates are not better than your existing loan.' };
+  const fee = Math.max(200, loan.principal * 0.01);
+  if (fee > p.money) return { ok: false, message: `Needs $${Math.round(fee).toLocaleString()} in fees.` };
+  p.money -= fee;
+  loan.rate = newRate;
+  log(state, `Refinanced a personal loan down to ${(newRate * 100).toFixed(1)}%.`, 'money');
+  return { ok: true, message: `New rate: ${(newRate * 100).toFixed(1)}%.` };
+}
+
+export function giftMoneyToChild(state: GameState, npcId: string, amount: number): ActionResult {
+  const p = state.player;
+  if (!p.children.includes(npcId)) return { ok: false, message: 'Not your child.' };
+  const npc = state.npcs[npcId];
+  if (!npc || !npc.alive) return { ok: false, message: 'Child unavailable.' };
+  if (amount <= 0 || amount > p.money) return { ok: false, message: 'Invalid amount.' };
+  p.money -= amount;
+  npc.wealth += amount;
+  npc.opinionOfPlayer = clamp(npc.opinionOfPlayer + 6, -100, 100);
+  p.happiness = clamp100(p.happiness + 2);
+  log(state, `You gifted ${npc.name} $${Math.round(amount).toLocaleString()}.`, 'money');
+  return { ok: true, message: `Gifted $${Math.round(amount).toLocaleString()} to ${npc.name}.` };
+}
+
+export function investInChildEducation(state: GameState, npcId: string, amount: number): ActionResult {
+  const p = state.player;
+  if (!p.children.includes(npcId)) return { ok: false, message: 'Not your child.' };
+  const npc = state.npcs[npcId];
+  if (!npc || !npc.alive) return { ok: false, message: 'Child unavailable.' };
+  if (npc.age >= 22) return { ok: false, message: 'Too old to benefit from extra schooling.' };
+  if (amount <= 0 || amount > p.money) return { ok: false, message: 'Invalid amount.' };
+  p.money -= amount;
+  npc.competence = clamp100(npc.competence + amount / 5_000);
+  npc.opinionOfPlayer = clamp(npc.opinionOfPlayer + 4, -100, 100);
+  log(state, `Invested $${Math.round(amount).toLocaleString()} in ${npc.name}'s education.`, 'money');
+  return { ok: true, message: `${npc.name}'s prospects just got brighter.` };
+}
+
+export function sponsorLocalSportsTeam(state: GameState, companyId: string): ActionResult {
+  const c = state.companies[companyId];
+  if (!c || !c.playerOwned || c.status !== 'active') return { ok: false, message: 'Not your company.' };
+  const cost = Math.max(10_000, c.revenue * 0.015);
+  if (cost > c.cash) return { ok: false, message: `Needs $${Math.round(cost).toLocaleString()} in company cash.` };
+  c.cash -= cost;
+  c.brand = clamp100(c.brand + 4);
+  state.player.reputation = clamp100(state.player.reputation + 1);
+  log(state, `${c.name} sponsored a local sports team, winning over the community.`, 'business');
+  return { ok: true, message: 'Sponsorship boosted local brand goodwill.' };
+}
+
+export function hostFundraiserGala(state: GameState): ActionResult {
+  const p = state.player;
+  if (!p.campaign) return { ok: false, message: 'You need an active campaign.' };
+  const cost = 15_000;
+  if (cost > p.money) return { ok: false, message: `Needs $${cost.toLocaleString()}.` };
+  const rng = withRng(state);
+  p.money -= cost;
+  const raised = Math.round(cost * rng.range(1.5, 3.5));
+  p.campaign.warChest += raised;
+  p.campaign.momentum = clamp(p.campaign.momentum + 2, -50, 50);
+  commit(state, rng);
+  log(state, `🎉 Your fundraiser gala raised $${raised.toLocaleString()} for the campaign.`, 'politics');
+  return { ok: true, message: `Raised $${raised.toLocaleString()}.` };
+}
+
+export function issuePublicApology(state: GameState): ActionResult {
+  const p = state.player;
+  if (p.notoriety <= 0 && p.reputation >= 50) return { ok: false, message: 'Nothing to apologize for right now.' };
+  p.notoriety = clamp100(p.notoriety - 6);
+  p.karma = clamp100(p.karma + 3);
+  p.popularity = clamp100(p.popularity - 2);
+  log(state, `You issued a public apology, taking a small popularity hit to clear the air.`, 'info');
+  return { ok: true, message: 'Notoriety reduced; popularity took a small hit.' };
+}
+
+export function takeSabbatical(state: GameState): ActionResult {
+  const p = state.player;
+  if (!p.job) return { ok: false, message: 'You need a job to take a sabbatical from.' };
+  p.happiness = clamp100(p.happiness + 10);
+  p.health = clamp100(p.health + 5);
+  p.job.performance = clamp100(p.job.performance - 10);
+  log(state, `You took a sabbatical to recharge. It cost you some job performance.`, 'good');
+  return { ok: true, message: 'A well-deserved break, at some career cost.' };
+}
+
+export function donateToPoliticalParty(state: GameState, partyId: string, amount: number): ActionResult {
+  const p = state.player;
+  const home = state.countries.find((c) => c.id === p.countryId)!;
+  const party = home.parties.find((x) => x.id === partyId);
+  if (!party) return { ok: false, message: 'Party not found.' };
+  if (amount <= 0 || amount > p.money) return { ok: false, message: 'Invalid amount.' };
+  p.money -= amount;
+  party.support = clamp100(party.support + amount / 20_000);
+  p.influence = clamp100(p.influence + amount / 40_000);
+  log(state, `Donated $${Math.round(amount).toLocaleString()} to ${party.name}.`, 'money');
+  return { ok: true, message: `${party.name}'s polling ticked up.` };
+}
+
 export const NEW_GAME_GENDERS: Gender[] = ['male', 'female'];

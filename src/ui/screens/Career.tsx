@@ -1,7 +1,7 @@
 /** Career screen: current job, education, job market, degrees. */
 import { useState } from 'react';
 import { useGame } from '../../store/gameStore';
-import { DEGREES, enroll, jobOpenings, quitJob, takeJob } from '../../sim/actions';
+import { DEGREES, enroll, jobOpenings, quitJob, takeJob, takeSabbatical } from '../../sim/actions';
 import { Badge, Button, Card, Pill, PillRow, SectionHeader, StatBar } from '../components';
 import { money, moneyFull } from '../format';
 import { INDUSTRY_BY_ID } from '../../data/industries';
@@ -46,9 +46,10 @@ export function Career() {
                   <span className="font-semibold">{INDUSTRY_BY_ID[p.job.industryId]?.name ?? 'General'}</span>
                 </div>
               </div>
-              <Button variant="danger" className="w-full mt-4" onClick={() => run(quitJob)}>
-                Quit Job
-              </Button>
+              <div className="grid grid-cols-2 gap-2 mt-4">
+                <Button variant="soft" onClick={() => run(takeSabbatical)}>🏝️ Take Sabbatical</Button>
+                <Button variant="danger" onClick={() => run(quitJob)}>Quit Job</Button>
+              </div>
             </Card>
           ) : (
             <Card className="p-6 text-center">

@@ -9,6 +9,8 @@ import {
   closeForexPosition,
   openForexPosition,
   propertyListings,
+  refinanceMortgage,
+  refinancePersonalLoan,
   renovateProperty,
   sellBondEarly,
   sellProperty,
@@ -77,6 +79,7 @@ export function Assets() {
               onRenovate={() => run(renovateProperty, prop.id)}
               onToggleRental={() => run(toggleRentalStatus, prop.id)}
               onToggleInsurance={() => run(togglePropertyInsurance, prop.id)}
+              onRefinance={() => run(refinanceMortgage, prop.id)}
             />
           ))}
         </div>
@@ -123,7 +126,10 @@ export function Assets() {
                   {pct(l.rate)} · {l.yearsLeft} yrs left
                 </div>
               </div>
-              <Badge tone="bad">{money(l.principal)}</Badge>
+              <div className="text-right shrink-0">
+                <Badge tone="bad">{money(l.principal)}</Badge>
+                <button className="block text-xs text-brand-500 font-semibold mt-1" onClick={() => run(refinancePersonalLoan, l.id)}>Refinance</button>
+              </div>
             </Card>
           ))}
         </div>
@@ -312,12 +318,14 @@ function PropertyCard({
   onRenovate,
   onToggleRental,
   onToggleInsurance,
+  onRefinance,
 }: {
   prop: PropertyAsset;
   onSell: () => void;
   onRenovate: () => void;
   onToggleRental: () => void;
   onToggleInsurance: () => void;
+  onRefinance: () => void;
 }) {
   const appreciation = prop.value / prop.purchasePrice - 1;
   return (
@@ -349,6 +357,7 @@ function PropertyCard({
         <Button size="sm" variant={prop.insured ? 'primary' : 'soft'} onClick={onToggleInsurance}>
           {prop.insured ? 'Insured' : 'Insure'}
         </Button>
+        {prop.mortgage > 0 && <Button size="sm" variant="soft" onClick={onRefinance}>💳 Refinance</Button>}
         <Button size="sm" variant="danger" onClick={onSell}>Sell</Button>
       </div>
     </Card>

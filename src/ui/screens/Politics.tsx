@@ -8,11 +8,13 @@ import {
   campaignAction,
   deliverBudgetSpeech,
   dismissMinister,
+  donateToPoliticalParty,
   investigateOfficial,
   foundParty,
   cancelPRAgency,
   hirePRAgency,
   holdCabinetMeeting,
+  hostFundraiserGala,
   holdPressConference,
   joinParty,
   launchCampaign,
@@ -120,6 +122,7 @@ export function Politics() {
                 >
                   {p.campaign.consultantHired ? '✅ Consultant Hired' : '🎯 Hire Consultant ($100k)'}
                 </Button>
+                <Button size="sm" variant="soft" className="col-span-2" onClick={() => run(hostFundraiserGala)}>🎉 Host Fundraiser Gala ($15k)</Button>
               </div>
             </Card>
           )}
@@ -422,7 +425,10 @@ function PartyTab({ party }: { party: { id: string; name: string; ideology: numb
                 <div className="font-bold truncate" title={pt.name}>{pt.name}</div>
                 <div className="text-xs text-slate-500 dark:text-slate-400 truncate">{ideologyLabel(pt.ideology)} · {pt.seats} seats · {pct(pt.support / 100, 0)}</div>
               </div>
-              <Button size="sm" className="shrink-0" onClick={() => run(joinParty, pt.id)}>Join</Button>
+              <div className="flex gap-1 shrink-0">
+                <Button size="sm" variant="ghost" onClick={() => run(donateToPoliticalParty, pt.id, 10_000)}>Donate $10k</Button>
+                <Button size="sm" onClick={() => run(joinParty, pt.id)}>Join</Button>
+              </div>
             </Card>
           ))}
           <Button variant="soft" className="w-full" onClick={() => setFounding(true)}>+ Found Your Own Party</Button>

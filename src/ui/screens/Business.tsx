@@ -27,6 +27,7 @@ import {
   proposeBoardResolution,
   qualityAudit,
   raceForInnovation,
+  renameCompany,
   runClinicalTrial,
   runFavorableCoverage,
   runRecruitmentDrive,
@@ -36,6 +37,7 @@ import {
   sellCompany,
   setCompanyCulture,
   setCompanyLever,
+  sponsorLocalSportsTeam,
   spinOffCompany,
   spyOnCompany,
   startCompany,
@@ -297,6 +299,8 @@ function FoundModal({ open, onClose }: { open: boolean; onClose: () => void }) {
 function ManageModal({ companyId, onClose }: { companyId: string; onClose: () => void }) {
   const { state, run } = useGame();
   const [amount, setAmount] = useState(0);
+  const [renaming, setRenaming] = useState(false);
+  const [renameDraft, setRenameDraft] = useState('');
   if (!state) return null;
   const c = state.companies[companyId];
   if (!c) return null;
@@ -322,6 +326,17 @@ function ManageModal({ companyId, onClose }: { companyId: string; onClose: () =>
 
   return (
     <Modal open onClose={onClose} title={c.name}>
+      {renaming ? (
+        <div className="flex items-center gap-2 mb-3">
+          <TextInput value={renameDraft} onChange={(e) => setRenameDraft(e.target.value)} maxLength={40} className="flex-1" />
+          <Button size="sm" onClick={() => { if (run(renameCompany, companyId, renameDraft).ok) setRenaming(false); }}>Save</Button>
+          <Button size="sm" variant="ghost" onClick={() => setRenaming(false)}>Cancel</Button>
+        </div>
+      ) : (
+        <button className="text-xs text-brand-500 font-semibold mb-3" onClick={() => { setRenameDraft(c.name); setRenaming(true); }}>
+          ✏️ Rename company
+        </button>
+      )}
       <div className="flex items-center gap-2 mb-4">
         <Badge tone="brand">{ind?.name}</Badge>
         {c.isPublic && <Badge tone="good">Public · {money(c.sharePrice)}/sh</Badge>}
@@ -430,6 +445,7 @@ function ManageModal({ companyId, onClose }: { companyId: string; onClose: () =>
         <Button size="sm" variant="soft" onClick={() => run(runRecruitmentDrive, c.id)}>🧑‍💼 Recruitment Drive</Button>
         <Button size="sm" variant="soft" onClick={() => run(franchiseCompany, c.id)}>🏬 Franchise ({c.franchiseCount})</Button>
         <Button size="sm" variant="soft" onClick={() => run(raceForInnovation, c.id)}>🔬 Race for Innovation</Button>
+        <Button size="sm" variant="soft" onClick={() => run(sponsorLocalSportsTeam, c.id)}>🏟️ Sponsor Sports Team</Button>
         {c.isPublic && (
           <Button size="sm" variant="soft" onClick={() => run(holdInvestorConference, c.id)}>📊 Investor Conference</Button>
         )}

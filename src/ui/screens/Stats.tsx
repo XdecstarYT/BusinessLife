@@ -68,6 +68,21 @@ const ACHIEVEMENTS: Record<string, { label: string; icon: string }> = {
   ironman_survivor: { label: 'Iron Man Survivor', icon: '🛡️' },
   lifelong_learner: { label: 'Lifelong Learner', icon: '🎓' },
   luxury_collector: { label: 'Luxury Collector', icon: '💎' },
+  debt_free: { label: 'Debt Free', icon: '🆓' },
+  ten_skills_mastered: { label: 'Master of Many Trades', icon: '🧰' },
+  crime_free_life: { label: 'Clean Record', icon: '✅' },
+  happily_married: { label: 'Happily Married', icon: '💞' },
+  serial_entrepreneur: { label: 'Serial Entrepreneur', icon: '🔁' },
+  influence_peddler: { label: 'Influence Peddler', icon: '🕸️' },
+  silver_tongue: { label: 'Silver Tongue', icon: '🗣️' },
+  saint: { label: 'Saint', icon: '😇' },
+  iron_will: { label: 'Iron Will', icon: '🖤' },
+  polyglot_scholar: { label: 'Polyglot Scholar', icon: '🌍' },
+  market_whale: { label: 'Market Whale', icon: '🐋' },
+  ten_year_veteran_ceo: { label: 'Decade at the Helm', icon: '⏳' },
+  unbreakable: { label: 'Unbreakable', icon: '💪' },
+  jetsetter: { label: 'Jetsetter', icon: '✈️' },
+  island_life: { label: 'Island Life', icon: '🏝️' },
 };
 
 export function Stats() {

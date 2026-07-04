@@ -1524,4 +1524,147 @@ ev({
   ],
 });
 
+// ---------------------------------------------------------------------------
+// V10: 15 additional event templates
+// ---------------------------------------------------------------------------
+ev({
+  id: 'life_neighbor_dispute', category: 'life', weight: 4, conditions: { hasProperty: true },
+  text: 'A property line dispute with your neighbor in {city} is getting heated.',
+  choices: [
+    { label: 'Hire a surveyor to settle it', effects: { money: -1_500, happiness: -1 } },
+    { label: 'Let it go for the sake of peace', effects: { happiness: -2, karma: 2 } },
+  ],
+});
+ev({
+  id: 'life_pet_emergency', category: 'life', weight: 3,
+  text: 'An unexpected emergency vet bill for {amount} landed on your desk.',
+  amount: { min: 300, max: 1_200 },
+  choices: [
+    { label: 'Pay it without hesitation', effects: { moneyAmountMult: -1, happiness: 1 } },
+    { label: 'Shop around for a cheaper clinic', effects: { moneyAmountMult: -0.6, happiness: -1 } },
+  ],
+});
+ev({
+  id: 'career_promotion_review', category: 'career', weight: 5, conditions: { employed: true },
+  text: 'Your annual performance review is coming up, and a promotion might be on the table.',
+  choices: [
+    { label: 'Make your case assertively', skillCheck: { skillId: SK.persuasion, bonusPerLevel: 0.006 }, outcomes: [
+      { chance: 0.5, text: 'You got the promotion and a raise.', effects: { jobPerformance: 10, happiness: 5 } },
+      { chance: 0.5, text: 'You were passed over this cycle.', effects: { happiness: -4 } },
+    ] },
+    { label: 'Let your work speak for itself', effects: { jobPerformance: 3 } },
+  ],
+});
+ev({
+  id: 'career_conference_invite', category: 'career', weight: 4, conditions: { employed: true },
+  text: 'Your employer is sending a few people to an industry conference. You could be one of them.',
+  choices: [
+    { label: 'Volunteer to go', effects: { smarts: 1, jobPerformance: 3, happiness: 2 } },
+    { label: 'Let someone else take the trip', effects: {} },
+  ],
+});
+ev({
+  id: 'biz_esg_report_scrutiny', category: 'business', weight: 3, conditions: { hasBusiness: true },
+  text: 'A watchdog group is scrutinizing {company}\'s environmental and labor practices.',
+  choices: [
+    { label: 'Commission an independent audit', effects: { companyCash: -15_000, companyBrand: 5 } },
+    { label: 'Dismiss it as activist noise', effects: { companyBrand: -4, karma: -2 } },
+  ],
+});
+ev({
+  id: 'biz_union_organizing', category: 'business', weight: 3, conditions: { hasBusiness: true },
+  text: 'Workers at {company} are quietly organizing to unionize.',
+  choices: [
+    { label: 'Get ahead of it with better pay and conditions', effects: { companyCash: -25_000, companyMorale: 10, karma: 3 } },
+    { label: 'Fight the unionization effort', skillCheck: { skillId: SK.management, bonusPerLevel: 0.005 }, outcomes: [
+      { chance: 0.5, text: 'The effort fizzled out.', effects: { companyMorale: -3, karma: -3 } },
+      { chance: 0.5, text: 'It succeeded anyway, and morale is sour.', effects: { companyMorale: -8, karma: -4 } },
+    ] },
+  ],
+});
+ev({
+  id: 'market_meme_stock', category: 'market', weight: 3, conditions: { hasStocks: true },
+  text: 'One of your holdings got adopted as an internet meme stock overnight.',
+  choices: [
+    { label: 'Ride the wave and sell into the spike', effects: { money: 8_000, karma: -1 } },
+    { label: 'Hold for the fundamentals', effects: { happiness: 1 } },
+  ],
+});
+ev({
+  id: 'market_analyst_downgrade', category: 'market', weight: 3, conditions: { businessPublic: true },
+  text: 'A prominent analyst downgraded {company}, citing growth concerns.',
+  choices: [
+    { label: 'Respond publicly with confidence', skillCheck: { skillId: SK.spin, bonusPerLevel: 0.005 }, outcomes: [
+      { chance: 0.5, text: 'The market shrugged it off.', effects: { companyBrand: 1 } },
+      { chance: 0.5, text: 'Shares dipped anyway.', effects: { companyCash: -5_000 } },
+    ] },
+    { label: 'Let the fundamentals speak for themselves', effects: {} },
+  ],
+});
+ev({
+  id: 'pol_town_hall_disruption', category: 'politics', weight: 4, conditions: { inOffice: 'any' },
+  text: 'Protesters disrupted your town hall meeting in {city}, chanting over your remarks.',
+  choices: [
+    { label: 'Engage with them directly', skillCheck: { skillId: SK.diplomacy, bonusPerLevel: 0.005 }, outcomes: [
+      { chance: 0.55, text: 'You defused the tension and even won some over.', effects: { popularity: 3, karma: 2 } },
+      { chance: 0.45, text: 'It devolved into a shouting match.', effects: { popularity: -4 } },
+    ] },
+    { label: 'Have security remove them', effects: { popularity: -3, notoriety: 1 } },
+  ],
+});
+ev({
+  id: 'pol_youth_wing_energy', category: 'politics', weight: 3, conditions: { inParty: true },
+  text: 'Your party\'s youth wing is pushing for a bolder, more energetic platform.',
+  choices: [
+    { label: 'Embrace their energy', effects: { influence: 2, popularity: 2 } },
+    { label: 'Rein them in — stability first', effects: { influence: -1 } },
+  ],
+});
+ev({
+  id: 'crime_heist_crew_offer', category: 'crime', weight: 3, conditions: { inCrimeFamily: true },
+  text: 'A crew wants to bring you in on a much bigger job than usual.',
+  choices: [
+    { label: 'Join the crew', skillCheck: { skillId: SK.streetSmarts, bonusPerLevel: 0.006 }, outcomes: [
+      { chance: 0.45, text: 'The job paid off huge.', effects: { money: 60_000, notoriety: 5 } },
+      { chance: 0.55, text: 'It went sideways and you barely escaped.', effects: { criminalRecord: 1, jailYears: 2 } },
+    ] },
+    { label: 'Sit this one out', effects: { notoriety: -1 } },
+  ],
+});
+ev({
+  id: 'world_currency_devaluation', category: 'world', weight: 3,
+  text: '{country} devalued its currency overnight, rattling regional markets.',
+  choices: [
+    { label: 'Watch your exposure closely', effects: { smarts: 1 } },
+    { label: 'Not your problem', effects: {} },
+  ],
+});
+ev({
+  id: 'media_podcast_invite', category: 'media', weight: 4, conditions: { minReputation: 45 },
+  text: 'A popular podcast wants to have you on for a long-form interview.',
+  choices: [
+    { label: 'Go on and be candid', skillCheck: { skillId: SK.publicSpeaking, bonusPerLevel: 0.005 }, outcomes: [
+      { chance: 0.6, text: 'You came across as thoughtful and genuine.', effects: { reputation: 4, popularity: 2 } },
+      { chance: 0.4, text: 'An offhand comment got clipped out of context.', effects: { reputation: -3 } },
+    ] },
+    { label: 'Stick to safe talking points', effects: { reputation: 1 } },
+  ],
+});
+ev({
+  id: 'fam_blended_family_tension', category: 'family', weight: 3, conditions: { hasSpouse: true, hasChildren: true },
+  text: 'Balancing time between your spouse and kids has been stressful lately.',
+  choices: [
+    { label: 'Plan a dedicated family day', effects: { happiness: 5, money: -500 } },
+    { label: 'Push through — things will settle down', effects: { happiness: -2 } },
+  ],
+});
+ev({
+  id: 'health_burnout_warning', category: 'health', weight: 4, conditions: { employed: true },
+  text: 'You have been running on empty for weeks and your body is sending warning signs.',
+  choices: [
+    { label: 'Take real time off to recover', effects: { happiness: 6, health: 5, jobPerformance: -3 } },
+    { label: 'Push through it', effects: { health: -5, happiness: -3 } },
+  ],
+});
+
 export const EVENT_TEMPLATES: EventTemplate[] = E;

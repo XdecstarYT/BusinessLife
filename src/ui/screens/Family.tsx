@@ -18,6 +18,7 @@ import {
   seekMentor,
   type DatingCandidate,
 } from '../../sim/family';
+import { giftMoneyToChild, investInChildEducation } from '../../sim/actions';
 import { Badge, Button, Card, Modal, SectionHeader, StatBar } from '../components';
 import { money } from '../format';
 
@@ -136,6 +137,16 @@ export function Family() {
                     </Button>
                   )}
                   {p.politicalHeirId === child.id && <Badge tone="brand">Political Heir</Badge>}
+                  {child.alive && (
+                    <Button size="sm" variant="ghost" onClick={() => run(giftMoneyToChild, child.id, 5_000)}>
+                      Gift $5k
+                    </Button>
+                  )}
+                  {child.alive && child.age < 22 && (
+                    <Button size="sm" variant="ghost" onClick={() => run(investInChildEducation, child.id, 5_000)}>
+                      Invest in Education ($5k)
+                    </Button>
+                  )}
                 </div>
               </Card>
             ))}

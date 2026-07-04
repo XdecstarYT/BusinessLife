@@ -18,6 +18,7 @@ import { distributeEstate, dynastyScore, tickFamily } from './family';
 import { tickWorldEvents } from './worldEvents';
 import { tryFireDailyEvent } from './dailyEvents';
 import { tickLifestyleAssets } from './lifestyle';
+import { SK } from '../data/skills';
 
 const SPECIAL_BIRTHDAYS = new Set([18, 21, 25, 30, 40, 50, 60, 65, 70, 75, 80, 90, 100]);
 
@@ -598,6 +599,21 @@ export function advanceYear(state: GameState): GameState {
     ['ironman_survivor', state.difficulty === 'ironman' && p.alive && p.age >= 70],
     ['lifelong_learner', p.education.length >= 3],
     ['luxury_collector', p.luxuryAssets.length >= 3],
+    ['debt_free', p.loans.length === 0 && p.age >= 30],
+    ['ten_skills_mastered', Object.values(p.skills).filter((v) => v >= 50).length >= 10],
+    ['crime_free_life', p.age >= 50 && p.criminalRecord === 0 && p.notoriety === 0],
+    ['happily_married', !!p.spouseId && p.divorceCount === 0 && p.age >= 40],
+    ['serial_entrepreneur', Object.values(state.companies).filter((c) => c.founderId === 'player').length >= 5],
+    ['influence_peddler', p.influence >= 90],
+    ['silver_tongue', p.charisma >= 95],
+    ['saint', p.karma >= 98],
+    ['iron_will', p.karma <= 5 && p.age >= 40],
+    ['polyglot_scholar', (p.skills[SK.foreignLanguages] ?? 0) >= 90],
+    ['market_whale', portfolioValue(state) >= 5e7],
+    ['ten_year_veteran_ceo', ownedCompanies.some((c) => state.year - c.foundedYear >= 10)],
+    ['unbreakable', p.health >= 90 && p.age >= 80],
+    ['jetsetter', p.luxuryAssets.some((a) => a.kind === 'private_jet')],
+    ['island_life', p.luxuryAssets.some((a) => a.kind === 'island')],
   ];
   const MILESTONE_LOG: Record<string, string> = {
     millionaire: '🏆 You are a millionaire!',
@@ -624,6 +640,21 @@ export function advanceYear(state: GameState): GameState {
     ironman_survivor: '🏆 Survived to 70 on Iron Man difficulty.',
     lifelong_learner: '🏆 Earned three or more degrees.',
     luxury_collector: '🏆 Assembled a collection of 3+ luxury assets.',
+    debt_free: '🏆 Debt-free with decades of life ahead of you.',
+    ten_skills_mastered: '🏆 Ten or more skills above 50.',
+    crime_free_life: '🏆 Fifty years old with a spotless record.',
+    happily_married: '🏆 Happily married for the long haul.',
+    serial_entrepreneur: '🏆 Founded five or more companies.',
+    influence_peddler: '🏆 Your influence has reached elite levels.',
+    silver_tongue: '🏆 A truly silver tongue.',
+    saint: '🏆 A saintly reputation for good.',
+    iron_will: '🏆 An iron will, unmoved by conscience.',
+    polyglot_scholar: '🏆 Mastered foreign languages.',
+    market_whale: '🏆 Your stock portfolio passed $50 million.',
+    ten_year_veteran_ceo: '🏆 Run a company for ten years or more.',
+    unbreakable: '🏆 Peak health at 80 years old.',
+    jetsetter: '🏆 You own a private jet.',
+    island_life: '🏆 You own a private island.',
   };
   for (const [key, hit] of milestones) {
     if (hit && !state.achievements.includes(key)) {

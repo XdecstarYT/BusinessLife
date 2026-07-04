@@ -6,7 +6,7 @@
  */
 import { useState, type ReactNode } from 'react';
 import { useGame, type Screen } from '../../store/gameStore';
-import { attemptPrisonEscape, bribeJudge, contestTerritory, CRIME_RANK_TITLES, doActivity, enterWitnessProtection, goStraight, heist, joinCrimeFamily } from '../../sim/actions';
+import { attemptPrisonEscape, bribeJudge, contestTerritory, CRIME_RANK_TITLES, doActivity, enterWitnessProtection, goStraight, heist, issuePublicApology, joinCrimeFamily } from '../../sim/actions';
 import { netWorth } from '../../sim/engine';
 import { Badge, Button, Card, CircleTile, Pill, PillRow, SectionHeader, StatBar } from '../components';
 import { money } from '../format';
@@ -224,6 +224,11 @@ export function Life() {
         <Pill label="📈 Investment Seminar" onClick={() => run(doActivity, 'investment_seminar')} />
         <Pill label="🤝 Negotiation Workshop" onClick={() => run(doActivity, 'negotiation_workshop')} />
       </PillRow>
+      )}
+      {(p.notoriety > 0 || p.reputation < 50) && (
+        <PillRow>
+          <Pill label="🙏 Issue Public Apology" onClick={() => run(issuePublicApology)} />
+        </PillRow>
       )}
 
       <SectionHeader title="Underworld" />

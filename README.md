@@ -109,12 +109,16 @@ plain JSON you can export and re-import.
   protests and strikes, issue government bonds, fund national cyber defense, and break ground on mega
   projects (bridges, tunnels, bullet trains, stadiums, dams) alongside the existing infrastructure slate.
 - **Thousands of scenarios** — a data-driven event engine resolves placeholders ({company}, {npc},
-  {amount}, ...) against live state, with skill-checked, probabilistic outcomes, plus 22 lightweight
-  daily flavor events for time-skipping and honors/awards events (knighthoods, hall-of-fame induction,
-  civic medals), so a compact template set produces an enormous variety of situations.
+  {amount}, ...) against live state, with skill-checked, probabilistic outcomes across **150+ event
+  templates**, plus **42 lightweight daily flavor events** for time-skipping and honors/awards events
+  (knighthoods, hall-of-fame induction, civic medals), so a compact template set produces an enormous
+  variety of situations.
+- **Small everyday actions** — rename a company, refinance a mortgage or personal loan, gift money or
+  invest in a child's education, sponsor a local sports team, host a campaign fundraiser gala, donate to
+  a political party, issue a public apology to shed notoriety, or take a career sabbatical.
 - **Meta progression** — a Legacy Score computed at game over from your wealth, dynasty, office and
   achievements (with a New Game+ bonus into your next life), a life timeline of every milestone you hit,
-  62+ achievements, a Year in Review recap after every year, random mid-game challenges with cash rewards,
+  77+ achievements, a Year in Review recap after every year, random mid-game challenges with cash rewards,
   a Casual/Standard/Iron Man difficulty choice, and four starting-economy scenarios (Modern, Boom, Recession,
   Crisis) to change the game you're playing from turn one.
 - **Dynamic news** synthesised from what actually happened that year, plus a personal life log and an
@@ -188,7 +192,7 @@ only moves when you tell it to, using the three buttons on the Life hub:
   unrest), diplomacy actions, commodities, national debt/cyber-defense tools, and any active global event
   (pandemic, trade war, tech boom, oil crisis, banking collapse, or AI disruption).
 - **News / Stats** — the dynamic wire (now with editorials, investigative pieces, interviews and election
-  coverage) plus a World History chronicle tab, your net-worth curve, 62+ achievements, a life timeline,
+  coverage) plus a World History chronicle tab, your net-worth curve, 77+ achievements, a life timeline,
   and save tools.
 - **Underworld** — join a crime family and climb its ranks through heists and protection rackets, contest
   rival turf, launder illicit proceeds through a front business, bribe a judge or attempt a prison escape if
