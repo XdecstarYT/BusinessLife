@@ -1,71 +1,14 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<meta name="theme-color" content="#08080a" />
-<title>BusinessLife — Tycoon Life Simulator</title>
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700;9..144,900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="css/styles.css" />
-</head>
-<body>
-  <div id="app" class="phone">
-    <!-- Status bar -->
-    <div class="statusbar">
-      <span class="sb-time" id="sbTime">9:41</span>
-      <span class="sb-icons">
-        <span class="sb-net"></span>
-        <span class="sb-wifi"></span>
-        <span class="sb-batt"></span>
-      </span>
-    </div>
-
-    <!-- Screen container (populated by JS) -->
-    <main id="screen" class="screen"></main>
-
-    <!-- Bottom navigation -->
-    <nav class="navbar" id="navbar">
-      <button class="nav-item active" data-tab="home">
-        <span class="nav-ico" data-ico="home"></span>
-        <span class="nav-label">Empire</span>
-      </button>
-      <button class="nav-item" data-tab="ventures">
-        <span class="nav-ico" data-ico="ventures"></span>
-        <span class="nav-label">Ventures</span>
-      </button>
-      <button class="nav-item" data-tab="market">
-        <span class="nav-ico" data-ico="market"></span>
-        <span class="nav-label">Market</span>
-      </button>
-      <button class="nav-item" data-tab="life">
-        <span class="nav-ico" data-ico="life"></span>
-        <span class="nav-label">Life</span>
-      </button>
-      <button class="nav-item" data-tab="you">
-        <span class="nav-ico" data-ico="you"></span>
-        <span class="nav-label">You</span>
-      </button>
-    </nav>
-  </div>
-
-  <!-- Modal / event layer -->
-  <div id="modalRoot" class="modal-root hidden"></div>
-  <!-- Toast layer -->
-  <div id="toastRoot" class="toast-root"></div>
-
-  <!-- Game scripts (load order matters — plain scripts, no build step) -->
-  <script src="js/data.js"></script>
-  <script src="js/util.js"></script>
-  <script src="js/state.js"></script>
-  <script src="js/economy.js"></script>
-  <script src="js/business.js"></script>
-  <script src="js/events.js"></script>
-  <script src="js/engine.js"></script>
-  <script src="js/icons.js"></script>
-  <script src="js/ui.js"></script>
-  <script src="js/screens.js"></script>
-  <script src="js/main.js"></script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b1220" />
+    <meta name="description" content="BusinessLife — a deep business, politics and economics life simulator that runs entirely in your browser." />
+    <title>BusinessLife — Business & Politics Life Simulator</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>
