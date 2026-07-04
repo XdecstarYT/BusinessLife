@@ -1,5 +1,5 @@
 /** Business screen: found companies, manage strategy levers, IPO, sell. */
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { useGame } from '../../store/gameStore';
 import {
   investInCompany,
@@ -52,6 +52,10 @@ import { Badge, Button, Card, LineChart, Modal, Pill, PillRow, SectionHeader, St
 import { money, moneyFull, pct } from '../format';
 import { INDUSTRIES, INDUSTRY_BY_ID } from '../../data/industries';
 import type { Company, ExecutiveRole } from '../../sim/types';
+
+const HQTourScene = lazy(() => import('../three/HQTourScene').then((m) => ({ default: m.HQTourScene })));
+const SupplyChainScene = lazy(() => import('../three/SupplyChainScene').then((m) => ({ default: m.SupplyChainScene })));
+const SceneFallback = <div className="w-full h-48 rounded-2xl bg-slate-100 dark:bg-ink-800 animate-pulse" />;
 
 const EXEC_ROLES: { role: ExecutiveRole; label: string; blurb: string }[] = [
   { role: 'cfo', label: 'CFO', blurb: 'Cuts your effective interest rate on debt.' },
@@ -384,7 +388,10 @@ function ManageModal({ companyId, onClose }: { companyId: string; onClose: () =>
           )}
         </div>
       </Card>
-      <div className="font-bold mb-2">Culture</div>
+      <Suspense fallback={SceneFallback}>
+        <HQTourScene hqTier={c.hqTier} employees={c.employees} morale={c.morale} culture={c.culture} />
+      </Suspense>
+      <div className="font-bold mb-2 mt-3">Culture</div>
       <div className="grid grid-cols-2 gap-2 mb-1">
         {(Object.keys(CULTURE_INFO) as Company['culture'][]).map((k) => (
           <Button
@@ -408,7 +415,10 @@ function ManageModal({ companyId, onClose }: { companyId: string; onClose: () =>
       <div className="mb-2">
         <StatBar label="Supply chain resilience" value={c.supplyChainResilience} />
       </div>
-      <div className="grid grid-cols-2 gap-2">
+      <Suspense fallback={SceneFallback}>
+        <SupplyChainScene supplyChainResilience={c.supplyChainResilience} revenue={c.revenue} />
+      </Suspense>
+      <div className="grid grid-cols-2 gap-2 mt-2">
         <Button size="sm" variant="soft" onClick={() => run(hireBrandAmbassador, c.id)}>🌟 Brand Deal</Button>
         <Button size="sm" variant="soft" onClick={() => run(runTrainingProgram, c.id)}>🎓 Training</Button>
         <Button size="sm" variant="soft" onClick={() => run(runGraduateProgram, c.id)}>🎓 Graduate Program</Button>

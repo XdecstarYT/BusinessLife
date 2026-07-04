@@ -1,7 +1,9 @@
 /** Election-night results reveal: an animated vote-share tally shown after a campaign resolves. */
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useGame } from '../store/gameStore';
 import { Button } from './components';
+
+const ElectionMapScene = lazy(() => import('./three/ElectionMapScene').then((m) => ({ default: m.ElectionMapScene })));
 
 export function ElectionResultModal() {
   const { state, dismissElectionResult } = useGame();
@@ -61,7 +63,10 @@ export function ElectionResultModal() {
         {result.regionalBreakdown.length > 0 && (
           <div className="mt-4 pt-4 border-t border-slate-100 dark:border-ink-800">
             <div className="text-xs font-bold uppercase text-slate-400 mb-2">By City</div>
-            <div className="space-y-1.5 max-h-40 overflow-y-auto">
+            <Suspense fallback={<div className="w-full h-48 rounded-2xl bg-slate-100 dark:bg-ink-800 animate-pulse" />}>
+              <ElectionMapScene regionalBreakdown={result.regionalBreakdown} />
+            </Suspense>
+            <div className="space-y-1.5 max-h-40 overflow-y-auto mt-3">
               {result.regionalBreakdown.map((r) => (
                 <div key={r.cityName} className="flex items-center justify-between text-xs">
                   <span className="text-slate-500 dark:text-slate-400">{r.cityName}</span>

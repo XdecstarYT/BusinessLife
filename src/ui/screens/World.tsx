@@ -1,8 +1,10 @@
 /** World screen: macro dashboard, countries, diplomacy, commodities. */
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { useGame } from '../../store/gameStore';
 import { Badge, BarList, Button, Card, LineChart, Modal, SectionHeader, StatBar } from '../components';
 import { money, num, pct, signedPct } from '../format';
+
+const TradeNetworkScene = lazy(() => import('../three/TradeNetworkScene').then((m) => ({ default: m.TradeNetworkScene })));
 import { CABINET_PORTFOLIOS, type AdvisorSpecialty, type CabinetPortfolio, type Country, type InfrastructureKind, type WorldEvent } from '../../sim/types';
 import {
   advisorRecommendation,
@@ -100,6 +102,21 @@ export function World() {
           items={Object.entries(e.commodities).map(([k, v]) => ({ label: k.toUpperCase(), value: v, color: '#f59e0b' }))}
           format={(v) => num(v)}
         />
+      </Card>
+
+      <SectionHeader title="Trade & Transport Network" />
+      <Card className="p-3 mb-4">
+        <Suspense fallback={<div className="w-full h-52 rounded-2xl bg-slate-100 dark:bg-ink-800 animate-pulse" />}>
+          <TradeNetworkScene
+            homeName={home.name}
+            routes={state.countries
+              .filter((c) => c.id !== home.id)
+              .map((c) => ({ name: c.name, relations: home.relations[c.id] ?? 0, atWar: home.atWarWith.includes(c.id) }))}
+          />
+        </Suspense>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 text-center">
+          Air and shipping traffic scales with diplomatic relations; routes to nations you're at war with are severed.
+        </p>
       </Card>
 
       <SectionHeader title="Nations" />

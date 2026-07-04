@@ -119,6 +119,11 @@ plain JSON you can export and re-import.
   Crisis) to change the game you're playing from turn one.
 - **Dynamic news** synthesised from what actually happened that year, plus a personal life log and an
   animated election-night results reveal with a city-by-city vote breakdown.
+- **Ambient 3D visualizations** (three.js, lazy-loaded so they never cost you bytes until you open them) —
+  tour your company's headquarters as it grows from a Basic Office to a Megacomplex with employees
+  wandering the campus, watch a live supply-chain flow from source to consumer, see the election-night
+  city breakdown as a growing bar chart, and view your nation's air/shipping network as animated routes
+  whose traffic scales with diplomatic relations (severed instantly for any nation you're at war with).
 - **Light and dark mode**, a mobile-first UI (with wider desktop breakpoints and safe-area support for
   notched devices) of circular icon tiles, pill chips, featured cards and canvas charts, with a bottom
   tab bar, a "More" sheet so every screen is reachable from anywhere, and a light first-launch tutorial.
@@ -238,6 +243,8 @@ src/
     SuccessionModal.tsx      Choose to continue as an heir, or end the story, on death
     YearRecapModal.tsx       "Year in Review" net-worth and headline recap after each Year advance
     TutorialOverlay.tsx      Light first-launch walkthrough (shown once per browser)
+    three/             Ambient three.js visualizations (lazy-loaded, code-split from the main bundle):
+                       HQTourScene, SupplyChainScene, ElectionMapScene, TradeNetworkScene
     screens/           Life, Career, Business, Market, Assets, Politics, Family, World, News, Stats
 ```
 
@@ -248,7 +255,8 @@ a row — the engine never hard-codes individual content, so mods and expansions
 
 ## Tech
 
-React + TypeScript (strict) · Vite · Tailwind CSS v4 · Zustand · IndexedDB · HTML Canvas charts.
+React + TypeScript (strict) · Vite · Tailwind CSS v4 · Zustand · IndexedDB · HTML Canvas charts ·
+three.js (lazy-loaded, code-split) for ambient 3D visualizations.
 
 ## Development
 
