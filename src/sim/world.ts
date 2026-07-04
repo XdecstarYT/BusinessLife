@@ -207,6 +207,9 @@ export function generateWorld(config: NewGameConfig): GameState {
       chiefJusticeId: null,
       judicialIntegrity: rng.range(40, 75),
       allianceId: null,
+      laborMarketTightness: rng.range(30, 60),
+      researchLevel: rng.range(20, 50),
+      energyRenewableShare: rng.range(15, 45),
     };
     countries.push(country);
   }
@@ -355,6 +358,8 @@ export function generateWorld(config: NewGameConfig): GameState {
     dirtyMoney: 0,
     turfControl: 0,
     inWitnessProtection: false,
+    thinkTankFunded: false,
+    prAgencyHired: false,
   };
   // Parents
   for (const kind of ['parent', 'parent'] as const) {

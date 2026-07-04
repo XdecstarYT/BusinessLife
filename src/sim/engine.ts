@@ -275,6 +275,16 @@ function tickPlayerLife(state: GameState, rng: RNG): void {
   // Lobbying firm retainer: ongoing upkeep for a permanent law-pass sway bonus.
   if (p.lobbyingFirmHired) p.money -= 25_000;
 
+  // Think tank retainer: slower-burn upkeep that builds influence (and approval, if leader).
+  if (p.thinkTankFunded) {
+    p.money -= 15_000;
+    p.influence = clamp100(p.influence + 0.6);
+    if (home.leaderId === 'player') home.approvalOfGovernment = clamp100(home.approvalOfGovernment + 0.4);
+  }
+
+  // PR agency retainer: dampens negative reputation/popularity/happiness hits (see events.ts).
+  if (p.prAgencyHired) p.money -= 10_000;
+
   for (const prop of p.properties) {
     prop.value = Math.max(10_000, prop.value * (e.housingIndex / Math.max(1, e.history.length >= 2 ? e.history[e.history.length - 2].housingIndex : 100)));
     if (prop.rentalYield > 0) p.money += prop.value * prop.rentalYield * 0.85; // net of costs

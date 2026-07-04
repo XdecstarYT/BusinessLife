@@ -7,7 +7,10 @@ import {
   cabinetCandidates,
   campaignAction,
   dismissMinister,
+  investigateOfficial,
   foundParty,
+  cancelPRAgency,
+  hirePRAgency,
   holdPressConference,
   joinParty,
   launchCampaign,
@@ -132,12 +135,22 @@ export function Politics() {
             </Card>
           )}
 
-          {p.office && !p.campaign && (
-            <Card className="p-5">
-              <div className="font-bold mb-3">Public Relations</div>
-              <Button size="sm" variant="soft" className="w-full" onClick={() => run(holdPressConference)}>📰 Hold Press Conference</Button>
-            </Card>
-          )}
+          <Card className="p-5">
+            <div className="font-bold mb-3">Public Relations</div>
+            <div className="space-y-2">
+              {p.office && !p.campaign && (
+                <Button size="sm" variant="soft" className="w-full" onClick={() => run(holdPressConference)}>📰 Hold Press Conference</Button>
+              )}
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-500 dark:text-slate-400 pr-2">PR agency ($50k, $10k/yr): softens negative reputation/popularity hits.</span>
+                {p.prAgencyHired ? (
+                  <Button size="sm" variant="ghost" onClick={() => run(cancelPRAgency)}>Cancel</Button>
+                ) : (
+                  <Button size="sm" variant="soft" onClick={() => run(hirePRAgency)}>Retain</Button>
+                )}
+              </div>
+            </div>
+          </Card>
 
           <Card className="p-5">
             <div className="font-bold mb-3">{home.flag} {home.name} Government</div>
@@ -416,11 +429,16 @@ function CabinetTab() {
                 {minister ? `${minister.name} · competence ${minister.competence}` : 'Vacant'}
               </div>
             </div>
-            {minister ? (
-              <Button size="sm" variant="danger" onClick={() => run(dismissMinister, portfolio)}>Dismiss</Button>
-            ) : (
-              <Button size="sm" onClick={() => setAppointing(portfolio)}>Appoint</Button>
-            )}
+            <div className="flex flex-col gap-1 items-end">
+              {minister ? (
+                <Button size="sm" variant="danger" onClick={() => run(dismissMinister, portfolio)}>Dismiss</Button>
+              ) : (
+                <Button size="sm" onClick={() => setAppointing(portfolio)}>Appoint</Button>
+              )}
+              {minister && (
+                <Button size="sm" variant="ghost" onClick={() => run(investigateOfficial, minister.id)}>🕵️ Investigate</Button>
+              )}
+            </div>
           </Card>
         );
       })}

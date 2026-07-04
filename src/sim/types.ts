@@ -194,6 +194,8 @@ export interface Player {
   dirtyMoney: number; // illicit proceeds from heists/rackets; must be laundered before spending freely
   turfControl: number; // 0..100, crime family's territorial strength; boosts heist/racket payouts
   inWitnessProtection: boolean; // wiped criminal record/notoriety at a steep one-time cost
+  thinkTankFunded: boolean; // ongoing retainer that slowly builds influence and (if leader) approval
+  prAgencyHired: boolean; // ongoing retainer that softens negative reputation/popularity/happiness hits
   campaign: null | {
     officeKind: OfficeKind;
     regionName: string;
@@ -371,6 +373,9 @@ export interface Country {
   chiefJusticeId: string | null; // NPC id nominated to head the judiciary
   judicialIntegrity: number; // 0..100, higher = fewer arbitrary law strike-downs
   allianceId: string | null; // Alliance id this nation belongs to, if any
+  laborMarketTightness: number; // 0..100, higher = harder/costlier hiring, more strike risk
+  researchLevel: number; // 0..100, national R&D strength; boosts tech-intensive industries
+  energyRenewableShare: number; // 0..100, share of the grid that's renewable; dampens climate risk growth
 }
 
 export const CABINET_PORTFOLIOS = ['Finance', 'Foreign Affairs', 'Defense', 'Health', 'Education', 'Justice'] as const;
@@ -482,6 +487,8 @@ export interface Company {
   bondDebt: number; // fixed-rate corporate bond principal outstanding
   bondRate: number; // locked coupon rate at issuance
   bondYearsLeft: number; // years remaining on the current bond term
+  franchiseCount: number; // franchised locations; each pays a small ongoing royalty
+  loyaltyProgram: boolean; // a membership/rewards program lifting retention and brand
 
   status: CompanyStatus;
   history: CompanyHistoryPoint[];

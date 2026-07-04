@@ -41,6 +41,8 @@ const ACHIEVEMENTS: Record<string, { label: string; icon: string }> = {
   space_pioneer: { label: 'Space Pioneer', icon: '🚀' },
   dynasty_continued: { label: 'Dynasty Continued', icon: '🕯️' },
   challenge_crusher: { label: 'Challenge Crusher', icon: '🎯' },
+  startup_investor: { label: 'Startup Investor', icon: '🌱' },
+  summit_diplomat: { label: 'Summit Diplomat', icon: '🌐' },
 };
 
 export function Stats() {

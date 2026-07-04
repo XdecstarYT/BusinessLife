@@ -704,6 +704,83 @@ export function fileTrademark(state: GameState, companyId: string): ActionResult
   return { ok: true, message: `Trademark filed for ${c.name}.` };
 }
 
+// ---------------------------------------------------------------------------
+// V7: Corporate/economic depth — recruitment, incubator/VC, franchising, loyalty
+// ---------------------------------------------------------------------------
+
+export function runRecruitmentDrive(state: GameState, companyId: string): ActionResult {
+  const c = state.companies[companyId];
+  if (!c || !c.playerOwned || c.status !== 'active') return { ok: false, message: 'Not your company.' };
+  const country = state.countries.find((k) => k.id === c.countryId)!;
+  const cost = Math.max(15_000, c.revenue * 0.02) * (1 + Math.max(0, country.laborMarketTightness - 50) * 0.01);
+  if (cost > c.cash) return { ok: false, message: `Needs $${Math.round(cost).toLocaleString()} in company cash — talent is expensive in this market.` };
+  const rng = withRng(state);
+  c.cash -= cost;
+  const chance = clamp(0.75 - Math.max(0, country.laborMarketTightness - 50) * 0.006, 0.35, 0.9);
+  const success = rng.chance(chance);
+  commit(state, rng);
+  if (success) {
+    c.managerQuality = clamp100(c.managerQuality + 8);
+    c.morale = clamp100(c.morale + 4);
+    log(state, `${c.name} won a competitive recruitment drive against rival employers.`, 'business');
+    return { ok: true, message: 'Recruitment drive succeeded. Management quality and morale up.' };
+  }
+  log(state, `${c.name}'s recruitment drive lost top candidates to rival offers.`, 'bad');
+  return { ok: false, message: 'Rivals out-bid you for the best candidates.' };
+}
+
+/** Invest in a small private NPC-owned company for an equity stake — a lightweight VC/incubator mechanic. */
+export function investInStartup(state: GameState, targetCompanyId: string, amount: number): ActionResult {
+  const p = state.player;
+  const target = state.companies[targetCompanyId];
+  if (!target || target.status !== 'active' || target.playerOwned || target.isPublic) return { ok: false, message: 'Invalid startup target.' };
+  if (target.revenue > 3_000_000) return { ok: false, message: 'Too large to be a startup investment — try a hostile takeover instead once public.' };
+  if (amount <= 0 || amount > p.money) return { ok: false, message: 'Not enough cash.' };
+  const value = companyValuation(target);
+  const stake = clamp(amount / Math.max(1, value + amount), 0.02, 0.4);
+  p.money -= amount;
+  target.cash += amount;
+  target.playerSharePct = stake;
+  target.playerOwned = true;
+  p.companies.push(target.id);
+  log(state, `Invested $${Math.round(amount).toLocaleString()} in startup ${target.name} for a ${(stake * 100).toFixed(1)}% stake.`, 'business');
+  if (!state.achievements.includes('startup_investor')) state.achievements.push('startup_investor');
+  return { ok: true, message: `Acquired a ${(stake * 100).toFixed(1)}% stake in ${target.name}.` };
+}
+
+export function franchiseCompany(state: GameState, companyId: string): ActionResult {
+  const c = state.companies[companyId];
+  if (!c || !c.playerOwned || c.status !== 'active') return { ok: false, message: 'Not your company.' };
+  if (c.brand < 55) return { ok: false, message: 'Needs at least 55 brand strength to attract franchisees.' };
+  const cost = Math.max(20_000, c.revenue * 0.05);
+  if (cost > c.cash) return { ok: false, message: `Needs $${Math.round(cost).toLocaleString()} in company cash.` };
+  const rng = withRng(state);
+  c.cash -= cost;
+  const chance = clamp(0.4 + (c.brand - 55) * 0.01, 0.2, 0.85);
+  const success = rng.chance(chance);
+  commit(state, rng);
+  if (success) {
+    c.franchiseCount++;
+    log(state, `${c.name} opened a new franchised location (${c.franchiseCount} total).`, 'business');
+    return { ok: true, message: `New franchise opened. ${c.franchiseCount} location(s) now paying royalties.` };
+  }
+  log(state, `${c.name} failed to attract a franchisee this round.`, 'bad');
+  return { ok: false, message: 'No franchisee signed on this time.' };
+}
+
+export function launchLoyaltyProgram(state: GameState, companyId: string): ActionResult {
+  const c = state.companies[companyId];
+  if (!c || !c.playerOwned || c.status !== 'active') return { ok: false, message: 'Not your company.' };
+  if (c.loyaltyProgram) return { ok: false, message: 'Already running a loyalty program.' };
+  const cost = Math.max(10_000, c.revenue * 0.015);
+  if (cost > c.cash) return { ok: false, message: `Needs $${Math.round(cost).toLocaleString()} in company cash.` };
+  c.cash -= cost;
+  c.loyaltyProgram = true;
+  c.customerSatisfaction = clamp100(c.customerSatisfaction + 5);
+  log(state, `${c.name} launched a customer loyalty/membership program.`, 'business');
+  return { ok: true, message: 'Loyalty program launched.' };
+}
+
 /** A political extension of the existing celebrity/brand-ambassador system: courting a
  * celebrity endorsement for an active campaign instead of a company. */
 export function seekCelebrityEndorsement(state: GameState): ActionResult {
@@ -1409,6 +1486,259 @@ export function leaveAlliance(state: GameState): ActionResult {
   home.allianceId = null;
   log(state, `${home.name} withdrew from its alliance.`, 'politics');
   return { ok: true, message: 'Left the alliance.' };
+}
+
+// ---------------------------------------------------------------------------
+// V7: Governance depth — board/shareholder votes, anti-corruption, procurement,
+// grants, think tanks
+// ---------------------------------------------------------------------------
+
+export type BoardProposal = 'increase_dividend' | 'exec_compensation' | 'block_activist';
+
+export function proposeBoardResolution(state: GameState, companyId: string, proposal: BoardProposal): ActionResult {
+  const c = state.companies[companyId];
+  if (!c || !c.playerOwned || !c.isPublic || c.status !== 'active') return { ok: false, message: 'Only public companies you control can hold a board vote.' };
+  const rng = withRng(state);
+  const chance = clamp(0.3 + c.playerSharePct * 0.5 + (c.esg - 50) * 0.002 + (c.customerSatisfaction - 50) * 0.001, 0.05, 0.95);
+  const passed = rng.chance(chance);
+  commit(state, rng);
+  if (!passed) {
+    log(state, `Shareholders voted down your ${proposal.replace('_', ' ')} resolution at ${c.name}.`, 'bad');
+    return { ok: false, message: 'The board voted against your proposal.' };
+  }
+  if (proposal === 'increase_dividend') {
+    c.dividendPayoutPct = clamp(c.dividendPayoutPct + 0.05, 0, 0.9);
+    log(state, `Shareholders approved a higher dividend at ${c.name}.`, 'business');
+    return { ok: true, message: 'Dividend increase approved.' };
+  }
+  if (proposal === 'exec_compensation') {
+    const cost = c.executives.reduce((s, e) => s + e.salary, 0) * 0.3;
+    if (cost > c.cash) return { ok: false, message: `Needs $${Math.round(cost).toLocaleString()} in company cash.` };
+    c.cash -= cost;
+    for (const e of c.executives) e.salary *= 1.2;
+    c.morale = clamp100(c.morale + 6);
+    log(state, `Shareholders approved a richer executive pay package at ${c.name}.`, 'business');
+    return { ok: true, message: 'Executive compensation increased. Morale up.' };
+  }
+  // block_activist
+  c.shortInterest = clamp(c.shortInterest * 0.5, 0, 0.6);
+  c.brand = clamp100(c.brand + 3);
+  log(state, `Shareholders backed the board against an activist push at ${c.name}.`, 'business');
+  return { ok: true, message: 'Activist campaign rebuffed.' };
+}
+
+export function investigateOfficial(state: GameState, npcId: string): ActionResult {
+  const { home, error } = requireLeadership(state);
+  if (error) return error;
+  const npc = state.npcs[npcId];
+  if (!npc || !npc.alive || npc.countryId !== home.id) return { ok: false, message: 'Invalid target.' };
+  const rng = withRng(state);
+  const corruptChance = clamp(1 - npc.integrity / 100, 0.05, 0.95);
+  const found = rng.chance(corruptChance);
+  commit(state, rng);
+  if (found) {
+    for (const [portfolio, id] of Object.entries(home.cabinet)) {
+      if (id === npcId) delete home.cabinet[portfolio];
+    }
+    home.corruption = clamp100(home.corruption - 4);
+    state.player.reputation = clamp100(state.player.reputation + 6);
+    state.player.popularity = clamp100(state.player.popularity + 3);
+    log(state, `🕵️ An anti-corruption probe removed ${npc.name} from office.`, 'politics');
+    return { ok: true, message: `${npc.name} was exposed and removed from office.` };
+  }
+  state.player.popularity = clamp100(state.player.popularity - 4);
+  state.player.reputation = clamp100(state.player.reputation - 2);
+  log(state, `An anti-corruption probe into ${npc.name} turned up nothing — critics call it a witch hunt.`, 'bad');
+  return { ok: false, message: `The investigation into ${npc.name} found nothing.` };
+}
+
+export function bidOnGovernmentContract(state: GameState, companyId: string): ActionResult {
+  const p = state.player;
+  const c = state.companies[companyId];
+  if (!c || !c.playerOwned || c.status !== 'active') return { ok: false, message: 'Not your company.' };
+  const home = state.countries.find((k) => k.id === c.countryId)!;
+  const bidCost = Math.max(5_000, c.revenue * 0.01);
+  if (bidCost > c.cash) return { ok: false, message: `Needs $${Math.round(bidCost).toLocaleString()} in company cash to prepare a bid.` };
+  const rng = withRng(state);
+  c.cash -= bidCost;
+  const chance = clamp(0.2 + (c.brand / 100) * 0.2 + (p.politicalCapital / 100) * 0.2 + (home.corruption / 100) * (p.notoriety > 20 ? 0.15 : -0.05), 0.05, 0.85);
+  const won = rng.chance(chance);
+  commit(state, rng);
+  if (won) {
+    const value = Math.max(50_000, c.revenue * rng.range(0.15, 0.4));
+    c.cash += value;
+    c.brand = clamp100(c.brand + 3);
+    log(state, `🏛️ ${c.name} won a government contract worth $${Math.round(value).toLocaleString()}.`, 'business');
+    return { ok: true, message: `Won the contract: $${Math.round(value).toLocaleString()}.` };
+  }
+  log(state, `${c.name}'s bid for a government contract was passed over.`, 'bad');
+  return { ok: false, message: 'The contract went to another bidder.' };
+}
+
+export function applyForGrant(state: GameState, companyId: string): ActionResult {
+  const c = state.companies[companyId];
+  if (!c || !c.playerOwned || c.status !== 'active') return { ok: false, message: 'Not your company.' };
+  const home = state.countries.find((k) => k.id === c.countryId)!;
+  if (home.economy.budgetBalance < -0.08) return { ok: false, message: `${home.name}'s budget is too strained to fund grants right now.` };
+  const rng = withRng(state);
+  const chance = clamp(0.25 + c.rdPct * 2, 0.1, 0.8);
+  const approved = rng.chance(chance);
+  commit(state, rng);
+  if (approved) {
+    const amount = Math.max(20_000, c.revenue * 0.05);
+    c.cash += amount;
+    c.quality = clamp100(c.quality + 3);
+    log(state, `${c.name} was awarded a government R&D grant of $${Math.round(amount).toLocaleString()}.`, 'business');
+    return { ok: true, message: `Grant awarded: $${Math.round(amount).toLocaleString()}.` };
+  }
+  return { ok: false, message: 'Grant application rejected.' };
+}
+
+export function fundThinkTank(state: GameState): ActionResult {
+  const p = state.player;
+  if (p.thinkTankFunded) return { ok: false, message: 'You already fund a think tank.' };
+  const cost = 60_000;
+  if (p.money < cost) return { ok: false, message: `Needs $${cost.toLocaleString()}.` };
+  p.money -= cost;
+  p.thinkTankFunded = true;
+  log(state, `Founded a policy think tank ($15k/yr upkeep) to build long-term influence.`, 'politics');
+  return { ok: true, message: 'Think tank funded.' };
+}
+
+export function cancelThinkTank(state: GameState): ActionResult {
+  const p = state.player;
+  if (!p.thinkTankFunded) return { ok: false, message: 'No think tank to defund.' };
+  p.thinkTankFunded = false;
+  log(state, `Defunded your policy think tank.`, 'politics');
+  return { ok: true, message: 'Think tank defunded.' };
+}
+
+// ---------------------------------------------------------------------------
+// V7: Science, health & energy depth
+// ---------------------------------------------------------------------------
+
+export function fundUniversityResearch(state: GameState, amount: number): ActionResult {
+  const { home, error } = requireLeadership(state);
+  if (error) return error;
+  if (amount <= 0 || amount > state.player.money) return { ok: false, message: 'Invalid funding amount.' };
+  state.player.money -= amount;
+  home.researchLevel = clamp100(home.researchLevel + amount / 40_000);
+  home.education = clamp100(home.education + amount / 200_000);
+  log(state, `Invested $${amount.toLocaleString()} in university research funding.`, 'politics');
+  return { ok: true, message: `National research level now ${Math.round(home.researchLevel)}.` };
+}
+
+export function investInHealthcare(state: GameState, amount: number): ActionResult {
+  const { home, error } = requireLeadership(state);
+  if (error) return error;
+  if (amount <= 0 || amount > state.player.money) return { ok: false, message: 'Invalid funding amount.' };
+  state.player.money -= amount;
+  home.healthcare = clamp100(home.healthcare + amount / 30_000);
+  log(state, `Invested $${amount.toLocaleString()} directly into the healthcare system.`, 'politics');
+  return { ok: true, message: `Healthcare quality now ${Math.round(home.healthcare)}.` };
+}
+
+export function runClinicalTrial(state: GameState, companyId: string): ActionResult {
+  const c = state.companies[companyId];
+  if (!c || !c.playerOwned || c.status !== 'active') return { ok: false, message: 'Not your company.' };
+  const ind = INDUSTRY_BY_ID[c.industryId];
+  if (!ind.tags.includes('health') || ind.techIntensity < 0.5) return { ok: false, message: 'Only R&D-heavy health/pharma companies can run clinical trials.' };
+  const cost = Math.max(60_000, c.revenue * 0.1);
+  if (cost > c.cash) return { ok: false, message: `Needs $${Math.round(cost).toLocaleString()} in company cash.` };
+  const country = state.countries.find((k) => k.id === c.countryId)!;
+  const rng = withRng(state);
+  c.cash -= cost;
+  const chance = clamp(0.25 + c.rdPct * 1.5 + (country.researchLevel / 100) * 0.2, 0.1, 0.75);
+  const success = rng.chance(chance);
+  commit(state, rng);
+  if (success) {
+    c.patents++;
+    c.quality = clamp100(c.quality + 6);
+    c.brand = clamp100(c.brand + 4);
+    log(state, `💊 ${c.name}'s clinical trial succeeded — a new drug patent was granted.`, 'business');
+    return { ok: true, message: 'Clinical trial succeeded! Patent granted.' };
+  }
+  log(state, `${c.name}'s clinical trial failed to meet its endpoints.`, 'bad');
+  return { ok: false, message: 'The trial failed. The R&D spend is a sunk cost.' };
+}
+
+export function setEnergyMix(state: GameState, renewableSharePct: number): ActionResult {
+  const { home, error } = requireLeadership(state);
+  if (error) return error;
+  const target = clamp(renewableSharePct, 0, 100);
+  const cost = Math.abs(target - home.energyRenewableShare) * 15_000;
+  if (cost > state.player.money) return { ok: false, message: `Needs $${Math.round(cost).toLocaleString()} to retool the grid that much.` };
+  state.player.money -= cost;
+  home.energyRenewableShare = target;
+  log(state, `Shifted the national energy grid to ${Math.round(target)}% renewable.`, 'politics');
+  return { ok: true, message: `Grid now ${Math.round(target)}% renewable.` };
+}
+
+// ---------------------------------------------------------------------------
+// V7: Media ownership & reputation management
+// ---------------------------------------------------------------------------
+
+export function runFavorableCoverage(state: GameState, companyId: string): ActionResult {
+  const p = state.player;
+  const c = state.companies[companyId];
+  const ind = INDUSTRY_BY_ID[c?.industryId ?? ''];
+  if (!c || !c.playerOwned || c.status !== 'active' || !ind?.tags.includes('media')) return { ok: false, message: 'Not a media company you control.' };
+  if (c.politicalInfluence < 20) return { ok: false, message: 'Needs at least 20 political influence built up.' };
+  c.politicalInfluence = clamp(c.politicalInfluence - 20, 0, 100);
+  const gain = 3 + c.politicalInfluence * 0.05;
+  p.reputation = clamp100(p.reputation + gain);
+  p.popularity = clamp100(p.popularity + gain * 0.6);
+  p.karma = clamp100(p.karma - 2);
+  log(state, `${c.name} ran a flattering profile piece on you.`, 'business');
+  return { ok: true, message: `Reputation +${gain.toFixed(0)} from favorable coverage.` };
+}
+
+export function hirePRAgency(state: GameState): ActionResult {
+  const p = state.player;
+  if (p.prAgencyHired) return { ok: false, message: 'You already retain a PR agency.' };
+  const cost = 50_000;
+  if (p.money < cost) return { ok: false, message: `Needs $${cost.toLocaleString()}.` };
+  p.money -= cost;
+  p.prAgencyHired = true;
+  log(state, `Retained a PR agency ($10k/yr upkeep) to manage your public image.`, 'politics');
+  return { ok: true, message: 'PR agency retained.' };
+}
+
+export function cancelPRAgency(state: GameState): ActionResult {
+  const p = state.player;
+  if (!p.prAgencyHired) return { ok: false, message: 'No PR agency retained.' };
+  p.prAgencyHired = false;
+  log(state, `Cancelled the PR agency retainer.`, 'politics');
+  return { ok: true, message: 'PR agency retainer cancelled.' };
+}
+
+// ---------------------------------------------------------------------------
+// V7: Diplomacy depth — international summits
+// ---------------------------------------------------------------------------
+
+export function attendSummit(state: GameState): ActionResult {
+  const { home, error } = requireLeadership(state);
+  if (error) return error;
+  const p = state.player;
+  const cost = 15;
+  if (p.politicalCapital < cost) return { ok: false, message: `Needs ${cost} political capital.` };
+  p.politicalCapital = clamp(p.politicalCapital - cost, 0, 100);
+  const rng = withRng(state);
+  const others = state.countries.filter((k) => k.id !== home.id && !home.atWarWith.includes(k.id));
+  for (const other of others) {
+    home.relations[other.id] = clamp((home.relations[other.id] ?? 0) + rng.range(3, 8), -100, 100);
+    other.relations[home.id] = clamp((other.relations[home.id] ?? 0) + rng.range(3, 8), -100, 100);
+  }
+  const breakthrough = rng.chance(0.3);
+  p.reputation = clamp100(p.reputation + (breakthrough ? 8 : 3));
+  p.influence = clamp100(p.influence + (breakthrough ? 6 : 2));
+  if (breakthrough) home.economy.businessConfidence = clamp100(home.economy.businessConfidence + 4);
+  commit(state, rng);
+  if (!state.achievements.includes('summit_diplomat')) state.achievements.push('summit_diplomat');
+  log(state, breakthrough
+    ? `🌐 A landmark agreement came out of the international summit.`
+    : `🌐 You attended an international summit, warming relations across the board.`, 'politics');
+  return { ok: true, message: breakthrough ? 'Summit breakthrough! Relations and confidence up.' : 'Relations improved with every nation present.' };
 }
 
 // ---------------------------------------------------------------------------

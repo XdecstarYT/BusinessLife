@@ -138,6 +138,10 @@ export function tickEconomy(state: GameState, country: Country, rng: RNG): Econo
   const law = aggregateLawEffects(country);
   let crisis: string | null = null;
   const difficultyCrisisMult = state.difficulty === 'casual' ? 0.6 : state.difficulty === 'ironman' ? 1.4 : 1;
+  // Crisis clustering: an already-unstable nation is more likely to see crises compound
+  // rather than arrive in isolation.
+  const instabilityCrisisMult = 1 + Math.max(0, 40 - country.stability) * 0.025;
+  const crisisMult = difficultyCrisisMult * instabilityCrisisMult;
 
   // --- Regime transitions -------------------------------------------------
   const spec = REGIME_TRANSITIONS[e.regime];
@@ -170,7 +174,7 @@ export function tickEconomy(state: GameState, country: Country, rng: RNG): Econo
   // Commodity shock pass-through
   const oilShock = (e.commodities.oil - 100) / 100;
   inflation += oilShock * 0.01;
-  if (e.govDebtToGdp > 1.5 && rng.chance(0.1 * difficultyCrisisMult)) {
+  if (e.govDebtToGdp > 1.5 && rng.chance(0.1 * crisisMult)) {
     inflation += rng.range(0.03, 0.1);
     crisis = 'debt';
   }
@@ -184,6 +188,11 @@ export function tickEconomy(state: GameState, country: Country, rng: RNG): Econo
   let unemployment = e.unemployment - (growth - 0.02) * 0.4;
   unemployment += (law.unemployment ?? 0);
   e.unemployment = clamp(unemployment + rng.range(-0.004, 0.004), 0.02, 0.35);
+
+  // Labor market tightness: low unemployment + strong growth make hiring harder and
+  // costlier, and raises strike risk; it eases again once the cycle turns.
+  const tightnessTarget = 50 + (0.06 - e.unemployment) * 800 + growth * 300;
+  country.laborMarketTightness = clamp100(country.laborMarketTightness * 0.7 + tightnessTarget * 0.3 + rng.range(-3, 3));
 
   // --- Confidence -------------------------------------------------------------
   e.businessConfidence = clamp100(
@@ -236,7 +245,12 @@ export function tickEconomy(state: GameState, country: Country, rng: RNG): Econo
   country.education = clamp100(country.education + (law.education ?? 0) * 0.4 + rng.range(-0.5, 0.5));
   country.infrastructure = clamp100(country.infrastructure + (law.infrastructure ?? 0) * 0.4 + rng.range(-0.5, 0.5));
   country.militaryPower = clamp100(country.militaryPower + (law.militaryPower ?? 0) * 0.4 + rng.range(-0.5, 0.5));
-  country.climateRisk = clamp100(country.climateRisk + (law.climateRisk ?? 0) * 0.3 + 0.3 + rng.range(-0.3, 0.3));
+  // A greener grid slows (but doesn't reverse) the underlying climate-risk drift.
+  const energyClimateDamp = 1 - (country.energyRenewableShare / 100) * 0.6;
+  country.climateRisk = clamp100(country.climateRisk + ((law.climateRisk ?? 0) * 0.3 + 0.3) * energyClimateDamp + rng.range(-0.3, 0.3));
+
+  // National research level slowly decays without reinvestment (funded via fundUniversityResearch()).
+  country.researchLevel = clamp100(country.researchLevel * 0.97 + rng.range(-0.5, 0.5));
 
   // --- Demographics ------------------------------------------------------------------
   const immigrationMult = 0.4 + (country.immigrationQuota / 100) * 1.2;
@@ -250,7 +264,7 @@ export function tickEconomy(state: GameState, country: Country, rng: RNG): Econo
 
   // Natural disasters scale with climate risk: they hit GDP, stability, property values and
   // business confidence together — insurers absorb some of the cost via higher claims.
-  if (rng.chance((country.climateRisk / 100) * 0.12 * difficultyCrisisMult)) {
+  if (rng.chance((country.climateRisk / 100) * 0.12 * crisisMult)) {
     crisis = crisis ?? 'disaster';
     e.gdp *= rng.range(0.985, 0.998);
     country.stability = clamp100(country.stability - rng.range(1, 4));

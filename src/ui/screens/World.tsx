@@ -6,18 +6,23 @@ import { money, num, pct, signedPct } from '../format';
 import { CABINET_PORTFOLIOS, type AdvisorSpecialty, type CabinetPortfolio, type Country, type InfrastructureKind, type WorldEvent } from '../../sim/types';
 import {
   advisorRecommendation,
+  attendSummit,
   cabinetCandidates,
   callReferendum,
   cancelLobbyingFirm,
+  cancelThinkTank,
   counterEspionage,
   declareWar,
   dismissAdvisor,
   foundAlliance,
+  fundThinkTank,
   fundIntelligenceAgency,
+  fundUniversityResearch,
   gatherIntelligence,
   hireAdvisor,
   hireLobbyingFirm,
   imposeSanctions,
+  investInHealthcare,
   joinAlliance,
   launchInfrastructureProject,
   leaveAlliance,
@@ -25,6 +30,7 @@ import {
   nominateChiefJustice,
   sendForeignAid,
   setBudgetAllocation,
+  setEnergyMix,
   setImmigrationQuota,
   setTaxRate,
   signPeaceTreaty,
@@ -157,6 +163,7 @@ function CountryModal({ country, onClose }: { country: Country; onClose: () => v
         <StatBar label="Education" value={country.education} />
         <StatBar label="Infrastructure" value={country.infrastructure} />
         <StatBar label="Climate risk" value={country.climateRisk} />
+        <StatBar label="Labor market tightness" value={country.laborMarketTightness} />
       </div>
       {country.totalSeats > 0 && (
         <>
@@ -233,6 +240,7 @@ function GovernmentTools({ country }: { country: Country }) {
   const { state, run } = useGame();
   const [taxDraft, setTaxDraft] = useState<Record<string, number>>({});
   const [immigrationDraft, setImmigrationDraft] = useState<number | null>(null);
+  const [energyDraft, setEnergyDraft] = useState<number | null>(null);
   const [nominating, setNominating] = useState(false);
   const [referendumPicker, setReferendumPicker] = useState(false);
   const [allianceNamer, setAllianceNamer] = useState(false);
@@ -322,6 +330,32 @@ function GovernmentTools({ country }: { country: Country }) {
         />
         <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Higher openness grows the population and labor supply faster, and softens minimum-wage growth.</div>
       </div>
+
+      <div className="font-bold mb-2 text-sm">Science, Health & Energy</div>
+      <Card className="p-3 mb-4 space-y-3">
+        <StatBar label="Research level" value={country.researchLevel} />
+        <StatBar label="Healthcare" value={country.healthcare} />
+        <div>
+          <div className="flex justify-between text-xs mb-1">
+            <span className="font-semibold">Renewable energy share</span>
+            <span className="font-bold text-brand-500">{Math.round(energyDraft ?? country.energyRenewableShare)}%</span>
+          </div>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={energyDraft ?? country.energyRenewableShare}
+            onChange={(e) => setEnergyDraft(Number(e.target.value))}
+            onMouseUp={() => run(setEnergyMix, energyDraft ?? country.energyRenewableShare)}
+            onTouchEnd={() => run(setEnergyMix, energyDraft ?? country.energyRenewableShare)}
+            className="w-full"
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <Button size="sm" variant="soft" onClick={() => run(fundUniversityResearch, 100_000)}>🎓 Fund Research ($100k)</Button>
+          <Button size="sm" variant="soft" onClick={() => run(investInHealthcare, 100_000)}>🏥 Fund Healthcare ($100k)</Button>
+        </div>
+      </Card>
 
       <div className="font-bold mb-2 text-sm">Economic Forecast (next year)</div>
       <div className="grid grid-cols-3 gap-2 mb-4 text-center text-sm">
@@ -422,6 +456,16 @@ function GovernmentTools({ country }: { country: Country }) {
         )}
       </Card>
 
+      <div className="font-bold mb-2 text-sm">Think Tank</div>
+      <Card className="p-3 mb-4 flex items-center justify-between">
+        <div className="text-xs text-slate-500 dark:text-slate-400 pr-2">$60k to fund, $15k/yr upkeep. Slowly builds influence, and approval if you lead.</div>
+        {p.thinkTankFunded ? (
+          <Button size="sm" variant="ghost" onClick={() => run(cancelThinkTank)}>Cancel</Button>
+        ) : (
+          <Button size="sm" variant="soft" onClick={() => run(fundThinkTank)}>Fund</Button>
+        )}
+      </Card>
+
       <div className="font-bold mb-2 text-sm">Alliance</div>
       <Card className="p-3">
         {alliance ? (
@@ -435,6 +479,12 @@ function GovernmentTools({ country }: { country: Country }) {
         ) : (
           <Button size="sm" variant="soft" className="w-full" onClick={() => setAllianceNamer(true)}>Found an Alliance</Button>
         )}
+      </Card>
+
+      <div className="font-bold mb-2 text-sm">International Summit</div>
+      <Card className="p-3 mb-4 flex items-center justify-between">
+        <div className="text-xs text-slate-500 dark:text-slate-400 pr-2">15 PC. Warms relations with every nation you aren't at war with, with a chance of a diplomatic breakthrough.</div>
+        <Button size="sm" variant="soft" onClick={() => run(attendSummit)}>Attend</Button>
       </Card>
 
       {nominating && (

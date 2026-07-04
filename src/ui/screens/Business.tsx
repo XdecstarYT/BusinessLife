@@ -3,20 +3,29 @@ import { useState } from 'react';
 import { useGame } from '../../store/gameStore';
 import {
   investInCompany,
+  applyForGrant,
   attemptHostileTakeover,
+  bidOnGovernmentContract,
   buybackShares,
   CULTURE_INFO,
   diversifySupplyChain,
   fileTrademark,
   fireExecutive,
+  franchiseCompany,
   hireBrandAmbassador,
   hireExecutive,
   HQ_TIERS,
+  investInStartup,
   issueCorporateBond,
   launderMoney,
+  launchLoyaltyProgram,
   protectionRacket,
   proactiveRecall,
+  proposeBoardResolution,
   qualityAudit,
+  runClinicalTrial,
+  runFavorableCoverage,
+  runRecruitmentDrive,
   runGraduateProgram,
   runLeadershipProgram,
   runTrainingProgram,
@@ -30,6 +39,7 @@ import {
   toggleCompanyInsurance,
   upgradeHQ,
   withdrawFromCompany,
+  type BoardProposal,
   type CompanyLever,
 } from '../../sim/actions';
 import { companyValuation } from '../../sim/business';
@@ -88,6 +98,11 @@ export function Business() {
                   <Button size="sm" variant="soft" onClick={() => run(spyOnCompany, c.id)}>🕵️ Espionage</Button>
                   <Button size="sm" disabled={!c.isPublic} onClick={() => setTakeoverTarget(c.id)}>🏴 Takeover</Button>
                 </div>
+                {!c.isPublic && c.revenue <= 3_000_000 && (
+                  <Button size="sm" variant="soft" className="w-full mt-2" onClick={() => run(investInStartup, c.id, 50_000)}>
+                    🌱 Invest $50k (VC Stake)
+                  </Button>
+                )}
                 {state.player.crimeFamilyId && (
                   <Button size="sm" variant="danger" className="w-full mt-2" onClick={() => run(protectionRacket, c.id)}>
                     🔫 Shakedown
@@ -393,6 +408,25 @@ function ManageModal({ companyId, onClose }: { companyId: string; onClose: () =>
         <Button size="sm" variant="soft" onClick={() => run(qualityAudit, c.id)}>✅ Quality Audit</Button>
         <Button size="sm" variant="soft" onClick={() => run(fileTrademark, c.id)}>™️ File Trademark ({c.trademarks}/5)</Button>
         <Button size="sm" variant="soft" onClick={() => run(proactiveRecall, c.id)}>⚠️ Proactive Recall</Button>
+        <Button size="sm" variant="soft" onClick={() => run(runRecruitmentDrive, c.id)}>🧑‍💼 Recruitment Drive</Button>
+        <Button size="sm" variant="soft" onClick={() => run(franchiseCompany, c.id)}>🏬 Franchise ({c.franchiseCount})</Button>
+        {ind?.tags.includes('health') && ind.techIntensity >= 0.5 && (
+          <Button size="sm" variant="soft" onClick={() => run(runClinicalTrial, c.id)}>💊 Run Clinical Trial</Button>
+        )}
+        {ind?.tags.includes('media') && (
+          <Button size="sm" variant="soft" className="col-span-2" onClick={() => run(runFavorableCoverage, c.id)}>
+            📰 Favorable Coverage ({Math.round(c.politicalInfluence)} influence)
+          </Button>
+        )}
+        <Button
+          size="sm"
+          variant="soft"
+          className="col-span-2"
+          disabled={c.loyaltyProgram}
+          onClick={() => run(launchLoyaltyProgram, c.id)}
+        >
+          {c.loyaltyProgram ? '💳 Loyalty Program Active' : '💳 Launch Loyalty Program'}
+        </Button>
       </div>
 
       {state.player.dirtyMoney > 0 && (
@@ -448,7 +482,28 @@ function ManageModal({ companyId, onClose }: { companyId: string; onClose: () =>
         <Button size="sm" variant="soft" className={c.isPublic ? '' : 'col-span-2'} onClick={() => run(spinOffCompany, c.id)}>
           ✂️ Spin Off Division
         </Button>
+        <Button size="sm" variant="soft" onClick={() => run(bidOnGovernmentContract, c.id)}>🏛️ Bid on Gov Contract</Button>
+        <Button size="sm" variant="soft" onClick={() => run(applyForGrant, c.id)}>📝 Apply for Grant</Button>
       </div>
+
+      {c.isPublic && (
+        <>
+          <div className="font-bold mb-2">Shareholder Votes</div>
+          <div className="grid grid-cols-1 gap-2 mb-2">
+            {(
+              [
+                { id: 'increase_dividend', label: '📈 Propose Higher Dividend' },
+                { id: 'exec_compensation', label: '💼 Propose Exec Pay Raise' },
+                { id: 'block_activist', label: '🛡️ Rally Board vs. Activist' },
+              ] as { id: BoardProposal; label: string }[]
+            ).map((p) => (
+              <Button key={p.id} size="sm" variant="soft" onClick={() => run(proposeBoardResolution, c.id, p.id)}>
+                {p.label}
+              </Button>
+            ))}
+          </div>
+        </>
+      )}
 
       <div className="font-bold mt-5 mb-2">Capital</div>
       <input

@@ -784,6 +784,21 @@ ev({
   ],
 });
 ev({
+  id: 'pol_election_fraud_allegation', category: 'politics', weight: 4, conditions: { campaigning: true },
+  text: 'Your opponent accuses your campaign of ballot irregularities and demands an independent recount.',
+  choices: [
+    { label: 'Demand the courts dismiss it', skillCheck: { skillId: SK.law, bonusPerLevel: 0.006 }, outcomes: [
+      { chance: 0.55, text: 'The judiciary threw the case out for lack of evidence.', effects: { campaignMomentum: 4, reputation: 3 } },
+      { chance: 0.45, text: 'The court ordered a recount anyway, costing you momentum.', effects: { campaignMomentum: -7, popularity: -3 } },
+    ] },
+    { label: 'Get ahead of it with a media blitz', skillCheck: { skillId: SK.spin, bonusPerLevel: 0.006 }, outcomes: [
+      { chance: 0.6, text: 'You framed it as a smear before it could stick.', effects: { campaignMomentum: 5, popularity: 2, skillXp: [SK.spin, 12] } },
+      { chance: 0.4, text: 'The story kept dogging you for weeks.', effects: { campaignMomentum: -5, karma: -1 } },
+    ] },
+    { label: 'Welcome a full independent audit', effects: { karma: 4, campaignMomentum: -2, reputation: 2 } },
+  ],
+});
+ev({
   id: 'pol_lobbyist_offer', category: 'politics', weight: 5, conditions: { inOffice: 'any' },
   text: 'A lobbyist for the {industry} industry offers {amount} in "consulting fees" for your support on upcoming regulation.',
   amount: { min: 50_000, max: 400_000 },

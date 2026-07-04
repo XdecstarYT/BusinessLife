@@ -136,6 +136,11 @@ export function fireEvents(state: GameState, rng: RNG): FiredEvent[] {
 }
 
 /** Apply an EffectSpec to the game state. Returns log lines describing what happened. */
+/** A retained PR agency softens (but doesn't erase) negative reputation/popularity/happiness hits. */
+function prDampen(p: { prAgencyHired: boolean }, v: number): number {
+  return v < 0 && p.prAgencyHired ? v * 0.75 : v;
+}
+
 export function applyEffects(state: GameState, fx: EffectSpec, event: FiredEvent | null): string[] {
   const p = state.player;
   const logs: string[] = [];
@@ -145,11 +150,11 @@ export function applyEffects(state: GameState, fx: EffectSpec, event: FiredEvent
   if (fx.moneyPct) p.money += p.money * fx.moneyPct;
   if (fx.moneyAmountMult) p.money += amount * fx.moneyAmountMult;
   if (fx.health) p.health = clamp100(p.health + fx.health);
-  if (fx.happiness) p.happiness = clamp100(p.happiness + fx.happiness);
+  if (fx.happiness) p.happiness = clamp100(p.happiness + prDampen(p, fx.happiness));
   if (fx.smarts) p.smarts = clamp100(p.smarts + fx.smarts);
   if (fx.charisma) p.charisma = clamp100(p.charisma + fx.charisma);
-  if (fx.reputation) p.reputation = clamp100(p.reputation + fx.reputation);
-  if (fx.popularity) p.popularity = clamp100(p.popularity + fx.popularity);
+  if (fx.reputation) p.reputation = clamp100(p.reputation + prDampen(p, fx.reputation));
+  if (fx.popularity) p.popularity = clamp100(p.popularity + prDampen(p, fx.popularity));
   if (fx.influence) p.influence = clamp100(p.influence + fx.influence);
   if (fx.karma) p.karma = clamp100(p.karma + fx.karma);
   if (fx.notoriety) p.notoriety = clamp100(p.notoriety + fx.notoriety);

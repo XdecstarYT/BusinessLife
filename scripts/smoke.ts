@@ -273,6 +273,59 @@ for (let y = 0; y < 82 && state.player.alive; y++) {
         A.launchInfrastructureProject(state, 'space_program');
       }
     }
+    // --- V7: corporate/economic depth ---
+    if (y === 36 && state.player.companies.length) {
+      const co = state.player.companies[0];
+      A.runRecruitmentDrive(state, co);
+      A.franchiseCompany(state, co);
+      A.launchLoyaltyProgram(state, co);
+      const startupTarget = Object.values(state.companies).find(
+        (c) => c.status === 'active' && !c.playerOwned && !c.isPublic && c.revenue < 3_000_000 && c.countryId === state.player.countryId,
+      );
+      if (startupTarget && state.player.money > 60_000) A.investInStartup(state, startupTarget.id, 50_000);
+    }
+    // --- V7: governance depth ---
+    if (y === 37) {
+      const pub = Object.values(state.companies).find((c) => c.isPublic && c.playerOwned && c.status === 'active');
+      if (pub) {
+        A.proposeBoardResolution(state, pub.id, 'increase_dividend');
+        A.bidOnGovernmentContract(state, pub.id);
+        A.applyForGrant(state, pub.id);
+      }
+      const home = state.countries.find((c) => c.id === state.player.countryId)!;
+      if (home.leaderId === 'player') {
+        const corruptOfficial = Object.values(home.cabinet).map((id) => state.npcs[id]).find((n) => n && n.alive);
+        if (corruptOfficial) A.investigateOfficial(state, corruptOfficial.id);
+      }
+    }
+    // --- V7: science, health & energy depth ---
+    if (y === 38) {
+      const home = state.countries.find((c) => c.id === state.player.countryId)!;
+      if (home.leaderId === 'player' && state.player.money > 100_000) {
+        A.fundUniversityResearch(state, 40_000);
+        A.investInHealthcare(state, 40_000);
+        A.setEnergyMix(state, 60);
+      }
+      const healthCo = state.player.companies.map((id) => state.companies[id]).find((c) => {
+        const ind = INDUSTRIES.find((i) => i.id === c.industryId);
+        return ind && ind.tags.includes('health') && ind.techIntensity >= 0.5;
+      });
+      if (healthCo) A.runClinicalTrial(state, healthCo.id);
+    }
+    // --- V7: media, reputation & crisis depth ---
+    if (y === 39) {
+      const mediaCo = state.player.companies.map((id) => state.companies[id]).find((c) => {
+        const ind = INDUSTRIES.find((i) => i.id === c.industryId);
+        return ind && ind.tags.includes('media');
+      });
+      if (mediaCo) A.runFavorableCoverage(state, mediaCo.id);
+      A.hirePRAgency(state);
+    }
+    // --- V7: diplomacy depth ---
+    if (y === 41) {
+      const home = state.countries.find((c) => c.id === state.player.countryId)!;
+      if (home.leaderId === 'player') A.attendSummit(state);
+    }
     // --- V6: continue as heir when a succession offer appears ---
     if (state.pendingSuccession && state.pendingSuccession.candidates.length) {
       state = continueAsHeir(state, state.pendingSuccession.candidates[0].npcId);
@@ -319,6 +372,9 @@ console.log('  grandchildren:', state.player.grandchildren.length, 'primary heir
 console.log('  dirty money remaining:', state.player.dirtyMoney, 'turf control:', state.player.turfControl, 'witness protection:', state.player.inWitnessProtection);
 console.log('  active challenge:', state.player.challenge?.description ?? 'none');
 console.log('  year recap present:', !!state.yearRecap);
+console.log('  franchise locations:', Object.values(state.companies).reduce((s, c) => s + c.franchiseCount, 0));
+console.log('  loyalty programs running:', Object.values(state.companies).filter((c) => c.loyaltyProgram).length);
+console.log('  think tank funded:', state.player.thinkTankFunded, 'PR agency hired:', state.player.prAgencyHired);
 console.log('  errors:', errors);
 
 // Invariant checks

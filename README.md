@@ -48,6 +48,17 @@ plain JSON you can export and re-import.
   morale, brand and management bonuses, pick a culture (Traditional, Flexible, Remote-First, Startup) with
   real tradeoffs, and hire a CFO/COO/CMO (each liable to be poached by a rival) alongside issuing corporate
   bonds, running stock buybacks, and spinning off a division into its own traded entity.
+- **Boardroom & public-sector deals** — put shareholder resolutions (dividend hikes, executive pay,
+  blocking an activist) to a vote weighted by your stake and the company's standing, bid on government
+  contracts, and apply for R&D grants — all alongside running competitive recruitment drives (harder when
+  the national labor market is tight), taking a VC-style equity stake in a small private startup, franchising
+  a strong brand into royalty-paying locations, and launching a customer loyalty program.
+- **Science, health & energy policy** — as head of state, fund university research and national healthcare
+  directly, and set the national energy grid's renewable share; pharma and biotech companies with enough
+  R&D intensity can run clinical trials for a shot at a new patent.
+- **Media ownership & reputation management** — own a media company to build political influence over time
+  and cash it in for a favorable profile piece, or retain a permanent PR agency that softens the sting of
+  bad press.
 - **The underworld** — join a crime family and climb five ranks through heists and protection rackets,
   contest rival turf for a bigger cut, launder illicit proceeds through a front business, bribe a judge or
   attempt a prison escape if you're caught, pay your way out and go straight, or enter witness protection to
@@ -61,10 +72,13 @@ plain JSON you can export and re-import.
   an immigration quota, read a trend-based economic forecast, hire up to three AI advisors whose advice can
   be wrong, fund an intelligence agency, nominate a Chief Justice (a low-integrity court can strike down laws
   on its own), call a referendum to bypass the legislature, retain a lobbying firm, found or join an
-  international alliance, and choose blockade or invasion when you declare war.
+  international alliance, choose blockade or invasion when you declare war, launch an anti-corruption probe
+  into your own officials, and attend international summits to warm relations with every nation you aren't
+  at war with in one sitting.
 - **Elections with real stakes** — pick manifesto promises at campaign launch and get judged on keeping them
-  at re-election time, hold press conferences and campaign debates, court celebrity endorsements, watch an
-  animated election-night results reveal, and track government approval by city.
+  at re-election time, hold press conferences and campaign debates, court celebrity endorsements, weather
+  ballot-fraud allegations from opponents, watch an animated election-night results reveal, and track
+  government approval by city.
 - **A changing climate** — climate risk rises over time (faster or slower depending on the laws in force),
   triggering natural disasters that hit property values and business confidence, with agriculture bearing
   the brunt and insurers absorbing some of the cost.
@@ -78,7 +92,7 @@ plain JSON you can export and re-import.
   civic medals), so a compact template set produces an enormous variety of situations.
 - **Meta progression** — a Legacy Score computed at game over from your wealth, dynasty, office and
   achievements (with a New Game+ bonus into your next life), a life timeline of every milestone you hit,
-  35+ achievements, a Year in Review recap after every year, random mid-game challenges with cash rewards,
+  37+ achievements, a Year in Review recap after every year, random mid-game challenges with cash rewards,
   a Casual/Standard/Iron Man difficulty choice, and four starting-economy scenarios (Modern, Boom, Recession,
   Crisis) to change the game you're playing from turn one.
 - **Dynamic news** synthesised from what actually happened that year, plus a personal life log.
@@ -142,7 +156,7 @@ only moves when you tell it to, using the three buttons on the Life hub:
   primary heir, track a Dynasty Score, and manage your mentor/rival/friend relationships.
 - **World** — a macro dashboard, every nation's economy and government (including climate risk), diplomacy
   actions, commodities, and any active global event (pandemic, trade war, or tech boom).
-- **News / Stats** — the dynamic wire, your net-worth curve, 35+ achievements, a life timeline, and save
+- **News / Stats** — the dynamic wire, your net-worth curve, 37+ achievements, a life timeline, and save
   tools.
 - **Underworld** — join a crime family and climb its ranks through heists and protection rackets, contest
   rival turf, launder illicit proceeds through a front business, bribe a judge or attempt a prison escape if

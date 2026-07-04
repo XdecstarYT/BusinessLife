@@ -84,6 +84,8 @@ export function createCompany(opts: FoundCompanyOptions, rng: RNG): Company {
     bondDebt: 0,
     bondRate: 0,
     bondYearsLeft: 0,
+    franchiseCount: 0,
+    loyaltyProgram: false,
     status: 'active',
     history: [],
   };
@@ -121,10 +123,11 @@ export function tickCompany(c: Company, ctx: CompanyTickContext): CompanyTickRes
   const cycle = 1 + e.gdpGrowth * (1 + ind.cyclicality * 3);
   const confidence = 0.9 + (e.consumerConfidence / 100) * 0.2;
   const lawMult = lawIndustryModifier(law, ind.tags);
-  // Price elasticity: cheap gains share, premium needs brand+quality.
+  // Price elasticity: cheap gains share, premium needs brand+quality. A loyalty/membership
+  // program makes customers noticeably less price-sensitive at the premium end.
   const priceFit = c.priceLevel <= 1
     ? 1 + (1 - c.priceLevel) * 0.8
-    : 1 - (c.priceLevel - 1) * (1.4 - (c.brand + c.quality) / 250);
+    : 1 - (c.priceLevel - 1) * (1.4 - (c.brand + c.quality) / 250) * (c.loyaltyProgram ? 0.75 : 1);
   // C-suite executives (hired via hireExecutive()) each lift a distinct lever.
   const cfo = c.executives.find((x) => x.role === 'cfo');
   const coo = c.executives.find((x) => x.role === 'coo');
@@ -188,10 +191,13 @@ export function tickCompany(c: Company, ctx: CompanyTickContext): CompanyTickRes
   c.revenue = Math.max(1000, c.revenue * cappedGrowth);
 
   // --- Costs ----------------------------------------------------------------
-  const avgWage = Math.max(e.minimumWage, 42_000 * (e.gdp / (country.population / 1e6) / 40_000)) * c.salaryLevel;
+  // A tight labor market bids up wages and slows hiring (everyone's competing for the same talent).
+  const tightnessWageMult = 1 + Math.max(0, country.laborMarketTightness - 50) * 0.004;
+  const avgWage = Math.max(e.minimumWage, 42_000 * (e.gdp / (country.population / 1e6) / 40_000)) * c.salaryLevel * tightnessWageMult;
   const targetEmployees = Math.max(1, Math.round((c.revenue / 95_000) * (0.4 + ind.laborIntensity) * (1 - c.automation / 100 * 0.6)));
-  // Hiring/firing friction
-  c.employees = Math.round(c.employees + (targetEmployees - c.employees) * 0.5);
+  // Hiring/firing friction; tighter labor markets slow how fast headcount can catch up.
+  const hiringSpeed = clamp(0.5 - Math.max(0, country.laborMarketTightness - 50) * 0.004, 0.2, 0.5);
+  c.employees = Math.round(c.employees + (targetEmployees - c.employees) * hiringSpeed);
   const laborCost = c.employees * avgWage;
   const inputCost = c.revenue * (1 - ind.baseMargin) * 0.55 * commodityMult;
   const marketingCost = c.revenue * c.marketingPct;
@@ -225,7 +231,9 @@ export function tickCompany(c: Company, ctx: CompanyTickContext): CompanyTickRes
   c.cash += c.profit;
 
   // --- Soft stats -------------------------------------------------------------
-  const rdPower = c.rdPct * (1 + ind.techIntensity) * cultureRdBoost;
+  // National research level (built via fundUniversityResearch()) amplifies R&D for tech-heavy firms.
+  const researchBoost = 1 + (country.researchLevel / 100) * ind.techIntensity * 0.4;
+  const rdPower = c.rdPct * (1 + ind.techIntensity) * cultureRdBoost * researchBoost;
   c.quality = clamp100(c.quality + rdPower * 90 - 2 + rng.range(-2, 2));
   c.brand = clamp100(c.brand + c.marketingPct * 40 - 1.5 + (c.customerSatisfaction - 50) * 0.05 + c.hqTier * 0.4 + c.trademarks * 0.3 + rng.range(-1.5, 1.5));
   c.customerSatisfaction = clamp100(
@@ -236,8 +244,10 @@ export function tickCompany(c: Company, ctx: CompanyTickContext): CompanyTickRes
   c.managerQuality = clamp100(c.managerQuality + rng.range(-2, c.culture === 'traditional' ? 5 : 3));
   c.esg = clamp100(c.esg + rng.range(-2, 2));
 
-  // Unionization pressure when morale is low in labor-heavy industries.
-  if (!c.unionized && ind.laborIntensity > 0.5 && c.morale < 40 && rng.chance(0.2)) {
+  // Unionization pressure when morale is low in labor-heavy industries; a tight labor
+  // market emboldens workers to organize (they have leverage — jobs are plentiful).
+  const tightnessStrikeBonus = Math.max(0, country.laborMarketTightness - 50) * 0.002;
+  if (!c.unionized && ind.laborIntensity > 0.5 && c.morale < 40 && rng.chance(0.2 + tightnessStrikeBonus)) {
     c.unionized = true;
     headline = `Workers at ${c.name} vote to unionize after morale slump`;
   }
@@ -255,6 +265,17 @@ export function tickCompany(c: Company, ctx: CompanyTickContext): CompanyTickRes
     if (rivals.length) rng.pick(rivals).brand = clamp100(rng.pick(rivals).brand - rng.range(1, 4));
   }
   if (c.patents > 0) c.cash += c.patents * c.revenue * 0.004;
+  // Franchised locations pay a small ongoing royalty back to the parent brand.
+  if (c.franchiseCount > 0) c.cash += c.franchiseCount * c.revenue * 0.006;
+  if (c.loyaltyProgram) c.customerSatisfaction = clamp100(c.customerSatisfaction + 3);
+
+  // Media & influence companies slowly build political/cultural sway with reach and reputation.
+  if (ind.tags.includes('media')) {
+    const growth = (ind.tags.includes('influence') ? 1.5 : 0.5) * (c.brand / 100);
+    c.politicalInfluence = clamp100(c.politicalInfluence + growth + rng.range(-1, 1));
+  } else if (c.politicalInfluence > 0) {
+    c.politicalInfluence = clamp100(c.politicalInfluence - 1);
+  }
 
   // Random lawsuits and breaches in regulated/risky industries; cyber defense mitigates both.
   const riskShield = 1 - (c.cyberDefense / 100) * 0.6;
