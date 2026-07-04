@@ -1,7 +1,7 @@
 /** Stock market: browse listed companies, trade, short, view portfolio. */
 import { useMemo, useState } from 'react';
 import { useGame } from '../../store/gameStore';
-import { buyShares, coverShort, marketCap, peRatio, sellShares, shortShares, portfolioValue } from '../../sim/market';
+import { buyOnMargin, buyShares, cancelLimitOrder, coverShort, marketCap, peRatio, placeLimitOrder, sellShares, shortShares, portfolioValue, toggleDrip } from '../../sim/market';
 import { Badge, Button, Card, LineChart, Modal, Pill, PillRow, SectionHeader } from '../components';
 import { money, moneyFull, num, signedPct } from '../format';
 import { INDUSTRY_BY_ID } from '../../data/industries';
@@ -145,19 +145,35 @@ function StockRow({ c, onClick }: { c: Company; onClick: () => void }) {
 }
 
 function PortfolioView({ onSelect }: { onSelect: (id: string) => void }) {
-  const { state } = useGame();
+  const { state, trade } = useGame();
   if (!state) return null;
   const p = state.player;
-  if (p.portfolio.length === 0) {
-    return <Card className="p-6 mt-4 text-center text-slate-500 dark:text-slate-400">No holdings yet. Buy shares from the Market tab.</Card>;
-  }
   const value = portfolioValue(state);
+  const dripToggle = (
+    <Card className="p-4 mb-3 flex items-center justify-between">
+      <div>
+        <div className="font-semibold text-sm">Dividend Reinvestment (DRIP)</div>
+        <div className="text-xs text-slate-500 dark:text-slate-400">Auto-buy more shares with dividends instead of taking cash.</div>
+      </div>
+      <Button size="sm" variant={p.drip ? 'primary' : 'soft'} onClick={() => trade(toggleDrip)}>{p.drip ? 'On' : 'Off'}</Button>
+    </Card>
+  );
+  if (p.portfolio.length === 0) {
+    return (
+      <div className="mt-4">
+        {dripToggle}
+        <Card className="p-6 text-center text-slate-500 dark:text-slate-400">No holdings yet. Buy shares from the Market tab.</Card>
+      </div>
+    );
+  }
   return (
     <div className="mt-4">
       <Card className="p-4 mb-3 text-center">
         <div className="text-xs text-slate-400">Portfolio Value</div>
         <div className="text-2xl font-black text-emerald-500">{money(value)}</div>
+        {p.marginDebt > 0 && <div className="text-xs text-rose-500 font-semibold mt-1">Margin debt: {money(p.marginDebt)}</div>}
       </Card>
+      {dripToggle}
       <div className="space-y-2">
         {p.portfolio.map((h) => {
           const c = state.companies[h.companyId];
@@ -193,6 +209,8 @@ function PortfolioView({ onSelect }: { onSelect: (id: string) => void }) {
 function TradeModal({ companyId, onClose }: { companyId: string; onClose: () => void }) {
   const { state, trade } = useGame();
   const [spend, setSpend] = useState(0);
+  const [limitPrice, setLimitPrice] = useState(0);
+  const [limitAmount, setLimitAmount] = useState(0);
   if (!state) return null;
   const c = state.companies[companyId];
   if (!c) return null;
@@ -201,6 +219,7 @@ function TradeModal({ companyId, onClose }: { companyId: string; onClose: () => 
   const pe = peRatio(c);
   const holding = p.portfolio.find((h) => h.companyId === companyId);
   const gain = yearGain(c);
+  const myOrders = p.limitOrders.filter((o) => o.companyId === companyId);
 
   return (
     <Modal open onClose={onClose} title={c.name}>
@@ -225,9 +244,48 @@ function TradeModal({ companyId, onClose }: { companyId: string; onClose: () => 
 
       <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Amount: {moneyFull(spend)}</label>
       <input type="range" min={0} max={Math.round(p.money)} value={spend} onChange={(e) => setSpend(Number(e.target.value))} className="w-full mt-1 mb-2" />
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         <Button size="sm" onClick={() => trade(buyShares, companyId, spend)}>Buy</Button>
         <Button size="sm" variant="soft" onClick={() => trade(shortShares, companyId, spend)}>Short</Button>
+        <Button size="sm" variant="soft" onClick={() => trade(buyOnMargin, companyId, spend)}>Margin Buy</Button>
+      </div>
+
+      <div className="mt-4">
+        <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Place a limit order</div>
+        <div className="grid grid-cols-2 gap-2 mb-2">
+          <input
+            type="number"
+            placeholder="Target price"
+            value={limitPrice || ''}
+            onChange={(e) => setLimitPrice(Number(e.target.value))}
+            className="rounded-xl px-3 py-2 text-sm bg-slate-100 dark:bg-ink-800 border border-transparent focus:border-brand-400 outline-none"
+          />
+          <input
+            type="number"
+            placeholder="Amount ($)"
+            value={limitAmount || ''}
+            onChange={(e) => setLimitAmount(Number(e.target.value))}
+            className="rounded-xl px-3 py-2 text-sm bg-slate-100 dark:bg-ink-800 border border-transparent focus:border-brand-400 outline-none"
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <Button size="sm" variant="soft" onClick={() => trade(placeLimitOrder, companyId, 'buy', limitPrice, limitAmount)}>
+            Buy if ≤ price
+          </Button>
+          <Button size="sm" variant="soft" onClick={() => trade(placeLimitOrder, companyId, 'sell', limitPrice, limitAmount)}>
+            Sell if ≥ price
+          </Button>
+        </div>
+        {myOrders.length > 0 && (
+          <div className="mt-2 space-y-1">
+            {myOrders.map((o) => (
+              <div key={o.id} className="flex items-center justify-between text-xs bg-slate-100 dark:bg-ink-800 rounded-lg px-2 py-1.5">
+                <span>{o.kind === 'buy' ? 'Buy' : 'Sell'} @ {money(o.targetPrice)} · {money(o.amount)}</span>
+                <button className="text-rose-500 font-semibold" onClick={() => trade(cancelLimitOrder, o.id)}>Cancel</button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {holding && holding.shares > 0 && (

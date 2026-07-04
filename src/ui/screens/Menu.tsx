@@ -4,7 +4,7 @@ import { useGame } from '../../store/gameStore';
 import { AUTOSAVE_ID, type SaveSlotMeta } from '../../store/persistence';
 import { Button, Card, Field, Pill, TextInput } from '../components';
 import { money } from '../format';
-import type { Gender } from '../../sim/types';
+import type { Difficulty, Gender } from '../../sim/types';
 import type { Scenario } from '../../sim/world';
 import { IconBusiness, IconSpark, IconTrophy } from '../icons';
 
@@ -15,6 +15,12 @@ const SCENARIOS: { id: Scenario; label: string; blurb: string }[] = [
   { id: 'crisis', label: 'Crisis Era', blurb: 'Start amid a full-blown crisis: contracting GDP, mass unemployment, a market crash.' },
 ];
 
+const DIFFICULTIES: { id: Difficulty; label: string; blurb: string }[] = [
+  { id: 'casual', label: 'Casual', blurb: 'Softer crises and lower mortality — a relaxed playthrough.' },
+  { id: 'standard', label: 'Standard', blurb: 'The default balance of risk and reward.' },
+  { id: 'ironman', label: 'Iron Man', blurb: 'Harsher crises, higher mortality, and no continuing as an heir when you die.' },
+];
+
 export function Menu() {
   const { saves, refreshSaves, newGame, load, remove, importFrom, darkMode, toggleDark } = useGame();
   const [creating, setCreating] = useState(false);
@@ -22,6 +28,8 @@ export function Menu() {
   const [gender, setGender] = useState<Gender>('male');
   const [seed, setSeed] = useState('');
   const [scenario, setScenario] = useState<Scenario>('modern');
+  const [difficulty, setDifficulty] = useState<Difficulty>('standard');
+  const [useLegacyBonus, setUseLegacyBonus] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -30,9 +38,18 @@ export function Menu() {
 
   const autosave = saves.find((s) => s.id === AUTOSAVE_ID);
   const manualSaves = saves.filter((s) => s.id !== AUTOSAVE_ID);
+  const bestLegacyScore = Math.max(0, ...saves.map((s) => s.legacyScore ?? 0));
+  const legacyBonusAmount = bestLegacyScore * 10_000;
 
   const start = () => {
-    newGame({ playerName: name.trim() || 'Alex Morgan', gender, seedText: seed.trim() || `${Date.now()}`, scenario });
+    newGame({
+      playerName: name.trim() || 'Alex Morgan',
+      gender,
+      seedText: seed.trim() || `${Date.now()}`,
+      scenario,
+      difficulty,
+      legacyBonus: useLegacyBonus ? legacyBonusAmount : 0,
+    });
   };
 
   const onImport = (file: File) => {
@@ -151,6 +168,32 @@ export function Menu() {
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">{SCENARIOS.find((s) => s.id === scenario)?.blurb}</p>
               </Field>
+              <Field label="Difficulty">
+                <div className="grid grid-cols-3 gap-2">
+                  {DIFFICULTIES.map((d) => (
+                    <button
+                      key={d.id}
+                      onClick={() => setDifficulty(d.id)}
+                      className={`text-left p-2.5 rounded-xl border-2 ${
+                        difficulty === d.id
+                          ? 'border-brand-500 bg-brand-500/10'
+                          : 'border-slate-200 dark:border-ink-700 bg-slate-50 dark:bg-ink-800'
+                      }`}
+                    >
+                      <div className="font-bold text-sm">{d.label}</div>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">{DIFFICULTIES.find((d) => d.id === difficulty)?.blurb}</p>
+              </Field>
+              {bestLegacyScore > 0 && (
+                <Field label="New Game+">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={useLegacyBonus} onChange={(e) => setUseLegacyBonus(e.target.checked)} />
+                    Start with a {money(legacyBonusAmount)} bonus from your best Legacy Score ({bestLegacyScore})
+                  </label>
+                </Field>
+              )}
             </div>
             <div className="flex gap-3 mt-6">
               <Button variant="ghost" onClick={() => setCreating(false)}>

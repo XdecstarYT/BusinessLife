@@ -6,24 +6,34 @@ import { money, num, pct, signedPct } from '../format';
 import { CABINET_PORTFOLIOS, type AdvisorSpecialty, type CabinetPortfolio, type Country, type InfrastructureKind, type WorldEvent } from '../../sim/types';
 import {
   advisorRecommendation,
+  cabinetCandidates,
+  callReferendum,
+  cancelLobbyingFirm,
   counterEspionage,
   declareWar,
   dismissAdvisor,
+  foundAlliance,
   fundIntelligenceAgency,
   gatherIntelligence,
   hireAdvisor,
+  hireLobbyingFirm,
   imposeSanctions,
+  joinAlliance,
   launchInfrastructureProject,
+  leaveAlliance,
   liftSanctions,
+  nominateChiefJustice,
   sendForeignAid,
   setBudgetAllocation,
+  setImmigrationQuota,
   setTaxRate,
   signPeaceTreaty,
   signTradeAgreement,
 } from '../../sim/actions';
 import { economicForecast } from '../../sim/economy';
+import { LAW_BY_ID } from '../../data/laws';
 
-const INFRA_KINDS: InfrastructureKind[] = ['roads', 'rail', 'airport', 'power', 'internet'];
+const INFRA_KINDS: InfrastructureKind[] = ['roads', 'rail', 'airport', 'power', 'internet', 'space_program'];
 const ADVISOR_SPECIALTIES: AdvisorSpecialty[] = ['economy', 'military', 'diplomacy'];
 
 const WORLD_EVENT_INFO: Record<WorldEvent['type'], { emoji: string; label: string; desc: string; tone: 'bad' | 'good' }> = {
@@ -146,6 +156,7 @@ function CountryModal({ country, onClose }: { country: Country; onClose: () => v
         <StatBar label="Healthcare" value={country.healthcare} />
         <StatBar label="Education" value={country.education} />
         <StatBar label="Infrastructure" value={country.infrastructure} />
+        <StatBar label="Climate risk" value={country.climateRisk} />
       </div>
       {country.totalSeats > 0 && (
         <>
@@ -181,7 +192,10 @@ function CountryModal({ country, onClose }: { country: Country; onClose: () => v
               {atWar ? (
                 <Button size="sm" onClick={() => run(signPeaceTreaty, country.id)} className="col-span-2">🕊️ Sign Peace Treaty</Button>
               ) : (
-                <Button size="sm" variant="danger" onClick={() => run(declareWar, country.id)}>⚔️ Declare War</Button>
+                <>
+                  <Button size="sm" variant="danger" onClick={() => run(declareWar, country.id, 'invasion')}>⚔️ Invade</Button>
+                  <Button size="sm" variant="danger" onClick={() => run(declareWar, country.id, 'blockade')}>🚢 Blockade</Button>
+                </>
               )}
               {sanctioned ? (
                 <Button size="sm" variant="soft" onClick={() => run(liftSanctions, country.id)}>Lift Sanctions</Button>
@@ -191,6 +205,11 @@ function CountryModal({ country, onClose }: { country: Country; onClose: () => v
               <Button size="sm" variant="soft" onClick={() => run(sendForeignAid, country.id)}>🤲 Send Aid (10 PC)</Button>
               <Button size="sm" variant="soft" onClick={() => run(signTradeAgreement, country.id)}>🤝 Trade Deal (10 PC)</Button>
               <Button size="sm" variant="soft" className="col-span-2" onClick={() => run(gatherIntelligence, country.id)}>🕵️ Gather Intelligence</Button>
+              {country.allianceId && !home.allianceId && (
+                <Button size="sm" variant="soft" className="col-span-2" onClick={() => run(joinAlliance, country.allianceId!)}>
+                  🤝 Join {state.alliances.find((a) => a.id === country.allianceId)?.name ?? 'their alliance'}
+                </Button>
+              )}
             </div>
           )}
         </div>
@@ -213,9 +232,17 @@ function CountryModal({ country, onClose }: { country: Country; onClose: () => v
 function GovernmentTools({ country }: { country: Country }) {
   const { state, run } = useGame();
   const [taxDraft, setTaxDraft] = useState<Record<string, number>>({});
+  const [immigrationDraft, setImmigrationDraft] = useState<number | null>(null);
+  const [nominating, setNominating] = useState(false);
+  const [referendumPicker, setReferendumPicker] = useState(false);
+  const [allianceNamer, setAllianceNamer] = useState(false);
+  const [allianceName, setAllianceName] = useState('');
   if (!state) return null;
   const forecast = economicForecast(country.economy);
   const p = state.player;
+  const chiefJustice = country.chiefJusticeId ? state.npcs[country.chiefJusticeId] : null;
+  const alliance = country.allianceId ? state.alliances.find((a) => a.id === country.allianceId) : null;
+  const referendumLaws = Object.values(LAW_BY_ID).filter((l) => !country.lawsInForce.includes(l.id));
 
   return (
     <div className="mt-5">
@@ -275,6 +302,25 @@ function GovernmentTools({ country }: { country: Country }) {
             </div>
           );
         })}
+      </div>
+
+      <div className="font-bold mb-2 text-sm">Immigration Policy</div>
+      <div className="bg-slate-100 dark:bg-ink-800 rounded-xl px-3 py-2 mb-4">
+        <div className="flex justify-between text-xs mb-1">
+          <span className="font-semibold">Quota (openness)</span>
+          <span className="font-bold text-brand-500">{Math.round(immigrationDraft ?? country.immigrationQuota)}%</span>
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          value={immigrationDraft ?? country.immigrationQuota}
+          onChange={(e) => setImmigrationDraft(Number(e.target.value))}
+          onMouseUp={() => run(setImmigrationQuota, immigrationDraft ?? country.immigrationQuota)}
+          onTouchEnd={() => run(setImmigrationQuota, immigrationDraft ?? country.immigrationQuota)}
+          className="w-full"
+        />
+        <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Higher openness grows the population and labor supply faster, and softens minimum-wage growth.</div>
       </div>
 
       <div className="font-bold mb-2 text-sm">Economic Forecast (next year)</div>
@@ -341,13 +387,108 @@ function GovernmentTools({ country }: { country: Country }) {
       </div>
 
       <div className="font-bold mb-2 text-sm">Intelligence Agency</div>
-      <Card className="p-3">
+      <Card className="p-3 mb-4">
         <StatBar label="Capability" value={country.intelCapability} />
         <div className="grid grid-cols-2 gap-2 mt-3">
           <Button size="sm" variant="soft" onClick={() => run(fundIntelligenceAgency, 50_000)}>Fund ($50k)</Button>
           <Button size="sm" variant="soft" onClick={() => run(counterEspionage)}>Counter-Espionage ($20k)</Button>
         </div>
       </Card>
+
+      <div className="font-bold mb-2 text-sm">Judiciary</div>
+      <Card className="p-3 mb-4">
+        <StatBar label="Judicial integrity" value={country.judicialIntegrity} />
+        <div className="text-xs text-slate-500 dark:text-slate-400 my-2">
+          {chiefJustice ? `Chief Justice: ${chiefJustice.name}` : 'No Chief Justice confirmed.'} Low integrity courts occasionally strike down laws arbitrarily.
+        </div>
+        <Button size="sm" variant="soft" className="w-full" onClick={() => setNominating(true)}>Nominate Chief Justice</Button>
+      </Card>
+
+      <div className="font-bold mb-2 text-sm">Referendum</div>
+      <Card className="p-3 mb-4">
+        <div className="text-xs text-slate-500 dark:text-slate-400 mb-2">
+          Put a law directly to the public instead of the legislature (15 PC). Odds blend approval with legislative support.
+        </div>
+        <Button size="sm" variant="soft" className="w-full" onClick={() => setReferendumPicker(true)}>Call Referendum</Button>
+      </Card>
+
+      <div className="font-bold mb-2 text-sm">Lobbying Firm</div>
+      <Card className="p-3 mb-4 flex items-center justify-between">
+        <div className="text-xs text-slate-500 dark:text-slate-400 pr-2">$75k to retain, $25k/yr upkeep. Permanently boosts law-pass odds.</div>
+        {p.lobbyingFirmHired ? (
+          <Button size="sm" variant="ghost" onClick={() => run(cancelLobbyingFirm)}>Cancel</Button>
+        ) : (
+          <Button size="sm" variant="soft" onClick={() => run(hireLobbyingFirm)}>Retain</Button>
+        )}
+      </Card>
+
+      <div className="font-bold mb-2 text-sm">Alliance</div>
+      <Card className="p-3">
+        {alliance ? (
+          <div className="flex items-center justify-between">
+            <div className="text-xs">
+              <div className="font-bold">{alliance.name}</div>
+              <div className="text-slate-500 dark:text-slate-400">{alliance.memberCountryIds.length} member nation(s)</div>
+            </div>
+            <Button size="sm" variant="danger" onClick={() => run(leaveAlliance)}>Leave</Button>
+          </div>
+        ) : (
+          <Button size="sm" variant="soft" className="w-full" onClick={() => setAllianceNamer(true)}>Found an Alliance</Button>
+        )}
+      </Card>
+
+      {nominating && (
+        <Modal open onClose={() => setNominating(false)} title="Nominate Chief Justice">
+          <div className="space-y-2 max-h-[50vh] overflow-y-auto">
+            {cabinetCandidates(state).length === 0 && <p className="text-center text-slate-400 py-6">No eligible nominees right now.</p>}
+            {cabinetCandidates(state).map((n) => (
+              <button
+                key={n.id}
+                onClick={() => { run(nominateChiefJustice, n.id); setNominating(false); }}
+                className="w-full text-left p-3 rounded-2xl bg-slate-100 dark:bg-ink-800 hover:bg-slate-200 dark:hover:bg-ink-700"
+              >
+                <div className="font-semibold">{n.name}</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Integrity {n.integrity}</div>
+              </button>
+            ))}
+          </div>
+        </Modal>
+      )}
+
+      {referendumPicker && (
+        <Modal open onClose={() => setReferendumPicker(false)} title="Call a Referendum">
+          <div className="space-y-2 max-h-[50vh] overflow-y-auto">
+            {referendumLaws.map((l) => (
+              <button
+                key={l.id}
+                onClick={() => { run(callReferendum, l.id); setReferendumPicker(false); }}
+                className="w-full text-left p-3 rounded-2xl bg-slate-100 dark:bg-ink-800 hover:bg-slate-200 dark:hover:bg-ink-700"
+              >
+                <div className="font-semibold">{l.name}</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">{l.description}</div>
+              </button>
+            ))}
+          </div>
+        </Modal>
+      )}
+
+      {allianceNamer && (
+        <Modal open onClose={() => setAllianceNamer(false)} title="Found an Alliance">
+          <input
+            value={allianceName}
+            onChange={(e) => setAllianceName(e.target.value)}
+            placeholder="Alliance name"
+            maxLength={40}
+            className="w-full rounded-xl px-3 py-2 text-sm bg-slate-100 dark:bg-ink-800 border border-transparent focus:border-brand-400 outline-none mb-3"
+          />
+          <Button
+            className="w-full"
+            onClick={() => { run(foundAlliance, allianceName); setAllianceNamer(false); setAllianceName(''); }}
+          >
+            Found Alliance
+          </Button>
+        </Modal>
+      )}
     </div>
   );
 }

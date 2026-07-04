@@ -19,6 +19,7 @@ export interface SaveSlotMeta {
   netWorth: number;
   updatedAt: number;
   autosave: boolean;
+  legacyScore: number | null; // set once the game has ended, for New Game+ bonuses
 }
 
 interface SaveRecord {
@@ -82,6 +83,7 @@ export async function saveGame(id: string, state: GameState, autosave = false): 
     netWorth: state.netWorthHistory[state.netWorthHistory.length - 1]?.value ?? state.player.money,
     updatedAt: Date.now(),
     autosave,
+    legacyScore: state.gameOver?.legacyScore ?? null,
   };
   const rec: SaveRecord = { id, meta, state: structuredClone(state) };
   const db = await openDB();

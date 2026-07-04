@@ -1,14 +1,22 @@
 /* Headless simulation smoke test: generate a world, exercise actions, and
    advance ~80 years, asserting invariants and catching exceptions. */
 import { generateWorld } from '../src/sim/world';
-import { advanceDay, advanceWeek, advanceYear, netWorth } from '../src/sim/engine';
+import { advanceDay, advanceWeek, advanceYear, netWorth, continueAsHeir } from '../src/sim/engine';
 import { resolveChoice } from '../src/sim/events';
 import { RNG } from '../src/sim/rng';
 import * as A from '../src/sim/actions';
-import { buyShares, marketCap } from '../src/sim/market';
-import { datingPool, propose, haveChild, nameSuccessor, namePoliticalHeir, dynastyScore } from '../src/sim/family';
+import { buyShares, marketCap, buyOnMargin, placeLimitOrder, cancelLimitOrder, toggleDrip } from '../src/sim/market';
+import { datingPool, propose, haveChild, nameSuccessor, namePoliticalHeir, namePrimaryHeir, adoptChild, dynastyScore } from '../src/sim/family';
 import * as F from '../src/sim/family';
 import { INDUSTRIES } from '../src/data/industries';
+import { LAW_BY_ID } from '../src/data/laws';
+
+// --- V6: scenario presets + difficulty + legacy bonus sanity check (no full sim) ---
+{
+  const boomWorld = generateWorld({ playerName: 'Boom Test', gender: 'female', seedText: 'boom-check', scenario: 'boom', difficulty: 'ironman', legacyBonus: 50_000 });
+  const home = boomWorld.countries.find((c) => c.isPlayerHome)!;
+  console.log('Scenario/difficulty check: regime =', home.economy.regime, '· difficulty =', boomWorld.difficulty, '· starting money >= 50000:', boomWorld.player.money >= 50_000);
+}
 
 /** Resolve any pending yearly choice events by auto-picking the first choice. */
 function resolvePending() {
@@ -210,6 +218,65 @@ for (let y = 0; y < 82 && state.player.alive; y++) {
         if (other) A.gatherIntelligence(state, other.id);
       }
     }
+    // --- V6: corporate structure depth ---
+    if (y === 28 && state.player.companies.length) {
+      const co = state.player.companies[0];
+      A.hireExecutive(state, co, 'cfo');
+      A.hireExecutive(state, co, 'coo');
+      A.hireExecutive(state, co, 'cmo');
+      A.issueCorporateBond(state, co, 100_000, 5);
+      A.spinOffCompany(state, co);
+      const pub = Object.values(state.companies).find((c) => c.isPublic && c.playerOwned && c.status === 'active');
+      if (pub) A.buybackShares(state, pub.id, Math.min(pub.cash, 20_000));
+    }
+    // --- V6: markets depth ---
+    if (y === 29) {
+      const pub = Object.values(state.companies).find((c) => c.isPublic && c.status === 'active');
+      if (pub) {
+        buyOnMargin(state, pub.id, 20_000);
+        placeLimitOrder(state, pub.id, 'buy', pub.sharePrice * 0.9, 5_000);
+        toggleDrip(state);
+        if (state.player.limitOrders.length) cancelLimitOrder(state, state.player.limitOrders[0].id);
+      }
+    }
+    // --- V6: government depth ---
+    if (y === 31) {
+      const home = state.countries.find((c) => c.id === state.player.countryId)!;
+      if (home.leaderId === 'player') {
+        const cands = A.cabinetCandidates(state);
+        if (cands.length) A.nominateChiefJustice(state, cands[0].id);
+        const lawId = Object.keys(LAW_BY_ID).find((id) => !home.lawsInForce.includes(id));
+        if (lawId) A.callReferendum(state, lawId);
+        A.hireLobbyingFirm(state);
+        A.foundAlliance(state, 'Test Pact');
+        const other = state.countries.find((c) => c.id !== home.id);
+        if (other && !home.atWarWith.includes(other.id)) A.declareWar(state, other.id, 'blockade');
+      }
+    }
+    // --- V6: crime depth ---
+    if (y === 32) {
+      if (state.player.crimeFamilyId) A.contestTerritory(state);
+      if (state.player.dirtyMoney > 0 && state.player.companies.length) A.launderMoney(state, state.player.companies[0], state.player.dirtyMoney);
+      if (!state.player.crimeFamilyId && state.player.criminalRecord > 0) A.enterWitnessProtection(state);
+    }
+    // --- V6: family depth ---
+    if (y === 33) {
+      adoptChild(state);
+      const heirCandidate = state.player.spouseId ?? state.player.children[0] ?? state.player.grandchildren[0];
+      if (heirCandidate) namePrimaryHeir(state, heirCandidate);
+    }
+    // --- V6: world depth ---
+    if (y === 34) {
+      const home = state.countries.find((c) => c.id === state.player.countryId)!;
+      if (home.leaderId === 'player') {
+        A.setImmigrationQuota(state, 75);
+        A.launchInfrastructureProject(state, 'space_program');
+      }
+    }
+    // --- V6: continue as heir when a succession offer appears ---
+    if (state.pendingSuccession && state.pendingSuccession.candidates.length) {
+      state = continueAsHeir(state, state.pendingSuccession.candidates[0].npcId);
+    }
   } catch (e) {
     errors++;
     console.error(`ERROR in year ${state.year}:`, (e as Error).message);
@@ -243,6 +310,15 @@ console.log('  political heir:', state.player.politicalHeirId ? state.npcs[state
 console.log('  advisors hired:', state.player.advisors.length);
 console.log('  trademarks filed:', Object.values(state.companies).reduce((s, c) => s + c.trademarks, 0));
 console.log('  companies acquired via NPC mergers:', Object.values(state.companies).filter((c) => c.status === 'acquired').length);
+console.log('  executives hired (total across companies):', Object.values(state.companies).reduce((s, c) => s + c.executives.length, 0));
+console.log('  companies with outstanding bonds:', Object.values(state.companies).filter((c) => c.bondDebt > 0).length);
+console.log('  margin debt:', state.player.marginDebt, 'drip:', state.player.drip, 'limit orders:', state.player.limitOrders.length);
+console.log('  alliances founded:', state.alliances.length);
+console.log('  war strategies recorded:', Object.keys(state.countries.find((c) => c.isPlayerHome)?.warStrategies ?? {}).length);
+console.log('  grandchildren:', state.player.grandchildren.length, 'primary heir:', state.player.primaryHeirId ? 'set' : 'none');
+console.log('  dirty money remaining:', state.player.dirtyMoney, 'turf control:', state.player.turfControl, 'witness protection:', state.player.inWitnessProtection);
+console.log('  active challenge:', state.player.challenge?.description ?? 'none');
+console.log('  year recap present:', !!state.yearRecap);
 console.log('  errors:', errors);
 
 // Invariant checks

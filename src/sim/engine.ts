@@ -4,12 +4,12 @@
  * player's own life (job, study, office, campaign, assets) → events → news.
  * Pure function of (state, rng): UI-free and worker-friendly.
  */
-import type { GameState, LifeLogEntry } from './types';
+import type { GameState, LifeLogEntry, Player } from './types';
 import { clamp, clamp100 } from './types';
 import { RNG } from './rng';
 import { tickCommodities, tickEconomy } from './economy';
 import { npcManageCompany, tickCompany, tickMergers, companyValuation } from './business';
-import { tickStock, portfolioValue } from './market';
+import { tickStock, portfolioValue, checkLimitOrders, tickMargin } from './market';
 import { campaignWinChance, OFFICE_SPEC_BY_KIND, promiseFulfillment, promiseMetricValue, tickNPCs, tickPolitics } from './politics';
 import { fireEvents } from './events';
 import { generateNews } from './news';
@@ -26,7 +26,7 @@ export function log(state: GameState, text: string, kind: LifeLogEntry['kind'] =
 
 export function netWorth(state: GameState): number {
   const p = state.player;
-  let total = p.money + portfolioValue(state);
+  let total = p.money + portfolioValue(state) - p.marginDebt + p.dirtyMoney;
   for (const prop of p.properties) total += prop.value - prop.mortgage;
   for (const loan of p.loans) total -= loan.principal;
   for (const id of p.companies) {
@@ -35,6 +35,40 @@ export function netWorth(state: GameState): number {
     total += (c.isPublic ? c.sharePrice * c.sharesOutstanding : companyValuation(c)) * c.playerSharePct;
   }
   return Math.round(total);
+}
+
+/** Assigns and resolves a random mid-game challenge: a stretch goal with a deadline and a cash reward. */
+function tickChallenge(state: GameState, rng: RNG): void {
+  const p = state.player;
+  if (!p.challenge) {
+    if (!rng.chance(0.12)) return;
+    const kind = rng.pick(['net_worth', 'reputation', 'companies'] as const);
+    if (kind === 'net_worth') {
+      const target = Math.round(Math.max(50_000, netWorth(state)) * rng.range(1.4, 2));
+      p.challenge = { id: `chal_${state.year}`, description: `Grow your net worth to $${target.toLocaleString()}`, kind, targetValue: target, deadlineYear: state.year + 5, rewardMoney: target * 0.05 };
+    } else if (kind === 'reputation') {
+      const target = Math.min(100, Math.round(p.reputation + rng.range(15, 30)));
+      p.challenge = { id: `chal_${state.year}`, description: `Raise your reputation to ${target}`, kind, targetValue: target, deadlineYear: state.year + 4, rewardMoney: 75_000 };
+    } else {
+      const target = p.companies.length + rng.int(1, 2);
+      p.challenge = { id: `chal_${state.year}`, description: `Own ${target} active companies`, kind, targetValue: target, deadlineYear: state.year + 6, rewardMoney: 100_000 };
+    }
+    log(state, `🎯 New challenge: ${p.challenge.description} by ${p.challenge.deadlineYear}.`, 'info');
+    return;
+  }
+  const c = p.challenge;
+  const current = c.kind === 'net_worth' ? netWorth(state) : c.kind === 'reputation' ? p.reputation : p.companies.filter((id) => state.companies[id]?.status === 'active').length;
+  if (current >= c.targetValue) {
+    p.money += c.rewardMoney;
+    p.happiness = clamp100(p.happiness + 8);
+    if (!state.achievements.includes('challenge_crusher')) state.achievements.push('challenge_crusher');
+    log(state, `🏅 Challenge complete: ${c.description}! Reward: $${Math.round(c.rewardMoney).toLocaleString()}.`, 'good');
+    p.challenge = null;
+  } else if (state.year >= c.deadlineYear) {
+    log(state, `⌛ Challenge expired: ${c.description}.`, 'bad');
+    p.happiness = clamp100(p.happiness - 3);
+    p.challenge = null;
+  }
 }
 
 function tickPlayerLife(state: GameState, rng: RNG): void {
@@ -238,6 +272,9 @@ function tickPlayerLife(state: GameState, rng: RNG): void {
   // Life insurance premium (payout is handled in family.ts's distributeEstate on death).
   if (p.lifeInsurance) p.money -= p.lifeInsurance.monthlyPremium * 12;
 
+  // Lobbying firm retainer: ongoing upkeep for a permanent law-pass sway bonus.
+  if (p.lobbyingFirmHired) p.money -= 25_000;
+
   for (const prop of p.properties) {
     prop.value = Math.max(10_000, prop.value * (e.housingIndex / Math.max(1, e.history.length >= 2 ? e.history[e.history.length - 2].housingIndex : 100)));
     if (prop.rentalYield > 0) p.money += prop.value * prop.rentalYield * 0.85; // net of costs
@@ -266,7 +303,8 @@ function tickPlayerLife(state: GameState, rng: RNG): void {
   // --- Mortality ----------------------------------------------------------------
   const mortality = p.age > 95 ? 0.35 : p.age > 85 ? 0.12 : p.age > 75 ? 0.05 : p.age > 65 ? 0.015 : 0.002;
   const healthMult = p.health < 20 ? 4 : p.health < 40 ? 2 : 1;
-  if (rng.chance(mortality * healthMult * (1 - home.healthcare / 300))) {
+  const difficultyMortalityMult = state.difficulty === 'casual' ? 0.6 : state.difficulty === 'ironman' ? 1.4 : 1;
+  if (rng.chance(mortality * healthMult * (1 - home.healthcare / 300) * difficultyMortalityMult)) {
     p.alive = false;
   }
 }
@@ -319,6 +357,97 @@ function gameOverCheck(state: GameState): void {
   log(state, `You died at age ${p.age}. ${state.gameOver.reason}`, 'milestone');
   for (const note of estateNotes) log(state, note, 'milestone');
   log(state, `Legacy score: ${legacyScore}/100.`, 'milestone');
+
+  // Offer to continue play as a surviving heir per the will, instead of ending the story here.
+  const candidateOf = (id: string | null, relation: 'Spouse' | 'Child' | 'Grandchild') => {
+    if (!id) return null;
+    const npc = state.npcs[id];
+    if (!npc || !npc.alive || npc.age < 16) return null;
+    return { npcId: id, name: npc.name, relation, isPrimaryHeir: id === p.primaryHeirId };
+  };
+  const candidates = [
+    candidateOf(p.spouseId, 'Spouse'),
+    ...p.children.map((id) => candidateOf(id, 'Child')),
+    ...p.grandchildren.map((id) => candidateOf(id, 'Grandchild')),
+  ].filter((c): c is NonNullable<typeof c> => !!c)
+    .sort((a, b) => Number(b.isPrimaryHeir) - Number(a.isPrimaryHeir));
+  if (candidates.length && state.difficulty !== 'ironman') {
+    state.pendingSuccession = { deceasedName: p.name, candidates };
+  }
+}
+
+/** Continue play as a chosen heir instead of ending the game. Inherits their wealth/company and
+ * resets the rest of the player scaffold fresh, incrementing the dynasty generation counter. */
+export function continueAsHeir(state: GameState, npcId: string): GameState {
+  const npc = state.npcs[npcId];
+  if (!npc) return state;
+  const oldPlayer = state.player;
+  const inheritedCompanies = Object.values(state.companies)
+    .filter((c) => c.status === 'active' && c.founderId === npcId)
+    .map((c) => c.id);
+  for (const id of inheritedCompanies) {
+    state.companies[id].playerOwned = true;
+  }
+  const newPlayer: Player = {
+    ...oldPlayer,
+    name: npc.name,
+    gender: npc.gender,
+    age: npc.age,
+    alive: true,
+    countryId: npc.countryId,
+    health: 85,
+    happiness: 65,
+    smarts: clamp100(npc.competence),
+    charisma: clamp100(npc.charisma),
+    reputation: 5,
+    popularity: 0,
+    influence: 0,
+    karma: 50,
+    notoriety: 0,
+    money: npc.wealth,
+    criminalRecord: 0,
+    inJailYears: 0,
+    skills: {},
+    education: [],
+    studying: null,
+    job: null,
+    companies: inheritedCompanies,
+    lifeInsurance: null,
+    spouseId: null,
+    children: [],
+    grandchildren: [],
+    divorceCount: 0,
+    primaryHeirId: null,
+    hasPrenup: false,
+    mentorId: null,
+    rivalId: null,
+    crimeFamilyId: null,
+    crimeRank: 0,
+    turfControl: 0,
+    dirtyMoney: 0,
+    inWitnessProtection: false,
+    partyId: null,
+    office: null,
+    politicalCapital: 0,
+    politicalHeirId: null,
+    advisors: [],
+    campaign: null,
+    lastElectionResult: null,
+    relationships: [],
+    limitOrders: [],
+    marginDebt: 0,
+    drip: false,
+    challenge: null,
+  };
+  delete state.npcs[npcId];
+  state.player = newPlayer;
+  state.generation++;
+  state.gameOver = null;
+  state.pendingSuccession = null;
+  state.yearRecap = null;
+  log(state, `🕯️ Life goes on: you continue the story as ${npc.name}, generation ${state.generation}.`, 'milestone');
+  if (!state.achievements.includes('dynasty_continued')) state.achievements.push('dynasty_continued');
+  return state;
 }
 
 /**
@@ -329,6 +458,8 @@ export function advanceYear(state: GameState): GameState {
   if (state.gameOver) return state;
   const rng = new RNG(state.seed);
   rng.state = state.rngState;
+  const netWorthStart = netWorth(state);
+  const yearBefore = state.year;
 
   state.year++;
   state.player.age++;
@@ -345,6 +476,7 @@ export function advanceYear(state: GameState): GameState {
     const res = tickEconomy(state, country, rng);
     if (res.crisis === 'crash' && country.isPlayerHome) politicalHeadlines.push(`Stock market crash wipes billions off ${country.name} shares`);
     if (res.crisis === 'debt' && country.isPlayerHome) politicalHeadlines.push(`${country.name} debt crisis: bond yields spike as investors flee`);
+    if (res.crisis === 'disaster' && country.isPlayerHome) politicalHeadlines.push(`🌪️ Climate disaster strikes ${country.name}: property damaged, confidence shaken`);
   }
 
   // 2. Politics & NPCs
@@ -369,10 +501,13 @@ export function advanceYear(state: GameState): GameState {
     tickStock(company, state, rng);
   }
   businessHeadlines.push(...tickMergers(state, rng));
+  for (const l of checkLimitOrders(state)) log(state, l, 'money');
+  for (const l of tickMargin(state)) log(state, l, 'bad');
 
   // 4. The player's own year
   tickPlayerLife(state, rng);
   if (state.player.alive) tickFamily(state, rng);
+  if (state.player.alive) tickChallenge(state, rng);
 
   // 5. Player company income: dividends from private profitable companies
   const p = state.player;
@@ -395,7 +530,14 @@ export function advanceYear(state: GameState): GameState {
   if (state.news.length > 400) state.news.splice(0, state.news.length - 400);
 
   // 8. Records & endings
-  state.netWorthHistory.push({ year: state.year, value: netWorth(state) });
+  const netWorthEnd = netWorth(state);
+  state.netWorthHistory.push({ year: state.year, value: netWorthEnd });
+  state.yearRecap = {
+    year: yearBefore,
+    netWorthStart,
+    netWorthEnd,
+    headlines: [...politicalHeadlines.slice(0, 3), ...businessHeadlines.slice(0, 2)],
+  };
   gameOverCheck(state);
 
   // Milestone achievements

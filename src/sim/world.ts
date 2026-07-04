@@ -3,7 +3,7 @@
  * cities, parties, politicians, executives and publicly listed companies,
  * then creates the 18-year-old player character inside it.
  */
-import type { City, Country, CountryState, GameState, Gender, NPC, NPCRole, Party, Player } from './types';
+import type { City, Country, CountryState, Difficulty, GameState, Gender, NPC, NPCRole, Party, Player } from './types';
 import { RNG, hashSeed } from './rng';
 import { COUNTRY_SEEDS } from '../data/countries';
 import { initEconomy } from './economy';
@@ -84,6 +84,8 @@ export interface NewGameConfig {
   seedText: string;
   startYear?: number;
   scenario?: Scenario;
+  difficulty?: Difficulty;
+  legacyBonus?: number; // starting money bonus carried over from a previous life's Legacy Score
 }
 
 export function generateWorld(config: NewGameConfig): GameState {
@@ -200,6 +202,11 @@ export function generateWorld(config: NewGameConfig): GameState {
       infrastructureProjects: [],
       intelCapability: rng.range(15, 40),
       taxAdjustments: {},
+      immigrationQuota: rng.range(35, 65),
+      warStrategies: {},
+      chiefJusticeId: null,
+      judicialIntegrity: rng.range(40, 75),
+      allianceId: null,
     };
     countries.push(country);
   }
@@ -236,6 +243,10 @@ export function generateWorld(config: NewGameConfig): GameState {
     worldEvent: null,
     generation: 1,
     calendarDay: 0,
+    difficulty: config.difficulty ?? 'standard',
+    alliances: [],
+    yearRecap: null,
+    pendingSuccession: null,
   };
 
   // Public + private NPC companies per country (more in the player's home).
@@ -304,7 +315,7 @@ export function generateWorld(config: NewGameConfig): GameState {
     influence: 0,
     karma: 50,
     notoriety: 0,
-    money: rng.int(500, 5_000),
+    money: rng.int(500, 5_000) + Math.max(0, config.legacyBonus ?? 0),
     criminalRecord: 0,
     inJailYears: 0,
     skills,
@@ -321,7 +332,9 @@ export function generateWorld(config: NewGameConfig): GameState {
     relationships: [],
     spouseId: null,
     children: [],
+    grandchildren: [],
     divorceCount: 0,
+    primaryHeirId: null,
     mentorId: null,
     rivalId: null,
     crimeFamilyId: null,
@@ -333,6 +346,15 @@ export function generateWorld(config: NewGameConfig): GameState {
     advisors: [],
     campaign: null,
     lastElectionResult: null,
+    hasPrenup: false,
+    lobbyingFirmHired: false,
+    marginDebt: 0,
+    drip: false,
+    limitOrders: [],
+    challenge: null,
+    dirtyMoney: 0,
+    turfControl: 0,
+    inWitnessProtection: false,
   };
   // Parents
   for (const kind of ['parent', 'parent'] as const) {

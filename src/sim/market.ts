@@ -82,7 +82,21 @@ export function tickStock(c: Company, state: GameState, rng: RNG): void {
     }
     const holding = player.portfolio.find((h) => h.companyId === c.id && h.shares > 0);
     if (holding) {
-      player.money += (totalDividend / c.sharesOutstanding) * holding.shares;
+      const payout = (totalDividend / c.sharesOutstanding) * holding.shares;
+      if (player.drip) {
+        // Dividend reinvestment plan: buy more shares instead of taking cash.
+        const newShares = Math.floor(payout / c.sharePrice);
+        if (newShares > 0) {
+          const cost = newShares * c.sharePrice;
+          holding.costBasis = (holding.costBasis * holding.shares + cost) / (holding.shares + newShares);
+          holding.shares += newShares;
+          player.money += payout - cost;
+        } else {
+          player.money += payout;
+        }
+      } else {
+        player.money += payout;
+      }
     }
   }
 }
@@ -159,6 +173,132 @@ export function coverShort(state: GameState, companyId: string, fraction: number
   h.shares += toCover;
   p.portfolio = p.portfolio.filter((x) => x.shares !== 0);
   return { ok: true, message: `Covered ${toCover.toLocaleString()} shares.` };
+}
+
+/** Buy shares partly with borrowed money. Buying power = cash + 50% of current long portfolio value. */
+export function buyOnMargin(state: GameState, companyId: string, spend: number): TradeResult {
+  const c = state.companies[companyId];
+  const p = state.player;
+  if (!c?.isPublic || c.status !== 'active') return { ok: false, message: 'Not tradable.' };
+  if (spend <= 0) return { ok: false, message: 'Invalid amount.' };
+  const maxBorrow = Math.max(0, longPortfolioValue(state) * 0.5 - p.marginDebt);
+  const available = p.money + maxBorrow;
+  if (spend > available) return { ok: false, message: 'Exceeds available margin buying power.' };
+  const borrow = Math.max(0, spend - p.money);
+  p.money -= Math.min(p.money, spend);
+  p.marginDebt += borrow;
+  const shares = Math.floor(spend / c.sharePrice);
+  if (shares < 1) return { ok: false, message: 'Cannot afford a single share.' };
+  const cost = shares * c.sharePrice;
+  const existing = p.portfolio.find((h) => h.companyId === companyId && h.shares > 0);
+  if (existing) {
+    existing.costBasis = (existing.costBasis * existing.shares + cost) / (existing.shares + shares);
+    existing.shares += shares;
+  } else {
+    p.portfolio.push({ companyId, shares, costBasis: c.sharePrice });
+  }
+  return { ok: true, message: `Bought ${shares.toLocaleString()} shares of ${c.name} on margin (${money0(borrow)} borrowed).` };
+}
+
+function money0(v: number): string {
+  return `$${Math.round(v).toLocaleString()}`;
+}
+
+function longPortfolioValue(state: GameState): number {
+  let total = 0;
+  for (const h of state.player.portfolio) {
+    if (h.shares <= 0) continue;
+    const c = state.companies[h.companyId];
+    if (c?.status === 'active' && c.isPublic) total += h.shares * c.sharePrice;
+  }
+  return total;
+}
+
+/** Yearly margin upkeep: charge interest, and force-liquidate if below the maintenance margin. */
+export function tickMargin(state: GameState): string[] {
+  const p = state.player;
+  const logs: string[] = [];
+  if (p.marginDebt <= 0) return logs;
+  const home = state.countries.find((c) => c.id === p.countryId);
+  const rate = (home?.economy.interestRate ?? 0.04) + 0.04;
+  const interest = p.marginDebt * rate;
+  p.money -= interest;
+  logs.push(`Paid $${Math.round(interest).toLocaleString()} in margin interest.`);
+  const longValue = longPortfolioValue(state);
+  if (longValue < p.marginDebt * 1.25) {
+    // Margin call: force-sell long positions until the debt is covered.
+    const longs = p.portfolio.filter((h) => h.shares > 0);
+    for (const h of longs) {
+      if (p.marginDebt <= 0) break;
+      const c = state.companies[h.companyId];
+      if (!c || !c.isPublic || c.status !== 'active') continue;
+      const toSell = h.shares;
+      const proceeds = toSell * c.sharePrice;
+      p.money += proceeds;
+      h.shares = 0;
+      const repay = Math.min(p.marginDebt, proceeds);
+      p.money -= repay;
+      p.marginDebt -= repay;
+    }
+    p.portfolio = p.portfolio.filter((x) => x.shares !== 0);
+    logs.push(`🚨 Margin call! Positions were liquidated to cover $${Math.round(p.marginDebt).toLocaleString()} of remaining debt.`);
+  }
+  return logs;
+}
+
+/** Check standing limit orders against current prices and execute any that trigger. */
+export function checkLimitOrders(state: GameState): string[] {
+  const p = state.player;
+  if (!p.limitOrders.length) return [];
+  const logs: string[] = [];
+  const remaining: typeof p.limitOrders = [];
+  for (const order of p.limitOrders) {
+    const c = state.companies[order.companyId];
+    if (!c || !c.isPublic || c.status !== 'active') continue;
+    const triggered = order.kind === 'buy' ? c.sharePrice <= order.targetPrice : c.sharePrice >= order.targetPrice;
+    if (!triggered) {
+      remaining.push(order);
+      continue;
+    }
+    if (order.kind === 'buy') {
+      const res = buyShares(state, order.companyId, Math.min(order.amount, p.money));
+      logs.push(`Limit order triggered: ${res.message}`);
+    } else {
+      const holding = p.portfolio.find((h) => h.companyId === order.companyId && h.shares > 0);
+      if (holding) {
+        const fraction = clamp(order.amount / (holding.shares * c.sharePrice), 0, 1);
+        const res = sellShares(state, order.companyId, fraction);
+        logs.push(`Limit order triggered: ${res.message}`);
+      }
+    }
+  }
+  p.limitOrders = remaining;
+  return logs;
+}
+
+let limitOrderCounter = 0;
+
+export function placeLimitOrder(state: GameState, companyId: string, kind: 'buy' | 'sell', targetPrice: number, amount: number): TradeResult {
+  const c = state.companies[companyId];
+  const p = state.player;
+  if (!c?.isPublic || c.status !== 'active') return { ok: false, message: 'Not tradable.' };
+  if (targetPrice <= 0 || amount <= 0) return { ok: false, message: 'Invalid order.' };
+  if (p.limitOrders.length >= 10) return { ok: false, message: 'Maximum of 10 standing limit orders.' };
+  limitOrderCounter = Math.max(limitOrderCounter, p.limitOrders.length) + 1;
+  p.limitOrders.push({ id: `limit_${state.year}_${limitOrderCounter}`, companyId, kind, targetPrice, amount });
+  return { ok: true, message: `Limit ${kind} order placed for ${c.name} at $${targetPrice.toFixed(2)}.` };
+}
+
+export function cancelLimitOrder(state: GameState, orderId: string): TradeResult {
+  const p = state.player;
+  if (!p.limitOrders.some((o) => o.id === orderId)) return { ok: false, message: 'Order not found.' };
+  p.limitOrders = p.limitOrders.filter((o) => o.id !== orderId);
+  return { ok: true, message: 'Limit order cancelled.' };
+}
+
+export function toggleDrip(state: GameState): TradeResult {
+  state.player.drip = !state.player.drip;
+  return { ok: true, message: state.player.drip ? 'Dividend reinvestment enabled.' : 'Dividend reinvestment disabled.' };
 }
 
 /** Net liquidation value of the player's portfolio. */

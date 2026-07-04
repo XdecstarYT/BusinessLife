@@ -31,30 +31,43 @@ plain JSON you can export and re-import.
   pass or repeal **93 laws** whose effects continuously reshape the economy. As head of state, conduct
   real foreign policy: declare war, sign peace treaties, impose or lift sanctions, send foreign aid, and
   sign trade agreements — on top of the elections, coups, sanctions and wars that unfold on their own.
-- **Family & dynasty** — date, marry, divorce, have children who age up as real NPCs, name a successor
-  to inherit a company or a political heir to inherit your party and popularity, track a Dynasty Score, and
-  pass your estate (plus any life insurance payout) to your family when you die.
+- **Family, dynasty & wills** — date, marry (with an optional prenup), divorce, have or adopt children who
+  age up as real NPCs and eventually have grandchildren of their own, name a successor to inherit a company
+  or a political heir to inherit your party and popularity, draft a will naming a primary heir for a bigger
+  share of your estate, and track a Dynasty Score.
+- **Continue your dynasty** — when you die, if you have a surviving spouse, child, or grandchild, choose to
+  keep playing as them (inheriting per your will) instead of ending the story, incrementing a generation
+  counter that feeds your next Legacy Score — or end the story there for good.
 - **Relationships** — find a mentor for a small yearly edge, network into new friends and allies, or
   declare a rival and feud with them through dedicated events.
 - **Corporate warfare** — patents and trademarks that pay off and dent rivals, a cyber-defense lever, a
   diversified supply chain, corporate espionage, shareholder revolts, hostile takeovers in both directions,
   and NPC-vs-NPC competitor mergers, plus proactive business initiatives (brand deals, tiered staff training
   from apprenticeship to executive leadership, quality audits, preemptive recalls).
-- **Corporate culture & headquarters** — upgrade from a Basic Office to a Megacomplex for morale, brand and
-  management bonuses, and pick a culture (Traditional, Flexible, Remote-First, Startup) with real tradeoffs
-  between overhead, morale volatility and R&D output.
+- **Corporate culture, headquarters & the C-suite** — upgrade from a Basic Office to a Megacomplex for
+  morale, brand and management bonuses, pick a culture (Traditional, Flexible, Remote-First, Startup) with
+  real tradeoffs, and hire a CFO/COO/CMO (each liable to be poached by a rival) alongside issuing corporate
+  bonds, running stock buybacks, and spinning off a division into its own traded entity.
 - **The underworld** — join a crime family and climb five ranks through heists and protection rackets,
-  bribe a judge or attempt a prison escape if you're caught, or pay your way out and go straight.
+  contest rival turf for a bigger cut, launder illicit proceeds through a front business, bribe a judge or
+  attempt a prison escape if you're caught, pay your way out and go straight, or enter witness protection to
+  wipe your record at a steep cost.
 - **Financial markets, bonds, and forex** — beyond stocks: buy government bonds for fixed income, speculate
-  long or short on foreign currencies, insure your businesses and properties, take out life insurance, and
-  watch a live scrolling stock ticker of the day's biggest movers.
-- **Head-of-state economic tools** — allocate the budget across six cabinet portfolios, set direct tax
-  rates, launch multi-year infrastructure projects (roads, rail, airports, power, internet), read a
-  trend-based economic forecast, hire up to three AI advisors whose advice can be wrong, and fund an
-  intelligence agency to gather intel or run counter-espionage on rival nations.
+  long or short on foreign currencies, trade on margin, enable dividend reinvestment (DRIP), set standing
+  limit orders, insure your businesses and properties, take out life insurance, and watch a live scrolling
+  stock ticker of the day's biggest movers.
+- **Head-of-state tools** — allocate the budget across six cabinet portfolios, set direct tax rates, launch
+  multi-year infrastructure projects (roads, rail, airports, power, internet, a national space program), set
+  an immigration quota, read a trend-based economic forecast, hire up to three AI advisors whose advice can
+  be wrong, fund an intelligence agency, nominate a Chief Justice (a low-integrity court can strike down laws
+  on its own), call a referendum to bypass the legislature, retain a lobbying firm, found or join an
+  international alliance, and choose blockade or invasion when you declare war.
 - **Elections with real stakes** — pick manifesto promises at campaign launch and get judged on keeping them
   at re-election time, hold press conferences and campaign debates, court celebrity endorsements, watch an
   animated election-night results reveal, and track government approval by city.
+- **A changing climate** — climate risk rises over time (faster or slower depending on the laws in force),
+  triggering natural disasters that hit property values and business confidence, with agriculture bearing
+  the brunt and insurers absorbing some of the cost.
 - **Global world events** — a pandemic, a global trade war, or a tech boom can sweep the world economy,
   each with its own winners and losers by industry, its own news coverage, and its own event templates.
 - **20+ lifestyle activities** — from the gym and vacations to book clubs, therapy, adopting a pet, art
@@ -64,8 +77,10 @@ plain JSON you can export and re-import.
   daily flavor events for time-skipping and honors/awards events (knighthoods, hall-of-fame induction,
   civic medals), so a compact template set produces an enormous variety of situations.
 - **Meta progression** — a Legacy Score computed at game over from your wealth, dynasty, office and
-  achievements, a life timeline of every milestone you hit, 30+ achievements, and four starting-economy
-  scenarios (Modern, Boom, Recession, Crisis) to change the game you're playing from turn one.
+  achievements (with a New Game+ bonus into your next life), a life timeline of every milestone you hit,
+  35+ achievements, a Year in Review recap after every year, random mid-game challenges with cash rewards,
+  a Casual/Standard/Iron Man difficulty choice, and four starting-economy scenarios (Modern, Boom, Recession,
+  Crisis) to change the game you're playing from turn one.
 - **Dynamic news** synthesised from what actually happened that year, plus a personal life log.
 - **Light and dark mode**, a mobile-first UI (with wider desktop breakpoints and safe-area support for
   notched devices) of circular icon tiles, pill chips, featured cards and canvas charts, with a bottom
@@ -102,36 +117,43 @@ only moves when you tell it to, using the three buttons on the Life hub:
 - **Career** — study for degrees (15 options), take jobs from a live market, and grow skills (120 of them
   across 10 categories). Performance drives raises, promotions and layoffs.
 - **Business** — found companies in any of 219 industries, then tune strategy (marketing, R&D, pricing,
-  wages, automation, cyber-defense, dividends), invest or draw capital, IPO, or sell. Upgrade your HQ tier
-  and pick a corporate culture, run one-off initiatives (brand deals, tiered training programs,
-  supply-chain diversification, quality audits, trademark filings, proactive recalls) and insure the
-  business. Switch to the **Rivals** tab to spy on competitors, shake them down if you're in the crime
-  family, or launch a hostile takeover of a public company — NPC rivals merge and consolidate on their own.
+  wages, automation, cyber-defense, dividends), invest or draw capital, IPO, or sell. Upgrade your HQ tier,
+  pick a corporate culture, and hire a CFO/COO/CMO. Run one-off initiatives (brand deals, tiered training
+  programs, supply-chain diversification, quality audits, trademark filings, proactive recalls), issue
+  corporate bonds, run stock buybacks, spin off a division, and insure the business. Switch to the
+  **Rivals** tab to spy on competitors, shake them down if you're in the crime family, or launch a hostile
+  takeover of a public company — NPC rivals merge and consolidate on their own.
 - **Markets** — trade the stock exchange of your home nation with a live scrolling ticker of top movers;
-  go long or short, collect dividends.
+  go long or short, trade on margin, collect and optionally reinvest dividends (DRIP), and set standing
+  limit orders that fire on their own.
 - **Assets** — buy property (cash or mortgage, including penthouses) for rental income and appreciation,
   renovate it, insure it, or move in yourself; take personal loans; buy government bonds; speculate long
   or short on foreign currencies; take out life insurance for your family.
 - **Politics** — join/found a party, run for office with a manifesto of promises tracked through your term,
   campaign (rallies, ads, debates, press conferences, celebrity endorsements, consultants, polling),
-  negotiate coalitions, appoint a cabinet if you lead the country, and legislate. Election night reveals an
-  animated results tally. As head of state, use the World screen to declare war, make peace, sanction or aid
-  other nations, sign trade deals, allocate the budget, set tax rates, launch infrastructure projects, hire
-  AI advisors, and run an intelligence agency.
-- **Family** — date and marry, have children who grow into real NPCs, name a business successor or a
-  political heir, track a Dynasty Score, and manage your mentor/rival/friend relationships.
-- **World** — a macro dashboard, every nation's economy and government, diplomacy actions, commodities,
-  and any active global event (pandemic, trade war, or tech boom).
-- **News / Stats** — the dynamic wire, your net-worth curve, 30+ achievements, a life timeline, and save
+  negotiate coalitions, appoint a cabinet if you lead the country, and legislate — or call a referendum to
+  put a law directly to the public. Election night reveals an animated results tally. As head of state, use
+  the World screen to declare war (blockade or invasion) and make peace, sanction or aid other nations, sign
+  trade deals, found or join an alliance, allocate the budget, set tax rates, set the immigration quota,
+  launch infrastructure projects (including a national space program), hire AI advisors, retain a lobbying
+  firm, nominate a Chief Justice, and run an intelligence agency.
+- **Family** — date and marry (with an optional prenup), have or adopt children who grow into real NPCs and
+  eventually have grandchildren, name a business successor or a political heir, draft a will naming a
+  primary heir, track a Dynasty Score, and manage your mentor/rival/friend relationships.
+- **World** — a macro dashboard, every nation's economy and government (including climate risk), diplomacy
+  actions, commodities, and any active global event (pandemic, trade war, or tech boom).
+- **News / Stats** — the dynamic wire, your net-worth curve, 35+ achievements, a life timeline, and save
   tools.
-- **Underworld** — join a crime family and climb its ranks through heists and protection rackets, bribe
-  a judge or attempt a prison escape if caught, or pay your way out and go straight.
+- **Underworld** — join a crime family and climb its ranks through heists and protection rackets, contest
+  rival turf, launder illicit proceeds through a front business, bribe a judge or attempt a prison escape if
+  caught, pay your way out and go straight, or enter witness protection to wipe your record.
 - **Lifestyle** — 20+ quick activities on the Life hub, from the gym and charity to book clubs, therapy,
   adopting a pet, art collecting, wine tasting, poker nights, blogging and learning a language.
 
 Life ends when you do — from old age, illness, or misfortune — with a Legacy Score summarizing your wealth,
-dynasty, office and achievements, and your estate (companies with a named successor, political heir, cash,
-property) passes to your spouse and children.
+dynasty, office and achievements. If a spouse, child, or grandchild survives you, choose to continue playing
+as them (inheriting per your will) instead of ending the story — otherwise your estate (companies with a
+named successor, political heir, cash, and property) passes to your spouse, children and grandchildren.
 
 ## Architecture
 
@@ -172,6 +194,8 @@ src/
     components.tsx     Cards, pills, circular tiles, stat bars, canvas charts
     AppShell.tsx       Top bar + bottom tab navigation + "More" sheet
     ElectionResultModal.tsx  Animated election-night results reveal
+    SuccessionModal.tsx      Choose to continue as an heir, or end the story, on death
+    YearRecapModal.tsx       "Year in Review" net-worth and headline recap after each Year advance
     TutorialOverlay.tsx      Light first-launch walkthrough (shown once per browser)
     screens/           Life, Career, Business, Market, Assets, Politics, Family, World, News, Stats
 ```

@@ -58,7 +58,7 @@ export interface FamilyActionResult {
 }
 
 /** Propose to a dating candidate; materializes them as a real NPC on success. */
-export function propose(state: GameState, candidate: DatingCandidate): FamilyActionResult {
+export function propose(state: GameState, candidate: DatingCandidate, withPrenup = false): FamilyActionResult {
   const p = state.player;
   if (p.spouseId) return { ok: false, message: 'You are already married.' };
   const rng = new RNG(state.seed);
@@ -98,10 +98,11 @@ export function propose(state: GameState, candidate: DatingCandidate): FamilyAct
   };
   state.npcs[npc.id] = npc;
   p.spouseId = npc.id;
+  p.hasPrenup = withPrenup;
   p.relationships.push({ npcId: npc.id, kind: 'spouse', closeness: 80 });
   p.money += candidate.wealth * 0.15; // modest dowry/shared assets
   p.happiness = clamp100(p.happiness + 15);
-  log(state, `💍 You married ${npc.name}!`, 'milestone');
+  log(state, `💍 You married ${npc.name}${withPrenup ? ' with a prenuptial agreement in place' : ''}!`, 'milestone');
   if (!state.achievements.includes('married')) state.achievements.push('married');
   return { ok: true, message: `${npc.name} said yes!` };
 }
@@ -110,12 +111,13 @@ export function divorce(state: GameState): FamilyActionResult {
   const p = state.player;
   if (!p.spouseId) return { ok: false, message: 'You are not married.' };
   const spouse = state.npcs[p.spouseId];
-  const settlement = p.money * 0.3;
+  const settlement = p.hasPrenup ? p.money * 0.05 : p.money * 0.3;
   p.money -= settlement;
   p.happiness = clamp100(p.happiness - 12);
   p.relationships = p.relationships.filter((r) => r.npcId !== p.spouseId);
-  log(state, `💔 You divorced ${spouse?.name ?? 'your spouse'}, paying a $${Math.round(settlement).toLocaleString()} settlement.`, 'bad');
+  log(state, `💔 You divorced ${spouse?.name ?? 'your spouse'}, paying a $${Math.round(settlement).toLocaleString()} settlement${p.hasPrenup ? ' (limited by your prenup)' : ''}.`, 'bad');
   p.spouseId = null;
+  p.hasPrenup = false;
   p.divorceCount++;
   return { ok: true, message: 'The divorce is finalized.' };
 }
@@ -164,6 +166,55 @@ export function haveChild(state: GameState): FamilyActionResult {
   return { ok: true, message: `Welcome, ${child.name}!` };
 }
 
+/** Adopt a child — no spouse required, and the child starts a little older than a newborn. */
+export function adoptChild(state: GameState): FamilyActionResult {
+  const p = state.player;
+  if (p.children.length >= 6) return { ok: false, message: 'Your family is already large enough!' };
+  const cost = 25_000;
+  if (p.money < cost) return { ok: false, message: `Adoption fees cost $${cost.toLocaleString()}.` };
+  const rng = new RNG(state.seed);
+  rng.state = state.rngState;
+  const gender = rng.chance(0.5) ? 'male' : 'female';
+  const names = { male: ['Milo', 'Theo', 'Jonah', 'Ezra', 'Silas'], female: ['Nora', 'Ivy', 'Wren', 'Luna', 'Rose'] };
+  const first = rng.pick(names[gender]);
+  const lastName = p.name.split(' ').slice(-1)[0];
+  const age = rng.int(1, 8);
+  state.rngState = rng.state;
+
+  const child: NPC = {
+    id: freshNpcId(state),
+    name: `${first} ${lastName}`,
+    gender,
+    age,
+    alive: true,
+    countryId: p.countryId,
+    role: 'family',
+    wealth: 0,
+    competence: rng.int(30, 80),
+    charisma: rng.int(30, 80),
+    ambition: rng.int(20, 90),
+    riskTolerance: rng.int(20, 80),
+    ideology: rng.int(-40, 40),
+    integrity: rng.int(40, 90),
+    popularity: 0,
+    opinionOfPlayer: 80,
+    partyId: null,
+    officeKind: null,
+    companyId: null,
+    goal: 'grow up',
+    memory: [`Adopted by ${p.name} at age ${age}.`],
+  };
+  p.money -= cost;
+  state.npcs[child.id] = child;
+  p.children.push(child.id);
+  p.relationships.push({ npcId: child.id, kind: 'child', closeness: 75 });
+  p.happiness = clamp100(p.happiness + 12);
+  if (!state.achievements.includes('adoptive_parent')) state.achievements.push('adoptive_parent');
+  log(state, `👶 You adopted ${child.name}, age ${age}!`, 'milestone');
+  if (p.children.length >= 3 && !state.achievements.includes('big_family')) state.achievements.push('big_family');
+  return { ok: true, message: `Welcome to the family, ${child.name}!` };
+}
+
 /** Designate an adult child as the heir to one of the player's companies. */
 export function nameSuccessor(state: GameState, companyId: string, childId: string): FamilyActionResult {
   const p = state.player;
@@ -191,6 +242,19 @@ export function namePoliticalHeir(state: GameState, childId: string): FamilyActi
   return { ok: true, message: `${child.name} will inherit your political network.` };
 }
 
+/** Draft (or amend) a will naming a primary heir — spouse, child, or grandchild — who gets
+ * priority in the estate split and top billing if you choose to continue play as a family member. */
+export function namePrimaryHeir(state: GameState, npcId: string): FamilyActionResult {
+  const p = state.player;
+  const eligible = [p.spouseId, ...p.children, ...p.grandchildren].filter((id): id is string => !!id);
+  if (!eligible.includes(npcId)) return { ok: false, message: 'Not an eligible heir.' };
+  const npc = state.npcs[npcId];
+  if (!npc || !npc.alive) return { ok: false, message: 'That family member is not available.' };
+  p.primaryHeirId = npcId;
+  log(state, `You drafted a will naming ${npc.name} as your primary heir.`, 'info');
+  return { ok: true, message: `${npc.name} is now your primary heir.` };
+}
+
 /** A rough 0..100 measure of how well the player's dynasty is set up to outlast them. */
 export function dynastyScore(state: GameState): number {
   const p = state.player;
@@ -198,6 +262,8 @@ export function dynastyScore(state: GameState): number {
   score += Math.min(30, p.children.filter((id) => state.npcs[id]?.alive).length * 10);
   score += Object.values(state.companies).filter((c) => c.playerOwned && c.successorId).length * 12;
   score += p.politicalHeirId ? 20 : 0;
+  score += p.primaryHeirId ? 10 : 0;
+  score += Math.min(10, p.grandchildren.filter((id) => state.npcs[id]?.alive).length * 5);
   score += Math.min(20, state.generation * 10);
   score += p.spouseId ? 8 : 0;
   return Math.max(0, Math.min(100, Math.round(score)));
@@ -212,6 +278,7 @@ export function tickFamily(state: GameState, rng: RNG): void {
   if (p.spouseId && !state.npcs[p.spouseId]?.alive) {
     log(state, `💔 Your spouse ${state.npcs[p.spouseId]?.name ?? ''} has passed away.`, 'bad');
     p.spouseId = null;
+    p.hasPrenup = false;
     p.happiness = clamp100(p.happiness - 20);
   }
 
@@ -223,6 +290,39 @@ export function tickFamily(state: GameState, rng: RNG): void {
     if (child.age === 18) {
       log(state, `${child.name} turned 18 and is now an adult, free to chart their own path.`, 'milestone');
       p.happiness = clamp100(p.happiness + 3);
+    }
+    // Adult children occasionally start their own family, giving you a grandchild.
+    if (child.age >= 25 && child.age <= 45 && rng.chance(0.035)) {
+      const gender = rng.chance(0.5) ? 'male' : 'female';
+      const grandchild: NPC = {
+        id: freshNpcId(state),
+        name: makePersonName(rng, gender),
+        gender,
+        age: 0,
+        alive: true,
+        countryId: child.countryId,
+        role: 'family',
+        wealth: 0,
+        competence: rng.int(30, 80),
+        charisma: rng.int(30, 80),
+        ambition: rng.int(20, 90),
+        riskTolerance: rng.int(20, 80),
+        ideology: rng.int(-40, 40),
+        integrity: rng.int(40, 90),
+        popularity: 0,
+        opinionOfPlayer: 70,
+        partyId: null,
+        officeKind: null,
+        companyId: null,
+        goal: 'grow up',
+        memory: [],
+        parentId: child.id,
+      };
+      state.npcs[grandchild.id] = grandchild;
+      p.grandchildren.push(grandchild.id);
+      p.relationships.push({ npcId: grandchild.id, kind: 'grandchild', closeness: 60 });
+      log(state, `👶 ${child.name} had a child of their own — you're a grandparent to ${grandchild.name}!`, 'milestone');
+      p.happiness = clamp100(p.happiness + 5);
     }
   }
   // Spousal relationship drifts a little each year.
@@ -252,11 +352,20 @@ export function tickFamily(state: GameState, rng: RNG): void {
   }
 }
 
+/** Splits a total among heirs, giving the will's primary heir (if among them) a double share. */
+function weightedSplit(total: number, heirs: string[], primaryHeirId: string | null): Map<string, number> {
+  const weight = (id: string) => (id === primaryHeirId ? 2 : 1);
+  const totalWeight = heirs.reduce((s, id) => s + weight(id), 0) || 1;
+  const shares = new Map<string, number>();
+  for (const id of heirs) shares.set(id, (total * weight(id)) / totalWeight);
+  return shares;
+}
+
 /** On the player's death, pass companies to named successors and cash to the family. */
 export function distributeEstate(state: GameState): string[] {
   const p = state.player;
   const notes: string[] = [];
-  const heirs = [p.spouseId, ...p.children].filter((id): id is string => !!id && !!state.npcs[id]?.alive);
+  const heirs = [p.spouseId, ...p.children, ...p.grandchildren].filter((id): id is string => !!id && !!state.npcs[id]?.alive);
 
   for (const companyId of p.companies) {
     const company: Company | undefined = state.companies[companyId];
@@ -272,23 +381,20 @@ export function distributeEstate(state: GameState): string[] {
       company.status = 'sold';
       company.playerOwned = false;
       if (heirs.length > 0) {
-        const share = value / heirs.length;
-        for (const id of heirs) state.npcs[id]!.wealth += share;
+        for (const [id, share] of weightedSplit(value, heirs, p.primaryHeirId)) state.npcs[id]!.wealth += share;
         notes.push(`${company.name} was sold and its value split among your family.`);
       }
     }
   }
   if (heirs.length > 0) {
-    const share = p.money / heirs.length;
-    for (const id of heirs) state.npcs[id]!.wealth += share;
-    notes.push(`Your $${Math.round(p.money).toLocaleString()} estate was divided among ${heirs.length} heir(s).`);
+    for (const [id, share] of weightedSplit(p.money, heirs, p.primaryHeirId)) state.npcs[id]!.wealth += share;
+    notes.push(`Your $${Math.round(p.money).toLocaleString()} estate was divided among ${heirs.length} heir(s)${p.primaryHeirId ? ', with your primary heir receiving the largest share' : ''}.`);
   }
   if (p.properties.length > 0 && heirs.length > 0) {
     notes.push(`${p.properties.length} propert${p.properties.length > 1 ? 'ies' : 'y'} passed to your family.`);
   }
   if (p.lifeInsurance && heirs.length > 0) {
-    const share = p.lifeInsurance.payout / heirs.length;
-    for (const id of heirs) state.npcs[id]!.wealth += share;
+    for (const [id, share] of weightedSplit(p.lifeInsurance.payout, heirs, p.primaryHeirId)) state.npcs[id]!.wealth += share;
     notes.push(`Your life insurance paid out $${Math.round(p.lifeInsurance.payout).toLocaleString()} to your family.`);
   }
   if (p.politicalHeirId && state.npcs[p.politicalHeirId]?.alive && (p.partyId || p.office)) {

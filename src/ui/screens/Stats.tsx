@@ -37,6 +37,10 @@ const ACHIEVEMENTS: Record<string, { label: string; icon: string }> = {
   nation_builder: { label: 'Nation Builder', icon: '🏗️' },
   knighted: { label: 'Knighted', icon: '⚔️' },
   hall_of_fame: { label: 'Hall of Fame', icon: '🏆' },
+  adoptive_parent: { label: 'Adoptive Parent', icon: '👨‍👩‍👧' },
+  space_pioneer: { label: 'Space Pioneer', icon: '🚀' },
+  dynasty_continued: { label: 'Dynasty Continued', icon: '🕯️' },
+  challenge_crusher: { label: 'Challenge Crusher', icon: '🎯' },
 };
 
 export function Stats() {

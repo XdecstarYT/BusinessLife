@@ -4,11 +4,16 @@ import { useGame } from '../../store/gameStore';
 import {
   investInCompany,
   attemptHostileTakeover,
+  buybackShares,
   CULTURE_INFO,
   diversifySupplyChain,
   fileTrademark,
+  fireExecutive,
   hireBrandAmbassador,
+  hireExecutive,
   HQ_TIERS,
+  issueCorporateBond,
+  launderMoney,
   protectionRacket,
   proactiveRecall,
   qualityAudit,
@@ -18,6 +23,7 @@ import {
   sellCompany,
   setCompanyCulture,
   setCompanyLever,
+  spinOffCompany,
   spyOnCompany,
   startCompany,
   takeCompanyPublic,
@@ -31,7 +37,13 @@ import { marketCap } from '../../sim/market';
 import { Badge, Button, Card, LineChart, Modal, Pill, PillRow, SectionHeader, StatBar, TextInput } from '../components';
 import { money, moneyFull, pct } from '../format';
 import { INDUSTRIES, INDUSTRY_BY_ID } from '../../data/industries';
-import type { Company } from '../../sim/types';
+import type { Company, ExecutiveRole } from '../../sim/types';
+
+const EXEC_ROLES: { role: ExecutiveRole; label: string; blurb: string }[] = [
+  { role: 'cfo', label: 'CFO', blurb: 'Cuts your effective interest rate on debt.' },
+  { role: 'coo', label: 'COO', blurb: 'Improves overall management effectiveness.' },
+  { role: 'cmo', label: 'CMO', blurb: 'Boosts marketing power and demand.' },
+];
 
 export function Business() {
   const { state, run } = useGame();
@@ -381,6 +393,61 @@ function ManageModal({ companyId, onClose }: { companyId: string; onClose: () =>
         <Button size="sm" variant="soft" onClick={() => run(qualityAudit, c.id)}>✅ Quality Audit</Button>
         <Button size="sm" variant="soft" onClick={() => run(fileTrademark, c.id)}>™️ File Trademark ({c.trademarks}/5)</Button>
         <Button size="sm" variant="soft" onClick={() => run(proactiveRecall, c.id)}>⚠️ Proactive Recall</Button>
+      </div>
+
+      {state.player.dirtyMoney > 0 && (
+        <>
+          <div className="font-bold mt-5 mb-2">Launder Money</div>
+          <div className="flex items-center justify-between bg-slate-100 dark:bg-ink-800 rounded-xl px-3 py-2 mb-2">
+            <div className="text-xs">
+              <div className="font-semibold">Dirty money: {money(state.player.dirtyMoney)}</div>
+              <div className="text-slate-500 dark:text-slate-400">Run it through {c.name} to clean it, minus a cut.</div>
+            </div>
+            <Button size="sm" variant="soft" onClick={() => run(launderMoney, c.id, state.player.dirtyMoney)}>Launder All</Button>
+          </div>
+        </>
+      )}
+
+      <div className="font-bold mt-5 mb-2">Executive Team</div>
+      <div className="space-y-2 mb-2">
+        {EXEC_ROLES.map(({ role, label, blurb }) => {
+          const exec = c.executives.find((e) => e.role === role);
+          return (
+            <div key={role} className="flex items-center justify-between bg-slate-100 dark:bg-ink-800 rounded-xl px-3 py-2">
+              <div className="min-w-0 pr-2">
+                <div className="text-xs font-bold">{label}{exec ? `: ${exec.name}` : ''}</div>
+                <div className="text-[11px] text-slate-500 dark:text-slate-400">{exec ? `Skill ${Math.round(exec.skill)} · ${money(exec.salary)}/yr` : blurb}</div>
+              </div>
+              {exec ? (
+                <Button size="sm" variant="ghost" onClick={() => run(fireExecutive, c.id, role)}>Let Go</Button>
+              ) : (
+                <Button size="sm" variant="soft" onClick={() => run(hireExecutive, c.id, role)}>Hire</Button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="font-bold mb-2">Corporate Finance</div>
+      <div className="grid grid-cols-2 gap-2 mb-2">
+        {c.bondDebt > 0 ? (
+          <div className="col-span-2 text-xs bg-slate-100 dark:bg-ink-800 rounded-xl px-3 py-2 flex justify-between">
+            <span>Bond outstanding</span>
+            <span className="font-bold">{money(c.bondDebt)} @ {(c.bondRate * 100).toFixed(1)}% · {c.bondYearsLeft}yr left</span>
+          </div>
+        ) : (
+          <Button size="sm" variant="soft" onClick={() => run(issueCorporateBond, c.id, Math.max(50_000, Math.round(c.revenue * 0.3)), 5)}>
+            🏦 Issue Bond
+          </Button>
+        )}
+        {c.isPublic && (
+          <Button size="sm" variant="soft" onClick={() => run(buybackShares, c.id, Math.min(c.cash, c.revenue * 0.1))}>
+            🔁 Buyback Shares
+          </Button>
+        )}
+        <Button size="sm" variant="soft" className={c.isPublic ? '' : 'col-span-2'} onClick={() => run(spinOffCompany, c.id)}>
+          ✂️ Spin Off Division
+        </Button>
       </div>
 
       <div className="font-bold mt-5 mb-2">Capital</div>

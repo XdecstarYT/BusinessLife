@@ -512,6 +512,18 @@ ev({
   ],
 });
 ev({
+  id: 'fam_succession_rivalry', category: 'family', weight: 3, conditions: { hasChildren: true, hasBusiness: true },
+  text: 'Word gets around about who you favor to inherit the business, and the siblings you passed over are furious.',
+  choices: [
+    { label: 'Reassure them with a cash gift', effects: { money: -20_000, happiness: 2, karma: 2 } },
+    { label: 'Tell them succession is earned, not owed', outcomes: [
+      { chance: 0.5, text: 'They respect the honesty, if not the decision.', effects: { karma: 3 } },
+      { chance: 0.5, text: 'It drives a permanent wedge into the family.', effects: { happiness: -5, karma: -2 } },
+    ] },
+    { label: 'Ignore the drama', effects: { happiness: -2 } },
+  ],
+});
+ev({
   id: 'fam_spouse_career', category: 'family', weight: 4, conditions: { hasSpouse: true },
   text: 'Your spouse wants to pursue their own ambitious career move, which would mean less time for the family.',
   choices: [

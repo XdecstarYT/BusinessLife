@@ -6,7 +6,7 @@
  */
 import type { ReactNode } from 'react';
 import { useGame, type Screen } from '../../store/gameStore';
-import { attemptPrisonEscape, bribeJudge, CRIME_RANK_TITLES, doActivity, goStraight, heist, joinCrimeFamily } from '../../sim/actions';
+import { attemptPrisonEscape, bribeJudge, contestTerritory, CRIME_RANK_TITLES, doActivity, enterWitnessProtection, goStraight, heist, joinCrimeFamily } from '../../sim/actions';
 import { netWorth } from '../../sim/engine';
 import { Badge, Button, Card, CircleTile, Pill, PillRow, SectionHeader, StatBar } from '../components';
 import { money } from '../format';
@@ -132,6 +132,9 @@ export function Life() {
         {p.partyId && <Badge tone="brand">{home.parties.find((x) => x.id === p.partyId)?.name}</Badge>}
         <Badge tone="good">PC {Math.round(p.politicalCapital)}</Badge>
         {p.crimeFamilyId && <Badge tone="bad">🕶️ {CRIME_RANK_TITLES[p.crimeRank]}</Badge>}
+        {p.turfControl > 0 && <Badge tone="bad">Turf {Math.round(p.turfControl)}</Badge>}
+        {p.dirtyMoney > 0 && <Badge tone="warn">Dirty {money(p.dirtyMoney)}</Badge>}
+        {p.inWitnessProtection && <Badge tone="good">🛡️ Protected</Badge>}
       </PillRow>
 
       {p.inJailYears > 0 && (
@@ -190,14 +193,30 @@ export function Life() {
       <SectionHeader title="Underworld" />
       <PillRow>
         {!p.crimeFamilyId ? (
-          <Pill label="🕶️ Join Crime Family" onClick={() => run(joinCrimeFamily)} />
+          <>
+            <Pill label="🕶️ Join Crime Family" onClick={() => run(joinCrimeFamily)} />
+            {!p.inWitnessProtection && p.criminalRecord > 0 && (
+              <Pill label="🛡️ Witness Protection ($100k)" onClick={() => run(enterWitnessProtection)} />
+            )}
+          </>
         ) : (
           <>
             <Pill label="💰 Heist" onClick={() => run(heist)} />
+            <Pill label="🗺️ Contest Territory" onClick={() => run(contestTerritory)} />
             <Pill label="🚪 Go Straight" onClick={() => run(goStraight)} />
           </>
         )}
       </PillRow>
+
+      {p.challenge && (
+        <>
+          <SectionHeader title="Challenge" />
+          <Card className="p-4 mb-4">
+            <div className="font-semibold text-sm mb-1">🎯 {p.challenge.description}</div>
+            <div className="text-xs text-slate-500 dark:text-slate-400">Deadline: {p.challenge.deadlineYear} · Reward: {money(p.challenge.rewardMoney)}</div>
+          </Card>
+        </>
+      )}
 
       {/* Life log */}
       <SectionHeader title="Life Log" action="News" onAction={() => setScreen('news')} />

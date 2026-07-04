@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { useGame } from '../../store/gameStore';
 import {
+  adoptChild,
   datingPool,
   declareRival,
   divorce,
@@ -9,6 +10,7 @@ import {
   endRivalry,
   haveChild,
   namePoliticalHeir,
+  namePrimaryHeir,
   nameSuccessor,
   networking,
   propose,
@@ -22,17 +24,26 @@ import { money } from '../format';
 export function Family() {
   const { state, run } = useGame();
   const [proposing, setProposing] = useState<DatingCandidate | null>(null);
+  const [withPrenup, setWithPrenup] = useState(false);
   const [successorFor, setSuccessorFor] = useState<string | null>(null);
   const [pickingRival, setPickingRival] = useState(false);
+  const [draftingWill, setDraftingWill] = useState(false);
   if (!state) return null;
   const p = state.player;
   const spouse = p.spouseId ? state.npcs[p.spouseId] : null;
   const mentor = p.mentorId ? state.npcs[p.mentorId] : null;
   const rival = p.rivalId ? state.npcs[p.rivalId] : null;
   const children = p.children.map((id) => state.npcs[id]).filter((n): n is NonNullable<typeof n> => !!n);
+  const grandchildren = p.grandchildren.map((id) => state.npcs[id]).filter((n): n is NonNullable<typeof n> => !!n);
   const candidates = !p.spouseId ? datingPool(state) : [];
   const companies = p.companies.map((id) => state.companies[id]).filter((c) => c?.status === 'active');
   const friends = p.relationships.filter((r) => r.kind === 'friend' || r.kind === 'ally');
+  const willEligible = [
+    ...(spouse && spouse.alive ? [{ id: spouse.id, name: spouse.name, relation: 'Spouse' }] : []),
+    ...children.filter((c) => c.alive).map((c) => ({ id: c.id, name: c.name, relation: 'Child' })),
+    ...grandchildren.filter((c) => c.alive).map((c) => ({ id: c.id, name: c.name, relation: 'Grandchild' })),
+  ];
+  const primaryHeirName = p.primaryHeirId ? state.npcs[p.primaryHeirId]?.name : null;
 
   return (
     <div>
@@ -62,17 +73,23 @@ export function Family() {
               <div className="text-xs text-brand-500 uppercase font-bold">Spouse</div>
               <div className="font-extrabold text-lg truncate max-w-[220px]" title={spouse.name}>{spouse.name}</div>
               <div className="text-sm text-slate-500 dark:text-slate-400">Age {spouse.age} · {money(spouse.wealth)} personal wealth</div>
+              {p.hasPrenup && <Badge tone="brand">Prenup in place</Badge>}
             </div>
             <span className="text-3xl">💍</span>
           </div>
           <div className="grid grid-cols-2 gap-2 mt-4">
             <Button size="sm" variant="soft" onClick={() => run(haveChild)}>Have a Child</Button>
-            <Button size="sm" variant="danger" onClick={() => run(divorce)}>Divorce</Button>
+            <Button size="sm" variant="soft" onClick={() => run(adoptChild)}>Adopt ($25k)</Button>
+            <Button size="sm" variant="danger" className="col-span-2" onClick={() => run(divorce)}>Divorce</Button>
           </div>
         </Card>
       ) : (
         <>
-          <Card className="p-4 mb-3 text-sm text-slate-500 dark:text-slate-400">You're single. Here's who you've met recently:</Card>
+          <Card className="p-4 mb-3 flex items-center justify-between">
+            <span className="text-sm text-slate-500 dark:text-slate-400">You're single, but you can still grow your family.</span>
+            <Button size="sm" variant="soft" onClick={() => run(adoptChild)}>Adopt ($25k)</Button>
+          </Card>
+          <Card className="p-4 mb-3 text-sm text-slate-500 dark:text-slate-400">Here's who you've met recently:</Card>
           <div className="space-y-3 mb-4">
             {candidates.map((c) => (
               <Card key={c.npcId} className="p-4 flex items-center gap-3">
@@ -125,6 +142,40 @@ export function Family() {
           </div>
         </>
       )}
+
+      {grandchildren.length > 0 && (
+        <>
+          <SectionHeader title="Grandchildren" />
+          <div className="space-y-2 mb-4">
+            {grandchildren.map((gc) => (
+              <Card key={gc.id} className="p-4 flex items-center justify-between">
+                <div className="min-w-0">
+                  <div className="font-bold truncate flex items-center gap-2" title={gc.name}>
+                    {gc.name}
+                    {!gc.alive && <Badge tone="bad">Deceased</Badge>}
+                  </div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">Age {gc.age}</div>
+                </div>
+                {p.primaryHeirId === gc.id && <Badge tone="brand">Primary Heir</Badge>}
+              </Card>
+            ))}
+          </div>
+        </>
+      )}
+
+      <SectionHeader title="Your Will" />
+      <Card className="p-4 mb-4">
+        <div className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+          Name a primary heir to get the largest share of your estate and top billing if you choose to continue
+          play as a family member when you die.
+        </div>
+        <div className="flex items-center justify-between">
+          <div className="text-sm font-semibold">{primaryHeirName ? `Primary heir: ${primaryHeirName}` : 'No primary heir named'}</div>
+          <Button size="sm" variant="soft" disabled={willEligible.length === 0} onClick={() => setDraftingWill(true)}>
+            Draft Will
+          </Button>
+        </div>
+      </Card>
 
       {companies.some((c) => c.successorId) && (
         <>
@@ -205,12 +256,16 @@ export function Family() {
           <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
             {proposing.compatibility}% compatibility · your charisma and their fondness for you determine the odds.
           </p>
+          <label className="flex items-center gap-2 mb-4 text-sm">
+            <input type="checkbox" checked={withPrenup} onChange={(e) => setWithPrenup(e.target.checked)} />
+            Sign a prenuptial agreement (protects premarital assets in a future divorce)
+          </label>
           <Button
             className="w-full"
             size="lg"
             onClick={() => {
-              const r = run(propose, proposing);
-              if (r.ok || !r.ok) setProposing(null);
+              const r = run(propose, proposing, withPrenup);
+              if (r.ok || !r.ok) { setProposing(null); setWithPrenup(false); }
             }}
           >
             Pop the Question
@@ -233,6 +288,30 @@ export function Family() {
               >
                 {c!.name}
               </Button>
+            ))}
+          </div>
+        </Modal>
+      )}
+
+      {draftingWill && (
+        <Modal open onClose={() => setDraftingWill(false)} title="Draft Your Will">
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+            Your primary heir receives a double share of your estate and is highlighted if you choose to
+            continue play as a family member.
+          </p>
+          <div className="space-y-2">
+            {willEligible.map((h) => (
+              <button
+                key={h.id}
+                onClick={() => { run(namePrimaryHeir, h.id); setDraftingWill(false); }}
+                className="w-full text-left p-3 rounded-2xl bg-slate-100 dark:bg-ink-800 hover:bg-slate-200 dark:hover:bg-ink-700 flex items-center justify-between"
+              >
+                <div>
+                  <div className="font-semibold">{h.name}</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">{h.relation}</div>
+                </div>
+                {p.primaryHeirId === h.id && <Badge tone="brand">Current</Badge>}
+              </button>
             ))}
           </div>
         </Modal>

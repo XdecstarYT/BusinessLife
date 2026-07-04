@@ -80,6 +80,10 @@ export function createCompany(opts: FoundCompanyOptions, rng: RNG): Company {
     hqTier: 0,
     culture: 'flexible',
     successorId: null,
+    executives: [],
+    bondDebt: 0,
+    bondRate: 0,
+    bondYearsLeft: 0,
     status: 'active',
     history: [],
   };
@@ -90,7 +94,7 @@ export function companyValuation(c: Company): number {
   const profitBase = Math.max(c.profit, c.revenue * 0.05);
   const growthMult = c.history.length >= 2 && c.history[c.history.length - 1].revenue > c.history[c.history.length - 2].revenue * 1.15 ? 1.5 : 1;
   const brandMult = 0.8 + (c.brand / 100) * 0.6;
-  const value = profitBase * 12 * growthMult * brandMult + c.assets + c.cash - c.debt;
+  const value = profitBase * 12 * growthMult * brandMult + c.assets + c.cash - c.debt - c.bondDebt;
   return Math.max(0, Math.round(value));
 }
 
@@ -121,7 +125,11 @@ export function tickCompany(c: Company, ctx: CompanyTickContext): CompanyTickRes
   const priceFit = c.priceLevel <= 1
     ? 1 + (1 - c.priceLevel) * 0.8
     : 1 - (c.priceLevel - 1) * (1.4 - (c.brand + c.quality) / 250);
-  const marketingPower = 1 + Math.sqrt(clamp01(c.marketingPct)) * 0.55;
+  // C-suite executives (hired via hireExecutive()) each lift a distinct lever.
+  const cfo = c.executives.find((x) => x.role === 'cfo');
+  const coo = c.executives.find((x) => x.role === 'coo');
+  const cmo = c.executives.find((x) => x.role === 'cmo');
+  const marketingPower = 1 + Math.sqrt(clamp01(c.marketingPct)) * 0.55 + (cmo ? cmo.skill / 100 * 0.15 : 0);
   const qualityPull = 0.75 + ((c.quality + c.customerSatisfaction) / 200) * 0.5;
   // HQ tier (0=Basic Office..3=Megacomplex) lifts manager effectiveness and morale
   // ceiling but costs more upkeep. Culture is a set of tradeoffs, not a straight bonus.
@@ -129,7 +137,8 @@ export function tickCompany(c: Company, ctx: CompanyTickContext): CompanyTickRes
   const cultureOverheadMult = c.culture === 'remote' ? 0.82 : c.culture === 'traditional' ? 1.08 : c.culture === 'startup' ? 0.92 : 1;
   const cultureMoraleNoise = c.culture === 'remote' || c.culture === 'startup' ? 5 : 3;
   const cultureRdBoost = c.culture === 'startup' ? 1.15 : 1;
-  const managerMult = 0.85 + (c.managerQuality / 100) * 0.3 + hqBonus;
+  const cooBonus = coo ? coo.skill / 100 * 0.06 : 0;
+  const managerMult = 0.85 + (c.managerQuality / 100) * 0.3 + hqBonus + cooBonus;
   const moraleMult = 0.9 + (c.morale / 100) * 0.2 + hqBonus * 0.6;
   const noise = 1 + rng.normal(0, ind.volatility * 0.5);
 
@@ -143,6 +152,12 @@ export function tickCompany(c: Company, ctx: CompanyTickContext): CompanyTickRes
       commodityMult -= idx * 0.25 * (1 - c.supplyChainResilience / 200);
     }
   }
+
+  // Climate change: agriculture bears rising climate risk directly; insurers see more claims
+  // but also charge more, netting out to a smaller but real drag.
+  let climateMult = 1;
+  if (ind.tags.includes('agriculture')) climateMult -= (country.climateRisk / 100) * 0.3;
+  else if (ind.tags.includes('insurance')) climateMult -= (country.climateRisk / 100) * 0.08;
 
   // Global world events (pandemic / trade war / tech boom) hit or help industries by tag.
   let worldEventMult = 1;
@@ -162,8 +177,15 @@ export function tickCompany(c: Company, ctx: CompanyTickContext): CompanyTickRes
     }
   }
 
-  const growthPotential = cycle * confidence * lawMult * priceFit * marketingPower * qualityPull * managerMult * moraleMult * commodityMult * worldEventMult * noise;
-  c.revenue = Math.max(1000, c.revenue * clamp(growthPotential, 0.4, 2.2));
+  // Market saturation: every industry is finite, so the very largest firms see their upside
+  // compression toward flat as they approach and exceed a plausible ceiling for one company.
+  // Without this, uncapped per-year growth multipliers compound without bound across very
+  // long playthroughs (e.g. multi-generation play via dynasty succession).
+  const saturation = clamp(1 - Math.log10(Math.max(1, c.revenue / 5e9)) * 0.35, 0.15, 1);
+
+  const growthPotential = cycle * confidence * lawMult * priceFit * marketingPower * qualityPull * managerMult * moraleMult * commodityMult * worldEventMult * climateMult * noise;
+  const cappedGrowth = 1 + (clamp(growthPotential, 0.4, 2.2) - 1) * saturation;
+  c.revenue = Math.max(1000, c.revenue * cappedGrowth);
 
   // --- Costs ----------------------------------------------------------------
   const avgWage = Math.max(e.minimumWage, 42_000 * (e.gdp / (country.population / 1e6) / 40_000)) * c.salaryLevel;
@@ -174,10 +196,28 @@ export function tickCompany(c: Company, ctx: CompanyTickContext): CompanyTickRes
   const inputCost = c.revenue * (1 - ind.baseMargin) * 0.55 * commodityMult;
   const marketingCost = c.revenue * c.marketingPct;
   const rdCost = c.revenue * c.rdPct;
-  const interest = c.debt * c.debtRate;
+  const cfoDebtDiscount = cfo ? cfo.skill / 100 * 0.015 : 0;
+  const interest = c.debt * Math.max(0.01, c.debtRate - cfoDebtDiscount);
+  const bondInterest = c.bondDebt * c.bondRate;
+  const execSalaries = c.executives.reduce((s, x) => s + x.salary, 0);
   const hqOverhead = c.hqTier * c.assets * 0.006;
-  const overheads = c.assets * 0.04 * cultureOverheadMult + hqOverhead + (c.insured ? c.revenue * 0.01 : 0);
-  c.expenses = laborCost + inputCost + marketingCost + rdCost + interest + overheads;
+  const overheads = c.assets * 0.04 * cultureOverheadMult + hqOverhead + execSalaries + (c.insured ? c.revenue * 0.01 : 0);
+  c.expenses = laborCost + inputCost + marketingCost + rdCost + interest + bondInterest + overheads;
+
+  // Corporate bond amortization: fixed-term principal repayment alongside the interest above.
+  if (c.bondYearsLeft > 0) {
+    const amort = c.bondDebt / c.bondYearsLeft;
+    c.cash -= amort;
+    c.bondDebt = Math.max(0, c.bondDebt - amort);
+    c.bondYearsLeft--;
+  }
+
+  // Rivals occasionally poach an executive, more likely when morale is weak.
+  if (c.executives.length && rng.chance(0.04 + Math.max(0, (45 - c.morale) * 0.003))) {
+    const poached = rng.pick(c.executives);
+    c.executives = c.executives.filter((x) => x !== poached);
+    headline = headline ?? `${poached.name} departs ${c.name} for a rival offer`;
+  }
 
   const pretax = c.revenue - c.expenses;
   const tax = pretax > 0 ? pretax * e.taxRates.corporate : 0;

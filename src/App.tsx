@@ -4,6 +4,8 @@ import { useGame } from './store/gameStore';
 import { AppShell } from './ui/AppShell';
 import { EventModal } from './ui/EventModal';
 import { ElectionResultModal } from './ui/ElectionResultModal';
+import { SuccessionModal } from './ui/SuccessionModal';
+import { YearRecapModal } from './ui/YearRecapModal';
 import { TutorialOverlay } from './ui/TutorialOverlay';
 import { GameOver, Toasts } from './ui/Overlays';
 import { Menu } from './ui/screens/Menu';
@@ -51,9 +53,11 @@ export default function App() {
           {screen === 'family' && <Family />}
         </div>
       </AppShell>
+      <YearRecapModal />
       <EventModal />
       <ElectionResultModal />
       <TutorialOverlay />
+      <SuccessionModal />
       <GameOver />
       <Toasts />
     </>

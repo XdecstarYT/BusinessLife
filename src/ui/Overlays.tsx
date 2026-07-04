@@ -22,7 +22,7 @@ export function Toasts() {
 
 export function GameOver() {
   const { state, toMenu } = useGame();
-  if (!state?.gameOver) return null;
+  if (!state?.gameOver || state.pendingSuccession) return null;
   const go = state.gameOver;
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">

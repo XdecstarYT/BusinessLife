@@ -137,6 +137,7 @@ export function tickEconomy(state: GameState, country: Country, rng: RNG): Econo
   const e = country.economy;
   const law = aggregateLawEffects(country);
   let crisis: string | null = null;
+  const difficultyCrisisMult = state.difficulty === 'casual' ? 0.6 : state.difficulty === 'ironman' ? 1.4 : 1;
 
   // --- Regime transitions -------------------------------------------------
   const spec = REGIME_TRANSITIONS[e.regime];
@@ -169,7 +170,7 @@ export function tickEconomy(state: GameState, country: Country, rng: RNG): Econo
   // Commodity shock pass-through
   const oilShock = (e.commodities.oil - 100) / 100;
   inflation += oilShock * 0.01;
-  if (e.govDebtToGdp > 1.5 && rng.chance(0.1)) {
+  if (e.govDebtToGdp > 1.5 && rng.chance(0.1 * difficultyCrisisMult)) {
     inflation += rng.range(0.03, 0.1);
     crisis = 'debt';
   }
@@ -218,7 +219,9 @@ export function tickEconomy(state: GameState, country: Country, rng: RNG): Econo
   e.taxRates.corporate += (targetCorp - e.taxRates.corporate) * 0.5;
   e.taxRates.sales += (targetSales - e.taxRates.sales) * 0.5;
   e.taxRates.capitalGains += (targetCg - e.taxRates.capitalGains) * 0.5;
-  const wageTarget = e.minimumWage * (1 + (law.minimumWagePct ?? 0) * 0.2 + e.inflation);
+  // Immigration policy: a larger labor supply softens minimum-wage growth a touch.
+  const immigrationWageDamp = 1 - (country.immigrationQuota - 50) / 500;
+  const wageTarget = e.minimumWage * (1 + (law.minimumWagePct ?? 0) * 0.2 + e.inflation) * immigrationWageDamp;
   e.minimumWage = e.minimumWage * 0.5 + wageTarget * 0.5;
 
   // --- FX ------------------------------------------------------------------------
@@ -236,7 +239,8 @@ export function tickEconomy(state: GameState, country: Country, rng: RNG): Econo
   country.climateRisk = clamp100(country.climateRisk + (law.climateRisk ?? 0) * 0.3 + 0.3 + rng.range(-0.3, 0.3));
 
   // --- Demographics ------------------------------------------------------------------
-  const naturalGrowth = (country.birthRate - country.deathRate + country.migrationRate) / 1000;
+  const immigrationMult = 0.4 + (country.immigrationQuota / 100) * 1.2;
+  const naturalGrowth = (country.birthRate - country.deathRate + country.migrationRate * immigrationMult) / 1000;
   country.population = Math.round(country.population * (1 + naturalGrowth));
   for (const city of country.cities) {
     city.population = Math.round(city.population * (1 + naturalGrowth + rng.range(-0.005, 0.01)));
@@ -244,11 +248,14 @@ export function tickEconomy(state: GameState, country: Country, rng: RNG): Econo
     city.crime = clamp100(city.crime + lawCrime * 0.5 + (e.unemployment - 0.06) * 20 + rng.range(-2, 2));
   }
 
-  // Natural disasters scale with climate risk.
-  if (rng.chance(country.climateRisk / 100 * 0.12)) {
+  // Natural disasters scale with climate risk: they hit GDP, stability, property values and
+  // business confidence together — insurers absorb some of the cost via higher claims.
+  if (rng.chance((country.climateRisk / 100) * 0.12 * difficultyCrisisMult)) {
     crisis = crisis ?? 'disaster';
     e.gdp *= rng.range(0.985, 0.998);
     country.stability = clamp100(country.stability - rng.range(1, 4));
+    e.housingIndex = Math.max(20, e.housingIndex * rng.range(0.88, 0.97));
+    e.businessConfidence = clamp100(e.businessConfidence - rng.range(3, 8));
   }
 
   e.history.push({

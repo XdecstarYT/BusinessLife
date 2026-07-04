@@ -118,7 +118,7 @@ export function estimateLawVote(state: GameState, country: Country, law: LawDef)
   }
   const p = state.player;
   // Player's political capital and lobbying skill sway marginal votes.
-  const sway = (p.politicalCapital * 0.6 + (p.skills[SK.lobbying] ?? 0) * 0.1 + (p.skills[SK.coalition] ?? 0) * 0.1) / 100;
+  const sway = (p.politicalCapital * 0.6 + (p.skills[SK.lobbying] ?? 0) * 0.1 + (p.skills[SK.coalition] ?? 0) * 0.1) / 100 + (p.lobbyingFirmHired ? 0.08 : 0);
   const total = Math.max(1, country.totalSeats);
   const chance = clamp(supportSeats / total + sway, 0.03, 0.97);
   return { chance, supportSeats: Math.round(supportSeats), totalSeats: total };
@@ -220,8 +220,18 @@ export function tickPolitics(state: GameState, country: Country, rng: RNG): stri
         if (proj.kind === 'internet' || proj.kind === 'power') country.economy.businessConfidence = clamp100(country.economy.businessConfidence + 4);
         if (proj.kind === 'roads' || proj.kind === 'rail') country.economy.gdpGrowth += 0.002;
         if (proj.kind === 'airport') country.economy.businessConfidence = clamp100(country.economy.businessConfidence + 3);
-        headlines.push(`🏗️ ${country.name} completed a new ${proj.kind} project.`);
-        if (playerIsLeader && !state.achievements.includes('nation_builder')) state.achievements.push('nation_builder');
+        if (proj.kind === 'space_program') {
+          country.militaryPower = clamp100(country.militaryPower + 10);
+          country.economy.businessConfidence = clamp100(country.economy.businessConfidence + 10);
+          country.stability = clamp100(country.stability + 5);
+          if (playerIsLeader) {
+            state.player.reputation = clamp100(state.player.reputation + 15);
+            state.player.popularity = clamp100(state.player.popularity + 10);
+            if (!state.achievements.includes('space_pioneer')) state.achievements.push('space_pioneer');
+          }
+        }
+        headlines.push(`🏗️ ${country.name} completed a new ${proj.kind === 'space_program' ? 'national space program' : proj.kind} project.`);
+        if (playerIsLeader && proj.kind !== 'space_program' && !state.achievements.includes('nation_builder')) state.achievements.push('nation_builder');
         finished.push(proj.id);
       }
     }
@@ -293,6 +303,14 @@ export function tickPolitics(state: GameState, country: Country, rng: RNG): stri
     }
   }
 
+  // Judicial review: a low-integrity court can arbitrarily strike down a law in force.
+  if (country.lawsInForce.length && rng.chance(clamp(0.05 * (1 - country.judicialIntegrity / 130), 0.005, 0.08))) {
+    const lawId = rng.pick(country.lawsInForce);
+    const law = LAW_BY_ID[lawId];
+    country.lawsInForce = country.lawsInForce.filter((id) => id !== lawId);
+    headlines.push(`⚖️ ${country.name}'s courts struck down the ${law?.name ?? 'law'}`);
+  }
+
   // Geopolitics: relations drift; sanctions and (rare) wars.
   for (const other of state.countries) {
     if (other.id === country.id) continue;
@@ -313,12 +331,27 @@ export function tickPolitics(state: GameState, country: Country, rng: RNG): stri
       other.atWarWith.push(country.id);
       headlines.push(`⚔️ WAR: ${country.name} and ${other.name} enter open conflict`);
     }
-    if (country.atWarWith.includes(other.id) && rng.chance(0.35)) {
-      country.atWarWith = country.atWarWith.filter((x) => x !== other.id);
-      other.atWarWith = other.atWarWith.filter((x) => x !== country.id);
-      country.relations[other.id] = -40;
-      other.relations[country.id] = -40;
-      headlines.push(`🕊️ Peace: ${country.name} and ${other.name} sign an armistice`);
+    if (country.atWarWith.includes(other.id)) {
+      // A war strategy chosen via declareWar() differentiates the yearly toll and peace odds.
+      const strategy = country.warStrategies[other.id];
+      let peaceChance = 0.35;
+      if (strategy === 'blockade') {
+        other.economy.businessConfidence = clamp100(other.economy.businessConfidence - 3);
+        other.economy.gdpGrowth -= 0.01;
+        peaceChance = 0.22;
+      } else if (strategy === 'invasion') {
+        country.stability = clamp100(country.stability - 2);
+        other.stability = clamp100(other.stability - 4);
+        peaceChance = 0.45;
+      }
+      if (rng.chance(peaceChance)) {
+        country.atWarWith = country.atWarWith.filter((x) => x !== other.id);
+        other.atWarWith = other.atWarWith.filter((x) => x !== country.id);
+        delete country.warStrategies[other.id];
+        country.relations[other.id] = -40;
+        other.relations[country.id] = -40;
+        headlines.push(`🕊️ Peace: ${country.name} and ${other.name} sign an armistice`);
+      }
     }
   }
 

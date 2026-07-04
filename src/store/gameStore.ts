@@ -6,7 +6,7 @@
 import { create } from 'zustand';
 import type { EventChoice, FiredEvent, GameState } from '../sim/types';
 import { generateWorld, type NewGameConfig } from '../sim/world';
-import { advanceDay, advanceWeek, advanceYear } from '../sim/engine';
+import { advanceDay, advanceWeek, advanceYear, continueAsHeir as continueAsHeirEngine } from '../sim/engine';
 import { resolveChoice } from '../sim/events';
 import { RNG } from '../sim/rng';
 import * as actions from '../sim/actions';
@@ -70,6 +70,9 @@ interface GameStoreState {
   chooseEvent: (choice: EventChoice) => void;
   dismissEventResult: () => void;
   dismissElectionResult: () => void;
+  continueAsHeir: (npcId: string) => void;
+  endStoryHere: () => void;
+  dismissYearRecap: () => void;
   toggleDark: () => void;
   toast: (text: string, tone?: 'ok' | 'err') => void;
 
@@ -242,6 +245,28 @@ export const useGame = create<GameStoreState>((set, get) => ({
     const s = get().state;
     if (!s) return;
     s.player.lastElectionResult = null;
+    commit(get, set);
+  },
+
+  continueAsHeir: (npcId) => {
+    const s = get().state;
+    if (!s) return;
+    const next = continueAsHeirEngine(s, npcId);
+    set({ state: { ...next }, screen: 'life' });
+    void saveGame(AUTOSAVE_ID, next, true);
+  },
+
+  endStoryHere: () => {
+    const s = get().state;
+    if (!s) return;
+    s.pendingSuccession = null;
+    commit(get, set);
+  },
+
+  dismissYearRecap: () => {
+    const s = get().state;
+    if (!s) return;
+    s.yearRecap = null;
     commit(get, set);
   },
 

@@ -4,13 +4,13 @@
  * and eligibility so the UI can surface clean errors. RNG-consuming actions
  * advance the persisted stream so outcomes stay deterministic on replay.
  */
-import type { Advisor, AdvisorSpecialty, CabinetPortfolio, Company, GameState, Gender, InfrastructureKind, ManifestoPromise, OfficeKind, PropertyAsset, TaxRates } from './types';
+import type { Advisor, AdvisorSpecialty, CabinetPortfolio, Company, Executive, ExecutiveRole, GameState, Gender, InfrastructureKind, ManifestoPromise, OfficeKind, PropertyAsset, TaxRates } from './types';
 import { CABINET_PORTFOLIOS, clamp, clamp100 } from './types';
 import { RNG } from './rng';
 import { INDUSTRY_BY_ID, INDUSTRIES } from '../data/industries';
 import { LAW_BY_ID } from '../data/laws';
 import { SK } from '../data/skills';
-import { makeCompanyName, makePartyName } from '../data/names';
+import { makeCompanyName, makePartyName, makePersonName } from '../data/names';
 import { createCompany, nextCompanyId, companyValuation } from './business';
 import { doIPO, marketCap } from './market';
 import { OFFICE_SPEC_BY_KIND, campaignWinChance, eligibleFor, estimateLawVote } from './politics';
@@ -594,6 +594,102 @@ export function runLeadershipProgram(state: GameState, companyId: string): Actio
   return { ok: true, message: 'Leadership program complete. Management, morale and brand all improved.' };
 }
 
+// ---------------------------------------------------------------------------
+// Corporate structure: executives, bonds, buybacks, spin-offs
+// ---------------------------------------------------------------------------
+
+const EXEC_TITLES: Record<ExecutiveRole, string> = { cfo: 'CFO', coo: 'COO', cmo: 'CMO' };
+
+export function hireExecutive(state: GameState, companyId: string, role: ExecutiveRole): ActionResult {
+  const c = state.companies[companyId];
+  if (!c || !c.playerOwned || c.status !== 'active') return { ok: false, message: 'Not your company.' };
+  if (c.executives.some((e) => e.role === role)) return { ok: false, message: `${c.name} already has a ${EXEC_TITLES[role]}.` };
+  const salary = Math.max(80_000, c.revenue * 0.01);
+  const signOnBonus = salary * 0.5;
+  if (signOnBonus > c.cash) return { ok: false, message: `Needs $${Math.round(signOnBonus).toLocaleString()} in company cash for the sign-on bonus.` };
+  const rng = withRng(state);
+  c.cash -= signOnBonus;
+  const exec: Executive = { role, name: makePersonName(rng, rng.chance(0.5) ? 'male' : 'female'), skill: rng.range(45, 90), salary };
+  c.executives.push(exec);
+  commit(state, rng);
+  log(state, `${c.name} hired ${exec.name} as ${EXEC_TITLES[role]}.`, 'business');
+  return { ok: true, message: `${exec.name} joins as ${EXEC_TITLES[role]}.` };
+}
+
+export function fireExecutive(state: GameState, companyId: string, role: ExecutiveRole): ActionResult {
+  const c = state.companies[companyId];
+  if (!c || !c.playerOwned || c.status !== 'active') return { ok: false, message: 'Not your company.' };
+  const exec = c.executives.find((e) => e.role === role);
+  if (!exec) return { ok: false, message: `No ${EXEC_TITLES[role]} to let go.` };
+  c.executives = c.executives.filter((e) => e.role !== role);
+  log(state, `${exec.name} departed as ${EXEC_TITLES[role]} of ${c.name}.`, 'business');
+  return { ok: true, message: `${exec.name} has left the company.` };
+}
+
+export function issueCorporateBond(state: GameState, companyId: string, amount: number, termYears: number): ActionResult {
+  const c = state.companies[companyId];
+  if (!c || !c.playerOwned || c.status !== 'active') return { ok: false, message: 'Not your company.' };
+  if (c.bondDebt > 0) return { ok: false, message: 'Repay the existing corporate bond before issuing another.' };
+  if (amount <= 0 || amount > c.assets * 2 + c.revenue) return { ok: false, message: 'Bond amount is too large relative to the company\'s size.' };
+  const country = state.countries.find((k) => k.id === c.countryId)!;
+  const riskSpread = clamp((c.debt + c.bondDebt) / Math.max(1, c.assets), 0, 1) * 0.03;
+  const rate = country.economy.interestRate + 0.02 + riskSpread;
+  c.cash += amount;
+  c.bondDebt = amount;
+  c.bondRate = rate;
+  c.bondYearsLeft = clamp(termYears, 2, 10);
+  log(state, `${c.name} issued a $${Math.round(amount).toLocaleString()} corporate bond at ${(rate * 100).toFixed(1)}%.`, 'business');
+  return { ok: true, message: `Bond issued: $${Math.round(amount).toLocaleString()} at ${(rate * 100).toFixed(1)}%.` };
+}
+
+export function buybackShares(state: GameState, companyId: string, amount: number): ActionResult {
+  const c = state.companies[companyId];
+  if (!c || !c.playerOwned || !c.isPublic || c.status !== 'active') return { ok: false, message: 'Only public companies you control can buy back shares.' };
+  if (amount <= 0 || amount > c.cash) return { ok: false, message: `Needs $${Math.round(amount).toLocaleString()} in company cash.` };
+  const cap = Math.max(1, marketCap(c));
+  const sharesRetired = amount / c.sharePrice;
+  if (sharesRetired >= c.sharesOutstanding * 0.5) return { ok: false, message: 'Cannot retire more than half of shares outstanding at once.' };
+  c.cash -= amount;
+  c.sharesOutstanding -= sharesRetired;
+  c.playerSharePct = clamp(c.playerSharePct * (c.sharesOutstanding + sharesRetired) / c.sharesOutstanding, 0, 1);
+  c.sharePrice = c.sharePrice * (1 + clamp(amount / cap, 0, 0.3) * 0.5);
+  log(state, `${c.name} bought back $${Math.round(amount).toLocaleString()} of its own shares.`, 'business');
+  return { ok: true, message: `Retired ${Math.round(sharesRetired).toLocaleString()} shares.` };
+}
+
+export function spinOffCompany(state: GameState, companyId: string): ActionResult {
+  const p = state.player;
+  const c = state.companies[companyId];
+  if (!c || !c.playerOwned || c.status !== 'active') return { ok: false, message: 'Not your company.' };
+  if (c.revenue < 5_000_000) return { ok: false, message: 'The company needs at least $5M in revenue to support a spin-off.' };
+  const ind = INDUSTRY_BY_ID[c.industryId];
+  const rng = withRng(state);
+  const spinFraction = 0.4;
+  const newId = nextCompanyId(state);
+  const spin = createCompany(
+    { name: `${c.name} Ventures`, industry: ind, countryId: c.countryId, founderId: 'player', playerOwned: true, capital: c.assets * spinFraction, year: state.year },
+    rng,
+  );
+  spin.id = newId;
+  spin.revenue = c.revenue * spinFraction;
+  spin.employees = Math.round(c.employees * spinFraction);
+  spin.cash = c.cash * spinFraction * 0.5;
+  spin.brand = c.brand * 0.7;
+  spin.quality = c.quality;
+  spin.playerSharePct = 0.7;
+  state.companies[newId] = spin;
+  p.companies.push(newId);
+
+  c.revenue *= 1 - spinFraction;
+  c.assets *= 1 - spinFraction;
+  c.employees = Math.round(c.employees * (1 - spinFraction));
+  c.cash -= spin.cash;
+
+  commit(state, rng);
+  log(state, `${c.name} spun off a new entity, ${spin.name}, retaining a 70% stake.`, 'business');
+  return { ok: true, message: `${spin.name} spun off successfully.` };
+}
+
 export function fileTrademark(state: GameState, companyId: string): ActionResult {
   const c = state.companies[companyId];
   if (!c || !c.playerOwned || c.status !== 'active') return { ok: false, message: 'Not your company.' };
@@ -966,7 +1062,7 @@ function homeOf(state: GameState) {
   return state.countries.find((c) => c.id === state.player.countryId)!;
 }
 
-export function declareWar(state: GameState, targetCountryId: string): ActionResult {
+export function declareWar(state: GameState, targetCountryId: string, strategy: 'blockade' | 'invasion' = 'invasion'): ActionResult {
   const { home, error } = requireLeadership(state);
   if (error) return error;
   const target = state.countries.find((c) => c.id === targetCountryId);
@@ -974,12 +1070,14 @@ export function declareWar(state: GameState, targetCountryId: string): ActionRes
   if (home.atWarWith.includes(target.id)) return { ok: false, message: `Already at war with ${target.name}.` };
   home.atWarWith.push(target.id);
   target.atWarWith.push(home.id);
+  home.warStrategies[target.id] = strategy;
   home.relations[target.id] = -100;
   target.relations[home.id] = -100;
-  home.stability = clamp(home.stability - 5, 0, 100);
+  home.stability = clamp(home.stability - (strategy === 'invasion' ? 8 : 3), 0, 100);
   if (!state.achievements.includes('diplomat')) state.achievements.push('diplomat');
-  log(state, `⚔️ You declared war on ${target.name}.`, 'politics');
-  return { ok: true, message: `War declared on ${target.name}.` };
+  const label = strategy === 'blockade' ? 'an economic blockade' : 'a full invasion';
+  log(state, `⚔️ You declared war on ${target.name} with ${label}.`, 'politics');
+  return { ok: true, message: `War declared on ${target.name} (${strategy}).` };
 }
 
 export function signPeaceTreaty(state: GameState, targetCountryId: string): ActionResult {
@@ -989,6 +1087,7 @@ export function signPeaceTreaty(state: GameState, targetCountryId: string): Acti
   if (!target || !home.atWarWith.includes(target.id)) return { ok: false, message: 'You are not at war with that nation.' };
   home.atWarWith = home.atWarWith.filter((id) => id !== target.id);
   target.atWarWith = target.atWarWith.filter((id) => id !== home.id);
+  delete home.warStrategies[target.id];
   home.relations[target.id] = -20;
   target.relations[home.id] = -20;
   home.stability = clamp(home.stability + 4, 0, 100);
@@ -1086,12 +1185,21 @@ export function setTaxRate(state: GameState, tax: keyof TaxRates, ratePct: numbe
   return { ok: true, message: `${tax} tax rate target set to ${Math.round(rate * 100)}%.` };
 }
 
+export function setImmigrationQuota(state: GameState, quotaPct: number): ActionResult {
+  const { home, error } = requireLeadership(state);
+  if (error) return error;
+  home.immigrationQuota = clamp(quotaPct, 0, 100);
+  log(state, `Set the national immigration quota to ${Math.round(home.immigrationQuota)}%.`, 'politics');
+  return { ok: true, message: `Immigration quota set to ${Math.round(home.immigrationQuota)}%.` };
+}
+
 const INFRA_SPECS: Record<InfrastructureKind, { capitalCost: number; budgetHit: number; years: number }> = {
   roads: { capitalCost: 15, budgetHit: 0.01, years: 2 },
   rail: { capitalCost: 20, budgetHit: 0.015, years: 3 },
   airport: { capitalCost: 25, budgetHit: 0.02, years: 3 },
   power: { capitalCost: 18, budgetHit: 0.012, years: 2 },
   internet: { capitalCost: 15, budgetHit: 0.01, years: 2 },
+  space_program: { capitalCost: 60, budgetHit: 0.05, years: 8 },
 };
 
 export function launchInfrastructureProject(state: GameState, kind: InfrastructureKind): ActionResult {
@@ -1207,6 +1315,102 @@ export function counterEspionage(state: GameState): ActionResult {
   return { ok: true, message: 'Counter-espionage operation complete.' };
 }
 
+export function nominateChiefJustice(state: GameState, npcId: string): ActionResult {
+  const { home, error } = requireLeadership(state);
+  if (error) return error;
+  const npc = state.npcs[npcId];
+  if (!npc || !npc.alive || npc.countryId !== home.id) return { ok: false, message: 'Invalid nominee.' };
+  home.chiefJusticeId = npcId;
+  home.judicialIntegrity = clamp100(home.judicialIntegrity * 0.4 + npc.integrity * 0.6);
+  log(state, `${npc.name} was confirmed as Chief Justice of ${home.name}.`, 'politics');
+  return { ok: true, message: `${npc.name} confirmed as Chief Justice.` };
+}
+
+export function callReferendum(state: GameState, lawId: string): ActionResult {
+  const { home, error } = requireLeadership(state);
+  if (error) return error;
+  const p = state.player;
+  const law = LAW_BY_ID[lawId];
+  if (!law) return { ok: false, message: 'Unknown law.' };
+  if (home.lawsInForce.includes(law.id)) return { ok: false, message: `${law.name} is already in force.` };
+  if (p.politicalCapital < 15) return { ok: false, message: 'Needs at least 15 political capital.' };
+  p.politicalCapital = clamp(p.politicalCapital - 15, 0, 100);
+  const legislatureEst = estimateLawVote(state, home, law);
+  const chance = clamp((legislatureEst.chance + home.approvalOfGovernment / 100) / 2, 0.05, 0.95);
+  const rng = withRng(state);
+  const passed = rng.chance(chance);
+  commit(state, rng);
+  if (passed) {
+    home.lawsInForce.push(law.id);
+    log(state, `🗳️ The referendum on the ${law.name} passed.`, 'politics');
+    return { ok: true, message: `Referendum passed: ${law.name} is now in force.` };
+  }
+  state.player.popularity = clamp100(state.player.popularity - 2);
+  log(state, `🗳️ The referendum on the ${law.name} failed at the ballot box.`, 'bad');
+  return { ok: false, message: `Referendum failed: ${law.name} was rejected.` };
+}
+
+export function hireLobbyingFirm(state: GameState): ActionResult {
+  const p = state.player;
+  if (p.lobbyingFirmHired) return { ok: false, message: 'You already retain a lobbying firm.' };
+  const cost = 75_000;
+  if (p.money < cost) return { ok: false, message: `Needs $${cost.toLocaleString()}.` };
+  p.money -= cost;
+  p.lobbyingFirmHired = true;
+  log(state, `Retained a lobbying firm ($25k/yr upkeep) to sway legislative votes.`, 'politics');
+  return { ok: true, message: 'Lobbying firm retained.' };
+}
+
+export function cancelLobbyingFirm(state: GameState): ActionResult {
+  const p = state.player;
+  if (!p.lobbyingFirmHired) return { ok: false, message: 'No lobbying firm retained.' };
+  p.lobbyingFirmHired = false;
+  log(state, `Cancelled the lobbying firm retainer.`, 'politics');
+  return { ok: true, message: 'Lobbying firm retainer cancelled.' };
+}
+
+export function foundAlliance(state: GameState, name: string): ActionResult {
+  const { home, error } = requireLeadership(state);
+  if (error) return error;
+  if (home.allianceId) return { ok: false, message: `${home.name} already belongs to an alliance.` };
+  const id = `alliance_${state.year}_${state.alliances.length + 1}`;
+  state.alliances.push({ id, name: name.trim() || `${home.name} Pact`, founderCountryId: home.id, memberCountryIds: [home.id] });
+  home.allianceId = id;
+  log(state, `${home.name} founded the ${name || `${home.name} Pact`} alliance.`, 'politics');
+  return { ok: true, message: 'Alliance founded.' };
+}
+
+export function joinAlliance(state: GameState, allianceId: string): ActionResult {
+  const { home, error } = requireLeadership(state);
+  if (error) return error;
+  if (home.allianceId) return { ok: false, message: `${home.name} already belongs to an alliance.` };
+  const alliance = state.alliances.find((a) => a.id === allianceId);
+  if (!alliance) return { ok: false, message: 'Alliance not found.' };
+  alliance.memberCountryIds.push(home.id);
+  home.allianceId = alliance.id;
+  for (const memberId of alliance.memberCountryIds) {
+    if (memberId === home.id) continue;
+    const member = state.countries.find((c) => c.id === memberId);
+    if (member) {
+      home.relations[member.id] = clamp((home.relations[member.id] ?? 0) + 25, -100, 100);
+      member.relations[home.id] = clamp((member.relations[home.id] ?? 0) + 25, -100, 100);
+    }
+  }
+  log(state, `${home.name} joined the ${alliance.name} alliance.`, 'politics');
+  return { ok: true, message: `Joined ${alliance.name}.` };
+}
+
+export function leaveAlliance(state: GameState): ActionResult {
+  const { home, error } = requireLeadership(state);
+  if (error) return error;
+  if (!home.allianceId) return { ok: false, message: 'Not in an alliance.' };
+  const alliance = state.alliances.find((a) => a.id === home.allianceId);
+  if (alliance) alliance.memberCountryIds = alliance.memberCountryIds.filter((id) => id !== home.id);
+  home.allianceId = null;
+  log(state, `${home.name} withdrew from its alliance.`, 'politics');
+  return { ok: true, message: 'Left the alliance.' };
+}
+
 // ---------------------------------------------------------------------------
 // Crime & the underworld
 // ---------------------------------------------------------------------------
@@ -1238,8 +1442,8 @@ export function heist(state: GameState): ActionResult {
   const chance = clamp(0.4 + skill * 0.004 + p.crimeRank * 0.03, 0.1, 0.85);
   const success = rng.chance(chance);
   if (success) {
-    const take = rng.range(20_000, 60_000) * p.crimeRank;
-    p.money += take;
+    const take = rng.range(20_000, 60_000) * p.crimeRank * (1 + p.turfControl / 200);
+    p.dirtyMoney += take;
     p.notoriety = clamp100(p.notoriety + 5);
     if (p.crimeRank < 5 && rng.chance(0.25)) {
       p.crimeRank++;
@@ -1273,7 +1477,7 @@ export function protectionRacket(state: GameState, targetCompanyId: string): Act
   const chance = clamp(0.7 + (p.skills[SK.bribery] ?? 0) * 0.002, 0.3, 0.9);
   if (rng.chance(chance)) {
     target.cash -= take;
-    p.money += take;
+    p.dirtyMoney += take * (1 + p.turfControl / 200);
     p.notoriety = clamp100(p.notoriety + 3);
     commit(state, rng);
     log(state, `Shook down ${target.name} for $${Math.round(take).toLocaleString()}.`, 'bad');
@@ -1334,10 +1538,78 @@ export function goStraight(state: GameState): ActionResult {
   p.money -= cost;
   p.crimeFamilyId = null;
   p.crimeRank = 0;
+  p.turfControl = 0;
   p.notoriety = clamp100(p.notoriety - 15);
   p.karma = clamp100(p.karma + 10);
   log(state, `You paid your way out of the family and went straight.`, 'good');
   return { ok: true, message: 'You left the criminal underworld behind.' };
+}
+
+export function launderMoney(state: GameState, companyId: string, amount: number): ActionResult {
+  const p = state.player;
+  const c = state.companies[companyId];
+  if (!c || !c.playerOwned || c.status !== 'active') return { ok: false, message: 'You need an active front business.' };
+  if (amount <= 0 || amount > p.dirtyMoney) return { ok: false, message: 'Not enough dirty money.' };
+  const rng = withRng(state);
+  const skill = p.skills[SK.moneyLaundering] ?? 0;
+  const cut = clamp(0.35 - c.brand / 500 - skill * 0.001, 0.1, 0.35);
+  const clean = amount * (1 - cut);
+  const caught = rng.chance(clamp(0.08 - c.brand * 0.0003 - skill * 0.0004, 0.01, 0.08));
+  p.dirtyMoney -= amount;
+  commit(state, rng);
+  if (caught) {
+    c.lawsuits++;
+    p.notoriety = clamp100(p.notoriety + 15);
+    p.criminalRecord++;
+    log(state, `🚨 A laundering operation through ${c.name} was flagged by regulators.`, 'bad');
+    return { ok: false, message: `The operation was flagged. Dirty money lost, and ${c.name} faces scrutiny.` };
+  }
+  p.money += clean;
+  log(state, `Laundered $${Math.round(amount).toLocaleString()} through ${c.name} (${Math.round(cut * 100)}% cut).`, 'bad');
+  return { ok: true, message: `Cleaned $${Math.round(clean).toLocaleString()}.` };
+}
+
+export function contestTerritory(state: GameState): ActionResult {
+  const p = state.player;
+  if (!p.crimeFamilyId) return { ok: false, message: 'You need to be in the family first.' };
+  if (p.inJailYears > 0) return { ok: false, message: 'Not while incarcerated.' };
+  if (p.turfControl >= 100) return { ok: false, message: 'You already control all the turf worth having.' };
+  const rng = withRng(state);
+  const skill = (p.skills[SK.streetSmarts] ?? 0) * 0.6 + (p.skills[SK.bribery] ?? 0) * 0.4;
+  const chance = clamp(0.35 + skill * 0.004 + p.crimeRank * 0.05, 0.15, 0.85);
+  const success = rng.chance(chance);
+  if (success) {
+    const gain = rng.range(8, 18);
+    p.turfControl = clamp100(p.turfControl + gain);
+    p.notoriety = clamp100(p.notoriety + 4);
+    commit(state, rng);
+    log(state, `Your family expanded its turf. Territory control now ${Math.round(p.turfControl)}.`, 'bad');
+    return { ok: true, message: `Turf control +${gain.toFixed(0)}.` };
+  }
+  const loss = rng.range(5, 12);
+  p.turfControl = clamp100(p.turfControl - loss);
+  p.health = clamp100(p.health - rng.range(5, 15));
+  commit(state, rng);
+  log(state, `A rival crew pushed back hard on your turf grab.`, 'bad');
+  return { ok: false, message: 'The turf war went badly. You took losses.' };
+}
+
+export function enterWitnessProtection(state: GameState): ActionResult {
+  const p = state.player;
+  if (p.crimeFamilyId) return { ok: false, message: 'Go straight first — you cannot enter protection while still in the family.' };
+  if (p.inWitnessProtection) return { ok: false, message: 'Already in witness protection.' };
+  const cost = 100_000;
+  if (p.money < cost) return { ok: false, message: `Needs $${cost.toLocaleString()}.` };
+  p.money -= cost;
+  p.criminalRecord = 0;
+  p.notoriety = 0;
+  p.turfControl = 0;
+  p.inWitnessProtection = true;
+  p.reputation = clamp(p.reputation - 10, 0, 100);
+  if (p.rivalId) p.rivalId = null;
+  p.happiness = clamp100(p.happiness - 8);
+  log(state, `You entered witness protection, wiping your criminal record at the cost of your old life.`, 'good');
+  return { ok: true, message: 'Your criminal record and notoriety were wiped clean.' };
 }
 
 // ---------------------------------------------------------------------------

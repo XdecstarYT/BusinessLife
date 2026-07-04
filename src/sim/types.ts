@@ -20,7 +20,7 @@ export type Gender = 'male' | 'female';
 
 export interface Relationship {
   npcId: string;
-  kind: 'parent' | 'sibling' | 'spouse' | 'child' | 'friend' | 'rival' | 'mentor' | 'ally';
+  kind: 'parent' | 'sibling' | 'spouse' | 'child' | 'grandchild' | 'friend' | 'rival' | 'mentor' | 'ally';
   closeness: number; // 0..100
 }
 
@@ -68,6 +68,25 @@ export interface ForexPosition {
 export interface LifeInsurancePolicy {
   monthlyPremium: number; // deducted yearly as premium*12
   payout: number;
+}
+
+export interface LimitOrder {
+  id: string;
+  companyId: string;
+  kind: 'buy' | 'sell';
+  targetPrice: number; // executes when sharePrice crosses this threshold
+  amount: number; // dollar amount to transact when triggered
+}
+
+export type ChallengeKind = 'net_worth' | 'reputation' | 'companies';
+
+export interface Challenge {
+  id: string;
+  description: string;
+  kind: ChallengeKind;
+  targetValue: number;
+  deadlineYear: number;
+  rewardMoney: number;
 }
 
 export interface PersonalLoan {
@@ -154,7 +173,9 @@ export interface Player {
   relationships: Relationship[];
   spouseId: string | null; // NPC id; also present in relationships as kind 'spouse'
   children: string[]; // NPC ids; also present in relationships as kind 'child'
+  grandchildren: string[]; // NPC ids; also present in relationships as kind 'grandchild'
   divorceCount: number;
+  primaryHeirId: string | null; // designated in a will; gets priority in the estate split and top billing at succession
   mentorId: string | null; // NPC id; also present in relationships as kind 'mentor'
   rivalId: string | null; // NPC id; also present in relationships as kind 'rival'
   crimeFamilyId: string | null; // NPC id of the boss, if the player has joined organized crime
@@ -164,6 +185,15 @@ export interface Player {
   politicalCapital: number; // spend to pass laws, gain from wins
   politicalHeirId: string | null; // NPC id (adult child) designated to inherit party/popularity on death
   advisors: Advisor[]; // up to 3 hired AI advisors offering recommendations that can be wrong
+  hasPrenup: boolean; // current marriage has a prenuptial agreement protecting premarital assets
+  lobbyingFirmHired: boolean; // ongoing retainer that boosts law-pass odds
+  marginDebt: number; // borrowed amount financing leveraged stock positions
+  drip: boolean; // dividend reinvestment plan: dividends auto-buy more shares of the same stock
+  limitOrders: LimitOrder[];
+  challenge: Challenge | null; // an active random mid-game objective
+  dirtyMoney: number; // illicit proceeds from heists/rackets; must be laundered before spending freely
+  turfControl: number; // 0..100, crime family's territorial strength; boosts heist/racket payouts
+  inWitnessProtection: boolean; // wiped criminal record/notoriety at a steep one-time cost
   campaign: null | {
     officeKind: OfficeKind;
     regionName: string;
@@ -217,6 +247,7 @@ export interface NPC {
   companyId: string | null; // company they run/own
   goal: string;
   memory: string[]; // notable interactions with the player
+  parentId?: string; // NPC id of the parent, for tracking grandchildren lineage
 }
 
 // ---------------------------------------------------------------------------
@@ -335,12 +366,17 @@ export interface Country {
   infrastructureProjects: InfrastructureProject[];
   intelCapability: number; // 0..100, national intelligence agency strength
   taxAdjustments: Partial<TaxRates>; // player-set direct rate offsets, layered on top of legislated rates
+  immigrationQuota: number; // 0..100, openness; shifts migrationRate and labor supply
+  warStrategies: Record<string, 'blockade' | 'invasion'>; // enemy countryId -> chosen strategy
+  chiefJusticeId: string | null; // NPC id nominated to head the judiciary
+  judicialIntegrity: number; // 0..100, higher = fewer arbitrary law strike-downs
+  allianceId: string | null; // Alliance id this nation belongs to, if any
 }
 
 export const CABINET_PORTFOLIOS = ['Finance', 'Foreign Affairs', 'Defense', 'Health', 'Education', 'Justice'] as const;
 export type CabinetPortfolio = (typeof CABINET_PORTFOLIOS)[number];
 
-export type InfrastructureKind = 'roads' | 'rail' | 'airport' | 'power' | 'internet';
+export type InfrastructureKind = 'roads' | 'rail' | 'airport' | 'power' | 'internet' | 'space_program';
 
 export interface InfrastructureProject {
   id: string;
@@ -442,8 +478,22 @@ export interface Company {
   culture: 'traditional' | 'flexible' | 'remote' | 'startup';
   successorId: string | null; // player's child (NPC id) designated to inherit this company
 
+  executives: Executive[]; // hired CFO/COO/CMO, up to one per role
+  bondDebt: number; // fixed-rate corporate bond principal outstanding
+  bondRate: number; // locked coupon rate at issuance
+  bondYearsLeft: number; // years remaining on the current bond term
+
   status: CompanyStatus;
   history: CompanyHistoryPoint[];
+}
+
+export type ExecutiveRole = 'cfo' | 'coo' | 'cmo';
+
+export interface Executive {
+  role: ExecutiveRole;
+  name: string;
+  skill: number; // 0..100
+  salary: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -679,6 +729,38 @@ export interface GameState {
   worldEvent: WorldEvent | null;
   generation: number; // dynasty counter; increments when an heir inherits and play continues
   calendarDay: number; // 0..364, days elapsed in the current year via daily/weekly advancement
+  difficulty: Difficulty;
+  alliances: Alliance[];
+  yearRecap: YearRecap | null; // transient: set after each advanceYear(), cleared once the UI shows it
+  pendingSuccession: SuccessionOffer | null; // transient: set on death when a will/heir continuation is available
+}
+
+export interface SuccessionCandidate {
+  npcId: string;
+  name: string;
+  relation: 'Spouse' | 'Child' | 'Grandchild';
+  isPrimaryHeir: boolean;
+}
+
+export interface SuccessionOffer {
+  deceasedName: string;
+  candidates: SuccessionCandidate[];
+}
+
+export type Difficulty = 'casual' | 'standard' | 'ironman';
+
+export interface Alliance {
+  id: string;
+  name: string;
+  founderCountryId: string;
+  memberCountryIds: string[];
+}
+
+export interface YearRecap {
+  year: number;
+  netWorthStart: number;
+  netWorthEnd: number;
+  headlines: string[];
 }
 
 // ---------------------------------------------------------------------------
