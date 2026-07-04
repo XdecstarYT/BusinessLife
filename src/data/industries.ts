@@ -3,7 +3,7 @@
  * [name, startupCost, baseMargin, volatility, cyclicality, capitalIntensity,
  *  laborIntensity, techIntensity, regulationSensitivity, skillKey, tags]
  *
- * 11 sectors x ~19 niches = 200+ industries, each with distinct economics.
+ * 12 sectors x ~20 niches = 230+ industries, each with distinct economics.
  * Tags connect industries to laws, events and commodity prices.
  */
 import type { Industry } from '../sim/types';
@@ -255,6 +255,28 @@ const SECTORS: Record<string, Row[]> = {
     ['Translation & Localization', 25 * K, 0.2, 0.2, 0.4, 0.02, 0.9, 0.5, 0.1, SK.teaching, ['services']],
     ['Space Tourism Venture', 50 * M, 0.05, 0.7, 0.9, 1.0, 0.3, 1.0, 0.8, SK.aerospace, ['space', 'tourism', 'tech', 'luxury']],
     ['Corporate Wellness Provider', 80 * K, 0.16, 0.2, 0.4, 0.15, 0.7, 0.2, 0.3, SK.management, ['services', 'health', 'consumer']],
+  ],
+  Emerging: [
+    ['Quantum Computing Lab', 20 * M, 0.05, 0.6, 0.3, 0.8, 0.3, 1.0, 0.3, SK.research, ['tech', 'research', 'ai']],
+    ['Carbon Capture Facility', 25 * M, 0.08, 0.4, 0.3, 0.9, 0.3, 0.7, 0.6, SK.engineering, ['industrial', 'green', 'energy']],
+    ['Vertical Farming Operation', 3 * M, 0.1, 0.3, 0.2, 0.6, 0.4, 0.6, 0.3, SK.farming, ['agriculture', 'food', 'tech', 'green']],
+    ['Autonomous Delivery Fleet', 5 * M, 0.09, 0.4, 0.4, 0.6, 0.2, 0.9, 0.5, SK.robotics, ['logistics', 'tech', 'platform']],
+    ['Biometric Security Firm', 1.2 * M, 0.18, 0.3, 0.2, 0.3, 0.3, 0.8, 0.5, SK.cybersecurity, ['tech', 'services', 'security']],
+    ['Telehealth Platform', 900 * K, 0.14, 0.3, 0.2, 0.2, 0.4, 0.85, 0.6, SK.programming, ['health', 'tech', 'platform']],
+    ['Micromobility Operator', 2 * M, 0.06, 0.4, 0.5, 0.5, 0.3, 0.5, 0.5, SK.operations, ['transport', 'tech', 'consumer']],
+    ['Desalination Plant', 40 * M, 0.1, 0.2, 0.1, 0.95, 0.2, 0.5, 0.6, SK.engineering, ['infrastructure', 'industrial', 'green']],
+    ['Asteroid Mining Venture', 80 * M, 0.02, 0.9, 0.3, 1.0, 0.2, 1.0, 0.4, SK.aerospace, ['space', 'tech', 'strategic']],
+    ['Gene Therapy Startup', 25 * M, 0.1, 0.6, 0.2, 0.6, 0.3, 1.0, 0.9, SK.biotech, ['health', 'research', 'tech']],
+    ['VR Fitness Studio Chain', 600 * K, 0.15, 0.3, 0.4, 0.3, 0.4, 0.6, 0.1, SK.fitness, ['consumer', 'tech', 'health']],
+    ['Digital Identity Platform', 1.5 * M, 0.2, 0.3, 0.2, 0.25, 0.3, 0.85, 0.6, SK.programming, ['tech', 'platform', 'services']],
+    ['Supply Chain SaaS', 800 * K, 0.22, 0.25, 0.3, 0.2, 0.35, 0.8, 0.2, SK.programming, ['tech', 'software', 'logistics']],
+    ['Climate Reinsurance Firm', 60 * M, 0.12, 0.4, 0.3, 0.8, 0.2, 0.4, 0.7, SK.riskManagement, ['finance', 'insurance', 'green']],
+    ['Agritech Drone Company', 1.8 * M, 0.13, 0.35, 0.3, 0.4, 0.3, 0.7, 0.4, SK.robotics, ['agriculture', 'tech']],
+    ['3D Printing Manufacturer', 2.5 * M, 0.14, 0.35, 0.4, 0.5, 0.3, 0.7, 0.2, SK.engineering, ['industrial', 'tech', 'manufacturing']],
+    ['Precision Fermentation Company', 4 * M, 0.11, 0.4, 0.3, 0.5, 0.3, 0.75, 0.4, SK.biotech, ['food', 'tech', 'research']],
+    ['Esports Betting Platform', 3 * M, 0.28, 0.5, 0.5, 0.2, 0.2, 0.8, 0.8, SK.programming, ['media', 'tech', 'platform', 'gambling']],
+    ['Synthetic Biology Lab', 18 * M, 0.09, 0.55, 0.2, 0.6, 0.3, 1.0, 0.7, SK.biotech, ['tech', 'research', 'health']],
+    ['Smart Grid Technology Firm', 6 * M, 0.15, 0.3, 0.3, 0.5, 0.3, 0.75, 0.5, SK.engineering, ['energy', 'tech', 'infrastructure']],
   ],
 };
 

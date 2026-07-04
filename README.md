@@ -17,7 +17,7 @@ plain JSON you can export and re-import.
   year, whether you jump straight there or accumulate days/weeks into it.
 - **Deterministic living world** — 12 fictional nations, dozens of states, ~150 cities, 400+ notable
   NPCs and 170+ companies, all generated from a seed so the same seed reproduces the same world exactly.
-- **219 industries** across 11 sectors, each with distinct economics (margins, cyclicality, capital and
+- **239 industries** across 12 sectors, each with distinct economics (margins, cyclicality, capital and
   labour intensity, tech and regulation sensitivity, commodity exposure).
 - **Full company simulation** — revenue emerges from the business cycle x your pricing, marketing, R&D,
   wages, automation, cyber-defense and brand x the laws in force x competition. IPO, pay dividends,
@@ -28,7 +28,7 @@ plain JSON you can export and re-import.
   unemployment, housing and equity indices, FX, government debt and shared commodity markets.
 - **Deep politics** — join or found a party, campaign for eight tiers of office (councillor to head of
   state) with rallies/ads/fundraising/consultants/polling, negotiate coalitions, appoint a cabinet, and
-  pass or repeal **93 laws** whose effects continuously reshape the economy. As head of state, conduct
+  pass or repeal **115 laws** whose effects continuously reshape the economy. As head of state, conduct
   real foreign policy: declare war, sign peace treaties, impose or lift sanctions, send foreign aid, and
   sign trade agreements — on top of the elections, coups, sanctions and wars that unfold on their own.
 - **Family, dynasty & wills** — date, marry (with an optional prenup), divorce, have or adopt children who
@@ -94,7 +94,7 @@ plain JSON you can export and re-import.
 - **Billionaire lifestyle & celebrity economy** — buy a private jet, superyacht, private island, sports
   team, champion racehorse or famous artwork (each with real upkeep, and racehorses/sports teams that
   occasionally throw off prize money), and take an equity-like royalty stake in a celebrity's career.
-- **20+ lifestyle activities** — from the gym and vacations to book clubs, therapy, adopting a pet, art
+- **50+ lifestyle activities** — from the gym and vacations to book clubs, therapy, adopting a pet, art
   collecting, wine tasting, poker nights, volunteering, blogging and learning a language.
 - **Living news network & world history** — richer news coverage (editorials, investigative journalism,
   interviews, election-watch coverage) alongside a sparse world-history chronicle of major milestones
@@ -114,7 +114,7 @@ plain JSON you can export and re-import.
   civic medals), so a compact template set produces an enormous variety of situations.
 - **Meta progression** — a Legacy Score computed at game over from your wealth, dynasty, office and
   achievements (with a New Game+ bonus into your next life), a life timeline of every milestone you hit,
-  42+ achievements, a Year in Review recap after every year, random mid-game challenges with cash rewards,
+  62+ achievements, a Year in Review recap after every year, random mid-game challenges with cash rewards,
   a Casual/Standard/Iron Man difficulty choice, and four starting-economy scenarios (Modern, Boom, Recession,
   Crisis) to change the game you're playing from turn one.
 - **Dynamic news** synthesised from what actually happened that year, plus a personal life log and an
@@ -158,7 +158,7 @@ only moves when you tell it to, using the three buttons on the Life hub:
 
 - **Career** — study for degrees (15 options), take jobs from a live market, and grow skills (120 of them
   across 10 categories). Performance drives raises, promotions and layoffs.
-- **Business** — found companies in any of 219 industries, then tune strategy (marketing, R&D, pricing,
+- **Business** — found companies in any of 239 industries, then tune strategy (marketing, R&D, pricing,
   wages, automation, cyber-defense, dividends), invest or draw capital, IPO, or sell. Upgrade your HQ tier,
   pick a corporate culture, and hire a CFO/COO/CMO. Run one-off initiatives (brand deals, tiered training
   programs, supply-chain diversification, quality audits, trademark filings, proactive recalls), issue
@@ -188,7 +188,7 @@ only moves when you tell it to, using the three buttons on the Life hub:
   unrest), diplomacy actions, commodities, national debt/cyber-defense tools, and any active global event
   (pandemic, trade war, tech boom, oil crisis, banking collapse, or AI disruption).
 - **News / Stats** — the dynamic wire (now with editorials, investigative pieces, interviews and election
-  coverage) plus a World History chronicle tab, your net-worth curve, 42+ achievements, a life timeline,
+  coverage) plus a World History chronicle tab, your net-worth curve, 62+ achievements, a life timeline,
   and save tools.
 - **Underworld** — join a crime family and climb its ranks through heists and protection rackets, contest
   rival turf, launder illicit proceeds through a front business, bribe a judge or attempt a prison escape if
@@ -228,8 +228,8 @@ src/
     actions.ts         The player "verbs" the UI calls between years
     engine.ts          advanceYear()/advanceDay()/advanceWeek(): orchestrate simulated time
   data/                Data-driven content (the game is authored here)
-    industries.ts      219 industries across 11 sectors
-    laws.ts            93 laws with economic effects and bloc support
+    industries.ts      239 industries across 12 sectors
+    laws.ts            115 laws with economic effects and bloc support
     events.ts          Event templates -> thousands of scenarios
     dailyEvents.ts     22 lightweight flavor events for day/week advancement
     skills.ts          120 skills; countries.ts, names.ts, ...

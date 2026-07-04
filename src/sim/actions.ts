@@ -51,6 +51,16 @@ export const DEGREES = [
   { degree: 'PhD', field: 'Artificial Intelligence', years: 5, cost: 60_000, smarts: 10 },
   { degree: "Juris Doctor", field: 'Advanced Law', years: 3, cost: 85_000, smarts: 8 },
   { degree: 'Diploma', field: 'Foreign Languages', years: 1, cost: 10_000, smarts: 3 },
+  { degree: "Bachelor's", field: 'Marketing', years: 3, cost: 22_000, smarts: 6 },
+  { degree: "Bachelor's", field: 'Psychology', years: 3, cost: 23_000, smarts: 6 },
+  { degree: "Bachelor's", field: 'Environmental Science', years: 4, cost: 32_000, smarts: 7 },
+  { degree: 'Master\'s', field: 'Finance', years: 2, cost: 55_000, smarts: 6 },
+  { degree: 'Master\'s', field: 'Public Policy', years: 2, cost: 45_000, smarts: 6 },
+  { degree: 'Master\'s', field: 'Data Science', years: 2, cost: 50_000, smarts: 7 },
+  { degree: 'Vocational Certificate', field: 'Aviation', years: 2, cost: 45_000, smarts: 4 },
+  { degree: 'Vocational Certificate', field: 'Electrical Trades', years: 2, cost: 18_000, smarts: 3 },
+  { degree: 'PhD', field: 'Biotechnology', years: 5, cost: 65_000, smarts: 10 },
+  { degree: 'Doctorate', field: 'Public Health', years: 5, cost: 55_000, smarts: 9 },
 ];
 
 export function enroll(state: GameState, index: number): ActionResult {
@@ -2168,7 +2178,14 @@ export type ActivityKind =
   | 'vacation' | 'gym' | 'doctor' | 'charity' | 'party' | 'meditate'
   | 'book_club' | 'therapy' | 'adopt_pet' | 'learn_instrument' | 'road_trip'
   | 'art_collecting' | 'wine_tasting' | 'poker_night' | 'volunteer' | 'seminar'
-  | 'spa_day' | 'home_improvement' | 'blog' | 'learn_language';
+  | 'spa_day' | 'home_improvement' | 'blog' | 'learn_language'
+  | 'yoga' | 'cooking_class' | 'golf_day' | 'chess_tournament' | 'sailing_lesson'
+  | 'skydiving' | 'marathon_training' | 'museum_visit' | 'live_concert' | 'camping_trip'
+  | 'yacht_day' | 'wine_country_tour' | 'gallery_opening' | 'fishing_trip' | 'martial_arts'
+  | 'stand_up_comedy' | 'public_speaking_course' | 'coding_bootcamp' | 'cybersecurity_course'
+  | 'personal_finance_course' | 'industry_conference' | 'startup_weekend' | 'life_coaching'
+  | 'mindfulness_retreat' | 'debate_club' | 'improv_class' | 'dance_lessons' | 'first_aid_course'
+  | 'investment_seminar' | 'negotiation_workshop';
 
 export function doActivity(state: GameState, kind: ActivityKind): ActionResult {
   const p = state.player;
@@ -2361,6 +2378,253 @@ export function doActivity(state: GameState, kind: ActivityKind): ActionResult {
       p.skills[SK.foreignLanguages] = clamp100((p.skills[SK.foreignLanguages] ?? 0) + 10);
       p.smarts = clamp100(p.smarts + 1);
       msg = 'You made real progress learning a new language.';
+      break;
+    }
+    case 'yoga': {
+      p.happiness = clamp100(p.happiness + 4);
+      p.health = clamp100(p.health + 4);
+      p.skills[SK.fitness] = clamp100((p.skills[SK.fitness] ?? 0) + 4);
+      msg = 'A calming yoga session left you centered.';
+      break;
+    }
+    case 'cooking_class': {
+      const cost = 400;
+      if (cost > p.money) return { ok: false, message: 'Cannot afford the cooking class.' };
+      p.money -= cost;
+      p.skills[SK.cooking] = clamp100((p.skills[SK.cooking] ?? 0) + 10);
+      p.happiness = clamp100(p.happiness + 3);
+      msg = 'You picked up some real kitchen skills.';
+      break;
+    }
+    case 'golf_day': {
+      const cost = 900;
+      if (cost > p.money) return { ok: false, message: 'Cannot afford a round of golf.' };
+      p.money -= cost;
+      p.skills[SK.golf] = clamp100((p.skills[SK.golf] ?? 0) + 8);
+      p.influence = clamp100(p.influence + 2);
+      msg = 'A round of golf with well-connected company.';
+      break;
+    }
+    case 'chess_tournament': {
+      p.skills[SK.chess] = clamp100((p.skills[SK.chess] ?? 0) + 10);
+      p.smarts = clamp100(p.smarts + 2);
+      msg = 'A hard-fought chess tournament sharpened your mind.';
+      break;
+    }
+    case 'sailing_lesson': {
+      const cost = 700;
+      if (cost > p.money) return { ok: false, message: 'Cannot afford sailing lessons.' };
+      p.money -= cost;
+      p.skills[SK.sailing] = clamp100((p.skills[SK.sailing] ?? 0) + 9);
+      p.happiness = clamp100(p.happiness + 4);
+      msg = 'You learned to read the wind out on the water.';
+      break;
+    }
+    case 'skydiving': {
+      const cost = 800;
+      if (cost > p.money) return { ok: false, message: 'Cannot afford the jump.' };
+      p.money -= cost;
+      p.happiness = clamp100(p.happiness + 12);
+      if (rng.chance(0.08)) {
+        p.health = clamp100(p.health - 8);
+        msg = 'A rough landing left you bruised, but what a rush.';
+      } else {
+        msg = 'An exhilarating jump you will never forget.';
+      }
+      break;
+    }
+    case 'marathon_training': {
+      p.health = clamp100(p.health + 8);
+      p.skills[SK.fitness] = clamp100((p.skills[SK.fitness] ?? 0) + 12);
+      p.happiness = clamp100(p.happiness + 3);
+      msg = 'Months of training paid off at the finish line.';
+      break;
+    }
+    case 'museum_visit': {
+      const cost = 150;
+      p.money -= cost;
+      p.smarts = clamp100(p.smarts + 2);
+      p.happiness = clamp100(p.happiness + 3);
+      msg = 'A thoughtful afternoon among the exhibits.';
+      break;
+    }
+    case 'live_concert': {
+      const cost = 500;
+      if (cost > p.money) return { ok: false, message: 'Cannot afford concert tickets.' };
+      p.money -= cost;
+      p.happiness = clamp100(p.happiness + 8);
+      msg = 'An unforgettable night of live music.';
+      break;
+    }
+    case 'camping_trip': {
+      const cost = 300;
+      p.money -= cost;
+      p.happiness = clamp100(p.happiness + 6);
+      p.health = clamp100(p.health + 3);
+      msg = 'A weekend off the grid recharged you.';
+      break;
+    }
+    case 'yacht_day': {
+      const cost = 4_000;
+      if (cost > p.money) return { ok: false, message: 'Cannot afford to charter a yacht.' };
+      p.money -= cost;
+      p.happiness = clamp100(p.happiness + 9);
+      p.reputation = clamp100(p.reputation + 1);
+      msg = 'A day chartering a yacht with the right crowd.';
+      break;
+    }
+    case 'wine_country_tour': {
+      const cost = 1_200;
+      if (cost > p.money) return { ok: false, message: 'Cannot afford the wine tour.' };
+      p.money -= cost;
+      p.skills[SK.wineTasting] = clamp100((p.skills[SK.wineTasting] ?? 0) + 9);
+      p.happiness = clamp100(p.happiness + 5);
+      msg = 'A refined tour through the vineyards.';
+      break;
+    }
+    case 'gallery_opening': {
+      const cost = 250;
+      p.money -= cost;
+      p.skills[SK.artCollecting] = clamp100((p.skills[SK.artCollecting] ?? 0) + 7);
+      p.influence = clamp100(p.influence + 2);
+      msg = 'A gallery opening full of interesting conversations.';
+      break;
+    }
+    case 'fishing_trip': {
+      const cost = 200;
+      p.money -= cost;
+      p.happiness = clamp100(p.happiness + 5);
+      p.health = clamp100(p.health + 2);
+      msg = 'A peaceful day out on the water.';
+      break;
+    }
+    case 'martial_arts': {
+      p.health = clamp100(p.health + 6);
+      p.skills[SK.fitness] = clamp100((p.skills[SK.fitness] ?? 0) + 8);
+      msg = 'Discipline and sparring built real strength.';
+      break;
+    }
+    case 'stand_up_comedy': {
+      p.charisma = clamp100(p.charisma + 3);
+      p.happiness = clamp100(p.happiness + 6);
+      msg = 'You bombed a little, then killed it. Great night.';
+      break;
+    }
+    case 'public_speaking_course': {
+      const cost = 500;
+      if (cost > p.money) return { ok: false, message: 'Cannot afford the course.' };
+      p.money -= cost;
+      p.skills[SK.publicSpeaking] = clamp100((p.skills[SK.publicSpeaking] ?? 0) + 10);
+      msg = 'You are far more comfortable in front of a crowd now.';
+      break;
+    }
+    case 'coding_bootcamp': {
+      const cost = 2_000;
+      if (cost > p.money) return { ok: false, message: 'Cannot afford the bootcamp.' };
+      p.money -= cost;
+      p.skills[SK.programming] = clamp100((p.skills[SK.programming] ?? 0) + 14);
+      msg = 'An intensive bootcamp leveled up your coding.';
+      break;
+    }
+    case 'cybersecurity_course': {
+      const cost = 1_500;
+      if (cost > p.money) return { ok: false, message: 'Cannot afford the course.' };
+      p.money -= cost;
+      p.skills[SK.cybersecurity] = clamp100((p.skills[SK.cybersecurity] ?? 0) + 12);
+      msg = 'You now think like an attacker and a defender.';
+      break;
+    }
+    case 'personal_finance_course': {
+      const cost = 600;
+      if (cost > p.money) return { ok: false, message: 'Cannot afford the course.' };
+      p.money -= cost;
+      p.skills[SK.accounting] = clamp100((p.skills[SK.accounting] ?? 0) + 10);
+      msg = 'Your handle on personal finance is much sharper.';
+      break;
+    }
+    case 'industry_conference': {
+      const cost = 1_000;
+      if (cost > p.money) return { ok: false, message: 'Cannot afford the conference.' };
+      p.money -= cost;
+      p.reputation = clamp100(p.reputation + 3);
+      if (p.job) {
+        const ind = INDUSTRY_BY_ID[p.job.industryId];
+        if (ind) p.skills[ind.skillId] = clamp100((p.skills[ind.skillId] ?? 0) + 6);
+      }
+      msg = 'A packed conference full of useful contacts.';
+      break;
+    }
+    case 'startup_weekend': {
+      p.skills[SK.strategy] = clamp100((p.skills[SK.strategy] ?? 0) + 10);
+      p.happiness = clamp100(p.happiness + 3);
+      msg = 'A frantic weekend building something from nothing.';
+      break;
+    }
+    case 'life_coaching': {
+      const cost = 800;
+      if (cost > p.money) return { ok: false, message: 'Cannot afford a life coach.' };
+      p.money -= cost;
+      p.happiness = clamp100(p.happiness + 6);
+      p.smarts = clamp100(p.smarts + 2);
+      msg = 'A clarifying session on where your life is headed.';
+      break;
+    }
+    case 'mindfulness_retreat': {
+      const cost = 1_000;
+      if (cost > p.money) return { ok: false, message: 'Cannot afford the retreat.' };
+      p.money -= cost;
+      p.happiness = clamp100(p.happiness + 8);
+      p.health = clamp100(p.health + 4);
+      p.karma = clamp100(p.karma + 3);
+      msg = 'A quiet retreat left you grounded and clear-headed.';
+      break;
+    }
+    case 'debate_club': {
+      p.skills[SK.debate] = clamp100((p.skills[SK.debate] ?? 0) + 10);
+      p.smarts = clamp100(p.smarts + 1);
+      msg = 'A spirited debate sharpened your arguments.';
+      break;
+    }
+    case 'improv_class': {
+      const cost = 300;
+      if (cost > p.money) return { ok: false, message: 'Cannot afford the class.' };
+      p.money -= cost;
+      p.charisma = clamp100(p.charisma + 3);
+      p.happiness = clamp100(p.happiness + 4);
+      msg = 'Thinking on your feet just got a lot easier.';
+      break;
+    }
+    case 'dance_lessons': {
+      const cost = 350;
+      if (cost > p.money) return { ok: false, message: 'Cannot afford dance lessons.' };
+      p.money -= cost;
+      p.charisma = clamp100(p.charisma + 2);
+      p.happiness = clamp100(p.happiness + 5);
+      msg = 'You have got some real moves now.';
+      break;
+    }
+    case 'first_aid_course': {
+      const cost = 250;
+      if (cost > p.money) return { ok: false, message: 'Cannot afford the course.' };
+      p.money -= cost;
+      p.skills[SK.medicine] = clamp100((p.skills[SK.medicine] ?? 0) + 8);
+      msg = 'You could save a life now if you had to.';
+      break;
+    }
+    case 'investment_seminar': {
+      const cost = 700;
+      if (cost > p.money) return { ok: false, message: 'Cannot afford the seminar.' };
+      p.money -= cost;
+      p.skills[SK.investing] = clamp100((p.skills[SK.investing] ?? 0) + 10);
+      msg = 'A seminar full of genuinely useful investing frameworks.';
+      break;
+    }
+    case 'negotiation_workshop': {
+      const cost = 900;
+      if (cost > p.money) return { ok: false, message: 'Cannot afford the workshop.' };
+      p.money -= cost;
+      p.skills[SK.negotiation] = clamp100((p.skills[SK.negotiation] ?? 0) + 11);
+      msg = 'You will not be out-negotiated so easily anymore.';
       break;
     }
   }

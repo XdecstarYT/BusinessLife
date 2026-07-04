@@ -4,7 +4,7 @@
  * reference's "Featured brands" grid), quick lifestyle chips, and the life
  * log feed. This is the screen the reference image most directly informs.
  */
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useGame, type Screen } from '../../store/gameStore';
 import { attemptPrisonEscape, bribeJudge, contestTerritory, CRIME_RANK_TITLES, doActivity, enterWitnessProtection, goStraight, heist, joinCrimeFamily } from '../../sim/actions';
 import { netWorth } from '../../sim/engine';
@@ -49,6 +49,7 @@ const LOG_TONE: Record<string, string> = {
 
 export function Life() {
   const { state, setScreen, nextYear, nextDay, nextWeek, run, eventQueue, activeEvent } = useGame();
+  const [showMoreActivities, setShowMoreActivities] = useState(false);
   if (!state) return null;
   const p = state.player;
   const home = state.countries.find((c) => c.id === p.countryId)!;
@@ -188,7 +189,42 @@ export function Life() {
         <Pill label="🔨 Home Improve" onClick={() => run(doActivity, 'home_improvement')} />
         <Pill label="✍️ Blog" onClick={() => run(doActivity, 'blog')} />
         <Pill label="🗣️ Language" onClick={() => run(doActivity, 'learn_language')} />
+        <Pill label={showMoreActivities ? '▲ Fewer' : '▼ More'} onClick={() => setShowMoreActivities((v) => !v)} />
       </PillRow>
+      {showMoreActivities && (
+      <PillRow>
+        <Pill label="🧘‍♀️ Yoga" onClick={() => run(doActivity, 'yoga')} />
+        <Pill label="🍳 Cooking Class" onClick={() => run(doActivity, 'cooking_class')} />
+        <Pill label="⛳ Golf Day" onClick={() => run(doActivity, 'golf_day')} />
+        <Pill label="♟️ Chess Tournament" onClick={() => run(doActivity, 'chess_tournament')} />
+        <Pill label="⛵ Sailing Lesson" onClick={() => run(doActivity, 'sailing_lesson')} />
+        <Pill label="🪂 Skydiving" onClick={() => run(doActivity, 'skydiving')} />
+        <Pill label="🏃 Marathon Training" onClick={() => run(doActivity, 'marathon_training')} />
+        <Pill label="🏛️ Museum Visit" onClick={() => run(doActivity, 'museum_visit')} />
+        <Pill label="🎤 Live Concert" onClick={() => run(doActivity, 'live_concert')} />
+        <Pill label="🏕️ Camping Trip" onClick={() => run(doActivity, 'camping_trip')} />
+        <Pill label="🛥️ Yacht Day" onClick={() => run(doActivity, 'yacht_day')} />
+        <Pill label="🍇 Wine Country Tour" onClick={() => run(doActivity, 'wine_country_tour')} />
+        <Pill label="🖼️ Gallery Opening" onClick={() => run(doActivity, 'gallery_opening')} />
+        <Pill label="🎣 Fishing Trip" onClick={() => run(doActivity, 'fishing_trip')} />
+        <Pill label="🥋 Martial Arts" onClick={() => run(doActivity, 'martial_arts')} />
+        <Pill label="🎙️ Stand-Up Comedy" onClick={() => run(doActivity, 'stand_up_comedy')} />
+        <Pill label="🎓 Public Speaking" onClick={() => run(doActivity, 'public_speaking_course')} />
+        <Pill label="💻 Coding Bootcamp" onClick={() => run(doActivity, 'coding_bootcamp')} />
+        <Pill label="🔐 Cybersecurity Course" onClick={() => run(doActivity, 'cybersecurity_course')} />
+        <Pill label="💰 Personal Finance Course" onClick={() => run(doActivity, 'personal_finance_course')} />
+        <Pill label="🏢 Industry Conference" onClick={() => run(doActivity, 'industry_conference')} />
+        <Pill label="🚀 Startup Weekend" onClick={() => run(doActivity, 'startup_weekend')} />
+        <Pill label="🧑‍🏫 Life Coaching" onClick={() => run(doActivity, 'life_coaching')} />
+        <Pill label="🌄 Mindfulness Retreat" onClick={() => run(doActivity, 'mindfulness_retreat')} />
+        <Pill label="🗣️ Debate Club" onClick={() => run(doActivity, 'debate_club')} />
+        <Pill label="🎭 Improv Class" onClick={() => run(doActivity, 'improv_class')} />
+        <Pill label="💃 Dance Lessons" onClick={() => run(doActivity, 'dance_lessons')} />
+        <Pill label="🩹 First Aid Course" onClick={() => run(doActivity, 'first_aid_course')} />
+        <Pill label="📈 Investment Seminar" onClick={() => run(doActivity, 'investment_seminar')} />
+        <Pill label="🤝 Negotiation Workshop" onClick={() => run(doActivity, 'negotiation_workshop')} />
+      </PillRow>
+      )}
 
       <SectionHeader title="Underworld" />
       <PillRow>

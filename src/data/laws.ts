@@ -328,6 +328,88 @@ export const LAWS: LawDef[] = [
   law('space_industry_incentives', 'Space Industry Incentives', 'Business', 'Tax credits and launch-site support for space companies.',
     { budgetBalance: -0.003, industryTagModifiers: { space: 0.2 }, businessConfidence: 2 },
     { left: 0.0, right: 0.5, business: 0.7, workers: 0.1 }, 0),
+
+  // ------------------------------------------------------------- Taxation
+  law('tax_property', 'Property Tax Reform', 'Taxation', 'Reassess and raise property tax rates on high-value real estate.',
+    { budgetBalance: 0.006, consumerConfidence: -2 },
+    { left: 0.5, right: -0.5, business: -0.3, workers: 0.2 }, -1),
+  law('sugar_tax', 'Sugar Tax', 'Taxation', 'Excise tax on sugary drinks and snacks to curb consumption.',
+    { budgetBalance: 0.003, industryTagModifiers: { food: -0.03 }, healthcare: 1, consumerConfidence: -2 },
+    { left: 0.5, right: -0.3, business: -0.3, workers: -0.1 }, -2),
+  law('tobacco_tax_hike', 'Tobacco Tax Hike', 'Taxation', 'Sharp excise increase on tobacco products.',
+    { budgetBalance: 0.004, healthcare: 2 },
+    { left: 0.6, right: 0.0, business: -0.4, workers: 0.0 }, -1),
+  law('alcohol_tax_hike', 'Alcohol Tax Hike', 'Taxation', 'Raise excise duties on alcoholic beverages.',
+    { budgetBalance: 0.003, crime: -1 },
+    { left: 0.4, right: -0.2, business: -0.4, workers: -0.1 }, -2),
+
+  // -------------------------------------------------------------- Education
+  law('apprenticeship_program', 'National Apprenticeship Program', 'Education', 'Fund employer-partnered apprenticeships for school leavers.',
+    { budgetBalance: -0.003, education: 2, unemployment: -0.004 },
+    { left: 0.6, right: 0.4, business: 0.5, workers: 0.6 }, 3),
+  law('teacher_pay_raise', 'Teacher Pay Raise', 'Education', 'Across-the-board salary increases for public school teachers.',
+    { budgetBalance: -0.004, education: 3 },
+    { left: 0.8, right: -0.2, business: -0.1, workers: 0.5 }, 4),
+  law('school_choice_vouchers', 'School Choice Vouchers', 'Education', 'Public funding follows students to the school of their choice.',
+    { budgetBalance: -0.002, education: 1 },
+    { left: -0.5, right: 0.7, business: 0.2, workers: -0.1 }, -1),
+
+  // -------------------------------------------------------------- Healthcare
+  law('mental_health_parity', 'Mental Health Parity Act', 'Healthcare', 'Insurers must cover mental health on par with physical health.',
+    { budgetBalance: -0.002, healthcare: 2 },
+    { left: 0.7, right: -0.1, business: -0.3, workers: 0.5 }, 3),
+  law('telemedicine_expansion', 'Telemedicine Expansion', 'Healthcare', 'Fund remote-care infrastructure and reimbursement parity.',
+    { budgetBalance: -0.002, healthcare: 2, industryTagModifiers: { health: 0.05, tech: 0.02 } },
+    { left: 0.5, right: 0.3, business: 0.4, workers: 0.2 }, 2),
+  law('vaccine_mandate', 'Vaccine Mandate', 'Healthcare', 'Require key vaccinations for school enrollment and certain jobs.',
+    { healthcare: 3, consumerConfidence: -3 },
+    { left: 0.6, right: -0.5, business: 0.1, workers: -0.2 }, -3),
+
+  // ------------------------------------------------------------ Environment
+  law('water_conservation_mandate', 'Water Conservation Mandate', 'Environment', 'Restrict water use in agriculture and industry during shortages.',
+    { climateRisk: -1, industryTagModifiers: { agriculture: -0.02 } },
+    { left: 0.6, right: -0.2, business: -0.3, workers: 0.0 }, 0),
+  law('noise_pollution_regulation', 'Noise Pollution Regulation', 'Environment', 'Cap permissible noise levels near residential zones.',
+    { businessConfidence: -1, consumerConfidence: 2 },
+    { left: 0.4, right: -0.1, business: -0.3, workers: 0.1 }, 1),
+  law('offshore_drilling_ban', 'Offshore Drilling Ban', 'Environment', 'Prohibit new offshore oil and gas drilling leases.',
+    { climateRisk: -2, industryTagModifiers: { oil: -0.15 } },
+    { left: 0.8, right: -0.7, business: -0.6, workers: -0.2 }, 1),
+
+  // -------------------------------------------------------------- Business
+  law('cybersecurity_mandate', 'Corporate Cybersecurity Mandate', 'Business', 'Require minimum cybersecurity standards for large companies.',
+    { businessConfidence: -1, crime: -1 },
+    { left: 0.3, right: 0.0, business: -0.4, workers: 0.1 }, 1),
+  law('drone_regulation', 'Commercial Drone Regulation', 'Business', 'License and restrict commercial drone operations.',
+    { businessConfidence: -1, industryTagModifiers: { logistics: -0.03 } },
+    { left: 0.2, right: 0.0, business: -0.3, workers: 0.1 }, 0),
+  law('franchise_regulation', 'Franchise Disclosure Law', 'Business', 'Require detailed financial disclosure to prospective franchisees.',
+    { industryTagModifiers: { retail: -0.02 }, consumerConfidence: 2 },
+    { left: 0.4, right: -0.1, business: -0.3, workers: 0.2 }, 1),
+  law('shareholder_rights_act', 'Shareholder Rights Act', 'Business', 'Strengthen minority shareholder voting and disclosure rights.',
+    { businessConfidence: -2, corruption: -1 },
+    { left: 0.5, right: -0.2, business: -0.5, workers: 0.2 }, 1),
+  law('remote_work_incentives', 'Remote Work Tax Incentive', 'Business', 'Tax credits for companies supporting remote work infrastructure.',
+    { businessConfidence: 2, industryTagModifiers: { software: 0.03 } },
+    { left: 0.2, right: 0.4, business: 0.5, workers: 0.4 }, 2),
+
+  // -------------------------------------------------------- Infrastructure
+  law('congestion_pricing', 'Urban Congestion Pricing', 'Infrastructure', 'Charge drivers entering city centers during peak hours.',
+    { budgetBalance: 0.002, infrastructure: 1, businessConfidence: -1, consumerConfidence: -1 },
+    { left: 0.3, right: -0.1, business: -0.2, workers: -0.2 }, -2),
+
+  // -------------------------------------------------------------- Justice
+  law('bail_reform', 'Bail Reform', 'Justice', 'End cash bail for non-violent offenses.',
+    { corruption: -1, crime: 1 },
+    { left: 0.7, right: -0.7, business: -0.1, workers: 0.3 }, -1),
+  law('hate_crime_law', 'Hate Crime Law', 'Justice', 'Enhanced penalties for crimes motivated by bias.',
+    { crime: -1, stability: 1 },
+    { left: 0.7, right: -0.2, business: 0.0, workers: 0.2 }, 2),
+
+  // ------------------------------------------------------------------ Social
+  law('veteran_benefits', 'Veteran Benefits Expansion', 'Social', 'Expand healthcare and pension benefits for military veterans.',
+    { budgetBalance: -0.003, consumerConfidence: 2 },
+    { left: 0.4, right: 0.5, business: 0.0, workers: 0.3 }, 3),
 ];
 
 export const LAW_BY_ID: Record<string, LawDef> = Object.fromEntries(LAWS.map((l) => [l.id, l]));

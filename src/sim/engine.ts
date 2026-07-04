@@ -572,19 +572,63 @@ export function advanceYear(state: GameState): GameState {
 
   // Milestone achievements
   const worth = state.netWorthHistory[state.netWorthHistory.length - 1].value;
+  const ownedCompanies = p.companies.map((id) => state.companies[id]).filter((c) => c && c.status === 'active');
   const milestones: [string, boolean][] = [
     ['millionaire', worth >= 1e6],
     ['deca_millionaire', worth >= 1e7],
     ['billionaire', worth >= 1e9],
     ['centenarian', p.age >= 100],
+    ['centa_millionaire', worth >= 1e8],
+    ['multi_billionaire', worth >= 1e10],
+    ['nonagenarian', p.age >= 90],
+    ['centenarian_elite', p.age >= 110],
+    ['renaissance_mind', Object.values(p.skills).filter((v) => v >= 80).length >= 5],
+    ['health_nut', p.health >= 98],
+    ['zen_master', p.happiness >= 98],
+    ['company_empire', ownedCompanies.length >= 5],
+    ['public_company_mogul', ownedCompanies.filter((c) => c.isPublic).length >= 3],
+    ['notorious', p.notoriety >= 90],
+    ['paragon', p.reputation >= 90 && p.karma >= 80],
+    ['property_baron', p.properties.length >= 10],
+    ['portfolio_titan', portfolioValue(state) >= 1e7],
+    ['patent_powerhouse', ownedCompanies.reduce((s, c) => s + c.patents, 0) >= 10],
+    ['trademark_empire', ownedCompanies.reduce((s, c) => s + c.trademarks, 0) >= 10],
+    ['grand_dynasty', state.generation >= 3],
+    ['big_family_tree', p.grandchildren.length >= 3],
+    ['ironman_survivor', state.difficulty === 'ironman' && p.alive && p.age >= 70],
+    ['lifelong_learner', p.education.length >= 3],
+    ['luxury_collector', p.luxuryAssets.length >= 3],
   ];
+  const MILESTONE_LOG: Record<string, string> = {
+    millionaire: '🏆 You are a millionaire!',
+    deca_millionaire: '🏆 Your net worth passed $10 million.',
+    billionaire: '🏆 BILLIONAIRE. You have joined the ten-figure club.',
+    centenarian: '🏆 You turned 100 years old.',
+    centa_millionaire: '🏆 Your net worth passed $100 million.',
+    multi_billionaire: '🏆 Your net worth passed $10 billion.',
+    nonagenarian: '🏆 You turned 90 years old.',
+    centenarian_elite: '🏆 You turned 110 years old.',
+    renaissance_mind: '🏆 Five skills mastered above 80 — a true renaissance mind.',
+    health_nut: '🏆 Peak physical health.',
+    zen_master: '🏆 Blissfully, serenely happy.',
+    company_empire: '🏆 You control an empire of 5+ active companies.',
+    public_company_mogul: '🏆 You control 3+ publicly listed companies.',
+    notorious: '🏆 Your notoriety has reached legendary levels.',
+    paragon: '🏆 A paragon of reputation and character.',
+    property_baron: '🏆 You own 10+ properties.',
+    portfolio_titan: '🏆 Your stock portfolio passed $10 million.',
+    patent_powerhouse: '🏆 Your companies hold 10+ patents.',
+    trademark_empire: '🏆 Your companies hold 10+ trademarks.',
+    grand_dynasty: '🏆 Your dynasty has reached its third generation.',
+    big_family_tree: '🏆 You have 3+ grandchildren.',
+    ironman_survivor: '🏆 Survived to 70 on Iron Man difficulty.',
+    lifelong_learner: '🏆 Earned three or more degrees.',
+    luxury_collector: '🏆 Assembled a collection of 3+ luxury assets.',
+  };
   for (const [key, hit] of milestones) {
     if (hit && !state.achievements.includes(key)) {
       state.achievements.push(key);
-      if (key === 'millionaire') log(state, '🏆 You are a millionaire!', 'milestone');
-      if (key === 'deca_millionaire') log(state, '🏆 Your net worth passed $10 million.', 'milestone');
-      if (key === 'billionaire') log(state, '🏆 BILLIONAIRE. You have joined the ten-figure club.', 'milestone');
-      if (key === 'centenarian') log(state, '🏆 You turned 100 years old.', 'milestone');
+      if (MILESTONE_LOG[key]) log(state, MILESTONE_LOG[key], 'milestone');
     }
   }
 
