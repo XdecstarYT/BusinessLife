@@ -58,6 +58,19 @@ export function ElectionResultModal() {
             </div>
           </div>
         </div>
+        {result.regionalBreakdown.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-slate-100 dark:border-ink-800">
+            <div className="text-xs font-bold uppercase text-slate-400 mb-2">By City</div>
+            <div className="space-y-1.5 max-h-40 overflow-y-auto">
+              {result.regionalBreakdown.map((r) => (
+                <div key={r.cityName} className="flex items-center justify-between text-xs">
+                  <span className="text-slate-500 dark:text-slate-400">{r.cityName}</span>
+                  <span className={`font-semibold ${r.playerSharePct >= 50 ? 'text-emerald-500' : 'text-rose-500'}`}>{r.playerSharePct}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         <Button className="w-full mt-5" size="lg" onClick={dismissElectionResult}>Continue</Button>
       </div>
     </div>

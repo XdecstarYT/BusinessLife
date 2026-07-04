@@ -131,7 +131,10 @@ const REGIME_TRANSITIONS: Record<EconomicRegime, { growth: [number, number]; nex
 export interface EconomyTickResult {
   regimeChanged: boolean;
   crisis: string | null; // headline-worthy shock this year
+  weatherHeadline: string | null; // a discrete, named weather event this year, if any
 }
+
+const WEATHER_KINDS = ['drought', 'flood', 'heatwave', 'cyclone', 'snowstorm'] as const;
 
 export function tickEconomy(state: GameState, country: Country, rng: RNG): EconomyTickResult {
   const e = country.economy;
@@ -272,6 +275,32 @@ export function tickEconomy(state: GameState, country: Country, rng: RNG): Econo
     e.businessConfidence = clamp100(e.businessConfidence - rng.range(3, 8));
   }
 
+  // Dynamic weather: milder, more frequent named events than the rarer full-blown disaster above.
+  let weatherHeadline: string | null = null;
+  if (!crisis && rng.chance((country.climateRisk / 100) * 0.18 * crisisMult)) {
+    const kind = rng.pick(WEATHER_KINDS);
+    const cityName = country.cities.length ? rng.pick(country.cities).name : country.name;
+    if (kind === 'drought') {
+      e.consumerConfidence = clamp100(e.consumerConfidence - rng.range(1, 3));
+      weatherHeadline = `🌵 A severe drought is hurting farmers around ${cityName}`;
+    } else if (kind === 'flood') {
+      e.housingIndex = Math.max(20, e.housingIndex * rng.range(0.95, 0.99));
+      e.businessConfidence = clamp100(e.businessConfidence - rng.range(1, 3));
+      weatherHeadline = `🌊 Flooding has disrupted transport and business around ${cityName}`;
+    } else if (kind === 'heatwave') {
+      e.businessConfidence = clamp100(e.businessConfidence - rng.range(1, 2));
+      country.healthcare = clamp100(country.healthcare - rng.range(0.5, 1.5));
+      weatherHeadline = `🌡️ A record heatwave is straining energy grids and hospitals near ${cityName}`;
+    } else if (kind === 'cyclone') {
+      e.housingIndex = Math.max(20, e.housingIndex * rng.range(0.93, 0.98));
+      country.stability = clamp100(country.stability - rng.range(0.5, 2));
+      weatherHeadline = `🌀 A cyclone has caused significant property damage near ${cityName}`;
+    } else {
+      e.businessConfidence = clamp100(e.businessConfidence - rng.range(1, 2));
+      weatherHeadline = `❄️ A severe snowstorm has shut down transport links around ${cityName}`;
+    }
+  }
+
   e.history.push({
     year: state.year,
     gdp: e.gdp,
@@ -284,7 +313,7 @@ export function tickEconomy(state: GameState, country: Country, rng: RNG): Econo
   });
   if (e.history.length > 120) e.history.shift();
 
-  return { regimeChanged: prevRegime !== e.regime, crisis };
+  return { regimeChanged: prevRegime !== e.regime, crisis, weatherHeadline };
 }
 
 /** A simple trend-extrapolation forecast for next year, derived from recent history. */

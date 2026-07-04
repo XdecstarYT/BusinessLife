@@ -68,13 +68,17 @@ plain JSON you can export and re-import.
   limit orders, insure your businesses and properties, take out life insurance, and watch a live scrolling
   stock ticker of the day's biggest movers.
 - **Head-of-state tools** — allocate the budget across six cabinet portfolios, set direct tax rates, launch
-  multi-year infrastructure projects (roads, rail, airports, power, internet, a national space program), set
+  multi-year infrastructure and mega projects (roads, rail, airports, power, internet, a national space
+  program, bridges, tunnels, a bullet train network, a stadium, a dam), set
   an immigration quota, read a trend-based economic forecast, hire up to three AI advisors whose advice can
   be wrong, fund an intelligence agency, nominate a Chief Justice (a low-integrity court can strike down laws
   on its own), call a referendum to bypass the legislature, retain a lobbying firm, found or join an
   international alliance, choose blockade or invasion when you declare war, launch an anti-corruption probe
-  into your own officials, and attend international summits to warm relations with every nation you aren't
-  at war with in one sitting.
+  into your own officials, attend international summits to warm relations with every nation you aren't
+  at war with in one sitting, issue government bonds and fund national cyber defense from the treasury,
+  hold cabinet meetings and deliver a live budget speech, and manage live protests and strikes by
+  conceding, cracking down, or ignoring them — all while an AI opposition leader builds a public
+  profile critiquing your record.
 - **Elections with real stakes** — pick manifesto promises at campaign launch and get judged on keeping them
   at re-election time, hold press conferences and campaign debates, court celebrity endorsements, weather
   ballot-fraud allegations from opponents, watch an animated election-night results reveal, and track
@@ -82,20 +86,39 @@ plain JSON you can export and re-import.
 - **A changing climate** — climate risk rises over time (faster or slower depending on the laws in force),
   triggering natural disasters that hit property values and business confidence, with agriculture bearing
   the brunt and insurers absorbing some of the cost.
-- **Global world events** — a pandemic, a global trade war, or a tech boom can sweep the world economy,
-  each with its own winners and losers by industry, its own news coverage, and its own event templates.
+- **Global world events** — a pandemic, a global trade war, a tech boom, an oil crisis, a banking
+  collapse, or an AI disruption wave can sweep the world economy, each with its own winners and losers
+  by industry, its own news coverage, and its own event templates — plus milder, more frequent named
+  weather events (droughts, floods, heatwaves, cyclones, snowstorms) layered on top of the rarer,
+  severe climate disasters.
+- **Billionaire lifestyle & celebrity economy** — buy a private jet, superyacht, private island, sports
+  team, champion racehorse or famous artwork (each with real upkeep, and racehorses/sports teams that
+  occasionally throw off prize money), and take an equity-like royalty stake in a celebrity's career.
 - **20+ lifestyle activities** — from the gym and vacations to book clubs, therapy, adopting a pet, art
   collecting, wine tasting, poker nights, volunteering, blogging and learning a language.
+- **Living news network & world history** — richer news coverage (editorials, investigative journalism,
+  interviews, election-watch coverage) alongside a sparse world-history chronicle of major milestones
+  (wars, peace treaties, alliances, coups, elections, dynasty transitions) spanning every generation you play.
+- **Public opinion & an AI opposition leader** — a Public Opinion dashboard segments approval by ideology,
+  class, age and region using the same left/right/business/worker blocs that drive the legislature vote,
+  while a rival politician builds a public profile critiquing your government the whole time you're in power.
+- **Deeper corporate & national levers** — rivals occasionally sabotage your companies (misinformation,
+  poaching, undercutting, nuisance lawsuits) that an AI business consultant helps you read and react to;
+  hold investor conferences, race rivals for a breakthrough patent, and invest in retail loss-prevention
+  to stop shrinkage; as head of state, hold cabinet meetings, deliver a live budget speech, manage live
+  protests and strikes, issue government bonds, fund national cyber defense, and break ground on mega
+  projects (bridges, tunnels, bullet trains, stadiums, dams) alongside the existing infrastructure slate.
 - **Thousands of scenarios** — a data-driven event engine resolves placeholders ({company}, {npc},
   {amount}, ...) against live state, with skill-checked, probabilistic outcomes, plus 22 lightweight
   daily flavor events for time-skipping and honors/awards events (knighthoods, hall-of-fame induction,
   civic medals), so a compact template set produces an enormous variety of situations.
 - **Meta progression** — a Legacy Score computed at game over from your wealth, dynasty, office and
   achievements (with a New Game+ bonus into your next life), a life timeline of every milestone you hit,
-  37+ achievements, a Year in Review recap after every year, random mid-game challenges with cash rewards,
+  42+ achievements, a Year in Review recap after every year, random mid-game challenges with cash rewards,
   a Casual/Standard/Iron Man difficulty choice, and four starting-economy scenarios (Modern, Boom, Recession,
   Crisis) to change the game you're playing from turn one.
-- **Dynamic news** synthesised from what actually happened that year, plus a personal life log.
+- **Dynamic news** synthesised from what actually happened that year, plus a personal life log and an
+  animated election-night results reveal with a city-by-city vote breakdown.
 - **Light and dark mode**, a mobile-first UI (with wider desktop breakpoints and safe-area support for
   notched devices) of circular icon tiles, pill chips, featured cards and canvas charts, with a bottom
   tab bar, a "More" sheet so every screen is reachable from anywhere, and a light first-launch tutorial.
@@ -142,7 +165,9 @@ only moves when you tell it to, using the three buttons on the Life hub:
   limit orders that fire on their own.
 - **Assets** — buy property (cash or mortgage, including penthouses) for rental income and appreciation,
   renovate it, insure it, or move in yourself; take personal loans; buy government bonds; speculate long
-  or short on foreign currencies; take out life insurance for your family.
+  or short on foreign currencies; take out life insurance for your family; and once you're rich enough,
+  buy into the billionaire lifestyle (private jets, yachts, islands, sports teams, racehorses, art) or
+  take a royalty stake in a celebrity's brand.
 - **Politics** — join/found a party, run for office with a manifesto of promises tracked through your term,
   campaign (rallies, ads, debates, press conferences, celebrity endorsements, consultants, polling),
   negotiate coalitions, appoint a cabinet if you lead the country, and legislate — or call a referendum to
@@ -154,10 +179,12 @@ only moves when you tell it to, using the three buttons on the Life hub:
 - **Family** — date and marry (with an optional prenup), have or adopt children who grow into real NPCs and
   eventually have grandchildren, name a business successor or a political heir, draft a will naming a
   primary heir, track a Dynasty Score, and manage your mentor/rival/friend relationships.
-- **World** — a macro dashboard, every nation's economy and government (including climate risk), diplomacy
-  actions, commodities, and any active global event (pandemic, trade war, or tech boom).
-- **News / Stats** — the dynamic wire, your net-worth curve, 37+ achievements, a life timeline, and save
-  tools.
+- **World** — a macro dashboard, every nation's economy and government (including climate risk and
+  unrest), diplomacy actions, commodities, national debt/cyber-defense tools, and any active global event
+  (pandemic, trade war, tech boom, oil crisis, banking collapse, or AI disruption).
+- **News / Stats** — the dynamic wire (now with editorials, investigative pieces, interviews and election
+  coverage) plus a World History chronicle tab, your net-worth curve, 42+ achievements, a life timeline,
+  and save tools.
 - **Underworld** — join a crime family and climb its ranks through heists and protection rackets, contest
   rival turf, launder illicit proceeds through a front business, bribe a judge or attempt a prison escape if
   caught, pay your way out and go straight, or enter witness protection to wipe your record.

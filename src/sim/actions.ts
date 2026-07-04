@@ -14,7 +14,7 @@ import { makeCompanyName, makePartyName, makePersonName } from '../data/names';
 import { createCompany, nextCompanyId, companyValuation } from './business';
 import { doIPO, marketCap } from './market';
 import { OFFICE_SPEC_BY_KIND, campaignWinChance, eligibleFor, estimateLawVote } from './politics';
-import { log } from './engine';
+import { log, logHistory } from './engine';
 
 export interface ActionResult {
   ok: boolean;
@@ -781,6 +781,83 @@ export function launchLoyaltyProgram(state: GameState, companyId: string): Actio
   return { ok: true, message: 'Loyalty program launched.' };
 }
 
+export function investInRetailSecurity(state: GameState, companyId: string): ActionResult {
+  const c = state.companies[companyId];
+  if (!c || !c.playerOwned || c.status !== 'active') return { ok: false, message: 'Not your company.' };
+  const ind = INDUSTRY_BY_ID[c.industryId];
+  if (!ind.tags.includes('retail')) return { ok: false, message: 'Only retail businesses face meaningful shrinkage.' };
+  if (c.securityInvested) return { ok: false, message: 'Loss-prevention is already in place.' };
+  const cost = Math.max(8_000, c.revenue * 0.01);
+  if (cost > c.cash) return { ok: false, message: `Needs $${Math.round(cost).toLocaleString()} in company cash.` };
+  c.cash -= cost;
+  c.securityInvested = true;
+  log(state, `${c.name} installed CCTV and loss-prevention staff to cut down on shrinkage.`, 'business');
+  return { ok: true, message: 'Security investment made. Shrinkage eliminated at an ongoing cost.' };
+}
+
+/** Present quarterly-style earnings and take analyst questions; can move the share price either way. */
+export function holdInvestorConference(state: GameState, companyId: string): ActionResult {
+  const p = state.player;
+  const c = state.companies[companyId];
+  if (!c || !c.playerOwned || !c.isPublic || c.status !== 'active') return { ok: false, message: 'Only public companies you control hold investor conferences.' };
+  const rng = withRng(state);
+  const skill = (p.skills[SK.negotiation] ?? 0) + (p.skills[SK.publicSpeaking] ?? 0);
+  const fundamentals = clamp((c.profit / Math.max(1, c.revenue)) * 2, -0.3, 0.3);
+  const chance = clamp(0.45 + skill * 0.003 + fundamentals, 0.15, 0.85);
+  const wentWell = rng.chance(chance);
+  const move = wentWell ? rng.range(0.02, 0.08) : -rng.range(0.02, 0.08);
+  c.sharePrice = Math.max(0.01, c.sharePrice * (1 + move));
+  c.brand = clamp100(c.brand + (wentWell ? 2 : -2));
+  commit(state, rng);
+  log(state, wentWell
+    ? `📊 ${c.name}'s investor conference impressed analysts; shares moved ${(move * 100).toFixed(1)}%.`
+    : `📊 ${c.name}'s investor conference raised tough questions; shares fell ${(-move * 100).toFixed(1)}%.`, 'business');
+  return { ok: true, message: wentWell ? `Shares up ${(move * 100).toFixed(1)}%.` : `Shares down ${(-move * 100).toFixed(1)}%.` };
+}
+
+/** Push for a breakthrough patent ahead of industry rivals. */
+export function raceForInnovation(state: GameState, companyId: string): ActionResult {
+  const c = state.companies[companyId];
+  if (!c || !c.playerOwned || c.status !== 'active') return { ok: false, message: 'Not your company.' };
+  const country = state.countries.find((k) => k.id === c.countryId)!;
+  const cost = Math.max(40_000, c.revenue * 0.08);
+  if (cost > c.cash) return { ok: false, message: `Needs $${Math.round(cost).toLocaleString()} in company cash.` };
+  const rng = withRng(state);
+  c.cash -= cost;
+  const chance = clamp(0.3 + c.rdPct * 1.8 + (country.researchLevel / 100) * 0.25, 0.1, 0.75);
+  const won = rng.chance(chance);
+  const rivals = Object.values(state.companies).filter(
+    (r) => r.status === 'active' && r.id !== c.id && r.industryId === c.industryId && r.countryId === c.countryId,
+  );
+  const rival = rivals.length ? rng.pick(rivals) : null;
+  commit(state, rng);
+  if (won) {
+    c.patents++;
+    c.quality = clamp100(c.quality + 5);
+    c.brand = clamp100(c.brand + 4);
+    if (!state.achievements.includes('innovation_leader')) state.achievements.push('innovation_leader');
+    log(state, `🔬 ${c.name} won the innovation race, filing a breakthrough patent first.`, 'business');
+    return { ok: true, message: 'You won the innovation race! Patent filed.' };
+  }
+  c.brand = clamp100(c.brand - 2);
+  log(state, rival
+    ? `🔬 ${rival.name} beat ${c.name} to the breakthrough patent.`
+    : `🔬 ${c.name}'s R&D push didn't pan out before a rival got there first.`, 'bad');
+  return { ok: false, message: rival ? `${rival.name} won the race instead.` : 'A rival got there first.' };
+}
+
+/** Read-only: an AI consultant's best-guess strategic tip based on current company fundamentals. */
+export function consultantRecommendation(company: { cash: number; morale: number; brand: number; quality: number; debt: number; revenue: number; customerSatisfaction: number; loyaltyProgram: boolean; securityInvested: boolean }, industryTags: string[]): string {
+  if (company.morale < 40) return 'Morale is low — a training program or leadership initiative could stabilize your workforce before it hurts output.';
+  if (company.debt > company.revenue * 0.6) return 'Debt is high relative to revenue — consider paying it down or issuing equity instead of more debt.';
+  if (company.brand < 40) return 'Brand awareness is weak — a brand ambassador deal or marketing push would help you compete on more than price.';
+  if (company.quality < 40) return 'Product quality is lagging — a quality audit could catch issues before they become a recall.';
+  if (company.customerSatisfaction < 45 && !company.loyaltyProgram) return 'Customer satisfaction is soft — a loyalty program tends to pay for itself in retention.';
+  if (industryTags.includes('retail') && !company.securityInvested) return 'This is a retail business without loss-prevention — shrinkage is quietly eating into your margin.';
+  if (company.cash > company.revenue * 0.4) return 'You are sitting on a lot of idle cash — consider a buyback, a bond paydown, or reinvesting in growth.';
+  return 'Fundamentals look solid. Consider an investor conference to build market confidence, or push for the next innovation.';
+}
+
 /** A political extension of the existing celebrity/brand-ambassador system: courting a
  * celebrity endorsement for an active campaign instead of a company. */
 export function seekCelebrityEndorsement(state: GameState): ActionResult {
@@ -1154,6 +1231,7 @@ export function declareWar(state: GameState, targetCountryId: string, strategy: 
   if (!state.achievements.includes('diplomat')) state.achievements.push('diplomat');
   const label = strategy === 'blockade' ? 'an economic blockade' : 'a full invasion';
   log(state, `⚔️ You declared war on ${target.name} with ${label}.`, 'politics');
+  logHistory(state, `⚔️ WAR: ${home.name} declares war on ${target.name} (${strategy})`);
   return { ok: true, message: `War declared on ${target.name} (${strategy}).` };
 }
 
@@ -1171,6 +1249,7 @@ export function signPeaceTreaty(state: GameState, targetCountryId: string): Acti
   state.player.popularity = clamp100(state.player.popularity + 5);
   if (!state.achievements.includes('diplomat')) state.achievements.push('diplomat');
   log(state, `🕊️ You signed a peace treaty with ${target.name}.`, 'politics');
+  logHistory(state, `🕊️ Peace: ${home.name} and ${target.name} sign an armistice`);
   return { ok: true, message: `Peace signed with ${target.name}.` };
 }
 
@@ -1277,6 +1356,11 @@ const INFRA_SPECS: Record<InfrastructureKind, { capitalCost: number; budgetHit: 
   power: { capitalCost: 18, budgetHit: 0.012, years: 2 },
   internet: { capitalCost: 15, budgetHit: 0.01, years: 2 },
   space_program: { capitalCost: 60, budgetHit: 0.05, years: 8 },
+  bridge: { capitalCost: 22, budgetHit: 0.015, years: 3 },
+  tunnel: { capitalCost: 28, budgetHit: 0.02, years: 4 },
+  bullet_train: { capitalCost: 45, budgetHit: 0.035, years: 6 },
+  stadium: { capitalCost: 20, budgetHit: 0.012, years: 2 },
+  dam: { capitalCost: 35, budgetHit: 0.025, years: 5 },
 };
 
 export function launchInfrastructureProject(state: GameState, kind: InfrastructureKind): ActionResult {
@@ -1291,6 +1375,29 @@ export function launchInfrastructureProject(state: GameState, kind: Infrastructu
   home.infrastructureProjects.push({ id: `infra-${home.id}-${kind}-${state.year}`, kind, yearsLeft: spec.years, totalYears: spec.years });
   log(state, `🏗️ ${home.name} broke ground on a new ${kind} project.`, 'politics');
   return { ok: true, message: `${kind} project underway, ${spec.years} year(s) to completion.` };
+}
+
+/** The national treasury issues government bonds to fund spending; the yield reflects investor
+ * confidence (rate rises as business confidence falls), and it raises the debt-to-GDP ratio. */
+export function issueGovernmentBonds(state: GameState, amountPctOfGdp: number): ActionResult {
+  const { home, error } = requireLeadership(state);
+  if (error) return error;
+  const target = clamp(amountPctOfGdp, 1, 20);
+  const yieldPct = home.economy.interestRate + Math.max(0, (60 - home.economy.businessConfidence) * 0.0015);
+  home.economy.govDebtToGdp = clamp(home.economy.govDebtToGdp + target / 100, 0, 4);
+  home.economy.budgetBalance = clamp(home.economy.budgetBalance + (target / 100) * 0.7, -0.3, 0.1);
+  log(state, `🏦 Issued government bonds worth ${target.toFixed(1)}% of GDP at an estimated ${(yieldPct * 100).toFixed(1)}% yield.`, 'politics');
+  return { ok: true, message: `Bonds issued at ~${(yieldPct * 100).toFixed(1)}% yield.` };
+}
+
+export function fundNationalCyberDefense(state: GameState, amount: number): ActionResult {
+  const { home, error } = requireLeadership(state);
+  if (error) return error;
+  if (amount <= 0 || amount > state.player.money) return { ok: false, message: 'Invalid funding amount.' };
+  state.player.money -= amount;
+  home.cyberDefense = clamp100(home.cyberDefense + amount / 25_000);
+  log(state, `Invested $${amount.toLocaleString()} in national cyber defense.`, 'politics');
+  return { ok: true, message: `National cyber defense now ${Math.round(home.cyberDefense)}.` };
 }
 
 const ADVISOR_COST = 50_000;
@@ -1454,6 +1561,7 @@ export function foundAlliance(state: GameState, name: string): ActionResult {
   state.alliances.push({ id, name: name.trim() || `${home.name} Pact`, founderCountryId: home.id, memberCountryIds: [home.id] });
   home.allianceId = id;
   log(state, `${home.name} founded the ${name || `${home.name} Pact`} alliance.`, 'politics');
+  logHistory(state, `🤝 ${home.name} founds the ${name || `${home.name} Pact`} alliance`);
   return { ok: true, message: 'Alliance founded.' };
 }
 
@@ -1739,6 +1847,116 @@ export function attendSummit(state: GameState): ActionResult {
     ? `🌐 A landmark agreement came out of the international summit.`
     : `🌐 You attended an international summit, warming relations across the board.`, 'politics');
   return { ok: true, message: breakthrough ? 'Summit breakthrough! Relations and confidence up.' : 'Relations improved with every nation present.' };
+}
+
+// ---------------------------------------------------------------------------
+// V8: Government depth — cabinet meetings, budget speech, protests
+// ---------------------------------------------------------------------------
+
+const PORTFOLIO_THEMES: Record<CabinetPortfolio, string> = {
+  Finance: 'a tax and spending package',
+  'Foreign Affairs': 'a diplomatic realignment',
+  Defense: 'a military spending increase',
+  Health: 'a healthcare funding boost',
+  Education: 'a school funding reform',
+  Justice: 'a crime crackdown package',
+};
+
+/** A cabinet meeting: a random appointed minister presents and argues for a policy in their portfolio. */
+export function holdCabinetMeeting(state: GameState): ActionResult {
+  const { home, error } = requireLeadership(state);
+  if (error) return error;
+  const appointed = Object.entries(home.cabinet).filter(([, id]) => id !== 'player');
+  if (!appointed.length) return { ok: false, message: 'No appointed ministers to convene.' };
+  const rng = withRng(state);
+  const [portfolio, npcId] = rng.pick(appointed);
+  const minister = state.npcs[npcId];
+  if (!minister || !minister.alive) return { ok: false, message: 'That minister is no longer available.' };
+  const theme = PORTFOLIO_THEMES[portfolio as CabinetPortfolio];
+  const chance = clamp(0.35 + (minister.competence - 50) * 0.005 + (state.player.politicalCapital - 50) * 0.002, 0.15, 0.85);
+  const agreed = rng.chance(chance);
+  const rivalMinister = appointed.find(([pf]) => pf !== portfolio);
+  const rivalName = rivalMinister ? state.npcs[rivalMinister[1]]?.name : null;
+  commit(state, rng);
+  if (agreed) {
+    const pull = 4 + minister.competence * 0.04;
+    if (portfolio === 'Finance') home.economy.businessConfidence = clamp100(home.economy.businessConfidence + pull);
+    else if (portfolio === 'Health') home.healthcare = clamp100(home.healthcare + pull);
+    else if (portfolio === 'Education') home.education = clamp100(home.education + pull);
+    else if (portfolio === 'Defense') home.militaryPower = clamp100(home.militaryPower + pull);
+    else if (portfolio === 'Justice') home.corruption = clamp100(home.corruption - pull);
+    else for (const otherId of Object.keys(home.relations)) home.relations[otherId] = clamp(home.relations[otherId] + pull * 0.3, -100, 100);
+    minister.opinionOfPlayer = clamp(minister.opinionOfPlayer + 8, -100, 100);
+    log(state, `🏛️ Cabinet meeting: ${minister.name} won backing for ${theme}.`, 'politics');
+    return { ok: true, message: `The cabinet agreed to ${minister.name}'s ${theme}.` };
+  }
+  const clash = rivalName ? ` ${rivalName} argued against it.` : '';
+  minister.opinionOfPlayer = clamp(minister.opinionOfPlayer - 5, -100, 100);
+  log(state, `🏛️ Cabinet meeting: ${minister.name}'s ${theme} was shot down.${clash}`, 'bad');
+  return { ok: false, message: `The cabinet couldn't agree on ${minister.name}'s proposal.${clash}` };
+}
+
+/** Deliver the national budget speech live in parliament; markets and voters react instantly. */
+export function deliverBudgetSpeech(state: GameState): ActionResult {
+  const { home, error } = requireLeadership(state);
+  if (error) return error;
+  const p = state.player;
+  const cost = 10;
+  if (p.politicalCapital < cost) return { ok: false, message: `Needs ${cost} political capital.` };
+  p.politicalCapital = clamp(p.politicalCapital - cost, 0, 100);
+  const rng = withRng(state);
+  const balance = home.economy.budgetBalance ?? 0;
+  const skill = (p.skills[SK.publicSpeaking] ?? 0) + (p.skills[SK.economics] ?? 0);
+  const deliveryChance = clamp(0.5 + skill * 0.003 + (p.charisma - 50) * 0.003, 0.2, 0.9);
+  const wellReceived = rng.chance(deliveryChance);
+  const balanceMult = balance >= 0 ? 1 : -1;
+  const popularityChange = wellReceived ? rng.range(3, 7) * (balance >= -0.05 ? 1 : 0.3) : -rng.range(2, 6);
+  const confidenceChange = wellReceived ? rng.range(2, 5) * balanceMult : -rng.range(1, 4);
+  p.popularity = clamp100(p.popularity + popularityChange);
+  home.economy.businessConfidence = clamp100(home.economy.businessConfidence + confidenceChange);
+  home.economy.stockIndex = home.economy.stockIndex * (1 + confidenceChange * 0.002);
+  commit(state, rng);
+  if (!state.achievements.includes('budget_orator')) state.achievements.push('budget_orator');
+  log(state, wellReceived
+    ? `📜 Your budget speech landed well; markets and voters both responded positively.`
+    : `📜 Your budget speech fell flat in the chamber.`, 'politics');
+  return { ok: true, message: wellReceived ? 'Budget speech well received.' : 'The speech underwhelmed.' };
+}
+
+export type ProtestResponse = 'concede' | 'crackdown' | 'ignore';
+
+/** Respond to a live protest/strike movement. */
+export function respondToProtests(state: GameState, approach: ProtestResponse): ActionResult {
+  const { home, error } = requireLeadership(state);
+  if (error) return error;
+  if (home.unrest < 30) return { ok: false, message: 'There is no significant unrest to respond to right now.' };
+  const p = state.player;
+  const rng = withRng(state);
+  if (approach === 'concede') {
+    home.unrest = clamp100(home.unrest - rng.range(15, 30));
+    p.popularity = clamp100(p.popularity + rng.range(3, 7));
+    home.economy.budgetBalance = (home.economy.budgetBalance ?? 0) - 0.01;
+    log(state, `You made concessions to protesters, easing unrest at a fiscal cost.`, 'politics');
+    commit(state, rng);
+    return { ok: true, message: 'Unrest eased through concessions.' };
+  }
+  if (approach === 'crackdown') {
+    home.unrest = clamp100(home.unrest - rng.range(25, 45));
+    home.stability = clamp(home.stability - rng.range(2, 6), 0, 100);
+    p.karma = clamp100(p.karma - rng.range(4, 10));
+    const backlash = rng.chance(0.4);
+    p.popularity = clamp100(p.popularity + (backlash ? -rng.range(5, 12) : rng.range(1, 4)));
+    log(state, backlash
+      ? `Your crackdown on protesters drew international condemnation.`
+      : `Your crackdown restored order quickly.`, backlash ? 'bad' : 'politics');
+    commit(state, rng);
+    return { ok: true, message: backlash ? 'Order restored, but at a reputational cost.' : 'Order restored.' };
+  }
+  home.unrest = clamp100(home.unrest + rng.range(2, 8));
+  p.popularity = clamp100(p.popularity - rng.range(1, 4));
+  log(state, `You ignored the unrest; it festers.`, 'bad');
+  commit(state, rng);
+  return { ok: true, message: 'Unrest continues to build.' };
 }
 
 // ---------------------------------------------------------------------------

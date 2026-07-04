@@ -6,11 +6,13 @@ import {
   availableOffices,
   cabinetCandidates,
   campaignAction,
+  deliverBudgetSpeech,
   dismissMinister,
   investigateOfficial,
   foundParty,
   cancelPRAgency,
   hirePRAgency,
+  holdCabinetMeeting,
   holdPressConference,
   joinParty,
   launchCampaign,
@@ -19,13 +21,14 @@ import {
   proposeLaw,
   proposedLaws,
   repealLaw,
+  respondToProtests,
   seekCelebrityEndorsement,
 } from '../../sim/actions';
-import { campaignWinChance, promiseFulfillment } from '../../sim/politics';
+import { campaignWinChance, promiseFulfillment, publicOpinionBreakdown } from '../../sim/politics';
 import { LAW_CATEGORIES } from '../../data/laws';
 import { BarList, Badge, Button, Card, Field, Modal, Pill, PillRow, SectionHeader, StatBar, TextInput } from '../components';
 import { money, moneyFull, pct } from '../format';
-import { CABINET_PORTFOLIOS, MANIFESTO_PROMISES, type CabinetPortfolio, type ManifestoPromise } from '../../sim/types';
+import { CABINET_PORTFOLIOS, MANIFESTO_PROMISES, type CabinetPortfolio, type Country, type ManifestoPromise } from '../../sim/types';
 
 const PROMISE_LABELS: Record<ManifestoPromise, string> = {
   tax_cuts: 'Cut Taxes',
@@ -159,6 +162,7 @@ export function Politics() {
               <StatBar label="Stability" value={home.stability} />
               <StatBar label="Corruption" value={home.corruption} />
               <StatBar label="Press Freedom" value={home.pressFreedom} />
+              <StatBar label="Unrest" value={home.unrest} />
             </div>
             <div className="mt-3 text-sm flex justify-between">
               <span className="text-slate-500 dark:text-slate-400">System</span>
@@ -170,20 +174,36 @@ export function Politics() {
                 <span className="font-semibold">{home.electionInYears} yr</span>
               </div>
             )}
+            {home.leaderId === 'player' && (
+              <Button size="sm" variant="soft" className="w-full mt-3" onClick={() => run(deliverBudgetSpeech)}>📜 Deliver Budget Speech (10 PC)</Button>
+            )}
           </Card>
 
-          {home.cities.length > 0 && (
-            <Card className="p-5">
-              <div className="font-bold mb-3">Approval by City</div>
-              <BarList
-                items={home.cities.slice(0, 8).map((city) => ({
-                  label: city.name,
-                  value: Math.round(Math.max(0, Math.min(100, home.approvalOfGovernment + (50 - city.crime) * 0.2 - (city.costOfLiving - 1) * 20))),
-                  color: '#337dff',
-                }))}
-              />
+          {home.leaderId === 'player' && home.oppositionLeaderId && state.npcs[home.oppositionLeaderId] && (
+            <Card className="p-5 flex items-center justify-between">
+              <div>
+                <div className="text-xs text-slate-400 uppercase font-bold mb-1">Leader of the Opposition</div>
+                <div className="font-bold">{state.npcs[home.oppositionLeaderId].name}</div>
+              </div>
+              <Badge tone={state.npcs[home.oppositionLeaderId].popularity > 50 ? 'bad' : 'brand'}>
+                {Math.round(state.npcs[home.oppositionLeaderId].popularity)} popularity
+              </Badge>
             </Card>
           )}
+
+          {home.leaderId === 'player' && home.unrest >= 30 && (
+            <Card className="p-5">
+              <div className="font-bold mb-2">✊ Protests & Unrest</div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Unrest is at {Math.round(home.unrest)}. How do you respond?</p>
+              <div className="grid grid-cols-3 gap-2">
+                <Button size="sm" variant="soft" onClick={() => run(respondToProtests, 'concede')}>Concede</Button>
+                <Button size="sm" variant="danger" onClick={() => run(respondToProtests, 'crackdown')}>Crackdown</Button>
+                <Button size="sm" variant="ghost" onClick={() => run(respondToProtests, 'ignore')}>Ignore</Button>
+              </div>
+            </Card>
+          )}
+
+          {home.cities.length > 0 && <PublicOpinionDashboard home={home} />}
         </div>
       )}
 
@@ -192,6 +212,33 @@ export function Politics() {
       {tab === 'party' && <PartyTab party={party} />}
       {tab === 'cabinet' && <CabinetTab />}
     </div>
+  );
+}
+
+const OPINION_TABS = [
+  { key: 'byRegion', label: 'Region' },
+  { key: 'byIdeology', label: 'Ideology' },
+  { key: 'byClass', label: 'Class' },
+  { key: 'byAge', label: 'Age' },
+] as const;
+
+function PublicOpinionDashboard({ home }: { home: Country }) {
+  const [seg, setSeg] = useState<(typeof OPINION_TABS)[number]['key']>('byRegion');
+  const breakdown = publicOpinionBreakdown(home);
+  return (
+    <Card className="p-5">
+      <div className="font-bold mb-3">Public Opinion</div>
+      <PillRow>
+        {OPINION_TABS.map((t) => (
+          <Pill key={t.key} label={t.label} active={seg === t.key} onClick={() => setSeg(t.key)} />
+        ))}
+      </PillRow>
+      <div className="mt-3">
+        <BarList
+          items={breakdown[seg].map((s) => ({ label: s.label, value: s.value, color: '#337dff' }))}
+        />
+      </div>
+    </Card>
   );
 }
 
@@ -418,6 +465,9 @@ function CabinetTab() {
   return (
     <div className="mt-4 space-y-2">
       <p className="text-xs text-slate-400 px-1">Ministers nudge their portfolio's national stats each year based on competence and integrity.</p>
+      {Object.values(home.cabinet).some((id) => id !== 'player') && (
+        <Button size="sm" variant="soft" className="w-full" onClick={() => run(holdCabinetMeeting)}>🗣️ Hold Cabinet Meeting</Button>
+      )}
       {CABINET_PORTFOLIOS.map((portfolio) => {
         const npcId = home.cabinet[portfolio];
         const minister = npcId ? state.npcs[npcId] : null;

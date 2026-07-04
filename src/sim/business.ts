@@ -86,6 +86,7 @@ export function createCompany(opts: FoundCompanyOptions, rng: RNG): Company {
     bondYearsLeft: 0,
     franchiseCount: 0,
     loyaltyProgram: false,
+    securityInvested: false,
     status: 'active',
     history: [],
   };
@@ -178,6 +179,17 @@ export function tickCompany(c: Company, ctx: CompanyTickContext): CompanyTickRes
     if (ind.tags.includes('tech') || ind.tags.includes('ai') || ind.tags.includes('software') || ind.tags.includes('platform')) {
       worldEventMult += worldEvent.severity * 0.3;
     }
+  } else if (worldEvent?.type === 'oil_crisis') {
+    if (ind.tags.includes('oil') || ind.tags.includes('energy')) worldEventMult += worldEvent.severity * 0.35;
+    if (ind.tags.includes('airline') || ind.tags.includes('shipping') || ind.tags.includes('logistics')) worldEventMult -= worldEvent.severity * 0.3;
+    if (ind.tags.includes('green') || ind.tags.includes('renewable')) worldEventMult += worldEvent.severity * 0.2;
+  } else if (worldEvent?.type === 'banking_collapse') {
+    if (ind.tags.includes('finance') || ind.tags.includes('banking') || ind.tags.includes('real_estate') || ind.tags.includes('property')) {
+      worldEventMult -= worldEvent.severity * 0.35;
+    }
+  } else if (worldEvent?.type === 'ai_disruption') {
+    if (ind.tags.includes('ai') || ind.tags.includes('tech') || ind.tags.includes('software')) worldEventMult += worldEvent.severity * 0.25;
+    if (ind.laborIntensity > 0.6) worldEventMult -= worldEvent.severity * 0.2;
   }
 
   // Market saturation: every industry is finite, so the very largest firms see their upside
@@ -189,6 +201,14 @@ export function tickCompany(c: Company, ctx: CompanyTickContext): CompanyTickRes
   const growthPotential = cycle * confidence * lawMult * priceFit * marketingPower * qualityPull * managerMult * moraleMult * commodityMult * worldEventMult * climateMult * noise;
   const cappedGrowth = 1 + (clamp(growthPotential, 0.4, 2.2) - 1) * saturation;
   c.revenue = Math.max(1000, c.revenue * cappedGrowth);
+
+  // Retail theft & security: unprotected retail-tagged businesses lose a slice of revenue to
+  // shrinkage, scaled by the country's average crime rate; security investment eliminates it
+  // at an ongoing overhead cost (see overheads below).
+  if (ind.tags.includes('retail') && !c.securityInvested) {
+    const avgCrime = country.cities.length ? country.cities.reduce((s, ct) => s + ct.crime, 0) / country.cities.length : 40;
+    c.revenue = Math.max(1000, c.revenue * (1 - (avgCrime / 100) * 0.06));
+  }
 
   // --- Costs ----------------------------------------------------------------
   // A tight labor market bids up wages and slows hiring (everyone's competing for the same talent).
@@ -207,7 +227,7 @@ export function tickCompany(c: Company, ctx: CompanyTickContext): CompanyTickRes
   const bondInterest = c.bondDebt * c.bondRate;
   const execSalaries = c.executives.reduce((s, x) => s + x.salary, 0);
   const hqOverhead = c.hqTier * c.assets * 0.006;
-  const overheads = c.assets * 0.04 * cultureOverheadMult + hqOverhead + execSalaries + (c.insured ? c.revenue * 0.01 : 0);
+  const overheads = c.assets * 0.04 * cultureOverheadMult + hqOverhead + execSalaries + (c.insured ? c.revenue * 0.01 : 0) + (c.securityInvested ? c.revenue * 0.015 : 0);
   c.expenses = laborCost + inputCost + marketingCost + rdCost + interest + bondInterest + overheads;
 
   // Corporate bond amortization: fixed-term principal repayment alongside the interest above.
@@ -363,6 +383,38 @@ export function tickMergers(state: GameState, rng: RNG): string[] {
     acquirer.brand = clamp100(acquirer.brand + 3);
     target.status = 'acquired';
     headlines.push(`${acquirer.name} acquires rival ${target.name} in a market consolidation.`);
+  }
+  return headlines;
+}
+
+/** NPC rivals occasionally take a shot at a player-owned company: smear campaigns, poaching,
+ * price undercutting, or aggressive legal action. Purely emergent — the player doesn't trigger this. */
+export function tickCorporateSabotage(state: GameState, rng: RNG): string[] {
+  const headlines: string[] = [];
+  for (const c of Object.values(state.companies)) {
+    if (c.status !== 'active' || !c.playerOwned) continue;
+    const rivals = Object.values(state.companies).filter(
+      (r) => r.status === 'active' && !r.playerOwned && r.industryId === c.industryId && r.countryId === c.countryId && r.revenue > c.revenue * 0.3,
+    );
+    if (!rivals.length || !rng.chance(0.06)) continue;
+    const rival = rng.pick(rivals);
+    const kind = rng.pick(['misinformation', 'poaching', 'undercutting', 'legal_action'] as const);
+    if (kind === 'misinformation') {
+      c.brand = clamp100(c.brand - rng.range(4, 10));
+      headlines.push(`${rival.name} is spreading misinformation about ${c.name} online.`);
+    } else if (kind === 'poaching') {
+      c.managerQuality = clamp100(c.managerQuality - rng.range(3, 8));
+      c.morale = clamp100(c.morale - rng.range(2, 6));
+      headlines.push(`${rival.name} poached several key staff from ${c.name}.`);
+    } else if (kind === 'undercutting') {
+      c.revenue = Math.max(1000, c.revenue * (1 - rng.range(0.03, 0.08)));
+      headlines.push(`${rival.name} is aggressively undercutting ${c.name} on price.`);
+    } else {
+      const legalCost = Math.min(c.cash, Math.max(5_000, c.revenue * 0.02));
+      c.cash -= legalCost;
+      c.brand = clamp100(c.brand - rng.range(1, 4));
+      headlines.push(`${c.name} is fighting off a nuisance lawsuit filed by ${rival.name}.`);
+    }
   }
   return headlines;
 }

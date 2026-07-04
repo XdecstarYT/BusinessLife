@@ -4,7 +4,7 @@
  * sanctions, wars). NPC politicians pursue their own careers; national
  * elections happen with or without the player.
  */
-import type { CabinetPortfolio, Country, GameState, LawDef, ManifestoPromise, Office, OfficeKind } from './types';
+import type { CabinetPortfolio, Country, GameState, InfrastructureKind, LawDef, ManifestoPromise, Office, OfficeKind } from './types';
 import { clamp, clamp100 } from './types';
 import { LAW_BY_ID } from '../data/laws';
 import { SK } from '../data/skills';
@@ -167,6 +167,65 @@ export function promiseFulfillment(office: Office, country: Country): PromiseSta
   });
 }
 
+export interface OpinionSegment {
+  label: string;
+  value: number; // 0..100 approval-like score
+}
+
+export interface OpinionBreakdown {
+  byIdeology: OpinionSegment[];
+  byClass: OpinionSegment[];
+  byAge: OpinionSegment[];
+  byRegion: OpinionSegment[];
+}
+
+/** Public opinion segmented by ideology/class/age/region, derived from the real laws in force
+ * (their left/right/business/worker support blocs) and country conditions — not a literal per-citizen poll,
+ * but a defensible aggregate consistent with how the legislature vote itself is estimated. */
+export function publicOpinionBreakdown(country: Country): OpinionBreakdown {
+  const laws = country.lawsInForce.map((id) => LAW_BY_ID[id]).filter((l): l is LawDef => !!l);
+  const baseline = country.approvalOfGovernment;
+  const avgSupport = (bloc: keyof LawDef['support']) =>
+    laws.length ? laws.reduce((s, l) => s + l.support[bloc], 0) / laws.length : 0;
+
+  const byIdeology: OpinionSegment[] = [
+    { label: 'Left', value: Math.round(clamp100(baseline + avgSupport('left') * 40)) },
+    { label: 'Center', value: Math.round(clamp100(baseline + (avgSupport('left') + avgSupport('right')) * 10)) },
+    { label: 'Right', value: Math.round(clamp100(baseline + avgSupport('right') * 40)) },
+  ];
+  const byClass: OpinionSegment[] = [
+    { label: 'Business owners', value: Math.round(clamp100(baseline + avgSupport('business') * 40)) },
+    { label: 'Workers', value: Math.round(clamp100(baseline + avgSupport('workers') * 40)) },
+  ];
+  const e = country.economy;
+  const byAge: OpinionSegment[] = [
+    { label: '18-30', value: Math.round(clamp100(baseline - e.unemployment * 100 * 0.4 + avgSupport('workers') * 15)) },
+    { label: '31-60', value: Math.round(clamp100(baseline + avgSupport('business') * 10)) },
+    { label: '61+', value: Math.round(clamp100(baseline + (country.healthcare - 50) * 0.3)) },
+  ];
+  const byRegion: OpinionSegment[] = country.cities.slice(0, 8).map((city) => ({
+    label: city.name,
+    value: Math.round(clamp100(baseline + (50 - city.crime) * 0.2 - (city.costOfLiving - 1) * 20)),
+  }));
+
+  return { byIdeology, byClass, byAge, byRegion };
+}
+
+const MEGA_PROJECT_KINDS = new Set(['bridge', 'tunnel', 'bullet_train', 'stadium', 'dam', 'space_program']);
+const MEGA_PROJECT_LABELS: Partial<Record<InfrastructureKind, string>> = {
+  space_program: 'national space program',
+  bullet_train: 'bullet train network',
+};
+
+/** A city-by-city breakdown of an election result, as a lightweight substitute for a literal
+ * interactive electorate map — city character (crime, cost of living) swings the vote a bit. */
+export function electionRegionalBreakdown(home: Country, playerSharePct: number, rng: RNG): { cityName: string; playerSharePct: number }[] {
+  return home.cities.slice(0, 8).map((city) => ({
+    cityName: city.name,
+    playerSharePct: Math.round(clamp(playerSharePct + (50 - city.crime) * 0.15 - (city.costOfLiving - 1) * 15 + rng.range(-5, 5), 1, 99)),
+  }));
+}
+
 /** Yearly political tick for one country. Returns notable headlines. */
 export function tickPolitics(state: GameState, country: Country, rng: RNG): string[] {
   const headlines: string[] = [];
@@ -184,6 +243,61 @@ export function tickPolitics(state: GameState, country: Country, rng: RNG): stri
   // If the player leads the country, their popularity tracks approval.
   if (playerIsLeader) {
     state.player.popularity = clamp100(state.player.popularity * 0.7 + country.approvalOfGovernment * 0.3);
+  }
+
+  // Unrest: protests and strikes build when approval is low, unemployment is high, or stability is shaky.
+  const unrestTarget = clamp(
+    (50 - country.approvalOfGovernment) * 0.6 + Math.max(0, e.unemployment - 0.06) * 300 + Math.max(0, 50 - country.stability) * 0.4,
+    0,
+    100,
+  );
+  country.unrest = clamp100(country.unrest * 0.8 + unrestTarget * 0.2 + rng.range(-3, 3));
+  if (country.unrest > 70 && rng.chance(0.35)) {
+    headlines.push(`✊ Mass protests grip ${country.name} as public anger boils over`);
+    country.economy.businessConfidence = clamp100(country.economy.businessConfidence - 4);
+    if (playerIsLeader) state.player.popularity = clamp100(state.player.popularity - 3);
+  } else if (country.unrest > 45 && rng.chance(0.25)) {
+    headlines.push(`📢 Strikes and demonstrations disrupt ${country.name}`);
+  }
+
+  // National cyberattacks: higher cyber defense reduces both odds and severity.
+  const cyberAttackChance = clamp(0.05 - (country.cyberDefense / 100) * 0.035, 0.01, 0.05);
+  if (rng.chance(cyberAttackChance)) {
+    const severity = rng.range(0.3, 1) * (1 - country.cyberDefense / 200);
+    country.economy.businessConfidence = clamp100(country.economy.businessConfidence - severity * 8);
+    const targets = Object.values(state.companies).filter((c) => c.status === 'active' && c.countryId === country.id);
+    const target = targets.length ? rng.pick(targets) : null;
+    if (target) {
+      target.cash = Math.max(0, target.cash - target.cash * severity * 0.1);
+      target.brand = clamp100(target.brand - severity * 5);
+    }
+    headlines.push(target
+      ? `🖥️ A major cyberattack struck ${country.name}, disrupting ${target.name} and rattling markets`
+      : `🖥️ A major cyberattack struck ${country.name}'s critical infrastructure`);
+  }
+
+  // AI Opposition Leader: while the player governs, a rival politician builds a public profile
+  // critiquing the government, adapting how loudly they push based on approval.
+  if (playerIsLeader) {
+    if (country.oppositionLeaderId && !state.npcs[country.oppositionLeaderId]?.alive) country.oppositionLeaderId = null;
+    if (!country.oppositionLeaderId) {
+      const candidate = Object.values(state.npcs).find(
+        (n) => n.alive && n.countryId === country.id && n.role === 'politician' && n.id !== state.player.politicalHeirId,
+      );
+      if (candidate) country.oppositionLeaderId = candidate.id;
+    }
+    const opposition = country.oppositionLeaderId ? state.npcs[country.oppositionLeaderId] : null;
+    if (opposition) {
+      const critiqueChance = clamp(0.06 + Math.max(0, 50 - country.approvalOfGovernment) * 0.004, 0.05, 0.4);
+      if (rng.chance(critiqueChance)) {
+        const hit = 1 + (opposition.charisma / 100) * 3;
+        state.player.popularity = clamp100(state.player.popularity - hit);
+        opposition.popularity = clamp100(opposition.popularity + hit * 0.6);
+        headlines.push(`🗣️ Opposition leader ${opposition.name} publicly slammed the government's record`);
+      }
+    }
+  } else if (country.oppositionLeaderId) {
+    country.oppositionLeaderId = null;
   }
 
   // Cabinet ministers (player-led governments only) nudge their portfolio's stat each year.
@@ -210,6 +324,25 @@ export function tickPolitics(state: GameState, country: Country, rng: RNG): stri
     }
   }
 
+  // Cabinet resignation risk: ministers with low confidence or a soured relationship with the player may quit.
+  if (playerIsLeader) {
+    for (const [portfolio, npcId] of Object.entries(country.cabinet)) {
+      if (npcId === 'player') continue;
+      const minister = state.npcs[npcId];
+      if (!minister || !minister.alive) continue;
+      const risk = clamp(
+        (50 - minister.popularity) * 0.002 + (50 - minister.integrity) * 0.0015 + (50 - minister.opinionOfPlayer) * 0.001,
+        0.01,
+        0.3,
+      );
+      if (rng.chance(risk)) {
+        delete country.cabinet[portfolio];
+        headlines.push(`🚪 ${minister.name} resigns as Minister for ${portfolio} amid falling confidence`);
+        state.player.popularity = clamp100(state.player.popularity - 2);
+      }
+    }
+  }
+
   // Infrastructure projects funded via launchInfrastructureProject() complete over several years.
   if (country.infrastructureProjects.length) {
     const finished: string[] = [];
@@ -229,8 +362,23 @@ export function tickPolitics(state: GameState, country: Country, rng: RNG): stri
             state.player.popularity = clamp100(state.player.popularity + 10);
             if (!state.achievements.includes('space_pioneer')) state.achievements.push('space_pioneer');
           }
+        } else if (proj.kind === 'bridge' || proj.kind === 'tunnel') {
+          country.economy.gdpGrowth += 0.0025;
+          country.economy.businessConfidence = clamp100(country.economy.businessConfidence + 3);
+        } else if (proj.kind === 'bullet_train') {
+          country.economy.gdpGrowth += 0.004;
+          country.economy.businessConfidence = clamp100(country.economy.businessConfidence + 6);
+        } else if (proj.kind === 'stadium') {
+          country.economy.businessConfidence = clamp100(country.economy.businessConfidence + 3);
+          if (playerIsLeader) state.player.popularity = clamp100(state.player.popularity + 6);
+        } else if (proj.kind === 'dam') {
+          country.energyRenewableShare = clamp100(country.energyRenewableShare + 8);
+          country.economy.businessConfidence = clamp100(country.economy.businessConfidence + 4);
         }
-        headlines.push(`🏗️ ${country.name} completed a new ${proj.kind === 'space_program' ? 'national space program' : proj.kind} project.`);
+        if (playerIsLeader && MEGA_PROJECT_KINDS.has(proj.kind) && !state.achievements.includes('mega_builder')) {
+          state.achievements.push('mega_builder');
+        }
+        headlines.push(`🏗️ ${country.name} completed a new ${MEGA_PROJECT_LABELS[proj.kind] ?? proj.kind} project.`);
         if (playerIsLeader && proj.kind !== 'space_program' && !state.achievements.includes('nation_builder')) state.achievements.push('nation_builder');
         finished.push(proj.id);
       }

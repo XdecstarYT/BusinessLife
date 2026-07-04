@@ -49,6 +49,23 @@ export interface PropertyAsset {
   insured: boolean;
 }
 
+export type LuxuryAssetKind = 'private_jet' | 'yacht' | 'island' | 'sports_team' | 'racehorse' | 'artwork';
+
+export interface LuxuryAsset {
+  id: string;
+  kind: LuxuryAssetKind;
+  name: string;
+  value: number;
+  upkeepPerYear: number;
+  yearAcquired: number;
+}
+
+export interface CelebrityStake {
+  npcId: string;
+  invested: number;
+  stakePct: number; // 0..1
+}
+
 export interface Bond {
   id: string;
   countryId: string;
@@ -196,6 +213,8 @@ export interface Player {
   inWitnessProtection: boolean; // wiped criminal record/notoriety at a steep one-time cost
   thinkTankFunded: boolean; // ongoing retainer that slowly builds influence and (if leader) approval
   prAgencyHired: boolean; // ongoing retainer that softens negative reputation/popularity/happiness hits
+  luxuryAssets: LuxuryAsset[]; // billionaire lifestyle purchases: jets, yachts, islands, sports teams, racehorses, art
+  celebrityStakes: CelebrityStake[]; // equity-like stakes in a celebrity NPC's earning power
   campaign: null | {
     officeKind: OfficeKind;
     regionName: string;
@@ -214,6 +233,7 @@ export interface ElectionResult {
   regionName: string;
   playerSharePct: number; // estimated vote share, 0..100
   rivalSharePct: number;
+  regionalBreakdown: { cityName: string; playerSharePct: number }[];
 }
 
 export type NPCRole =
@@ -376,12 +396,26 @@ export interface Country {
   laborMarketTightness: number; // 0..100, higher = harder/costlier hiring, more strike risk
   researchLevel: number; // 0..100, national R&D strength; boosts tech-intensive industries
   energyRenewableShare: number; // 0..100, share of the grid that's renewable; dampens climate risk growth
+  unrest: number; // 0..100, active protest/strike movement intensity
+  cyberDefense: number; // 0..100, national cyber defense strength; dampens cyberattack severity
+  oppositionLeaderId: string | null; // NPC id; reactively critiques the player's government and adapts
 }
 
 export const CABINET_PORTFOLIOS = ['Finance', 'Foreign Affairs', 'Defense', 'Health', 'Education', 'Justice'] as const;
 export type CabinetPortfolio = (typeof CABINET_PORTFOLIOS)[number];
 
-export type InfrastructureKind = 'roads' | 'rail' | 'airport' | 'power' | 'internet' | 'space_program';
+export type InfrastructureKind =
+  | 'roads'
+  | 'rail'
+  | 'airport'
+  | 'power'
+  | 'internet'
+  | 'space_program'
+  | 'bridge'
+  | 'tunnel'
+  | 'bullet_train'
+  | 'stadium'
+  | 'dam';
 
 export interface InfrastructureProject {
   id: string;
@@ -489,6 +523,7 @@ export interface Company {
   bondYearsLeft: number; // years remaining on the current bond term
   franchiseCount: number; // franchised locations; each pays a small ongoing royalty
   loyaltyProgram: boolean; // a membership/rewards program lifting retention and brand
+  securityInvested: boolean; // loss-prevention investment; eliminates retail shrinkage at an ongoing cost
 
   status: CompanyStatus;
   history: CompanyHistoryPoint[];
@@ -677,9 +712,15 @@ export interface DailyEventTemplate {
 export interface NewsItem {
   year: number;
   category: 'economy' | 'business' | 'politics' | 'world' | 'markets' | 'society' | 'player';
+  subtype?: 'breaking' | 'editorial' | 'investigative' | 'interview' | 'election';
   headline: string;
   outlet: string;
   sentiment: number; // -1..1
+}
+
+export interface WorldHistoryEntry {
+  year: number;
+  text: string;
 }
 
 export interface LifeLogEntry {
@@ -707,7 +748,7 @@ export interface GameOverInfo {
 }
 
 export interface WorldEvent {
-  type: 'pandemic' | 'trade_war' | 'tech_boom';
+  type: 'pandemic' | 'trade_war' | 'tech_boom' | 'oil_crisis' | 'banking_collapse' | 'ai_disruption';
   yearsLeft: number;
   severity: number; // 0..1
 }
@@ -740,6 +781,7 @@ export interface GameState {
   alliances: Alliance[];
   yearRecap: YearRecap | null; // transient: set after each advanceYear(), cleared once the UI shows it
   pendingSuccession: SuccessionOffer | null; // transient: set on death when a will/heir continuation is available
+  worldHistory: WorldHistoryEntry[]; // sparse chronicle of major world-level milestones, spans generations
 }
 
 export interface SuccessionCandidate {

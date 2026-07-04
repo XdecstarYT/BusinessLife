@@ -812,6 +812,18 @@ ev({
   ],
 });
 ev({
+  id: 'pol_advocacy_pressure', category: 'politics', weight: 4, conditions: { inOffice: 'any' },
+  text: 'An advocacy coalition is running ads and organizing rallies to pressure you into adopting their platform.',
+  choices: [
+    { label: 'Meet with them and adopt part of their platform', effects: { popularity: 4, karma: 3, influence: -1 } },
+    { label: 'Publicly dismiss the pressure campaign', skillCheck: { skillId: SK.spin, bonusPerLevel: 0.005 }, outcomes: [
+      { chance: 0.55, text: 'You held firm without much political cost.', effects: { popularity: -1 } },
+      { chance: 0.45, text: 'The pressure campaign only grew louder.', effects: { popularity: -5, politicalCapital: -3 } },
+    ] },
+    { label: 'Quietly ignore it', effects: { influence: 1 } },
+  ],
+});
+ev({
   id: 'pol_crisis_flood', category: 'politics', weight: 4, conditions: { inOffice: 'any' },
   text: 'Severe floods have hit {city}. Thousands are displaced and the cameras are rolling.',
   choices: [
@@ -859,6 +871,66 @@ ev({
       { chance: 0.55, text: 'The piece came out balanced, almost flattering.', effects: { popularity: 3, influence: 2 } },
       { chance: 0.45, text: 'They used your quotes against you.', effects: { popularity: -6 } },
     ] },
+  ],
+});
+ev({
+  id: 'pol_leaked_emails', category: 'politics', weight: 4, conditions: { inOffice: 'any' },
+  text: 'A trove of your private emails has leaked, revealing blunt internal strategy talk.',
+  choices: [
+    { label: 'Own it — say nothing was illegal, just candid', effects: { karma: 2, popularity: -3 } },
+    { label: 'Claim the leak was doctored', skillCheck: { skillId: SK.spin, bonusPerLevel: 0.006 }, outcomes: [
+      { chance: 0.5, text: 'The doctoring claim muddied the story enough to survive it.', effects: { popularity: 1, karma: -3 } },
+      { chance: 0.5, text: 'Forensic analysis debunked your claim, and it became a bigger story.', effects: { popularity: -8, karma: -4, reputation: -3 } },
+    ] },
+    { label: 'Resign in protest of the leak itself', effects: { popularity: 4, karma: 4, happiness: -6 } },
+  ],
+});
+ev({
+  id: 'pol_conflict_of_interest', category: 'politics', weight: 4, conditions: { inOffice: 'any', hasBusiness: true },
+  text: 'Reporters note that a regulation you championed happens to benefit a company you own a stake in.',
+  choices: [
+    { label: 'Divest your stake publicly', effects: { money: -10_000, karma: 5, reputation: 3, popularity: 2 } },
+    { label: 'Insist it was a coincidence', skillCheck: { skillId: SK.law, bonusPerLevel: 0.005 }, outcomes: [
+      { chance: 0.5, text: 'An ethics review cleared you of wrongdoing.', effects: { reputation: 2 } },
+      { chance: 0.5, text: 'The ethics review was scathing.', effects: { popularity: -6, reputation: -5, karma: -3 } },
+    ] },
+    { label: 'Refuse to comment', effects: { popularity: -3, notoriety: 2 } },
+  ],
+});
+ev({
+  id: 'pol_tax_scandal', category: 'politics', weight: 3, conditions: { inOffice: 'any', minMoney: 200_000 },
+  text: 'Leaked documents suggest you routed personal income through an offshore shell to minimize tax.',
+  choices: [
+    { label: 'Pay the back taxes and apologize', effects: { money: -80_000, karma: 4, popularity: 1 } },
+    { label: 'Argue it was fully legal tax planning', skillCheck: { skillId: SK.law, bonusPerLevel: 0.005 }, outcomes: [
+      { chance: 0.5, text: 'The legal argument held up in the court of public opinion.', effects: { popularity: -1 } },
+      { chance: 0.5, text: 'Voters saw it as a rich person\'s excuse.', effects: { popularity: -9, karma: -3 } },
+    ] },
+    { label: 'Stonewall the reporters', effects: { popularity: -4, notoriety: 2 } },
+  ],
+});
+ev({
+  id: 'pol_hot_mic_comment', category: 'politics', weight: 4, conditions: { inOffice: 'any' },
+  text: 'A hot mic caught you making a dismissive comment about voters in {city} that is now everywhere online.',
+  choices: [
+    { label: 'Issue a full, direct apology', effects: { popularity: 1, karma: 3 } },
+    { label: 'Say it was taken out of context', skillCheck: { skillId: SK.spin, bonusPerLevel: 0.006 }, outcomes: [
+      { chance: 0.55, text: 'The context defense actually landed.', effects: { popularity: 0 } },
+      { chance: 0.45, text: 'The full clip made things worse.', effects: { popularity: -7 } },
+    ] },
+    { label: 'Double down defiantly', effects: { popularity: -5, notoriety: 3, influence: 1 } },
+  ],
+});
+ev({
+  id: 'pol_affair_rumor', category: 'politics', weight: 3, conditions: { inOffice: 'any', hasSpouse: true },
+  text: 'Tabloids are running unconfirmed rumors of an affair, sourced to an anonymous staffer.',
+  choices: [
+    { label: 'Deny it categorically', skillCheck: { skillId: SK.spin, bonusPerLevel: 0.005 }, outcomes: [
+      { chance: 0.55, text: 'The denial held and the story faded.', effects: { happiness: -2 } },
+      { chance: 0.45, text: 'The denial only fueled more speculation.', effects: { popularity: -6, happiness: -6 } },
+    ] },
+    { label: 'Address it directly with your spouse at your side', effects: { happiness: -3, popularity: 2, karma: 2 } },
+    { label: 'Refuse to dignify it with a response', effects: { popularity: -2 } },
   ],
 });
 ev({

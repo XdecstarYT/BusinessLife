@@ -17,12 +17,14 @@ import {
   foundAlliance,
   fundThinkTank,
   fundIntelligenceAgency,
+  fundNationalCyberDefense,
   fundUniversityResearch,
   gatherIntelligence,
   hireAdvisor,
   hireLobbyingFirm,
   imposeSanctions,
   investInHealthcare,
+  issueGovernmentBonds,
   joinAlliance,
   launchInfrastructureProject,
   leaveAlliance,
@@ -39,13 +41,16 @@ import {
 import { economicForecast } from '../../sim/economy';
 import { LAW_BY_ID } from '../../data/laws';
 
-const INFRA_KINDS: InfrastructureKind[] = ['roads', 'rail', 'airport', 'power', 'internet', 'space_program'];
+const INFRA_KINDS: InfrastructureKind[] = ['roads', 'rail', 'airport', 'power', 'internet', 'space_program', 'bridge', 'tunnel', 'bullet_train', 'stadium', 'dam'];
 const ADVISOR_SPECIALTIES: AdvisorSpecialty[] = ['economy', 'military', 'diplomacy'];
 
 const WORLD_EVENT_INFO: Record<WorldEvent['type'], { emoji: string; label: string; desc: string; tone: 'bad' | 'good' }> = {
   pandemic: { emoji: '🦠', label: 'Global Pandemic', desc: 'Tourism, airlines and entertainment are hit hard; health and remote-work industries are up.', tone: 'bad' },
   trade_war: { emoji: '⚔️', label: 'Global Trade War', desc: 'Exporters and shippers are squeezed by tariffs; inflation is running hotter than usual.', tone: 'bad' },
   tech_boom: { emoji: '🚀', label: 'Tech Boom', desc: 'Tech, AI and software stocks are surging; business confidence is elevated worldwide.', tone: 'good' },
+  oil_crisis: { emoji: '🛢️', label: 'Global Oil Crisis', desc: 'Energy prices are spiking; inflation is running hot and confidence is shaken worldwide.', tone: 'bad' },
+  banking_collapse: { emoji: '🏦', label: 'Banking Collapse', desc: 'A credit crunch is rattling markets and confidence everywhere; rates are climbing.', tone: 'bad' },
+  ai_disruption: { emoji: '🤖', label: 'AI Disruption', desc: 'Automation is reshaping labor markets; unemployment is up even as business confidence rises.', tone: 'bad' },
 };
 
 function WorldEventBanner({ event }: { event: WorldEvent }) {
@@ -357,6 +362,16 @@ function GovernmentTools({ country }: { country: Country }) {
         </div>
       </Card>
 
+      <div className="font-bold mb-2 text-sm">Treasury & National Security</div>
+      <Card className="p-3 mb-4 space-y-3">
+        <StatBar label="Cyber defense" value={country.cyberDefense} />
+        <div className="text-[11px] text-slate-500 dark:text-slate-400">Debt-to-GDP: {Math.round(country.economy.govDebtToGdp * 100)}% · Budget balance: {signedPct(country.economy.budgetBalance)}</div>
+        <div className="grid grid-cols-2 gap-2">
+          <Button size="sm" variant="soft" onClick={() => run(issueGovernmentBonds, 5)}>🏦 Issue Bonds (5% GDP)</Button>
+          <Button size="sm" variant="soft" onClick={() => run(fundNationalCyberDefense, 100_000)}>🖥️ Fund Cyber Defense ($100k)</Button>
+        </div>
+      </Card>
+
       <div className="font-bold mb-2 text-sm">Economic Forecast (next year)</div>
       <div className="grid grid-cols-3 gap-2 mb-4 text-center text-sm">
         <div className="bg-slate-100 dark:bg-ink-800 rounded-xl px-2 py-2">
@@ -378,7 +393,7 @@ function GovernmentTools({ country }: { country: Country }) {
         <div className="space-y-1 mb-2">
           {country.infrastructureProjects.map((proj) => (
             <div key={proj.id} className="flex justify-between text-xs bg-slate-100 dark:bg-ink-800 rounded-xl px-3 py-2">
-              <span className="capitalize font-semibold">{proj.kind}</span>
+              <span className="capitalize font-semibold">{proj.kind.replace('_', ' ')}</span>
               <span className="text-slate-500 dark:text-slate-400">{proj.yearsLeft}yr left</span>
             </div>
           ))}
@@ -393,7 +408,7 @@ function GovernmentTools({ country }: { country: Country }) {
             disabled={country.infrastructureProjects.some((pr) => pr.kind === kind)}
             onClick={() => run(launchInfrastructureProject, kind)}
           >
-            {kind}
+            {kind.replace('_', ' ')}
           </Button>
         ))}
       </div>

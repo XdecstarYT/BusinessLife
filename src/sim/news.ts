@@ -8,8 +8,15 @@ import { NEWS_OUTLETS } from '../data/names';
 import { INDUSTRY_BY_ID } from '../data/industries';
 import type { RNG } from './rng';
 
-function item(state: GameState, rng: RNG, category: NewsItem['category'], headline: string, sentiment: number): NewsItem {
-  return { year: state.year, category, headline, outlet: rng.pick(NEWS_OUTLETS), sentiment };
+function item(
+  state: GameState,
+  rng: RNG,
+  category: NewsItem['category'],
+  headline: string,
+  sentiment: number,
+  subtype?: NewsItem['subtype'],
+): NewsItem {
+  return { year: state.year, category, subtype, headline, outlet: rng.pick(NEWS_OUTLETS), sentiment };
 }
 
 export function generateNews(state: GameState, rng: RNG, politicalHeadlines: string[], businessHeadlines: string[]): NewsItem[] {
@@ -85,6 +92,43 @@ export function generateNews(state: GameState, rng: RNG, politicalHeadlines: str
   const playerCos = p.companies.map((id) => state.companies[id]).filter((c) => c && c.status === 'active');
   const big = playerCos.find((c) => c.revenue > 50_000_000);
   if (big && rng.chance(0.5)) news.push(item(state, rng, 'business', `Inside ${big.name}: ${p.name}'s ${INDUSTRY_BY_ID[big.industryId].name.toLowerCase()} juggernaut`, 0.4));
+
+  // Editorials: opinion pieces reacting to the state of the nation.
+  if (rng.chance(0.5)) {
+    const editorialTemplates: [string, number][] = [
+      [`EDITORIAL: Why ${home.name}'s ${e.regime.replace('_', ' ')} won't last`, -0.1],
+      [`OPINION: The case for and against ${home.name}'s current tax settings`, 0],
+      [`EDITORIAL: ${home.leaderId === 'player' ? p.name : 'The government'} is ${e.gdpGrowth > 0.02 ? 'finally getting it right' : 'losing the economic argument'}`, e.gdpGrowth > 0.02 ? 0.3 : -0.3],
+      [`OPINION: What ${home.name} gets wrong about immigration policy`, -0.1],
+      [`EDITORIAL: The market's verdict on the last twelve months`, hist.length >= 2 && hist[hist.length - 1].stockIndex > hist[hist.length - 2].stockIndex ? 0.4 : -0.4],
+    ];
+    const [headline, sentiment] = rng.pick(editorialTemplates);
+    news.push(item(state, rng, 'politics', headline, sentiment, 'editorial'));
+  }
+
+  // Investigative journalism: digs into corruption, corporate conduct, or public figures.
+  if (rng.chance(0.35)) {
+    const investigativeTemplates: [string, number][] = [
+      [`INVESTIGATION: How corruption quietly costs ${home.name} billions each year`, -0.5],
+      [`INVESTIGATION: Inside the lobbying money reshaping ${home.name}'s parliament`, -0.4],
+      [`Months-long probe finds regulatory gaps across ${home.name}'s biggest industries`, -0.3],
+      [`Investigative team traces a web of shell companies back to ${home.name}'s elite`, -0.5],
+    ];
+    const [headline, sentiment] = rng.pick(investigativeTemplates);
+    news.push(item(state, rng, rng.chance(0.5) ? 'politics' : 'business', headline, sentiment, 'investigative'));
+  }
+
+  // Interview: a sit-down with a notable figure when the player has real standing.
+  if (p.reputation > 55 || p.influence > 55) {
+    news.push(item(state, rng, 'player', `INTERVIEW: "${p.name} On The Record" — a candid sit-down on ambition, risk, and what comes next`, 0.4, 'interview'));
+  }
+
+  // Election coverage: campaign season or an election due next year anywhere.
+  if (p.campaign) {
+    news.push(item(state, rng, 'politics', `ELECTION WATCH: ${p.name}'s campaign for ${p.campaign.officeKind.replace('_', ' ')} heats up`, 0.1, 'election'));
+  } else if (home.electionInYears === 1) {
+    news.push(item(state, rng, 'politics', `ELECTION WATCH: ${home.name} heads to the polls next year`, 0, 'election'));
+  }
 
   return news;
 }

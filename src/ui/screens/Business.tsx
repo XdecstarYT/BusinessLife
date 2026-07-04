@@ -7,6 +7,7 @@ import {
   attemptHostileTakeover,
   bidOnGovernmentContract,
   buybackShares,
+  consultantRecommendation,
   CULTURE_INFO,
   diversifySupplyChain,
   fileTrademark,
@@ -14,7 +15,9 @@ import {
   franchiseCompany,
   hireBrandAmbassador,
   hireExecutive,
+  holdInvestorConference,
   HQ_TIERS,
+  investInRetailSecurity,
   investInStartup,
   issueCorporateBond,
   launderMoney,
@@ -23,6 +26,7 @@ import {
   proactiveRecall,
   proposeBoardResolution,
   qualityAudit,
+  raceForInnovation,
   runClinicalTrial,
   runFavorableCoverage,
   runRecruitmentDrive,
@@ -395,6 +399,11 @@ function ManageModal({ companyId, onClose }: { companyId: string; onClose: () =>
       </div>
       <div className="text-xs text-slate-500 dark:text-slate-400 mb-2">{CULTURE_INFO[c.culture].blurb}</div>
 
+      <Card className="p-3 mt-5 mb-3 bg-brand-50 dark:bg-brand-900/20 border border-brand-200 dark:border-brand-800">
+        <div className="text-[11px] font-bold text-brand-600 dark:text-brand-400 uppercase mb-1">🤖 AI Business Consultant</div>
+        <div className="text-xs text-slate-600 dark:text-slate-300">{consultantRecommendation(c, ind?.tags ?? [])}</div>
+      </Card>
+
       <div className="font-bold mt-5 mb-2">One-off Initiatives</div>
       <div className="mb-2">
         <StatBar label="Supply chain resilience" value={c.supplyChainResilience} />
@@ -410,6 +419,15 @@ function ManageModal({ companyId, onClose }: { companyId: string; onClose: () =>
         <Button size="sm" variant="soft" onClick={() => run(proactiveRecall, c.id)}>⚠️ Proactive Recall</Button>
         <Button size="sm" variant="soft" onClick={() => run(runRecruitmentDrive, c.id)}>🧑‍💼 Recruitment Drive</Button>
         <Button size="sm" variant="soft" onClick={() => run(franchiseCompany, c.id)}>🏬 Franchise ({c.franchiseCount})</Button>
+        <Button size="sm" variant="soft" onClick={() => run(raceForInnovation, c.id)}>🔬 Race for Innovation</Button>
+        {c.isPublic && (
+          <Button size="sm" variant="soft" onClick={() => run(holdInvestorConference, c.id)}>📊 Investor Conference</Button>
+        )}
+        {ind?.tags.includes('retail') && (
+          <Button size="sm" variant="soft" disabled={c.securityInvested} onClick={() => run(investInRetailSecurity, c.id)}>
+            {c.securityInvested ? '🔒 Security Active' : '🔒 Invest in Security'}
+          </Button>
+        )}
         {ind?.tags.includes('health') && ind.techIntensity >= 0.5 && (
           <Button size="sm" variant="soft" onClick={() => run(runClinicalTrial, c.id)}>💊 Run Clinical Trial</Button>
         )}

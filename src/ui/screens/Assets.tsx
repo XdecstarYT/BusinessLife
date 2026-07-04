@@ -16,13 +16,14 @@ import {
   toggleRentalStatus,
   togglePropertyInsurance,
 } from '../../sim/actions';
+import { buyLuxuryAsset, divestCelebrityStake, investInCelebrityBrand, LUXURY_CATALOG, sellLuxuryAsset } from '../../sim/lifestyle';
 import { Badge, Button, Card, Field, Pill, PillRow, SectionHeader } from '../components';
 import { money, moneyFull, pct } from '../format';
 import type { PropertyAsset } from '../../sim/types';
 
 export function Assets() {
   const { state, run } = useGame();
-  const [tab, setTab] = useState<'owned' | 'buy' | 'loans' | 'bonds' | 'forex' | 'insurance'>('owned');
+  const [tab, setTab] = useState<'owned' | 'buy' | 'loans' | 'bonds' | 'forex' | 'insurance' | 'lifestyle' | 'celebrities'>('owned');
   const [loanAmt, setLoanAmt] = useState(50_000);
   const [loanYears, setLoanYears] = useState(10);
   const [bondAmt, setBondAmt] = useState(20_000);
@@ -59,6 +60,8 @@ export function Assets() {
         <Pill label={`Bonds (${p.bonds.length})`} active={tab === 'bonds'} onClick={() => setTab('bonds')} />
         <Pill label={`Forex (${p.forexPositions.length})`} active={tab === 'forex'} onClick={() => setTab('forex')} />
         <Pill label="Insurance" active={tab === 'insurance'} onClick={() => setTab('insurance')} />
+        <Pill label={`Lifestyle (${p.luxuryAssets.length})`} active={tab === 'lifestyle'} onClick={() => setTab('lifestyle')} />
+        <Pill label={`Celebrities (${p.celebrityStakes.length})`} active={tab === 'celebrities'} onClick={() => setTab('celebrities')} />
       </PillRow>
 
       {tab === 'owned' && (
@@ -236,6 +239,67 @@ export function Assets() {
           <Card className="p-4 text-xs text-slate-500 dark:text-slate-400">
             Company insurance is managed per-business from the Business tab's strategy panel.
           </Card>
+        </div>
+      )}
+
+      {tab === 'lifestyle' && (
+        <div className="mt-4 space-y-3">
+          <p className="text-xs text-slate-400 px-1">Vanity assets: real upkeep every year, prestige and happiness up front, and a shot at flavor payouts for racehorses and sports teams.</p>
+          {p.luxuryAssets.map((asset) => (
+            <Card key={asset.id} className="p-4 flex justify-between items-center">
+              <div className="min-w-0">
+                <div className="font-bold truncate">{asset.name}</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">
+                  {money(asset.value)} · upkeep {money(asset.upkeepPerYear)}/yr
+                </div>
+              </div>
+              <Button size="sm" variant="danger" onClick={() => run(sellLuxuryAsset, asset.id)}>Sell</Button>
+            </Card>
+          ))}
+          <Card className="p-5">
+            <div className="font-bold mb-3">Acquire</div>
+            <div className="space-y-2">
+              {LUXURY_CATALOG.map((entry) => (
+                <div key={entry.kind} className="flex justify-between items-center">
+                  <div>
+                    <div className="font-semibold text-sm">{entry.label}</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400">≈ {money(entry.baseCost)}</div>
+                  </div>
+                  <Button size="sm" variant="soft" onClick={() => run(buyLuxuryAsset, entry.kind)}>Buy</Button>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {tab === 'celebrities' && (
+        <div className="mt-4 space-y-3">
+          <p className="text-xs text-slate-400 px-1">Invest in a celebrity's brand for an ongoing royalty tied to their fame and fortune.</p>
+          {p.celebrityStakes.map((stake) => {
+            const npc = state.npcs[stake.npcId];
+            return (
+              <Card key={stake.npcId} className="p-4 flex justify-between items-center">
+                <div>
+                  <div className="font-bold">{npc?.name ?? 'Unknown'}</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">{(stake.stakePct * 100).toFixed(1)}% stake · invested {money(stake.invested)}</div>
+                </div>
+                <Button size="sm" variant="danger" onClick={() => run(divestCelebrityStake, stake.npcId)}>Cash Out</Button>
+              </Card>
+            );
+          })}
+          {Object.values(state.npcs)
+            .filter((n) => n.alive && n.role === 'celebrity' && n.countryId === p.countryId && !p.celebrityStakes.some((s) => s.npcId === n.id))
+            .slice(0, 8)
+            .map((n) => (
+              <Card key={n.id} className="p-4 flex justify-between items-center">
+                <div>
+                  <div className="font-bold">{n.name}</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">Est. wealth {money(n.wealth)}</div>
+                </div>
+                <Button size="sm" variant="soft" onClick={() => run(investInCelebrityBrand, n.id, 50_000)}>Invest $50k</Button>
+              </Card>
+            ))}
         </div>
       )}
     </div>

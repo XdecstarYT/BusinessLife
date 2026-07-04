@@ -8,21 +8,30 @@ import type { GameState, LifeLogEntry, Player } from './types';
 import { clamp, clamp100 } from './types';
 import { RNG } from './rng';
 import { tickCommodities, tickEconomy } from './economy';
-import { npcManageCompany, tickCompany, tickMergers, companyValuation } from './business';
+import { npcManageCompany, tickCompany, tickMergers, tickCorporateSabotage, companyValuation } from './business';
 import { tickStock, portfolioValue, checkLimitOrders, tickMargin } from './market';
-import { campaignWinChance, OFFICE_SPEC_BY_KIND, promiseFulfillment, promiseMetricValue, tickNPCs, tickPolitics } from './politics';
+import { campaignWinChance, electionRegionalBreakdown, OFFICE_SPEC_BY_KIND, promiseFulfillment, promiseMetricValue, tickNPCs, tickPolitics } from './politics';
 import { fireEvents } from './events';
 import { generateNews } from './news';
 import { INDUSTRY_BY_ID } from '../data/industries';
 import { distributeEstate, dynastyScore, tickFamily } from './family';
 import { tickWorldEvents } from './worldEvents';
 import { tryFireDailyEvent } from './dailyEvents';
+import { tickLifestyleAssets } from './lifestyle';
 
 const SPECIAL_BIRTHDAYS = new Set([18, 21, 25, 30, 40, 50, 60, 65, 70, 75, 80, 90, 100]);
 
 export function log(state: GameState, text: string, kind: LifeLogEntry['kind'] = 'info'): void {
   state.lifeLog.push({ year: state.year, age: state.player.age, text, kind });
 }
+
+/** Appends to the sparse, world-level (not personal) history chronicle — major milestones only. */
+export function logHistory(state: GameState, text: string): void {
+  state.worldHistory.push({ year: state.year, text });
+  if (state.worldHistory.length > 300) state.worldHistory.splice(0, state.worldHistory.length - 300);
+}
+
+const MAJOR_HEADLINE_MARKERS = ['WAR:', 'Peace:', 'COUP', 'wins the', 'retains power', 'dies;'];
 
 export function netWorth(state: GameState): number {
   const p = state.player;
@@ -160,6 +169,7 @@ function tickPlayerLife(state: GameState, rng: RNG): void {
         regionName: p.office.regionName,
         playerSharePct: Math.round(winChance * 100),
         rivalSharePct: Math.round((1 - winChance) * 100),
+        regionalBreakdown: electionRegionalBreakdown(home, winChance * 100, rng),
       };
       if (won) {
         p.office.yearsInOffice = 0;
@@ -210,6 +220,7 @@ function tickPlayerLife(state: GameState, rng: RNG): void {
         regionName: p.campaign.regionName,
         playerSharePct: Math.round(chance * 100),
         rivalSharePct: Math.round((1 - chance) * 100),
+        regionalBreakdown: electionRegionalBreakdown(home, chance * 100, rng),
       };
       if (won) {
         p.office = {
@@ -456,6 +467,7 @@ export function continueAsHeir(state: GameState, npcId: string): GameState {
   state.pendingSuccession = null;
   state.yearRecap = null;
   log(state, `🕯️ Life goes on: you continue the story as ${npc.name}, generation ${state.generation}.`, 'milestone');
+  logHistory(state, `🕯️ ${oldPlayer.name}'s dynasty continues through ${npc.name} (generation ${state.generation})`);
   if (!state.achievements.includes('dynasty_continued')) state.achievements.push('dynasty_continued');
   return state;
 }
@@ -481,17 +493,23 @@ export function advanceYear(state: GameState): GameState {
   // 1. World economy
   tickCommodities(state, rng);
   const worldEventHeadlines = tickWorldEvents(state, rng);
+  for (const h of worldEventHeadlines) logHistory(state, h);
   const politicalHeadlines: string[] = [...worldEventHeadlines];
   for (const country of state.countries) {
     const res = tickEconomy(state, country, rng);
     if (res.crisis === 'crash' && country.isPlayerHome) politicalHeadlines.push(`Stock market crash wipes billions off ${country.name} shares`);
     if (res.crisis === 'debt' && country.isPlayerHome) politicalHeadlines.push(`${country.name} debt crisis: bond yields spike as investors flee`);
     if (res.crisis === 'disaster' && country.isPlayerHome) politicalHeadlines.push(`🌪️ Climate disaster strikes ${country.name}: property damaged, confidence shaken`);
+    if (res.weatherHeadline && country.isPlayerHome) politicalHeadlines.push(res.weatherHeadline);
   }
 
   // 2. Politics & NPCs
   for (const country of state.countries) {
-    politicalHeadlines.push(...tickPolitics(state, country, rng));
+    const countryHeadlines = tickPolitics(state, country, rng);
+    for (const h of countryHeadlines) {
+      if (MAJOR_HEADLINE_MARKERS.some((m) => h.includes(m))) logHistory(state, h);
+    }
+    politicalHeadlines.push(...countryHeadlines);
   }
   politicalHeadlines.push(...tickNPCs(state, rng));
 
@@ -511,6 +529,7 @@ export function advanceYear(state: GameState): GameState {
     tickStock(company, state, rng);
   }
   businessHeadlines.push(...tickMergers(state, rng));
+  businessHeadlines.push(...tickCorporateSabotage(state, rng));
   for (const l of checkLimitOrders(state)) log(state, l, 'money');
   for (const l of tickMargin(state)) log(state, l, 'bad');
 
@@ -518,6 +537,7 @@ export function advanceYear(state: GameState): GameState {
   tickPlayerLife(state, rng);
   if (state.player.alive) tickFamily(state, rng);
   if (state.player.alive) tickChallenge(state, rng);
+  if (state.player.alive) for (const h of tickLifestyleAssets(state, rng)) log(state, h, 'money');
 
   // 5. Player company income: dividends from private profitable companies
   const p = state.player;

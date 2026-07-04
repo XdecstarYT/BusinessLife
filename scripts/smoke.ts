@@ -8,6 +8,8 @@ import * as A from '../src/sim/actions';
 import { buyShares, marketCap, buyOnMargin, placeLimitOrder, cancelLimitOrder, toggleDrip } from '../src/sim/market';
 import { datingPool, propose, haveChild, nameSuccessor, namePoliticalHeir, namePrimaryHeir, adoptChild, dynastyScore } from '../src/sim/family';
 import * as F from '../src/sim/family';
+import { buyLuxuryAsset, sellLuxuryAsset, investInCelebrityBrand, divestCelebrityStake } from '../src/sim/lifestyle';
+import { publicOpinionBreakdown } from '../src/sim/politics';
 import { INDUSTRIES } from '../src/data/industries';
 import { LAW_BY_ID } from '../src/data/laws';
 
@@ -326,6 +328,43 @@ for (let y = 0; y < 82 && state.player.alive; y++) {
       const home = state.countries.find((c) => c.id === state.player.countryId)!;
       if (home.leaderId === 'player') A.attendSummit(state);
     }
+    // --- V8: billionaire lifestyle & celebrity economy ---
+    if (y === 42 && state.player.money > 5_000_000) {
+      buyLuxuryAsset(state, 'racehorse');
+      buyLuxuryAsset(state, 'artwork');
+      const celeb = Object.values(state.npcs).find((n) => n.alive && n.role === 'celebrity' && n.countryId === state.player.countryId);
+      if (celeb) investInCelebrityBrand(state, celeb.id, 50_000);
+    }
+    if (y === 43) {
+      if (state.player.luxuryAssets.length) sellLuxuryAsset(state, state.player.luxuryAssets[0].id);
+      if (state.player.celebrityStakes.length) divestCelebrityStake(state, state.player.celebrityStakes[0].npcId);
+    }
+    // --- V8: government depth (cabinet meetings, budget speech, protests, opinion dashboard) ---
+    if (y === 44) {
+      const home = state.countries.find((c) => c.id === state.player.countryId)!;
+      if (home.leaderId === 'player') {
+        A.holdCabinetMeeting(state);
+        A.deliverBudgetSpeech(state);
+        if (home.unrest >= 30) A.respondToProtests(state, 'concede');
+        publicOpinionBreakdown(home);
+      }
+    }
+    // --- V8: corporate depth (retail security, investor conference, innovation race) ---
+    if (y === 45 && state.player.companies.length) {
+      const co = state.player.companies[0];
+      A.investInRetailSecurity(state, co);
+      A.holdInvestorConference(state, co);
+      A.raceForInnovation(state, co);
+    }
+    // --- V8: world & economy depth (mega projects, debt market, cyber defense) ---
+    if (y === 46) {
+      const home = state.countries.find((c) => c.id === state.player.countryId)!;
+      if (home.leaderId === 'player') {
+        A.launchInfrastructureProject(state, 'bridge');
+        A.issueGovernmentBonds(state, 5);
+        A.fundNationalCyberDefense(state, 100_000);
+      }
+    }
     // --- V6: continue as heir when a succession offer appears ---
     if (state.pendingSuccession && state.pendingSuccession.candidates.length) {
       state = continueAsHeir(state, state.pendingSuccession.candidates[0].npcId);
@@ -375,6 +414,12 @@ console.log('  year recap present:', !!state.yearRecap);
 console.log('  franchise locations:', Object.values(state.companies).reduce((s, c) => s + c.franchiseCount, 0));
 console.log('  loyalty programs running:', Object.values(state.companies).filter((c) => c.loyaltyProgram).length);
 console.log('  think tank funded:', state.player.thinkTankFunded, 'PR agency hired:', state.player.prAgencyHired);
+console.log('  luxury assets:', state.player.luxuryAssets.length, 'celebrity stakes:', state.player.celebrityStakes.length);
+console.log('  world history entries:', state.worldHistory.length);
+console.log('  companies with security invested:', Object.values(state.companies).filter((c) => c.securityInvested).length);
+console.log('  home unrest:', Math.round(state.countries.find((c) => c.id === state.player.countryId)?.unrest ?? 0));
+console.log('  home cyber defense:', Math.round(state.countries.find((c) => c.id === state.player.countryId)?.cyberDefense ?? 0));
+console.log('  opposition leader assigned:', !!state.countries.find((c) => c.id === state.player.countryId)?.oppositionLeaderId);
 console.log('  errors:', errors);
 
 // Invariant checks

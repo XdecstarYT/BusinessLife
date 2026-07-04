@@ -43,6 +43,11 @@ const ACHIEVEMENTS: Record<string, { label: string; icon: string }> = {
   challenge_crusher: { label: 'Challenge Crusher', icon: '🎯' },
   startup_investor: { label: 'Startup Investor', icon: '🌱' },
   summit_diplomat: { label: 'Summit Diplomat', icon: '🌐' },
+  billionaire_lifestyle: { label: 'Billionaire Lifestyle', icon: '💎' },
+  celebrity_investor: { label: 'Celebrity Investor', icon: '🌟' },
+  budget_orator: { label: 'Budget Orator', icon: '📜' },
+  innovation_leader: { label: 'Innovation Leader', icon: '🔬' },
+  mega_builder: { label: 'Mega Builder', icon: '🏗️' },
 };
 
 export function Stats() {
