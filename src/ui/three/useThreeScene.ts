@@ -47,11 +47,19 @@ function makeTextSprite(text: string, scale: number): THREE.Sprite {
 /** onFrame receives elapsed seconds; return it from `setup` to animate every frame. */
 export type ThreeFrameFn = (elapsedSeconds: number) => void;
 
+export interface ThreeSceneOptions {
+  /** 'orbit' (default) attaches drag-to-rotate + wheel/pinch zoom. 'none' skips them so the
+   * scene can implement its own input (e.g. a walkable hub driving a player character). */
+  controls?: 'orbit' | 'none';
+}
+
 export function useThreeScene(
   containerRef: RefObject<HTMLDivElement | null>,
   setup: (handle: ThreeSceneHandle) => ThreeFrameFn | void,
   deps: React.DependencyList,
+  options?: ThreeSceneOptions,
 ): void {
+  const orbitControls = options?.controls !== 'none';
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -126,14 +134,18 @@ export function useThreeScene(
     };
     const onTouchEnd = () => { pinchDist = 0; };
     const el = renderer.domElement;
-    el.style.touchAction = 'pan-y';
-    el.style.cursor = 'grab';
-    el.addEventListener('pointerdown', onPointerDown);
-    window.addEventListener('pointermove', onPointerMove);
-    window.addEventListener('pointerup', onPointerUp);
-    el.addEventListener('wheel', onWheel, { passive: false });
-    el.addEventListener('touchmove', onTouchMove, { passive: false });
-    el.addEventListener('touchend', onTouchEnd);
+    if (orbitControls) {
+      el.style.touchAction = 'pan-y';
+      el.style.cursor = 'grab';
+      el.addEventListener('pointerdown', onPointerDown);
+      window.addEventListener('pointermove', onPointerMove);
+      window.addEventListener('pointerup', onPointerUp);
+      el.addEventListener('wheel', onWheel, { passive: false });
+      el.addEventListener('touchmove', onTouchMove, { passive: false });
+      el.addEventListener('touchend', onTouchEnd);
+    } else {
+      el.style.touchAction = 'none';
+    }
 
     const onFrame = setup({ scene, camera, renderer, addStars, makeLabel });
 
@@ -149,12 +161,14 @@ export function useThreeScene(
     return () => {
       cancelAnimationFrame(raf);
       ro.disconnect();
-      el.removeEventListener('pointerdown', onPointerDown);
-      window.removeEventListener('pointermove', onPointerMove);
-      window.removeEventListener('pointerup', onPointerUp);
-      el.removeEventListener('wheel', onWheel);
-      el.removeEventListener('touchmove', onTouchMove);
-      el.removeEventListener('touchend', onTouchEnd);
+      if (orbitControls) {
+        el.removeEventListener('pointerdown', onPointerDown);
+        window.removeEventListener('pointermove', onPointerMove);
+        window.removeEventListener('pointerup', onPointerUp);
+        el.removeEventListener('wheel', onWheel);
+        el.removeEventListener('touchmove', onTouchMove);
+        el.removeEventListener('touchend', onTouchEnd);
+      }
       const disposeMaterial = (m: THREE.Material) => {
         const tex = m as Partial<THREE.MeshStandardMaterial>;
         tex.map?.dispose();

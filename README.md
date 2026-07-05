@@ -52,6 +52,17 @@ plain JSON you can export and re-import.
   unit economics but builds trust and cuts returns; field defects surface on their own over a product's
   life, and you can ride one out or issue a voluntary recall that costs real money but rebuilds trust
   before lawsuits and bad headlines pile up.
+- **🧭 Explore: a walkable 3D hub layered over the real simulation** — leave the menus and walk your
+  city block in third-person (drag a virtual joystick, or WASD/arrows on desktop) around a plaza with
+  six buildings that are computed fresh from live game state every time you visit, not decoration: your
+  HQ is a boarded vacant lot until you found a company, then a lit tower that gains a construction crane
+  once it's thriving — or goes dark the moment it's bankrupt; Parliament only raises a flag if you hold
+  office, sized by your real approval; the Exchange's ticker ring glows green or red with the actual
+  market move this year; your Studio storefront lights up once a product goes public; your home's
+  windows glow warmer the happier and healthier you are; the Bank scales with your real net worth. A
+  continuous day/night cycle sweeps the sky, streetlamps switch on at dusk, trees shift with the season,
+  and a few ambient pedestrians and cars loop the plaza for atmosphere. Walk up to any building and an
+  Enter prompt hands off straight to that system's real screen.
 - **Daily / Weekly / Yearly time control** — advance a single day, a week, or a full year. Day/week
   ticks are lightweight (a small chance of a flavor moment, tiny stat drift) so you can fast-forward
   without interruption; the full economy/company/politics simulation still resolves exactly once a

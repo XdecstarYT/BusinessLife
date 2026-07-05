@@ -12,6 +12,7 @@ import {
   IconAssets,
   IconBusiness,
   IconCareer,
+  IconExplore,
   IconHeart,
   IconLife,
   IconMarket,
@@ -39,6 +40,7 @@ const MORE_SCREENS: { screen: Screen; label: string; Icon: (p: { className?: str
   { screen: 'assets', label: 'Assets', Icon: IconAssets },
   { screen: 'family', label: 'Family', Icon: IconHeart },
   { screen: 'world', label: 'World', Icon: IconWorld },
+  { screen: 'explore', label: 'Explore', Icon: IconExplore },
   { screen: 'news', label: 'News', Icon: IconNews },
   { screen: 'stats', label: 'Stats', Icon: IconStats },
 ];

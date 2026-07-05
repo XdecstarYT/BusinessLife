@@ -16,6 +16,7 @@ import { Market } from './ui/screens/Market';
 import { Assets } from './ui/screens/Assets';
 import { Politics } from './ui/screens/Politics';
 import { World } from './ui/screens/World';
+import { Explore } from './ui/screens/Explore';
 import { News } from './ui/screens/News';
 import { Stats } from './ui/screens/Stats';
 import { Family } from './ui/screens/Family';
@@ -50,6 +51,7 @@ export default function App() {
           {screen === 'assets' && <Assets />}
           {screen === 'politics' && <Politics />}
           {screen === 'world' && <World />}
+          {screen === 'explore' && <Explore />}
           {screen === 'news' && <News />}
           {screen === 'stats' && <Stats />}
           {screen === 'family' && <Family />}

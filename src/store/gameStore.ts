@@ -32,6 +32,7 @@ export type Screen =
   | 'assets'
   | 'politics'
   | 'world'
+  | 'explore'
   | 'news'
   | 'stats'
   | 'family';
