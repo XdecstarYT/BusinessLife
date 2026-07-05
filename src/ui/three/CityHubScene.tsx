@@ -489,7 +489,8 @@ export function CityHubScene({ buildings, season, onEnter, onQuickAction }: City
 
   useThreeScene(
     ref,
-    ({ scene, camera, makeLabel }) => {
+    ({ scene, camera, makeLabel, quality }) => {
+      const castsShadows = quality === 'desktop';
       scene.fog = new THREE.Fog(0x0b1220, 14, 40);
       scene.background = new THREE.Color(0x0b1220);
 
@@ -497,6 +498,17 @@ export function CityHubScene({ buildings, season, onEnter, onQuickAction }: City
       scene.add(hemi);
       const sun = new THREE.DirectionalLight(0xffffff, 1.2);
       sun.position.set(6, 10, 4);
+      if (castsShadows) {
+        sun.castShadow = true;
+        sun.shadow.mapSize.set(1024, 1024);
+        sun.shadow.camera.left = -PLAZA_RADIUS - 2;
+        sun.shadow.camera.right = PLAZA_RADIUS + 2;
+        sun.shadow.camera.top = PLAZA_RADIUS + 2;
+        sun.shadow.camera.bottom = -PLAZA_RADIUS - 2;
+        sun.shadow.camera.near = 1;
+        sun.shadow.camera.far = 30;
+        sun.shadow.bias = -0.0015;
+      }
       scene.add(sun);
       const fill = new THREE.AmbientLight(0xffffff, 0.25);
       scene.add(fill);
@@ -506,6 +518,7 @@ export function CityHubScene({ buildings, season, onEnter, onQuickAction }: City
         new THREE.MeshStandardMaterial({ map: plazaGroundTexture(), roughness: 0.95 }),
       );
       ground.rotation.x = -Math.PI / 2;
+      ground.receiveShadow = castsShadows;
       scene.add(ground);
 
       // Buildings, ring around the plaza, each with a floating name label.
@@ -515,6 +528,11 @@ export function CityHubScene({ buildings, season, onEnter, onQuickAction }: City
         const x = Math.cos(angle) * RING_RADIUS, z = Math.sin(angle) * RING_RADIUS;
         const group = new THREE.Group();
         buildBuilding(group, b, foliage.leaf);
+        if (castsShadows) {
+          group.traverse((obj) => {
+            if (obj instanceof THREE.Mesh) { obj.castShadow = true; obj.receiveShadow = true; }
+          });
+        }
         group.position.set(x, 0, z);
         group.lookAt(0, 0, 0);
         scene.add(group);
@@ -541,6 +559,8 @@ export function CityHubScene({ buildings, season, onEnter, onQuickAction }: City
       }
       const fountainBase = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.2, 0.3, 24), new THREE.MeshStandardMaterial({ color: 0xcfd3d8, roughness: 0.4 }));
       fountainBase.position.y = 0.15;
+      fountainBase.castShadow = castsShadows;
+      fountainBase.receiveShadow = castsShadows;
       scene.add(fountainBase);
       const water = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.85, 0.05, 24), new THREE.MeshStandardMaterial({ color: 0x3fa6c9, metalness: 0.3, roughness: 0.1, emissive: 0x1c4a5c, emissiveIntensity: 0.3 }));
       water.position.y = 0.33;
@@ -577,6 +597,7 @@ export function CityHubScene({ buildings, season, onEnter, onQuickAction }: City
       nose.rotation.x = Math.PI / 2;
       nose.position.set(0, 0.68, 0.28);
       player.add(nose);
+      if (castsShadows) { playerBody.castShadow = true; nose.castShadow = true; }
       scene.add(player);
 
       camera.position.set(0, 5.2, 8);

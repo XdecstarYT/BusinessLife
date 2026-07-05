@@ -3,17 +3,35 @@
  * container div. Handles renderer/resize/cleanup boilerplate so individual scenes
  * (HQ tour, supply chain, election map, trade network) only describe their own geometry.
  *
+ * The rendering pipeline aims for a believable, filmic look rather than the flat, washed-out
+ * default three.js output: ACES filmic tone mapping + correct sRGB output, a procedural studio
+ * environment map so PBR materials get real reflections instead of looking chalky, soft shadows,
+ * and a light bloom pass so every emissive accent (windows, screens, beacons) actually glows.
+ * Shadows and bloom are desktop-only (`handle.quality === 'desktop'`) — phone GPUs, especially at
+ * devicePixelRatio 3 on iPhone, choke on shadow maps and multi-pass post-processing stacked on
+ * top of several dynamic lights, so touch devices get the tone-mapped/environment-lit look
+ * without the two most expensive pieces.
+ *
  * Interaction comes free: dragging rotates the whole scene around Y (applied to the scene
  * root, so per-scene camera animation still works on top), and the mouse wheel / pinch
  * zooms via camera.zoom. Scenes opt into a subtle starfield backdrop via `handle.addStars()`.
  */
 import { useEffect, type RefObject } from 'react';
 import * as THREE from 'three';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+
+export type ThreeQualityTier = 'mobile' | 'desktop';
 
 export interface ThreeSceneHandle {
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
   renderer: THREE.WebGLRenderer;
+  /** 'desktop' gets shadows + bloom; 'mobile' (touch devices) skips both for frame rate. */
+  quality: ThreeQualityTier;
   /** Adds a dim starfield sphere around the scene for depth. */
   addStars: (count?: number) => void;
   /** Creates a small floating text label as a sprite; caller positions and adds it. */
@@ -76,9 +94,44 @@ export function useThreeScene(
     // canvas with several dynamic lights and physical materials; cap lower on
     // touch devices so mobile stays smooth instead of dropping frames.
     const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    const quality: ThreeQualityTier = isTouchDevice ? 'mobile' : 'desktop';
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, isTouchDevice ? 1.5 : 2));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.0;
+    if (quality === 'desktop') {
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    }
     const el = renderer.domElement;
     container.appendChild(el);
+
+    // A procedural studio environment (three.js's standard stand-in for an HDRI) so metal,
+    // glass and other PBR materials pick up believable reflections instead of looking flat —
+    // this is a one-time cost at mount, not a per-frame one, so it's cheap on every device.
+    // Every scene's direct lights were hand-tuned against flat (non-IBL) lighting, so the
+    // environment's contribution is dialed down to a supporting role rather than stacking
+    // full-strength on top and blowing out ground planes and pale materials.
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const envTexture = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    scene.environment = envTexture;
+    scene.environmentIntensity = 0.4;
+    pmrem.dispose();
+
+    // Bloom + a final output pass (correct tone mapping/color space through the composer)
+    // is the single highest-impact, lowest-effort move for "does this look expensive" — every
+    // emissive accent in these scenes (windows, screens, beacons, seals) actually glows instead
+    // of just being a flat bright color. Desktop only: two extra full-screen passes per frame is
+    // real GPU cost, and phones already have shadows/lights to worry about.
+    let composer: EffectComposer | null = null;
+    let bloomPass: UnrealBloomPass | null = null;
+    if (quality === 'desktop') {
+      composer = new EffectComposer(renderer);
+      composer.addPass(new RenderPass(scene, camera));
+      bloomPass = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.4, 0.55, 0.82);
+      composer.addPass(bloomPass);
+      composer.addPass(new OutputPass());
+    }
 
     const resize = () => {
       const w = Math.max(1, container.clientWidth);
@@ -86,6 +139,7 @@ export function useThreeScene(
       renderer.setSize(w, h, false);
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
+      composer?.setSize(w, h);
     };
     resize();
     const ro = new ResizeObserver(resize);
@@ -151,7 +205,7 @@ export function useThreeScene(
       el.style.touchAction = 'none';
     }
 
-    const onFrame = setup({ scene, camera, renderer, addStars, makeLabel });
+    const onFrame = setup({ scene, camera, renderer, quality, addStars, makeLabel });
 
     let raf = 0;
     let contextLost = false;
@@ -159,7 +213,8 @@ export function useThreeScene(
     const loop = () => {
       if (!contextLost) {
         onFrame?.(clock.getElapsedTime());
-        renderer.render(scene, camera);
+        if (composer) composer.render();
+        else renderer.render(scene, camera);
       }
       raf = requestAnimationFrame(loop);
     };
@@ -213,8 +268,9 @@ export function useThreeScene(
           obj.material.dispose();
         }
       });
-      (scene.environment as THREE.Texture | null)?.dispose();
+      envTexture.dispose();
       scene.environment = null;
+      composer?.dispose();
       renderer.dispose();
       if (renderer.domElement.parentNode === container) container.removeChild(renderer.domElement);
     };

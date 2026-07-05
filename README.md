@@ -159,9 +159,13 @@ plain JSON you can export and re-import.
   dedicated 3D scene of their own: a legislative Chamber with a real hemicycle of seat blocks sized and
   colored by actual party seat counts and ideology (your own party outlined gold, cabinet podiums lit
   when filled), and an Exchange Trading Floor with a big board tracking the real national index and
-  ticker booths for the day's biggest real movers. (Honest scope: still a stylized, procedurally-built
-  diorama, not a full open-world engine with physics or pathfinding — but every shape, color and light
-  on screen is driven by real simulation state, not decoration.)
+  ticker booths for the day's biggest real movers. Every 3D scene now renders through a filmic
+  (ACES) tone-mapped pipeline with a procedural studio environment map for real reflections on
+  metal and glass, plus soft shadows and a bloom pass on desktop so lit windows, screens and seals
+  actually glow instead of just being a flat bright color (phones get the tone-mapped, reflection-lit
+  look without the two most expensive pieces, to protect frame rate). (Honest scope: still a
+  stylized, procedurally-built diorama, not a full open-world engine with physics or pathfinding —
+  but every shape, color and light on screen is driven by real simulation state, not decoration.)
 - **The world and your rivals react back** — a real, player-vs-named-rival price war: undercut a
   specific competitor's price and they may cut right back at you, shifting real market share both ways.
   Everyone in your inner circle (spouse, mentor, rival) now shows a real mood, disposition and their most
