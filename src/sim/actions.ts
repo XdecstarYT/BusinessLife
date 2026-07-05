@@ -560,6 +560,45 @@ export function spyOnCompany(state: GameState, targetCompanyId: string): ActionR
   return { ok: false, message: `Caught red-handed spying on ${target.name}.` };
 }
 
+/** Deliberately undercut a specific named rival's price to grab share — a real, targeted
+ * price war rather than the passive drift `npcManageCompany` gives NPC companies, with a
+ * real chance the rival fights back by cutting their own price in retaliation. */
+export function startPriceWar(state: GameState, companyId: string, targetCompanyId: string): ActionResult {
+  const p = state.player;
+  const mine = state.companies[companyId];
+  const target = state.companies[targetCompanyId];
+  if (!mine || !mine.playerOwned || mine.status !== 'active') return { ok: false, message: 'Not your company.' };
+  if (!target || target.status !== 'active' || target.playerOwned) return { ok: false, message: 'Invalid target.' };
+  if (target.industryId !== mine.industryId || target.countryId !== mine.countryId) {
+    return { ok: false, message: `${target.name} isn't a direct competitor.` };
+  }
+  if (onCooldown(state, `price_war_${companyId}_${targetCompanyId}`)) return { ok: false, message: 'Already undercut them this year.' };
+  const cost = Math.round(30_000 + mine.revenue * 0.01);
+  if (cost > p.money) return { ok: false, message: `An ad blitz to publicize the discount costs $${cost.toLocaleString()}.` };
+  const rng = withRng(state);
+  p.money -= cost;
+  setCooldown(state, `price_war_${companyId}_${targetCompanyId}`);
+  mine.priceLevel = clamp(mine.priceLevel - 0.12, 0.7, 1.5);
+  const edge = (mine.brand + mine.quality - target.brand - target.quality) / 200; // -1..1
+  const shareShift = Math.max(0.005, 0.02 + edge * 0.02);
+  mine.marketShare = Math.min(1, mine.marketShare + shareShift);
+  target.marketShare = Math.max(0, target.marketShare - shareShift);
+  target.customerSatisfaction = clamp100(target.customerSatisfaction - 4);
+  const retaliates = rng.chance(0.4 + Math.max(0, -edge) * 0.3);
+  if (retaliates) {
+    target.priceLevel = clamp(target.priceLevel - rng.range(0.05, 0.15), 0.7, 1.5);
+    logHistory(state, `${target.name} slashed prices in retaliation against ${mine.name}'s price war.`);
+  }
+  commit(state, rng);
+  log(state, `Undercut ${target.name} on price with ${mine.name}.`, 'business');
+  return {
+    ok: true,
+    message: retaliates
+      ? `Price war launched — you grabbed some share, but ${target.name} cut prices right back.`
+      : `Price war launched — ${target.name} held their price and lost ground.`,
+  };
+}
+
 /** Attempt to acquire an NPC-owned public company by outbidding the market. */
 export function attemptHostileTakeover(state: GameState, targetCompanyId: string, offerAmount: number): ActionResult {
   const p = state.player;

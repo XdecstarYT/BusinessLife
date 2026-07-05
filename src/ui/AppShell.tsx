@@ -29,6 +29,7 @@ import { Modal } from './components';
 
 const TABS: { screen: Screen; label: string; Icon: (p: { className?: string }) => ReactNode }[] = [
   { screen: 'life', label: 'Life', Icon: IconLife },
+  { screen: 'explore', label: 'City', Icon: IconExplore },
   { screen: 'business', label: 'Business', Icon: IconBusiness },
   { screen: 'market', label: 'Markets', Icon: IconMarket },
   { screen: 'politics', label: 'Politics', Icon: IconPolitics },
@@ -40,7 +41,6 @@ const MORE_SCREENS: { screen: Screen; label: string; Icon: (p: { className?: str
   { screen: 'assets', label: 'Assets', Icon: IconAssets },
   { screen: 'family', label: 'Family', Icon: IconHeart },
   { screen: 'world', label: 'World', Icon: IconWorld },
-  { screen: 'explore', label: 'Explore', Icon: IconExplore },
   { screen: 'news', label: 'News', Icon: IconNews },
   { screen: 'stats', label: 'Stats', Icon: IconStats },
 ];

@@ -1,5 +1,5 @@
 /** Stock market: browse listed companies, trade, short, view portfolio. */
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { useGame } from '../../store/gameStore';
 import { buyOnMargin, buyShares, cancelLimitOrder, coverShort, marketCap, peRatio, placeLimitOrder, sellShares, shortShares, portfolioValue, toggleDrip } from '../../sim/market';
 import { buyCrypto, sellCrypto } from '../../sim/actions';
@@ -7,6 +7,9 @@ import { Badge, Button, Card, LineChart, Modal, Pill, PillRow, SectionHeader } f
 import { money, moneyFull, num, signedPct } from '../format';
 import { INDUSTRY_BY_ID } from '../../data/industries';
 import type { Company } from '../../sim/types';
+
+const ExchangeFloorScene = lazy(() => import('../three/ExchangeFloorScene').then((m) => ({ default: m.ExchangeFloorScene })));
+const FloorFallback = <div className="w-full h-56 rounded-2xl bg-slate-100 dark:bg-ink-800 animate-pulse" />;
 
 export function Market() {
   const { state } = useGame();
@@ -46,6 +49,19 @@ export function Market() {
           <LineChart data={idxHistory.length ? idxHistory : [100]} height={64} color="#8b5cf6" />
         </div>
       </Card>
+
+      <div className="mb-4">
+        <Suspense fallback={FloorFallback}>
+          <ExchangeFloorScene
+            indexValue={home.economy.stockIndex}
+            indexChangePct={idxHistory.length >= 2 ? idxHistory[idxHistory.length - 1] / idxHistory[idxHistory.length - 2] - 1 : 0}
+            movers={[...listed]
+              .sort((a, b) => Math.abs(yearGain(b)) - Math.abs(yearGain(a)))
+              .slice(0, 6)
+              .map((c) => ({ name: c.name, price: c.sharePrice, gainPct: yearGain(c) }))}
+          />
+        </Suspense>
+      </div>
 
       <LiveTicker companies={listed} />
 

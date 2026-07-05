@@ -1,5 +1,5 @@
 /** Politics: party membership, offices/campaigns, legislation, government. */
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { useGame } from '../../store/gameStore';
 import {
   appointMinister,
@@ -32,6 +32,9 @@ import { BarList, Badge, Button, Card, Field, Modal, Pill, PillRow, SectionHeade
 import { money, moneyFull, pct } from '../format';
 import { CABINET_PORTFOLIOS, MANIFESTO_PROMISES, type CabinetPortfolio, type Country, type ManifestoPromise } from '../../sim/types';
 
+const PoliticalChamberScene = lazy(() => import('../three/PoliticalChamberScene').then((m) => ({ default: m.PoliticalChamberScene })));
+const ChamberFallback = <div className="w-full h-56 rounded-2xl bg-slate-100 dark:bg-ink-800 animate-pulse" />;
+
 const PROMISE_LABELS: Record<ManifestoPromise, string> = {
   tax_cuts: 'Cut Taxes',
   healthcare: 'Boost Healthcare',
@@ -60,6 +63,23 @@ export function Politics() {
         <Pill label="Party" active={tab === 'party'} onClick={() => setTab('party')} />
         {isLeader && <Pill label="Cabinet" active={tab === 'cabinet'} onClick={() => setTab('cabinet')} />}
       </PillRow>
+
+      {home.totalSeats > 0 && (
+        <div className="mt-4">
+          <Suspense fallback={ChamberFallback}>
+            <PoliticalChamberScene
+              parties={home.parties.map((party) => ({ id: party.id, name: party.name, seats: party.seats, ideology: party.ideology, isPlayerParty: party.id === p.partyId }))}
+              totalSeats={home.totalSeats}
+              isLeader={isLeader}
+              portfolios={CABINET_PORTFOLIOS.map((portfolio) => ({
+                name: portfolio,
+                filled: !!home.cabinet[portfolio],
+                byPlayer: home.cabinet[portfolio] === 'player',
+              }))}
+            />
+          </Suspense>
+        </div>
+      )}
 
       {tab === 'status' && (
         <div className="mt-4 space-y-4">

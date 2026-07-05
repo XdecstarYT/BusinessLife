@@ -19,8 +19,33 @@ import {
   type DatingCandidate,
 } from '../../sim/family';
 import { giftMoneyToChild, investInChildEducation } from '../../sim/actions';
+import { npcWarmth } from '../../sim/npcMind';
+import type { NPC } from '../../sim/types';
 import { Badge, Button, Card, Modal, SectionHeader, StatBar } from '../components';
 import { money } from '../format';
+
+const MOOD_LABEL = (mood: number): string => (mood >= 70 ? 'upbeat' : mood >= 45 ? 'even-keeled' : mood >= 25 ? 'strained' : 'miserable');
+
+function PersonCard({ role, npc }: { role: string; npc: NPC }) {
+  const warmth = npcWarmth(npc);
+  return (
+    <Card className="p-4">
+      <div className="flex items-center justify-between mb-2">
+        <div className="min-w-0 pr-2">
+          <div className="text-xs text-slate-400 uppercase font-bold">{role}</div>
+          <div className="font-bold truncate" title={npc.name}>{npc.name}</div>
+        </div>
+        <Badge tone={warmth >= 65 ? 'good' : warmth <= 30 ? 'bad' : 'neutral'}>{Math.round(warmth)} warmth</Badge>
+      </div>
+      <div className="text-xs text-slate-500 dark:text-slate-400 mb-2">
+        Feeling {MOOD_LABEL(npc.mood)} · {npc.relationshipTension >= 50 ? 'tension is running high' : 'no particular tension'} with you
+      </div>
+      {npc.memory.length > 0 && (
+        <div className="text-xs italic text-slate-400 truncate" title={npc.memory[0]}>"{npc.memory[0]}"</div>
+      )}
+    </Card>
+  );
+}
 
 export function Family() {
   const { state, run } = useGame();
@@ -243,6 +268,20 @@ export function Family() {
           </Card>
         )}
       </div>
+
+      {(spouse || mentor || rival) && (
+        <>
+          <SectionHeader title="People" />
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3 px-1">
+            Every person you're close to has a real mood, memory and disposition toward you — not just a stat you moved.
+          </p>
+          <div className="space-y-3 mb-4">
+            {spouse && spouse.alive && <PersonCard role="Spouse" npc={spouse} />}
+            {mentor && mentor.alive && <PersonCard role="Mentor" npc={mentor} />}
+            {rival && rival.alive && <PersonCard role="Rival" npc={rival} />}
+          </div>
+        </>
+      )}
 
       {pickingRival && (
         <Modal open onClose={() => setPickingRival(false)} title="Declare a Rival">

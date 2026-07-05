@@ -1,25 +1,28 @@
 /**
- * The Explore hub: a small walkable 3D plaza that stands in for "the city."
- * Six buildings ring a central square — HQ, Bank, Parliament, Exchange,
- * Studio storefront and Home — and every one of them is driven by real
- * simulation state passed in as props (tier/dormant/accent), not decoration:
- * a bankrupt HQ is dark and boarded, a thriving one gets a construction
- * crane, Parliament only flies a flag if you hold office, the Exchange's
- * ticker ring glows green or red with the real market trend.
+ * The Explore hub: a walkable 3D plaza that stands in for "the city," and
+ * the primary way to reach every major system — HQ, Bank, Parliament,
+ * Exchange, Studio storefront, Home, Career office, Park, Docks and the
+ * Newsstand. Every one of them is driven by real simulation state passed
+ * in as props (tier/dormant/accent), not decoration: a bankrupt HQ is dark
+ * and boarded, a thriving one gets a construction crane, Parliament only
+ * flies a flag if you hold office, the Exchange's ticker ring glows green
+ * or red with the real market trend.
  *
  * Movement is a virtual joystick (touch) or WASD/arrows (desktop) driving the
  * player capsule in world space; a fixed-offset chase camera trails behind.
  * A continuous day/night cycle and a few looping ambient pedestrians/cars
  * keep the plaza feeling alive. Walking up to a building surfaces an
- * "Enter" prompt that hands off to the real screen for that system — this
- * is a navigation layer over the existing simulation, not a separate one.
+ * "Enter" prompt that hands off to the real screen for that system, and
+ * some buildings also offer a quick action you can take right there
+ * without leaving the plaza — this is a navigation-and-action layer over
+ * the existing simulation, not a separate one.
  */
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import * as THREE from 'three';
 import { useThreeScene } from './useThreeScene';
 
-export type HubBuildingId = 'hq' | 'bank' | 'parliament' | 'exchange' | 'studio' | 'home';
-export type HubArchetype = 'tower' | 'bank' | 'capitol' | 'exchange' | 'storefront' | 'house';
+export type HubBuildingId = 'hq' | 'bank' | 'parliament' | 'exchange' | 'studio' | 'home' | 'office' | 'park' | 'docks' | 'newsstand';
+export type HubArchetype = 'tower' | 'bank' | 'capitol' | 'exchange' | 'storefront' | 'house' | 'office' | 'park' | 'dock' | 'kiosk';
 export type HubSeason = 'spring' | 'summer' | 'autumn' | 'winter';
 
 export interface HubBuilding {
@@ -30,12 +33,14 @@ export interface HubBuilding {
   tier: 0 | 1 | 2 | 3; // drives lighting/size/extra props — reflects real sim state
   accent: string; // hex, used for glow/trim/banner color
   dormant?: boolean; // nothing built here yet — smaller, unlit, inviting rather than reactive
+  quickAction?: { label: string; icon: string }; // an action offered right here, without leaving the plaza
 }
 
 interface CityHubSceneProps {
   buildings: HubBuilding[];
   season: HubSeason;
   onEnter: (id: HubBuildingId) => void;
+  onQuickAction?: (id: HubBuildingId) => void;
 }
 
 const PLAZA_RADIUS = 11;
@@ -273,6 +278,96 @@ function buildHouse(group: THREE.Group, tier: number, foliage: string): void {
   group.add(trunk);
 }
 
+function buildOffice(group: THREE.Group, tier: number, accent: string, dormant: boolean): void {
+  const floors = dormant ? 2 : 3 + tier;
+  const w = 2.1, d = 1.4, floorH = 0.55;
+  const h = floors * floorH;
+  const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ color: dormant ? 0x3a3f47 : 0x394456, roughness: 0.6 }));
+  body.position.y = h / 2;
+  group.add(body);
+  for (let f = 0; f < floors; f++) {
+    const strip = new THREE.Mesh(
+      new THREE.PlaneGeometry(w * 0.92, floorH * 0.62),
+      new THREE.MeshStandardMaterial({ color: 0xbcd6f2, emissive: 0xbcd6f2, emissiveIntensity: dormant ? 0.05 : 0.35 + tier * 0.1, roughness: 0.3 }),
+    );
+    strip.position.set(0, floorH * (f + 0.5), d / 2 + 0.01);
+    group.add(strip);
+  }
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.28), new THREE.MeshStandardMaterial({ map: signTexture('CAREER'), emissive: 0xffffff, emissiveMap: signTexture('CAREER'), emissiveIntensity: 0.8 }));
+  sign.position.set(0, h + 0.22, 0);
+  group.add(sign);
+  if (!dormant && tier >= 2) {
+    const awning = new THREE.Mesh(new THREE.BoxGeometry(w * 1.05, 0.08, 0.35), new THREE.MeshStandardMaterial({ color: accent }));
+    awning.position.set(0, 0.5, d / 2 + 0.25);
+    group.add(awning);
+  }
+}
+
+function buildPark(group: THREE.Group, tier: number, foliage: string, dormant: boolean): void {
+  const lawn = new THREE.Mesh(new THREE.CircleGeometry(1.5, 24), new THREE.MeshStandardMaterial({ color: foliage, roughness: 0.9 }));
+  lawn.rotation.x = -Math.PI / 2;
+  lawn.position.y = 0.01;
+  group.add(lawn);
+  const treeCount = dormant ? 1 : 2 + tier;
+  for (let i = 0; i < treeCount; i++) {
+    const a = (i / treeCount) * Math.PI * 2;
+    const r = 0.7 + (i % 2) * 0.3;
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 0.4, 8), new THREE.MeshStandardMaterial({ color: 0x5a3d28 }));
+    trunk.position.set(Math.cos(a) * r, 0.2, Math.sin(a) * r);
+    group.add(trunk);
+    const crown = new THREE.Mesh(new THREE.SphereGeometry(0.32, 12, 10), new THREE.MeshStandardMaterial({ color: foliage === '#8a9a95' ? '#c7d2ce' : foliage, roughness: 0.8 }));
+    crown.position.set(Math.cos(a) * r, 0.55, Math.sin(a) * r);
+    group.add(crown);
+  }
+  const bench = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.1, 0.22), new THREE.MeshStandardMaterial({ color: 0x8a6a45 }));
+  bench.position.set(0, 0.18, 0.9);
+  group.add(bench);
+  if (!dormant) {
+    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 10), new THREE.MeshStandardMaterial({ color: 0xfff2c8, emissive: 0xfff2c8, emissiveIntensity: 0.4 + tier * 0.2 }));
+    lamp.position.set(-0.8, 0.9, -0.4);
+    group.add(lamp);
+  }
+}
+
+function buildDock(group: THREE.Group, tier: number, accent: string, dormant: boolean): void {
+  const pier = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.12, 1), new THREE.MeshStandardMaterial({ color: 0x5a4a38, roughness: 0.9 }));
+  pier.position.y = 0.06;
+  group.add(pier);
+  const warehouse = new THREE.Mesh(new THREE.BoxGeometry(1.3, 1 + tier * 0.3, 0.9), new THREE.MeshStandardMaterial({ color: dormant ? 0x3a3f47 : 0x3f4a52, roughness: 0.7 }));
+  warehouse.position.set(-0.3, (1 + tier * 0.3) / 2 + 0.12, -0.3);
+  group.add(warehouse);
+  const boat = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.2, 0.32), new THREE.MeshStandardMaterial({ color: dormant ? 0x555 : accent, roughness: 0.5 }));
+  boat.position.set(0.7, 0.18, 0.55);
+  group.add(boat);
+  if (!dormant && tier >= 1) {
+    const crane = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 1.4, 8), new THREE.MeshStandardMaterial({ color: 0xd9a441 }));
+    crane.position.set(-0.7, 0.8, -0.5);
+    group.add(crane);
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(1, 0.05, 0.05), new THREE.MeshStandardMaterial({ color: 0xd9a441 }));
+    arm.position.set(-0.2, 1.45, -0.5);
+    group.add(arm);
+  }
+  const flagPole = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.8, 6), new THREE.MeshStandardMaterial({ color: 0x888 }));
+  flagPole.position.set(0.9, 0.5, -0.2);
+  group.add(flagPole);
+  const flag = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.18), new THREE.MeshStandardMaterial({ color: accent, side: THREE.DoubleSide }));
+  flag.position.set(1.05, 0.82, -0.2);
+  flag.userData.flag = true;
+  group.add(flag);
+}
+
+function buildKiosk(group: THREE.Group, tier: number, accent: string, dormant: boolean): void {
+  const booth = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.6, 0.85, 10), new THREE.MeshStandardMaterial({ color: dormant ? 0x3a3f47 : 0x2a3242, roughness: 0.6 }));
+  booth.position.y = 0.42;
+  group.add(booth);
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(0.75, 0.4, 10), new THREE.MeshStandardMaterial({ color: accent, roughness: 0.5 }));
+  roof.position.y = 1.05;
+  group.add(roof);
+  const board = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.4), new THREE.MeshStandardMaterial({ map: signTexture('NEWS'), emissive: 0xffffff, emissiveMap: signTexture('NEWS'), emissiveIntensity: dormant ? 0.1 : 0.7 + tier * 0.1 }));
+  board.position.set(0, 0.55, 0.58);
+  group.add(board);
+}
+
 function buildBuilding(group: THREE.Group, b: HubBuilding, foliage: string): void {
   switch (b.archetype) {
     case 'tower': buildTower(group, b.tier, b.accent, !!b.dormant); return;
@@ -281,6 +376,10 @@ function buildBuilding(group: THREE.Group, b: HubBuilding, foliage: string): voi
     case 'exchange': buildExchange(group, b.tier, b.accent); return;
     case 'storefront': buildStorefront(group, b.tier, b.accent, !!b.dormant); return;
     case 'house': buildHouse(group, b.tier, foliage); return;
+    case 'office': buildOffice(group, b.tier, b.accent, !!b.dormant); return;
+    case 'park': buildPark(group, b.tier, foliage, !!b.dormant); return;
+    case 'dock': buildDock(group, b.tier, b.accent, !!b.dormant); return;
+    case 'kiosk': buildKiosk(group, b.tier, b.accent, !!b.dormant); return;
   }
 }
 
@@ -310,7 +409,7 @@ function makePedestrian(color: number): THREE.Group {
 
 // --------------------------------------------------------------------------- component
 
-export function CityHubScene({ buildings, season, onEnter }: CityHubSceneProps) {
+export function CityHubScene({ buildings, season, onEnter, onQuickAction }: CityHubSceneProps) {
   const ref = useRef<HTMLDivElement>(null);
   const inputRef = useRef({ x: 0, z: 0 });
   const nearbyRef = useRef<HubBuildingId | null>(null);
@@ -604,14 +703,24 @@ export function CityHubScene({ buildings, season, onEnter }: CityHubSceneProps) 
         />
       </div>
 
-      {/* Enter-building prompt */}
+      {/* Enter-building prompt, plus a quick action right here if one's on offer */}
       {nearbyBuilding && (
-        <button
-          onClick={() => onEnter(nearbyBuilding.id)}
-          className="absolute left-1/2 -translate-x-1/2 bottom-8 bg-brand-500 text-white font-bold px-5 py-2.5 rounded-full shadow-lg anim-in"
-        >
-          Enter {nearbyBuilding.label} →
-        </button>
+        <div className="absolute left-1/2 -translate-x-1/2 bottom-8 flex flex-col items-center gap-2 anim-in">
+          {nearbyBuilding.quickAction && onQuickAction && (
+            <button
+              onClick={() => onQuickAction(nearbyBuilding.id)}
+              className="bg-white/95 dark:bg-ink-800/95 text-slate-800 dark:text-white font-semibold text-sm px-4 py-2 rounded-full shadow-lg"
+            >
+              {nearbyBuilding.quickAction.icon} {nearbyBuilding.quickAction.label}
+            </button>
+          )}
+          <button
+            onClick={() => onEnter(nearbyBuilding.id)}
+            className="bg-brand-500 text-white font-bold px-5 py-2.5 rounded-full shadow-lg"
+          >
+            Enter {nearbyBuilding.label} →
+          </button>
+        </div>
       )}
 
       <div className="absolute top-3 left-1/2 -translate-x-1/2 text-[11px] text-white/70 bg-black/30 px-3 py-1 rounded-full">

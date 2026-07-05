@@ -44,6 +44,7 @@ import {
   spyOnCompany,
   startCompany,
   startMoonshot,
+  startPriceWar,
   takeCompanyPublic,
   toggleCompanyInsurance,
   upgradeHQ,
@@ -98,18 +99,26 @@ export function Business() {
           </p>
           {rivals.map((c) => {
             const ind = INDUSTRY_BY_ID[c.industryId];
+            const myRival = companies.find((mine) => mine.industryId === c.industryId);
             return (
               <Card key={c.id} className="p-4">
                 <div className="flex justify-between items-start mb-2">
                   <div className="min-w-0 pr-2">
                     <div className="font-bold truncate" title={c.name}>{c.name}</div>
-                    <div className="text-xs text-slate-500 dark:text-slate-400 truncate">{ind?.name} · cap {money(marketCap(c))}</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                      {ind?.name} · cap {money(marketCap(c))} · price {c.priceLevel < 0.9 ? 'discount' : c.priceLevel > 1.1 ? 'premium' : 'mid-market'} · {Math.round(c.marketShare * 100)}% share
+                    </div>
                   </div>
                   {c.isPublic ? <Badge tone="brand">Public</Badge> : <Badge>Private</Badge>}
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <Button size="sm" variant="soft" onClick={() => run(spyOnCompany, c.id)}>🕵️ Espionage</Button>
                   <Button size="sm" disabled={!c.isPublic} onClick={() => setTakeoverTarget(c.id)}>🏴 Takeover</Button>
+                  {myRival && (
+                    <Button size="sm" variant="soft" className="col-span-2" onClick={() => run(startPriceWar, myRival.id, c.id)}>
+                      ⚔️ Price War (with {myRival.name})
+                    </Button>
+                  )}
                 </div>
                 {!c.isPublic && c.revenue <= 3_000_000 && (
                   <Button size="sm" variant="soft" className="w-full mt-2" onClick={() => run(investInStartup, c.id, 50_000)}>

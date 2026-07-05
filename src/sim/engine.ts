@@ -254,11 +254,15 @@ function tickCEOs(state: GameState, rng: RNG): void {
   }
 }
 
-function tickPlayerLife(state: GameState, rng: RNG): void {
+/** Returns headlines for real, notable-to-the-outside-world moments this tick
+ * (arrest, release, burnout) so `generateNews` can react to the player's actual
+ * life instead of only macro events. */
+function tickPlayerLife(state: GameState, rng: RNG): string[] {
   const p = state.player;
   const home = state.countries.find((c) => c.id === p.countryId)!;
   const city = home.cities.find((c) => c.id === p.cityId) ?? home.cities[0];
   const e = home.economy;
+  const headlines: string[] = [];
 
   if (p.socialFollowers === undefined) { // backfill for saves from before V17 social/info layer
     p.socialFollowers = 0;
@@ -283,8 +287,9 @@ function tickPlayerLife(state: GameState, rng: RNG): void {
       log(state, 'You were released from prison.', 'milestone');
       if (!state.achievements.includes('jailbird')) state.achievements.push('jailbird');
       p.yearsServedThisSentence = 0;
+      headlines.push(`${p.name} released after serving out a prison sentence`);
     }
-    return; // No job/study/campaign progression inside.
+    return headlines; // No job/study/campaign progression inside.
   }
 
   // --- Investigation heat: a life of crime draws real law-enforcement attention over time,
@@ -305,6 +310,7 @@ function tickPlayerLife(state: GameState, rng: RNG): void {
     }
     p.reputation = clamp100(p.reputation - 20);
     log(state, `🚨 Investigators finally caught up with you — convicted and sentenced to ${sentence} year(s).`, 'bad');
+    headlines.push(`${p.name} convicted, sentenced to ${sentence} year${sentence === 1 ? '' : 's'} after a long-running investigation`);
   }
 
   // --- Study --------------------------------------------------------------
@@ -665,6 +671,7 @@ function tickPlayerLife(state: GameState, rng: RNG): void {
     p.burnoutUntilYear = state.year + rng.int(1, 3);
     log(state, '🔥 Burnout hit hard this year — you\'re running on empty.', 'bad');
     if (!state.achievements.includes('burned_out')) state.achievements.push('burned_out');
+    headlines.push(`Associates say ${p.name} is visibly burning out under the pressure`);
   }
   const burnedOut = p.burnoutUntilYear !== null && state.year <= p.burnoutUntilYear;
   if (burnedOut) {
@@ -687,6 +694,7 @@ function tickPlayerLife(state: GameState, rng: RNG): void {
   if (rng.chance(mortality * healthMult * (1 - home.healthcare / 300) * difficultyMortalityMult)) {
     p.alive = false;
   }
+  return headlines;
 }
 
 /** A rough 0..100 composite of wealth, dynasty, office and achievements at death. */
@@ -937,7 +945,7 @@ export function advanceYear(state: GameState): GameState {
   for (const l of tickMargin(state)) log(state, l, 'bad');
 
   // 4. The player's own year
-  tickPlayerLife(state, rng);
+  const playerHeadlines = tickPlayerLife(state, rng);
   if (state.player.alive) tickFamily(state, rng);
   if (state.player.alive) tickChallenge(state, rng);
   if (state.player.alive) for (const h of tickLifestyleAssets(state, rng)) log(state, h, 'money');
@@ -959,7 +967,7 @@ export function advanceYear(state: GameState): GameState {
   state.pendingEvents = p.alive ? fireEvents(state, rng) : [];
 
   // 7. News
-  const news = generateNews(state, rng, politicalHeadlines.slice(0, 6), businessHeadlines.slice(0, 4));
+  const news = generateNews(state, rng, politicalHeadlines.slice(0, 6), businessHeadlines.slice(0, 4), playerHeadlines);
   state.news.push(...news);
   if (state.news.length > 400) state.news.splice(0, state.news.length - 400);
 

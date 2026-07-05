@@ -151,6 +151,23 @@ plain JSON you can export and re-import.
   Confidence/Motivation/Burnout meter bank — just Stress plus a binary Burnout state — and no generative
   AI interrogation or courtroom simulation. What's real: subject-driven degree payoffs, a player-wide
   mental-health mechanic that feeds job performance, and an arrest/parole pipeline with teeth.)
+- **3D is now a main way you play, not a side visualization** — the walkable City hub gets its own
+  primary tab, and has grown from 6 buildings to 10: a Career office (push for a promotion right there),
+  a Park (family, and a free moment to meditate), the Docks (foreign relations) and a Newsstand (skims
+  the day's real headline) join HQ, Bank, Parliament, Exchange, Studio and Home — several offering a
+  quick action you can take without leaving the plaza. Politics and the stock market each get a
+  dedicated 3D scene of their own: a legislative Chamber with a real hemicycle of seat blocks sized and
+  colored by actual party seat counts and ideology (your own party outlined gold, cabinet podiums lit
+  when filled), and an Exchange Trading Floor with a big board tracking the real national index and
+  ticker booths for the day's biggest real movers. (Honest scope: still a stylized, procedurally-built
+  diorama, not a full open-world engine with physics or pathfinding — but every shape, color and light
+  on screen is driven by real simulation state, not decoration.)
+- **The world and your rivals react back** — a real, player-vs-named-rival price war: undercut a
+  specific competitor's price and they may cut right back at you, shifting real market share both ways.
+  Everyone in your inner circle (spouse, mentor, rival) now shows a real mood, disposition and their most
+  recent memory of you, not just a name and a number. National news now covers your own life when it's
+  genuinely newsworthy — a conviction, a release, or burning out under the pressure — alongside the
+  economy and world events it already tracked.
 - **Family, dynasty & wills** — date, marry (with an optional prenup), divorce, have or adopt children who
   age up as real NPCs and eventually have grandchildren of their own, name a successor to inherit a company
   or a political heir to inherit your party and popularity, draft a will naming a primary heir for a bigger
