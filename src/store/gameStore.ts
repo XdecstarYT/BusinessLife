@@ -27,6 +27,7 @@ export type Screen =
   | 'life'
   | 'career'
   | 'business'
+  | 'studio'
   | 'market'
   | 'assets'
   | 'politics'

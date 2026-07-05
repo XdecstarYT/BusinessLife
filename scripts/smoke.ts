@@ -9,6 +9,7 @@ import { buyShares, marketCap, buyOnMargin, placeLimitOrder, cancelLimitOrder, t
 import { datingPool, propose, haveChild, nameSuccessor, namePoliticalHeir, namePrimaryHeir, adoptChild, dynastyScore } from '../src/sim/family';
 import * as F from '../src/sim/family';
 import { buyLuxuryAsset, sellLuxuryAsset, investInCelebrityBrand, divestCelebrityStake } from '../src/sim/lifestyle';
+import * as P from '../src/sim/products';
 import { publicOpinionBreakdown } from '../src/sim/politics';
 import { INDUSTRIES } from '../src/data/industries';
 import { LAW_BY_ID } from '../src/data/laws';
@@ -384,6 +385,34 @@ for (let y = 0; y < 82 && state.player.alive; y++) {
       if (home.leaderId === 'player') A.bidToHostGlobalGames(state);
     }
     if (y === 50 && state.player.age >= 60 && !state.player.retired) A.retire(state);
+    // --- V12: the Studio (product design & commerce) ---
+    if (y === 24 && state.player.companies.length) {
+      const co = state.companies[state.player.companies[0]];
+      if (co) co.cash = Math.max(co.cash, 2_000_000); // fund the pipeline for the exercise
+      const created = P.createProduct(state, state.player.companies[0], 'smartphone', 'Smoke Phone');
+      if (created.ok && created.productId) {
+        const pid = created.productId;
+        P.generateConcept(state, pid, 'minimalist eco-friendly smartphone');
+        P.researchProductTech(state, 'green_materials');
+        P.setProductMaterials(state, pid, 'aluminum', 'glass');
+        P.updateProductForm(state, pid, { slimness: 0.8, finish: 'metallic' });
+        P.setProductPackaging(state, pid, 'eco');
+        P.buildPrototype(state, pid);
+        P.runProductTests(state, pid);
+        P.refineDesign(state, pid);
+        P.fileProductPatent(state, pid);
+        P.setProductPrice(state, pid, 750);
+        P.setProductMarketing(state, pid, 100_000);
+        P.setProductManufacturing(state, pid, 'regional');
+        P.startProduction(state, pid);
+        P.holdLaunchEvent(state, pid, 'convention_keynote');
+      }
+    }
+    if (y === 30) {
+      const launched = Object.values(state.products).find((pr) => pr.stage === 'launched');
+      if (launched) P.upgradeGeneration(state, launched.id);
+      P.setStorefront(state, { theme: 'noir' });
+    }
     // --- V6: continue as heir when a succession offer appears ---
     if (state.pendingSuccession && state.pendingSuccession.candidates.length) {
       state = continueAsHeir(state, state.pendingSuccession.candidates[0].npcId);
@@ -445,6 +474,10 @@ console.log('  foundation:', state.player.foundation ? `${state.player.foundatio
 console.log('  retired:', state.player.retired, 'pension:', state.player.pensionIncome);
 console.log('  memoir:', state.player.memoir?.title ?? 'none / expired');
 console.log('  CEOs hired:', Object.values(state.companies).filter((c) => c.ceoName).length, 'moonshots active:', Object.values(state.companies).filter((c) => c.moonshot).length);
+const allProducts = Object.values(state.products);
+console.log('  products designed:', allProducts.length, '· launched:', allProducts.filter((p) => p.stage === 'launched').length);
+console.log('  product units sold:', allProducts.reduce((s, p) => s + p.unitsSoldTotal, 0).toLocaleString(), '· product profit:', Math.round(allProducts.reduce((s, p) => s + p.profitTotal, 0)).toLocaleString());
+console.log('  product tech unlocked:', state.productTech.join(', ') || 'none', '· storefront theme:', state.storefront.theme);
 console.log('  errors:', errors);
 
 // Invariant checks

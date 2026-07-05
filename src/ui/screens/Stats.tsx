@@ -94,6 +94,13 @@ const ACHIEVEMENTS: Record<string, { label: string; icon: string }> = {
   company_of_the_year: { label: 'Company of the Year', icon: '🏆' },
   moonshot_landed: { label: 'Moonshot Landed', icon: '🚀' },
   chairman: { label: 'Chairman', icon: '🪑' },
+  first_product: { label: 'First Concept', icon: '💡' },
+  product_patented: { label: 'Product Patent', icon: '📜' },
+  product_launched: { label: 'Product Launch', icon: '🎬' },
+  product_dynasty: { label: 'Product Dynasty', icon: '🔁' },
+  rnd_visionary: { label: 'R&D Visionary', icon: '🔬' },
+  design_icon: { label: 'Design Icon', icon: '✨' },
+  million_units: { label: 'Million Units', icon: '📦' },
 };
 
 export function Stats() {

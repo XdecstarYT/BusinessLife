@@ -257,6 +257,9 @@ export function generateWorld(config: NewGameConfig): GameState {
     worldHistory: [],
     cryptoPrice: rng.range(800, 3_000),
     cryptoHistory: [],
+    products: {},
+    productTech: [],
+    storefront: { name: `${config.playerName.split(' ').pop()} Studio`, theme: 'aurora', featuredProductId: null },
   };
 
   // Public + private NPC companies per country (more in the player's home).

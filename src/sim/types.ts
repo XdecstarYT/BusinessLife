@@ -565,6 +565,101 @@ export interface Moonshot {
   invested: number; // total committed; burned over the project's life
 }
 
+// ---------------------------------------------------------------------------
+// Product Design & Commerce (the Studio)
+// ---------------------------------------------------------------------------
+
+export type ProductCategory =
+  | 'smartphone' | 'laptop' | 'tablet' | 'wearable' | 'gaming' | 'audio'
+  | 'appliance' | 'smart_home' | 'furniture' | 'fashion' | 'shoes' | 'jewelry'
+  | 'cosmetics' | 'automotive' | 'food_beverage' | 'medical' | 'industrial'
+  | 'toys' | 'sports' | 'luxury';
+
+export type ProductMaterialId =
+  | 'aluminum' | 'titanium' | 'steel' | 'carbon_fiber' | 'glass' | 'leather'
+  | 'plastic' | 'ceramic' | 'wood' | 'marble' | 'fabric' | 'gold' | 'chrome'
+  | 'copper' | 'eco_composite' | 'recycled';
+
+export type ProductStage = 'concept' | 'prototype' | 'testing' | 'production' | 'launched' | 'retired';
+export type PublishState = 'draft' | 'internal' | 'portfolio' | 'marketplace' | 'public';
+export type ManufacturingStrategy = 'handmade' | 'boutique' | 'regional' | 'overseas' | 'automated' | 'sustainable' | 'luxury_craft' | 'mass';
+export type PackagingStyle = 'minimal' | 'premium' | 'eco' | 'playful' | 'industrial';
+export type ProductFinish = 'matte' | 'gloss' | 'metallic' | 'brushed';
+export type StudioLighting = 'studio' | 'sunset' | 'showroom' | 'noir';
+export type LaunchVenue = 'livestream' | 'rooftop_party' | 'convention_keynote' | 'flagship_theater';
+export type SalesChannel = 'storefront' | 'online' | 'retail' | 'boutique';
+
+/** Parametric 3D form: drives the procedural product mesh in the Studio viewport. */
+export interface ProductForm {
+  size: number; // 0.6..1.8 overall scale
+  slimness: number; // 0..1 thinner/sleeker
+  curvature: number; // 0..1 soft/rounded vs sharp
+  accent: number; // 0..1 how prominent accent details are
+  bodyColor: string; // hex
+  accentColor: string; // hex
+  finish: ProductFinish;
+  lighting: StudioLighting; // preferred preview lighting preset
+}
+
+export interface ProductTestScores {
+  appearance: number; innovation: number; comfort: number; reliability: number;
+  performance: number; easeOfUse: number; sustainability: number; buildQuality: number; value: number;
+}
+
+export interface ProductReview {
+  year: number;
+  stars: number; // 1..5
+  text: string;
+}
+
+export interface ProductSalesPoint {
+  year: number;
+  units: number;
+  revenue: number;
+  profit: number;
+}
+
+export interface Product {
+  id: string;
+  companyId: string; // owning (player) company; profits flow into it
+  name: string;
+  tagline: string;
+  category: ProductCategory;
+  generation: number; // 1..n; upgraded generations supersede their predecessor
+  predecessorId: string | null;
+  stage: ProductStage;
+  publishState: PublishState;
+  materials: [ProductMaterialId, ProductMaterialId]; // primary body + accent
+  form: ProductForm;
+  features: string[]; // granted by unlocked product tech
+  packaging: PackagingStyle;
+  manufacturing: ManufacturingStrategy;
+  price: number;
+  patented: boolean;
+  testScores: ProductTestScores | null;
+  iterations: number; // refinement passes
+  designQuality: number; // 0..100, grows with refinement and R&D
+  hype: number; // 0..100 launch buzz, decays yearly
+  brandPower: number; // 0..100 product-brand strength
+  yearDesigned: number;
+  yearLaunched: number | null;
+  unitsSoldTotal: number;
+  revenueTotal: number;
+  profitTotal: number;
+  rating: number; // 0..5 running customer rating
+  reviews: ProductReview[];
+  returnRate: number; // 0..1
+  marketingBudget: number; // per-year spend from company cash
+  channels: SalesChannel[];
+  salesHistory: ProductSalesPoint[];
+}
+
+export interface Storefront {
+  name: string;
+  theme: 'aurora' | 'noir' | 'porcelain' | 'terra';
+  featuredProductId: string | null;
+}
+
 export type ExecutiveRole = 'cfo' | 'coo' | 'cmo';
 
 export interface Executive {
@@ -820,6 +915,9 @@ export interface GameState {
   worldHistory: WorldHistoryEntry[]; // sparse chronicle of major world-level milestones, spans generations
   cryptoPrice: number; // the world's single cryptocurrency, priced in the home currency
   cryptoHistory: number[]; // recent yearly closes for charting
+  products: Record<string, Product>; // the Studio: player-designed products
+  productTech: string[]; // unlocked product R&D node ids
+  storefront: Storefront; // the player's customizable product storefront
 }
 
 export interface SuccessionCandidate {

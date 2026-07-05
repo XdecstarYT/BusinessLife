@@ -19,6 +19,7 @@ import { World } from './ui/screens/World';
 import { News } from './ui/screens/News';
 import { Stats } from './ui/screens/Stats';
 import { Family } from './ui/screens/Family';
+import { Studio } from './ui/screens/Studio';
 
 export default function App() {
   const { state, screen, darkMode } = useGame();
@@ -44,6 +45,7 @@ export default function App() {
           {screen === 'life' && <Life />}
           {screen === 'career' && <Career />}
           {screen === 'business' && <Business />}
+          {screen === 'studio' && <Studio />}
           {screen === 'market' && <Market />}
           {screen === 'assets' && <Assets />}
           {screen === 'politics' && <Politics />}

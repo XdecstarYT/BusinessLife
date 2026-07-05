@@ -18,6 +18,7 @@ import { distributeEstate, dynastyScore, tickFamily } from './family';
 import { tickWorldEvents } from './worldEvents';
 import { tryFireDailyEvent } from './dailyEvents';
 import { tickLifestyleAssets } from './lifestyle';
+import { tickProducts } from './products';
 import { SK } from '../data/skills';
 
 const SPECIAL_BIRTHDAYS = new Set([18, 21, 25, 30, 40, 50, 60, 65, 70, 75, 80, 90, 100]);
@@ -705,6 +706,7 @@ export function advanceYear(state: GameState): GameState {
   businessHeadlines.push(...tickMergers(state, rng));
   businessHeadlines.push(...tickCorporateSabotage(state, rng));
   businessHeadlines.push(...tickIndustryAwards(state, rng));
+  businessHeadlines.push(...tickProducts(state, rng));
   tickMoonshots(state, rng);
   tickCEOs(state, rng);
   tickCrypto(state, rng);

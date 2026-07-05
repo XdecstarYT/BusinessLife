@@ -155,17 +155,28 @@ export function useThreeScene(
       el.removeEventListener('wheel', onWheel);
       el.removeEventListener('touchmove', onTouchMove);
       el.removeEventListener('touchend', onTouchEnd);
+      const disposeMaterial = (m: THREE.Material) => {
+        const tex = m as Partial<THREE.MeshStandardMaterial>;
+        tex.map?.dispose();
+        tex.emissiveMap?.dispose();
+        tex.roughnessMap?.dispose();
+        tex.normalMap?.dispose();
+        tex.alphaMap?.dispose();
+        m.dispose();
+      };
       scene.traverse((obj) => {
         if (obj instanceof THREE.Mesh || obj instanceof THREE.Line || obj instanceof THREE.Points) {
           obj.geometry?.dispose();
           const mat = obj.material;
-          if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
-          else mat?.dispose();
+          if (Array.isArray(mat)) mat.forEach(disposeMaterial);
+          else if (mat) disposeMaterial(mat);
         } else if (obj instanceof THREE.Sprite) {
           obj.material.map?.dispose();
           obj.material.dispose();
         }
       });
+      (scene.environment as THREE.Texture | null)?.dispose();
+      scene.environment = null;
       renderer.dispose();
       if (renderer.domElement.parentNode === container) container.removeChild(renderer.domElement);
     };

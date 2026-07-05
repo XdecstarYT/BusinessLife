@@ -1,0 +1,1195 @@
+/**
+ * The Studio viewport: a futuristic innovation-lab environment (reflective glass
+ * floor, holographic rings, drifting ambient particles, robotic arm silhouette)
+ * with a procedurally built product on a rotating pedestal.
+ *
+ * Products are built to read like real industrial design, not primitives:
+ * rounded-extruded unibodies, canvas-drawn screens / keyboards / watch faces /
+ * bottle labels, physically-based materials with clearcoat and glass
+ * transmission, image-based environment reflections, ACES tone mapping and a
+ * soft contact shadow. Every category gets its own model — a smartwatch, a pair
+ * of headphones, a perfume bottle and a car are all distinct objects — and the
+ * whole mesh rebuilds live from the form sliders, colors, materials and finish.
+ */
+import { useRef } from 'react';
+import * as THREE from 'three';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { useThreeScene } from './useThreeScene';
+import type { Product, StudioLighting } from '../../sim/types';
+import { PRODUCT_CATEGORY_BY_ID, PRODUCT_MATERIAL_BY_ID } from '../../data/productData';
+
+interface ProductStudioSceneProps {
+  product: Product;
+  tall?: boolean;
+}
+
+const LIGHTING_PRESETS: Record<StudioLighting, { ambient: number; key: number; keyColor: number; rim: number; rimColor: number; fill: number; fillColor: number; fogColor: number; exposure: number }> = {
+  studio: { ambient: 0.4, key: 1.6, keyColor: 0xffffff, rim: 0.9, rimColor: 0x88b4ff, fill: 0.5, fillColor: 0xffe9c9, fogColor: 0x0b1220, exposure: 1.15 },
+  sunset: { ambient: 0.32, key: 1.5, keyColor: 0xffb066, rim: 0.8, rimColor: 0xff5e8a, fill: 0.35, fillColor: 0x7a5cff, fogColor: 0x180f1e, exposure: 1.05 },
+  showroom: { ambient: 0.55, key: 1.9, keyColor: 0xfff6e8, rim: 1.0, rimColor: 0xffffff, fill: 0.6, fillColor: 0xdde8ff, fogColor: 0x11151d, exposure: 1.25 },
+  noir: { ambient: 0.16, key: 1.3, keyColor: 0x9db8ff, rim: 1.2, rimColor: 0x38f2d4, fill: 0.2, fillColor: 0x27314a, fogColor: 0x05070d, exposure: 0.95 },
+};
+
+// ---------------------------------------------------------------------------
+// Canvas textures — screens, keyboards, watch faces, labels, logos, shadows.
+// All deterministic (no randomness) so rebuilds are visually stable.
+// ---------------------------------------------------------------------------
+
+function makeTexture(w: number, h: number, draw: (ctx: CanvasRenderingContext2D, w: number, h: number) => void): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d')!;
+  draw(ctx, w, h);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  return tex;
+}
+
+const APP_ICON_COLORS = ['#4f8ef7', '#34c77b', '#f7b23b', '#ee5f6e', '#9a6cf5', '#31c4d8', '#f2803b', '#5a6acf'];
+
+function phoneScreenTexture(accent: string): THREE.CanvasTexture {
+  return makeTexture(256, 512, (ctx, w, h) => {
+    const g = ctx.createLinearGradient(0, 0, w * 0.4, h);
+    g.addColorStop(0, accent);
+    g.addColorStop(0.55, '#141a2c');
+    g.addColorStop(1, '#05070d');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+    // status bar
+    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    ctx.font = '600 15px system-ui, sans-serif';
+    ctx.fillText('9:41', 16, 26);
+    ctx.fillRect(w - 40, 14, 24, 11);
+    ctx.fillRect(w - 15, 17, 3, 5);
+    // app grid
+    const cols = 4, size = 38, gapX = (w - cols * size) / (cols + 1);
+    for (let row = 0; row < 5; row++) {
+      for (let col = 0; col < cols; col++) {
+        const x = gapX + col * (size + gapX);
+        const y = 60 + row * (size + 22);
+        ctx.fillStyle = APP_ICON_COLORS[(row * cols + col) % APP_ICON_COLORS.length];
+        ctx.beginPath();
+        ctx.roundRect(x, y, size, size, 10);
+        ctx.fill();
+      }
+    }
+    // dock
+    ctx.fillStyle = 'rgba(255,255,255,0.14)';
+    ctx.beginPath();
+    ctx.roundRect(10, h - 66, w - 20, 56, 16);
+    ctx.fill();
+    for (let col = 0; col < cols; col++) {
+      const x = gapX + col * (size + gapX);
+      ctx.fillStyle = APP_ICON_COLORS[(col + 3) % APP_ICON_COLORS.length];
+      ctx.beginPath();
+      ctx.roundRect(x, h - 57, size, size, 10);
+      ctx.fill();
+    }
+  });
+}
+
+function laptopScreenTexture(accent: string, name: string): THREE.CanvasTexture {
+  return makeTexture(512, 320, (ctx, w, h) => {
+    const g = ctx.createLinearGradient(0, h, w, 0);
+    g.addColorStop(0, '#0a0f1c');
+    g.addColorStop(0.6, '#17203a');
+    g.addColorStop(1, accent);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+    // aurora sweep
+    ctx.strokeStyle = 'rgba(255,255,255,0.10)';
+    ctx.lineWidth = 26;
+    ctx.beginPath();
+    ctx.moveTo(-20, h * 0.8);
+    ctx.bezierCurveTo(w * 0.3, h * 0.35, w * 0.6, h * 0.9, w + 20, h * 0.3);
+    ctx.stroke();
+    // menu bar
+    ctx.fillStyle = 'rgba(8,12,22,0.75)';
+    ctx.fillRect(0, 0, w, 22);
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.font = '600 12px system-ui, sans-serif';
+    ctx.fillText(name.slice(0, 22), 12, 15);
+    ctx.fillText('9:41', w - 40, 15);
+    // floating window
+    ctx.fillStyle = 'rgba(15,22,38,0.92)';
+    ctx.beginPath();
+    ctx.roundRect(w * 0.12, h * 0.24, w * 0.5, h * 0.44, 8);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+    ctx.fillRect(w * 0.12, h * 0.24, w * 0.5, 18);
+    for (const [i, c] of ['#ee5f6e', '#f7b23b', '#34c77b'].entries()) {
+      ctx.fillStyle = c;
+      ctx.beginPath();
+      ctx.arc(w * 0.12 + 14 + i * 14, h * 0.24 + 9, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // dock
+    ctx.fillStyle = 'rgba(255,255,255,0.13)';
+    ctx.beginPath();
+    ctx.roundRect(w * 0.28, h - 34, w * 0.44, 26, 10);
+    ctx.fill();
+    for (let i = 0; i < 6; i++) {
+      ctx.fillStyle = APP_ICON_COLORS[i];
+      ctx.beginPath();
+      ctx.roundRect(w * 0.3 + i * 36, h - 30, 18, 18, 5);
+      ctx.fill();
+    }
+  });
+}
+
+/** Full laptop top deck: keyboard well, keys and trackpad, tinted to the body color. */
+function deckTexture(bodyColor: string): THREE.CanvasTexture {
+  return makeTexture(512, 360, (ctx, w, h) => {
+    ctx.fillStyle = bodyColor;
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = 'rgba(0,0,0,0.28)';
+    ctx.beginPath();
+    ctx.roundRect(w * 0.06, 14, w * 0.88, h * 0.5, 8);
+    ctx.fill();
+    const rows = 5, cols = 13;
+    const kw = (w * 0.84) / cols, kh = (h * 0.44) / rows;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (r === rows - 1 && c > 2 && c < 10) continue; // spacebar span
+        ctx.fillStyle = 'rgba(22,26,34,0.95)';
+        ctx.beginPath();
+        ctx.roundRect(w * 0.08 + c * kw, 22 + r * kh, kw - 4, kh - 5, 3);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.10)';
+        ctx.fillRect(w * 0.08 + c * kw, 22 + r * kh, kw - 4, 2);
+      }
+    }
+    ctx.fillStyle = 'rgba(22,26,34,0.95)';
+    ctx.beginPath();
+    ctx.roundRect(w * 0.08 + 3 * kw, 22 + 4 * kh, 7 * kw - 4, kh - 5, 3);
+    ctx.fill();
+    // trackpad
+    ctx.fillStyle = 'rgba(0,0,0,0.22)';
+    ctx.beginPath();
+    ctx.roundRect(w * 0.34, h * 0.62, w * 0.32, h * 0.32, 8);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    ctx.stroke();
+  });
+}
+
+function watchFaceTexture(accent: string): THREE.CanvasTexture {
+  return makeTexture(256, 256, (ctx, w, h) => {
+    const cx = w / 2, cy = h / 2, r = w * 0.47;
+    const g = ctx.createRadialGradient(cx, cy, 4, cx, cy, r);
+    g.addColorStop(0, '#161c28');
+    g.addColorStop(1, '#04060b');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+    // tick marks
+    for (let i = 0; i < 60; i++) {
+      const a = (i / 60) * Math.PI * 2;
+      const major = i % 5 === 0;
+      ctx.strokeStyle = major ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.3)';
+      ctx.lineWidth = major ? 3 : 1;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(a) * r * (major ? 0.84 : 0.9), cy + Math.sin(a) * r * (major ? 0.84 : 0.9));
+      ctx.lineTo(cx + Math.cos(a) * r * 0.96, cy + Math.sin(a) * r * 0.96);
+      ctx.stroke();
+    }
+    // complication
+    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+    ctx.beginPath();
+    ctx.arc(cx, cy + r * 0.45, r * 0.14, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = accent;
+    ctx.font = '700 18px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('72', cx, cy + r * 0.5);
+    // hands at 10:09 — the classic showroom time
+    const hand = (angle: number, len: number, width: number, color: string) => {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + Math.cos(angle) * r * len, cy + Math.sin(angle) * r * len);
+      ctx.stroke();
+    };
+    hand(-Math.PI / 2 - (2 / 12) * Math.PI * 2 + 0.1, 0.5, 6, '#e8edf5');
+    hand(-Math.PI / 2 + (9 / 60) * Math.PI * 2, 0.78, 4, '#e8edf5');
+    hand(-Math.PI / 2 + (31 / 60) * Math.PI * 2, 0.85, 2, accent);
+    ctx.fillStyle = accent;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
+/** Wraparound product label for bottles / jars — name, rules and a barcode. */
+function labelTexture(name: string, tagline: string): THREE.CanvasTexture {
+  return makeTexture(512, 256, (ctx, w, h) => {
+    ctx.fillStyle = '#f4f0e6';
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = '#1d2430';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(10, 10, w - 20, h - 20);
+    ctx.fillStyle = '#1d2430';
+    ctx.textAlign = 'center';
+    ctx.font = '700 44px Georgia, serif';
+    ctx.fillText(name.slice(0, 16).toUpperCase(), w / 2, h * 0.42);
+    ctx.font = 'italic 20px Georgia, serif';
+    ctx.fillStyle = '#4a5568';
+    ctx.fillText(tagline.slice(0, 38), w / 2, h * 0.6);
+    ctx.fillRect(w / 2 - 90, h * 0.68, 180, 2);
+    // barcode
+    for (let i = 0; i < 28; i++) {
+      ctx.fillStyle = '#1d2430';
+      ctx.fillRect(w / 2 - 56 + i * 4, h * 0.76, i % 3 === 0 ? 3 : 1.5, 30);
+    }
+  });
+}
+
+/** Transparent brand wordmark, used as a subtle engraving on product bodies. */
+function wordmarkTexture(text: string): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d')!;
+  const font = '600 44px system-ui, sans-serif';
+  ctx.font = font;
+  const tw = Math.ceil(ctx.measureText(text).width) + 16;
+  canvas.width = Math.max(64, tw);
+  canvas.height = 64;
+  ctx.font = font;
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'center';
+  ctx.fillText(text, canvas.width / 2, 34);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/** ECG-style readout for medical devices. */
+function vitalsTexture(accent: string): THREE.CanvasTexture {
+  return makeTexture(512, 256, (ctx, w, h) => {
+    ctx.fillStyle = '#04070c';
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = 'rgba(60,220,140,0.9)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    let x = 0;
+    ctx.moveTo(0, h * 0.45);
+    while (x < w) {
+      ctx.lineTo(x + 26, h * 0.45);
+      ctx.lineTo(x + 34, h * 0.2);
+      ctx.lineTo(x + 42, h * 0.72);
+      ctx.lineTo(x + 50, h * 0.45);
+      x += 86;
+      ctx.lineTo(x, h * 0.45);
+    }
+    ctx.stroke();
+    ctx.fillStyle = '#3cdc8c';
+    ctx.font = '700 52px system-ui, sans-serif';
+    ctx.fillText('72', w - 120, 66);
+    ctx.font = '600 18px system-ui, sans-serif';
+    ctx.fillText('BPM', w - 120, 90);
+    ctx.fillStyle = accent;
+    ctx.font = '700 34px system-ui, sans-serif';
+    ctx.fillText('98%', w - 120, h - 44);
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.font = '600 15px system-ui, sans-serif';
+    ctx.fillText('SpO₂', w - 120, h - 22);
+  });
+}
+
+/** Soft radial contact shadow under the product. */
+function shadowTexture(): THREE.CanvasTexture {
+  return makeTexture(256, 256, (ctx, w, h) => {
+    const g = ctx.createRadialGradient(w / 2, h / 2, 8, w / 2, h / 2, w / 2);
+    g.addColorStop(0, 'rgba(0,0,0,0.5)');
+    g.addColorStop(0.6, 'rgba(0,0,0,0.22)');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Geometry + material helpers
+// ---------------------------------------------------------------------------
+
+/** Rounded-corner box via extrusion with a bevel — reads like machined unibody, not a primitive. */
+function roundedBoxGeo(w: number, h: number, d: number, radius: number): THREE.ExtrudeGeometry {
+  const r = Math.max(0.005, Math.min(radius, w / 2 - 0.004, h / 2 - 0.004));
+  const x = -w / 2, y = -h / 2;
+  const shape = new THREE.Shape();
+  shape.moveTo(x + r, y);
+  shape.lineTo(x + w - r, y);
+  shape.absarc(x + w - r, y + r, r, -Math.PI / 2, 0, false);
+  shape.lineTo(x + w, y + h - r);
+  shape.absarc(x + w - r, y + h - r, r, 0, Math.PI / 2, false);
+  shape.lineTo(x + r, y + h);
+  shape.absarc(x + r, y + h - r, r, Math.PI / 2, Math.PI, false);
+  shape.lineTo(x, y + r);
+  shape.absarc(x + r, y + r, r, Math.PI, Math.PI * 1.5, false);
+  const bevel = Math.min(d * 0.28, r * 0.7);
+  const geo = new THREE.ExtrudeGeometry(shape, {
+    depth: Math.max(0.002, d - bevel * 2),
+    bevelEnabled: true,
+    bevelThickness: bevel,
+    bevelSize: bevel * 0.9,
+    bevelSegments: 3,
+    curveSegments: 10,
+  });
+  geo.translate(0, 0, -Math.max(0.002, d - bevel * 2) / 2);
+  return geo;
+}
+
+/** Rounded box lying flat: footprint w×d in the XZ plane, thickness t upward. */
+function flatRoundedGeo(w: number, d: number, t: number, radius: number): THREE.ExtrudeGeometry {
+  const geo = roundedBoxGeo(w, d, t, radius);
+  geo.rotateX(-Math.PI / 2);
+  return geo;
+}
+
+function productMaterial(matId: string, finish: string, colorOverride?: string): THREE.MeshPhysicalMaterial {
+  const def = PRODUCT_MATERIAL_BY_ID[matId];
+  const mat = new THREE.MeshPhysicalMaterial({
+    color: colorOverride ?? def.color,
+    metalness: def.metalness,
+    roughness: def.roughness,
+    envMapIntensity: 1.0,
+  });
+  if (matId === 'glass') {
+    mat.transmission = 0.85;
+    mat.thickness = 0.4;
+    mat.ior = 1.5;
+    mat.roughness = Math.min(mat.roughness, 0.12);
+  }
+  if (finish === 'gloss') {
+    mat.clearcoat = 1;
+    mat.clearcoatRoughness = 0.06;
+    mat.roughness = Math.max(0.05, mat.roughness * 0.45);
+  } else if (finish === 'matte') {
+    mat.roughness = Math.min(0.95, mat.roughness + 0.28);
+    mat.envMapIntensity = 0.5;
+  } else if (finish === 'metallic') {
+    mat.metalness = Math.min(1, mat.metalness + 0.4);
+    mat.roughness = Math.max(0.08, mat.roughness * 0.55);
+    mat.envMapIntensity = 1.4;
+  } else if (finish === 'brushed') {
+    mat.metalness = Math.min(1, mat.metalness + 0.25);
+    mat.roughness = 0.42;
+  }
+  return mat;
+}
+
+function screenMaterial(tex: THREE.CanvasTexture): THREE.MeshStandardMaterial {
+  return new THREE.MeshStandardMaterial({
+    color: 0x000000,
+    emissive: 0xffffff,
+    emissiveMap: tex,
+    emissiveIntensity: 0.95,
+    roughness: 0.15,
+    metalness: 0.1,
+  });
+}
+
+function emissiveDot(color: THREE.ColorRepresentation, r: number): THREE.Mesh {
+  return new THREE.Mesh(
+    new THREE.SphereGeometry(r, 10, 10),
+    new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 1.6 }),
+  );
+}
+
+function wordmarkPlane(text: string, height: number): THREE.Mesh {
+  const tex = wordmarkTexture(text);
+  const aspect = (tex.image as HTMLCanvasElement).width / 64;
+  return new THREE.Mesh(
+    new THREE.PlaneGeometry(aspect * height, height),
+    new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.8, depthWrite: false }),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Per-category product builders
+// ---------------------------------------------------------------------------
+
+interface BuildCtx {
+  group: THREE.Group;
+  product: Product;
+  s: number;      // size multiplier
+  slim: number;   // thickness multiplier from slimness slider
+  curve: number;  // curvature 0..1
+  accentAmt: number;
+  body: THREE.MeshPhysicalMaterial;
+  accent: THREE.MeshPhysicalMaterial;
+  brand: string;
+}
+
+function buildSlab(c: BuildCtx): void {
+  const isTablet = c.product.category === 'tablet';
+  const s = c.s;
+  const w = (isTablet ? 1.5 : 0.92) * s, h = (isTablet ? 2.0 : 1.86) * s, d = (isTablet ? 0.095 : 0.13) * s * c.slim;
+  const r = w * (0.07 + c.curve * 0.12);
+  c.group.add(new THREE.Mesh(roundedBoxGeo(w, h, d, r), c.body));
+  // display with a drawn home screen
+  const screen = new THREE.Mesh(roundedBoxGeo(w * 0.93, h * 0.95, 0.012, r * 0.85), screenMaterial(phoneScreenTexture(c.product.form.accentColor)));
+  screen.position.z = d / 2 + 0.004;
+  c.group.add(screen);
+  // rear camera island: plate + lenses + flash
+  const plate = new THREE.Mesh(roundedBoxGeo(w * 0.38, w * 0.38, 0.035, w * 0.09), c.accent);
+  plate.position.set(-w * 0.24, h * 0.32, -d / 2 - 0.014);
+  c.group.add(plate);
+  const lensGlass = new THREE.MeshPhysicalMaterial({ color: 0x0a1018, metalness: 0.4, roughness: 0.05, clearcoat: 1 });
+  const lensCount = isTablet ? 1 : 3;
+  const lensPos: Array<[number, number]> = [[-0.09, 0.09], [-0.09, -0.03], [0.03, 0.03]];
+  for (let i = 0; i < lensCount; i++) {
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(w * 0.055, w * 0.012, 10, 24), productMaterial('chrome', 'metallic'));
+    const lens = new THREE.Mesh(new THREE.CylinderGeometry(w * 0.045, w * 0.045, 0.02, 20), lensGlass);
+    lens.rotation.x = Math.PI / 2;
+    const [lx, ly] = lensPos[i];
+    for (const m of [ring, lens]) {
+      m.position.set(-w * 0.24 + lx * w, h * 0.32 + ly * w, -d / 2 - 0.035);
+      c.group.add(m);
+    }
+  }
+  const flash = emissiveDot(0xfff2cc, w * 0.02);
+  flash.position.set(-w * 0.24 + 0.03 * w, h * 0.32 + 0.1 * w, -d / 2 - 0.03);
+  c.group.add(flash);
+  // side buttons
+  for (const [by, bh] of [[h * 0.22, 0.16 * s], [h * 0.05, 0.1 * s]] as const) {
+    const btn = new THREE.Mesh(roundedBoxGeo(0.02 * s, bh, d * 0.5, 0.008), c.accent);
+    btn.rotation.y = Math.PI / 2;
+    btn.position.set(w / 2 + 0.008, by, 0);
+    c.group.add(btn);
+  }
+  // rear wordmark
+  const mark = wordmarkPlane(c.brand, h * 0.05);
+  mark.rotation.y = Math.PI;
+  mark.position.set(0, -h * 0.1, -d / 2 - 0.006);
+  c.group.add(mark);
+}
+
+function buildClamshell(c: BuildCtx): void {
+  const s = c.s;
+  const w = 1.95 * s, dpt = 1.35 * s, t = 0.085 * s * c.slim;
+  const r = w * (0.03 + c.curve * 0.04);
+  const base = new THREE.Mesh(flatRoundedGeo(w, dpt, t, r), c.body);
+  base.position.y = t / 2;
+  c.group.add(base);
+  // keyboard + trackpad deck
+  const deck = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.96, dpt * 0.92), new THREE.MeshStandardMaterial({ map: deckTexture(c.product.form.bodyColor), roughness: 0.6, metalness: 0.3 }));
+  deck.rotation.x = -Math.PI / 2;
+  deck.position.y = t + 0.003;
+  c.group.add(deck);
+  // lid, opened ~110°
+  const lid = new THREE.Group();
+  lid.position.set(0, t, -dpt / 2 + 0.02);
+  lid.rotation.x = -Math.PI / 2 + 1.92;
+  const lidH = 1.3 * s;
+  const lidMesh = new THREE.Mesh(roundedBoxGeo(w, lidH, t * 0.75, r), c.body);
+  lidMesh.position.y = lidH / 2;
+  lid.add(lidMesh);
+  const display = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.92, lidH * 0.88), screenMaterial(laptopScreenTexture(c.product.form.accentColor, c.product.name)));
+  display.position.set(0, lidH / 2, t * 0.75 / 2 + 0.003);
+  lid.add(display);
+  const mark = wordmarkPlane(c.brand, lidH * 0.08);
+  mark.rotation.y = Math.PI;
+  mark.position.set(0, lidH / 2, -t * 0.75 / 2 - 0.004);
+  lid.add(mark);
+  c.group.add(lid);
+  // hinge bar
+  const hinge = new THREE.Mesh(new THREE.CylinderGeometry(t * 0.55, t * 0.55, w * 0.94, 14), c.accent);
+  hinge.rotation.z = Math.PI / 2;
+  hinge.position.set(0, t, -dpt / 2 + 0.02);
+  c.group.add(hinge);
+  // rubber feet
+  for (const [fx, fz] of [[-0.44, -0.4], [0.44, -0.4], [-0.44, 0.4], [0.44, 0.4]] as const) {
+    const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.035 * s, 0.045 * s, 0.02, 10), new THREE.MeshStandardMaterial({ color: 0x14171c, roughness: 0.9 }));
+    foot.position.set(fx * w, -0.01, fz * dpt);
+    c.group.add(foot);
+  }
+}
+
+function buildWatch(c: BuildCtx): void {
+  const s = c.s;
+  const caseW = 0.95 * s, caseH = 1.08 * s, caseD = 0.26 * s * c.slim;
+  const r = caseW * (0.2 + c.curve * 0.28); // curvature morphs square → round case
+  const caseMesh = new THREE.Mesh(roundedBoxGeo(caseW, caseH, caseD, r), c.body);
+  c.group.add(caseMesh);
+  const face = new THREE.Mesh(roundedBoxGeo(caseW * 0.86, caseH * 0.88, 0.012, r * 0.9), screenMaterial(watchFaceTexture(c.product.form.accentColor)));
+  face.position.z = caseD / 2 + 0.004;
+  c.group.add(face);
+  // crystal dome
+  const crystal = new THREE.Mesh(new THREE.SphereGeometry(caseW * 0.62, 24, 12, 0, Math.PI * 2, 0, Math.PI * 0.32), productMaterial('glass', 'gloss'));
+  crystal.scale.set(1, 1.1, 0.32);
+  crystal.rotation.x = Math.PI / 2;
+  crystal.position.z = caseD / 2 - 0.02;
+  c.group.add(crystal);
+  // crown + side button
+  const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.055 * s, 0.055 * s, 0.09 * s, 14), c.accent);
+  crown.rotation.z = Math.PI / 2;
+  crown.position.set(caseW / 2 + 0.04 * s, caseH * 0.16, 0);
+  c.group.add(crown);
+  const sideBtn = new THREE.Mesh(roundedBoxGeo(0.05 * s, 0.22 * s, 0.05 * s, 0.02 * s), c.accent);
+  sideBtn.rotation.y = Math.PI / 2;
+  sideBtn.position.set(caseW / 2 + 0.015 * s, -caseH * 0.12, 0);
+  c.group.add(sideBtn);
+  // strap: two curved bands
+  for (const dir of [1, -1] as const) {
+    const strap = new THREE.Mesh(roundedBoxGeo(caseW * 0.62, caseH * 0.85, caseD * 0.4, caseW * 0.12), c.accent);
+    strap.position.set(0, dir * (caseH * 0.85), -caseD * 0.16);
+    strap.rotation.x = -dir * 0.5;
+    c.group.add(strap);
+  }
+}
+
+function buildHeadphones(c: BuildCtx): void {
+  const s = c.s;
+  const band = new THREE.Mesh(new THREE.TorusGeometry(0.85 * s, 0.06 * s, 14, 40, Math.PI), c.body);
+  c.group.add(band);
+  const pad = new THREE.Mesh(new THREE.TorusGeometry(0.85 * s, 0.075 * s, 12, 24, Math.PI * 0.5), c.accent);
+  pad.rotation.z = Math.PI * 0.25;
+  c.group.add(pad);
+  for (const dir of [1, -1] as const) {
+    const cup = new THREE.Group();
+    cup.position.set(dir * 0.85 * s, -0.1 * s, 0);
+    const shell = new THREE.Mesh(new THREE.SphereGeometry(0.34 * s, 24, 18, 0, Math.PI * 2, 0, Math.PI / 2), c.body);
+    shell.rotation.z = dir * Math.PI / 2;
+    shell.scale.set(0.75, 1, 1);
+    cup.add(shell);
+    const cushion = new THREE.Mesh(new THREE.TorusGeometry(0.26 * s, 0.085 * s, 12, 26), new THREE.MeshStandardMaterial({ color: 0x181b21, roughness: 0.92 }));
+    cushion.rotation.y = Math.PI / 2;
+    cushion.position.x = -dir * 0.06 * s;
+    cup.add(cushion);
+    const yoke = new THREE.Mesh(new THREE.CylinderGeometry(0.022 * s, 0.022 * s, 0.34 * s, 8), c.accent);
+    yoke.position.set(dir * 0.02 * s, 0.36 * s, 0);
+    cup.add(yoke);
+    const dot = wordmarkPlane(c.brand.slice(0, 1), 0.22 * s);
+    dot.rotation.y = dir > 0 ? Math.PI / 2 : -Math.PI / 2;
+    dot.position.x = dir * 0.28 * s;
+    cup.add(dot);
+    c.group.add(cup);
+  }
+}
+
+function buildRing(c: BuildCtx): void {
+  const s = c.s;
+  const band = new THREE.Mesh(new THREE.TorusGeometry(0.52 * s, 0.075 * s * (0.7 + c.curve * 0.5), 18, 48), c.body);
+  c.group.add(band);
+  // gem on a prong setting
+  const gemMat = new THREE.MeshPhysicalMaterial({
+    color: c.product.form.accentColor, metalness: 0.1, roughness: 0.02,
+    transmission: 0.7, thickness: 0.4, ior: 2.2, envMapIntensity: 2.2,
+  });
+  const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.17 * s, 0), gemMat);
+  gem.position.y = 0.62 * s;
+  gem.rotation.y = Math.PI / 4;
+  c.group.add(gem);
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+    const prong = new THREE.Mesh(new THREE.CylinderGeometry(0.015 * s, 0.02 * s, 0.16 * s, 8), c.accent);
+    prong.position.set(Math.cos(a) * 0.09 * s, 0.56 * s, Math.sin(a) * 0.09 * s);
+    c.group.add(prong);
+  }
+  const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.1 * s, 0.13 * s, 0.1 * s, 16), c.accent);
+  collar.position.y = 0.5 * s;
+  c.group.add(collar);
+}
+
+function buildConsole(c: BuildCtx): void {
+  const s = c.s;
+  const w = 0.72 * s, h = 1.7 * s, d = 0.36 * s * c.slim;
+  const r = w * (0.08 + c.curve * 0.1);
+  c.group.add(new THREE.Mesh(roundedBoxGeo(w, h, d, r), c.body));
+  // center light strip
+  const strip = new THREE.Mesh(roundedBoxGeo(0.03 * s, h * 0.86, 0.01, 0.01), new THREE.MeshStandardMaterial({ color: c.product.form.accentColor, emissive: c.product.form.accentColor, emissiveIntensity: 1.6 }));
+  strip.position.z = d / 2 + 0.005;
+  c.group.add(strip);
+  // side vent lines
+  for (let i = 0; i < 6; i++) {
+    const vent = new THREE.Mesh(new THREE.BoxGeometry(0.01, h * 0.4, d * 0.55), c.accent);
+    vent.position.set(-w / 2 - 0.004, h * 0.12, 0);
+    vent.position.y = h * 0.28 - i * 0.1 * s;
+    c.group.add(vent);
+  }
+  // disc slot + power dot
+  const slot = new THREE.Mesh(new THREE.BoxGeometry(0.015, h * 0.3, 0.012), new THREE.MeshStandardMaterial({ color: 0x0a0d12 }));
+  slot.position.set(w * 0.28, -h * 0.05, d / 2 + 0.004);
+  c.group.add(slot);
+  const power = emissiveDot(c.product.form.accentColor, 0.018 * s);
+  power.position.set(w * 0.28, -h * 0.34, d / 2 + 0.004);
+  c.group.add(power);
+  // stand
+  const stand = new THREE.Mesh(new THREE.CylinderGeometry(0.34 * s, 0.4 * s, 0.045 * s, 28), c.accent);
+  stand.position.y = -h / 2 - 0.02;
+  c.group.add(stand);
+}
+
+function buildSpeaker(c: BuildCtx): void {
+  const s = c.s;
+  const bodyMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.52 * s, 0.56 * s, 1.15 * s, 40), c.body);
+  c.body.roughness = Math.max(c.body.roughness, 0.75); // fabric wrap reads matte
+  c.group.add(bodyMesh);
+  const top = new THREE.Mesh(new THREE.CylinderGeometry(0.52 * s, 0.52 * s, 0.06 * s, 40), c.accent);
+  top.position.y = 0.6 * s;
+  c.group.add(top);
+  const led = new THREE.Mesh(new THREE.TorusGeometry(0.4 * s, 0.014 * s, 10, 48), new THREE.MeshStandardMaterial({ color: c.product.form.accentColor, emissive: c.product.form.accentColor, emissiveIntensity: 1.8 }));
+  led.rotation.x = Math.PI / 2;
+  led.position.y = 0.635 * s;
+  c.group.add(led);
+  const mark = wordmarkPlane(c.brand, 0.1 * s);
+  mark.position.set(0, -0.42 * s, 0.56 * s);
+  c.group.add(mark);
+}
+
+function buildAppliance(c: BuildCtx): void {
+  const s = c.s;
+  const w = 1.15 * s, h = 1.35 * s, d = 0.85 * s * c.slim;
+  const r = w * (0.05 + c.curve * 0.08);
+  c.group.add(new THREE.Mesh(roundedBoxGeo(w, h, d, r), c.body));
+  // brew head + platform (espresso-machine silhouette)
+  const head = new THREE.Mesh(roundedBoxGeo(w * 0.5, h * 0.28, d * 0.5, r * 0.6), c.accent);
+  head.position.set(0, h * 0.12, d * 0.45);
+  c.group.add(head);
+  const tray = new THREE.Mesh(flatRoundedGeo(w * 0.6, d * 0.5, 0.04 * s, 0.04), c.accent);
+  tray.position.set(0, -h / 2 + 0.05 * s, d * 0.35);
+  c.group.add(tray);
+  // control screen + dial
+  const panel = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.34, h * 0.14), screenMaterial(vitalsTexture(c.product.form.accentColor)));
+  panel.position.set(0, h * 0.34, d / 2 + 0.004);
+  c.group.add(panel);
+  const dial = new THREE.Mesh(new THREE.CylinderGeometry(0.075 * s, 0.075 * s, 0.05 * s, 24), productMaterial('chrome', 'metallic'));
+  dial.rotation.x = Math.PI / 2;
+  dial.position.set(w * 0.3, h * 0.34, d / 2 + 0.02);
+  c.group.add(dial);
+  const mark = wordmarkPlane(c.brand, h * 0.05);
+  mark.position.set(0, -h * 0.28, d / 2 + 0.006);
+  c.group.add(mark);
+}
+
+function buildBottle(c: BuildCtx): void {
+  const s = c.s;
+  // smooth bottle profile: base → body → shoulder → neck
+  const profile: Array<[number, number]> = [
+    [0.02, 0], [0.3, 0], [0.34, 0.04], [0.35, 0.5], [0.35, 0.95],
+    [0.32, 1.12], [0.2, 1.28], [0.13, 1.38], [0.12, 1.52], [0.12, 1.62],
+  ];
+  const pts = profile.map(([px, py]) => new THREE.Vector2(px * s * (0.8 + c.curve * 0.4), py * s * 1.15));
+  const bottle = new THREE.Mesh(new THREE.LatheGeometry(pts, 48), c.body);
+  c.group.add(bottle);
+  // wraparound printed label
+  const label = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.355 * s * (0.8 + c.curve * 0.4), 0.355 * s * (0.8 + c.curve * 0.4), 0.5 * s, 48, 1, true),
+    new THREE.MeshStandardMaterial({ map: labelTexture(c.product.name, c.product.tagline), roughness: 0.8 }),
+  );
+  label.position.y = 0.72 * s;
+  c.group.add(label);
+  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.135 * s, 0.135 * s, 0.14 * s, 28), c.accent);
+  cap.position.y = 1.9 * s;
+  c.group.add(cap);
+}
+
+function buildPerfume(c: BuildCtx): void {
+  const s = c.s;
+  const w = 0.85 * s, h = 1.0 * s, d = 0.38 * s * c.slim;
+  const glass = productMaterial('glass', 'gloss');
+  glass.color = new THREE.Color(c.product.form.bodyColor);
+  glass.transmission = 0.9;
+  c.group.add(new THREE.Mesh(roundedBoxGeo(w, h, d, w * (0.08 + c.curve * 0.2)), glass));
+  // liquid inside
+  const liquid = new THREE.Mesh(roundedBoxGeo(w * 0.82, h * 0.68, d * 0.6, w * 0.07), new THREE.MeshPhysicalMaterial({ color: c.product.form.accentColor, transmission: 0.5, roughness: 0.1, thickness: 0.3 }));
+  liquid.position.y = -h * 0.12;
+  c.group.add(liquid);
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.09 * s, 0.11 * s, 0.12 * s, 20), c.accent);
+  neck.position.y = h / 2 + 0.06 * s;
+  c.group.add(neck);
+  const capSphere = new THREE.Mesh(new THREE.SphereGeometry(0.16 * s, 24, 18), c.accent);
+  capSphere.position.y = h / 2 + 0.26 * s;
+  c.group.add(capSphere);
+  const mark = wordmarkPlane(c.product.name.slice(0, 12), h * 0.09);
+  mark.position.set(0, h * 0.22, d / 2 + 0.005);
+  c.group.add(mark);
+}
+
+function buildHandbag(c: BuildCtx): void {
+  const s = c.s;
+  const w = 1.3 * s, h = 0.9 * s, d = 0.42 * s * c.slim;
+  const r = w * (0.06 + c.curve * 0.1);
+  c.group.add(new THREE.Mesh(roundedBoxGeo(w, h, d, r), c.body));
+  // front flap
+  const flap = new THREE.Mesh(roundedBoxGeo(w * 0.98, h * 0.55, 0.03 * s, r), c.body);
+  flap.position.set(0, h * 0.22, d / 2 + 0.012);
+  c.group.add(flap);
+  // clasp
+  const clasp = new THREE.Mesh(roundedBoxGeo(0.14 * s, 0.1 * s, 0.03 * s, 0.03 * s), c.accent);
+  clasp.position.set(0, -h * 0.02, d / 2 + 0.035);
+  c.group.add(clasp);
+  // handle arc
+  const handle = new THREE.Mesh(new THREE.TorusGeometry(0.42 * s, 0.035 * s, 12, 32, Math.PI), c.accent);
+  handle.position.y = h / 2;
+  c.group.add(handle);
+  // stitching hint: thin darker outline on flap edge
+  const stitch = new THREE.Mesh(new THREE.BoxGeometry(w * 0.94, 0.008, 0.032 * s), c.accent);
+  stitch.position.set(0, -h * 0.05, d / 2 + 0.012);
+  c.group.add(stitch);
+  const mark = wordmarkPlane(c.brand, h * 0.08);
+  mark.position.set(0, h * 0.32, d / 2 + 0.032);
+  c.group.add(mark);
+}
+
+function buildSeat(c: BuildCtx): void {
+  const s = c.s;
+  const cushion = new THREE.Mesh(flatRoundedGeo(1.35 * s, 1.25 * s, 0.24 * s, 0.14 * s), c.body);
+  c.group.add(cushion);
+  const back = new THREE.Mesh(roundedBoxGeo(1.35 * s, 1.15 * s, 0.16 * s, 0.12 * s), c.body);
+  back.position.set(0, 0.62 * s, -0.56 * s);
+  back.rotation.x = -0.12 - c.curve * 0.22;
+  c.group.add(back);
+  // lumbar pillow
+  const pillow = new THREE.Mesh(roundedBoxGeo(1.1 * s, 0.4 * s, 0.14 * s, 0.14 * s), c.accent);
+  pillow.position.set(0, 0.34 * s, -0.44 * s);
+  pillow.rotation.x = back.rotation.x;
+  c.group.add(pillow);
+  // armrests when accent is dialed up
+  if (c.accentAmt > 0.4) {
+    for (const dir of [1, -1] as const) {
+      const arm = new THREE.Mesh(roundedBoxGeo(0.14 * s, 0.5 * s, 0.9 * s, 0.06 * s), c.body);
+      arm.rotation.y = Math.PI / 2;
+      arm.position.set(dir * 0.68 * s, 0.22 * s, 0);
+      c.group.add(arm);
+    }
+  }
+  // splayed tapered legs with floor pads
+  for (const [lx, lz] of [[-0.52, -0.48], [0.52, -0.48], [-0.52, 0.48], [0.52, 0.48]] as const) {
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.035 * s, 0.05 * s, 0.8 * s, 12), c.accent);
+    leg.position.set(lx * s * 1.15, -0.48 * s, lz * s * 1.15);
+    leg.rotation.set(lz * 0.14, 0, -lx * 0.14);
+    c.group.add(leg);
+    const pad = new THREE.Mesh(new THREE.CylinderGeometry(0.05 * s, 0.05 * s, 0.02, 10), new THREE.MeshStandardMaterial({ color: 0x14171c, roughness: 0.9 }));
+    pad.position.set(lx * s * 1.21, -0.87 * s, lz * s * 1.21);
+    c.group.add(pad);
+  }
+}
+
+function buildVehicle(c: BuildCtx): void {
+  const s = c.s;
+  const L = 2.9 * s, W = 1.2 * s;
+  const roofY = (0.72 + c.curve * 0.14) * s;
+  const wheelR = 0.26 * s;
+  // lower body: bumper → hood → beltline → trunk, with cut wheel arches,
+  // extruded across the width. The greenhouse sits on top as separate glass.
+  const belt = 0.47 * s;
+  const shape = new THREE.Shape();
+  shape.moveTo(-L / 2, 0.16 * s);
+  shape.lineTo(-L / 2 + 0.05 * s, 0.32 * s);                       // front bumper
+  shape.quadraticCurveTo(-L * 0.3, 0.45 * s, -L * 0.12, belt);     // hood
+  shape.lineTo(L * 0.44, belt + 0.01 * s);                         // beltline
+  shape.quadraticCurveTo(L / 2, belt, L / 2, 0.32 * s);            // trunk
+  shape.lineTo(L / 2, 0.12 * s);
+  shape.lineTo(L * 0.36, 0.12 * s);
+  shape.absarc(L * 0.28, 0.12 * s, wheelR * 1.18, 0, Math.PI, true);   // rear arch
+  shape.lineTo(-L * 0.2, 0.12 * s);
+  shape.absarc(-L * 0.28, 0.12 * s, wheelR * 1.18, 0, Math.PI, true);  // front arch
+  shape.lineTo(-L / 2, 0.12 * s);
+  shape.closePath();
+  const bodyGeo = new THREE.ExtrudeGeometry(shape, { depth: W - 0.14 * s, bevelEnabled: true, bevelThickness: 0.07 * s, bevelSize: 0.06 * s, bevelSegments: 3, curveSegments: 14 });
+  bodyGeo.translate(0, 0, -(W - 0.14 * s) / 2);
+  c.group.add(new THREE.Mesh(bodyGeo, c.body));
+  // greenhouse: tinted glass canopy above the beltline (windshield → roof → rear glass)
+  const glassShape = new THREE.Shape();
+  glassShape.moveTo(-L * 0.1, belt - 0.02 * s);
+  glassShape.lineTo(-L * 0.02, roofY);
+  glassShape.quadraticCurveTo(L * 0.12, roofY + 0.04 * s, L * 0.26, roofY - 0.02 * s);
+  glassShape.lineTo(L * 0.4, belt - 0.02 * s);
+  glassShape.closePath();
+  const glassGeo = new THREE.ExtrudeGeometry(glassShape, { depth: W - 0.3 * s, bevelEnabled: true, bevelThickness: 0.03 * s, bevelSize: 0.03 * s, bevelSegments: 2, curveSegments: 10 });
+  glassGeo.translate(0, 0, -(W - 0.3 * s) / 2);
+  const tinted = new THREE.MeshPhysicalMaterial({ color: 0x101826, metalness: 0.5, roughness: 0.04, clearcoat: 1 });
+  c.group.add(new THREE.Mesh(glassGeo, tinted));
+  // wheels: tire + rim + spokes
+  for (const [wx, wz] of [[-L * 0.28, W / 2], [-L * 0.28, -W / 2], [L * 0.28, W / 2], [L * 0.28, -W / 2]] as const) {
+    const wheel = new THREE.Group();
+    wheel.position.set(wx, 0.12 * s, wz);
+    const tire = new THREE.Mesh(new THREE.TorusGeometry(wheelR * 0.78, wheelR * 0.3, 14, 28), new THREE.MeshStandardMaterial({ color: 0x14161a, roughness: 0.92 }));
+    wheel.add(tire);
+    const rim = new THREE.Mesh(new THREE.CylinderGeometry(wheelR * 0.55, wheelR * 0.55, 0.06 * s, 20), c.accent);
+    rim.rotation.x = Math.PI / 2;
+    wheel.add(rim);
+    for (let i = 0; i < 5; i++) {
+      const spoke = new THREE.Mesh(new THREE.BoxGeometry(wheelR * 0.16, wheelR * 1.05, 0.05 * s), c.accent);
+      spoke.rotation.z = (i / 5) * Math.PI * 2;
+      wheel.add(spoke);
+    }
+    c.group.add(wheel);
+  }
+  // lights, grille, mirrors
+  for (const dz of [1, -1] as const) {
+    const head = new THREE.Mesh(roundedBoxGeo(0.16 * s, 0.06 * s, 0.05 * s, 0.02 * s), new THREE.MeshStandardMaterial({ color: 0xf3f8ff, emissive: 0xcfe4ff, emissiveIntensity: 1.5 }));
+    head.rotation.y = Math.PI / 2;
+    head.position.set(-L / 2 - 0.055 * s, 0.34 * s, dz * W * 0.3);
+    c.group.add(head);
+    const tail = new THREE.Mesh(roundedBoxGeo(0.14 * s, 0.05 * s, 0.05 * s, 0.02 * s), new THREE.MeshStandardMaterial({ color: 0xc22030, emissive: 0xff2038, emissiveIntensity: 1.2 }));
+    tail.rotation.y = Math.PI / 2;
+    tail.position.set(L / 2 + 0.055 * s, 0.35 * s, dz * W * 0.3);
+    c.group.add(tail);
+    const mirror = new THREE.Mesh(roundedBoxGeo(0.1 * s, 0.06 * s, 0.04 * s, 0.02 * s), c.body);
+    mirror.position.set(-L * 0.05, 0.52 * s, dz * (W / 2 + 0.05 * s));
+    c.group.add(mirror);
+  }
+  const grille = new THREE.Mesh(roundedBoxGeo(0.4 * s, 0.1 * s, 0.03 * s, 0.03 * s), new THREE.MeshStandardMaterial({ color: 0x101318, metalness: 0.6, roughness: 0.4 }));
+  grille.rotation.y = Math.PI / 2;
+  grille.position.set(-L / 2 - 0.055 * s, 0.22 * s, 0);
+  c.group.add(grille);
+}
+
+function buildSneaker(c: BuildCtx): void {
+  const s = c.s;
+  // sole: flat rounded outline with a slight heel wedge
+  const sole = new THREE.Mesh(flatRoundedGeo(1.9 * s, 0.72 * s, 0.18 * s, 0.3 * s), c.accent);
+  sole.position.y = -0.32 * s;
+  c.group.add(sole);
+  const wedge = new THREE.Mesh(flatRoundedGeo(0.8 * s, 0.7 * s, 0.1 * s, 0.28 * s), c.accent);
+  wedge.position.set(0.5 * s, -0.22 * s, 0);
+  c.group.add(wedge);
+  // upper: toe box + midfoot + heel counter
+  const toe = new THREE.Mesh(new THREE.SphereGeometry(0.34 * s, 22, 16), c.body);
+  toe.scale.set(1.25, 0.72, 1);
+  toe.position.set(-0.62 * s, -0.12 * s, 0);
+  c.group.add(toe);
+  const mid = new THREE.Mesh(new THREE.SphereGeometry(0.42 * s, 22, 16, 0, Math.PI * 2, 0, Math.PI / 2), c.body);
+  mid.scale.set(1.5, 0.95 + c.curve * 0.3, 0.78);
+  mid.position.set(-0.05 * s, -0.24 * s, 0);
+  c.group.add(mid);
+  const heel = new THREE.Mesh(new THREE.SphereGeometry(0.34 * s, 20, 16, 0, Math.PI * 2, 0, Math.PI / 2), c.body);
+  heel.scale.set(0.95, 1.35, 0.8);
+  heel.position.set(0.62 * s, -0.24 * s, 0);
+  c.group.add(heel);
+  // laces across the instep
+  for (let i = 0; i < 4; i++) {
+    const lace = new THREE.Mesh(new THREE.CylinderGeometry(0.022 * s, 0.022 * s, 0.34 * s, 8), c.accent);
+    lace.rotation.z = Math.PI / 2 + 0.35;
+    lace.rotation.y = 0.15;
+    lace.position.set(-0.38 * s + i * 0.17 * s, 0.02 * s + i * 0.07 * s, 0);
+    c.group.add(lace);
+  }
+  // side swoosh stripe
+  const stripe = new THREE.Mesh(roundedBoxGeo(0.75 * s, 0.07 * s, 0.02 * s, 0.03 * s), c.accent);
+  stripe.rotation.z = 0.28;
+  stripe.position.set(0.12 * s, -0.18 * s, 0.31 * s);
+  c.group.add(stripe);
+  // heel pull tab
+  const tab = new THREE.Mesh(roundedBoxGeo(0.06 * s, 0.16 * s, 0.02 * s, 0.02 * s), c.accent);
+  tab.position.set(0.86 * s, 0.28 * s, 0);
+  c.group.add(tab);
+}
+
+function buildApparel(c: BuildCtx): void {
+  const s = c.s;
+  // dress form: shoulders → waist → hem, with a stand — reads as fashion on display
+  const pts: THREE.Vector2[] = [];
+  const profile: Array<[number, number]> = [
+    [0.16, 0], [0.5, 0.06], [0.52, 0.2], [0.42, 0.7], [0.36, 0.95],
+    [0.44, 1.25], [0.5, 1.5], [0.42, 1.62], [0.14, 1.7],
+  ];
+  for (const [px, py] of profile) pts.push(new THREE.Vector2(px * s * (0.85 + c.curve * 0.3), py * s));
+  const form = new THREE.Mesh(new THREE.LatheGeometry(pts, 40), c.body);
+  form.position.y = -0.85 * s;
+  c.group.add(form);
+  // collar + buttons
+  const collar = new THREE.Mesh(new THREE.TorusGeometry(0.15 * s, 0.035 * s, 10, 24), c.accent);
+  collar.rotation.x = Math.PI / 2;
+  collar.position.y = 0.86 * s;
+  c.group.add(collar);
+  for (let i = 0; i < 3; i++) {
+    const btn = emissiveDot(c.product.form.accentColor, 0.025 * s);
+    btn.position.set(0, 0.55 * s - i * 0.3 * s, 0.46 * s - i * 0.015 * s);
+    c.group.add(btn);
+  }
+  // stand pole + base
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.025 * s, 0.025 * s, 0.5 * s, 10), productMaterial('chrome', 'metallic'));
+  pole.position.y = -1.1 * s;
+  c.group.add(pole);
+  const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.3 * s, 0.34 * s, 0.04 * s, 24), productMaterial('chrome', 'metallic'));
+  foot.position.y = -1.33 * s;
+  c.group.add(foot);
+}
+
+function buildMedical(c: BuildCtx): void {
+  const s = c.s;
+  const w = 1.35 * s, h = 1.0 * s, d = 0.5 * s * c.slim;
+  const shellWhite = productMaterial(c.product.materials[0], c.product.form.finish, '#e9edf2');
+  c.group.add(new THREE.Mesh(roundedBoxGeo(w, h, d, w * (0.06 + c.curve * 0.08)), shellWhite));
+  const display = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.72, h * 0.56), screenMaterial(vitalsTexture(c.product.form.accentColor)));
+  display.position.set(-w * 0.08, h * 0.08, d / 2 + 0.004);
+  c.group.add(display);
+  for (let i = 0; i < 3; i++) {
+    const btn = new THREE.Mesh(new THREE.CylinderGeometry(0.045 * s, 0.045 * s, 0.03, 14), c.accent);
+    btn.rotation.x = Math.PI / 2;
+    btn.position.set(w * 0.36, h * 0.26 - i * 0.2 * s, d / 2 + 0.012);
+    c.group.add(btn);
+  }
+  const handle = new THREE.Mesh(new THREE.TorusGeometry(0.24 * s, 0.035 * s, 10, 24, Math.PI), c.accent);
+  handle.position.y = h / 2;
+  c.group.add(handle);
+  const cross = wordmarkPlane('+', h * 0.2);
+  cross.position.set(w * 0.34, -h * 0.3, d / 2 + 0.005);
+  c.group.add(cross);
+}
+
+function buildIndustrial(c: BuildCtx): void {
+  const s = c.s;
+  const base = new THREE.Mesh(flatRoundedGeo(1.6 * s, 1.1 * s, 0.22 * s, 0.06 * s), c.body);
+  base.position.y = -0.6 * s;
+  c.group.add(base);
+  // robotic arm: base → shoulder → forearm → claw
+  const pivot = new THREE.Mesh(new THREE.CylinderGeometry(0.22 * s, 0.28 * s, 0.3 * s, 20), c.accent);
+  pivot.position.y = -0.35 * s;
+  c.group.add(pivot);
+  const upper = new THREE.Mesh(roundedBoxGeo(0.16 * s, 0.9 * s, 0.16 * s, 0.05 * s), c.body);
+  upper.position.set(0.1 * s, 0.1 * s, 0);
+  upper.rotation.z = -0.35;
+  c.group.add(upper);
+  const joint = new THREE.Mesh(new THREE.SphereGeometry(0.12 * s, 16, 12), c.accent);
+  joint.position.set(0.26 * s, 0.5 * s, 0);
+  c.group.add(joint);
+  const fore = new THREE.Mesh(roundedBoxGeo(0.12 * s, 0.72 * s, 0.12 * s, 0.04 * s), c.body);
+  fore.position.set(0.55 * s, 0.62 * s, 0);
+  fore.rotation.z = -1.25;
+  c.group.add(fore);
+  for (const dz of [0.05, -0.05] as const) {
+    const finger = new THREE.Mesh(roundedBoxGeo(0.04 * s, 0.2 * s, 0.03 * s, 0.012 * s), c.accent);
+    finger.position.set(0.92 * s, 0.52 * s, dz * s);
+    finger.rotation.z = -0.5;
+    c.group.add(finger);
+  }
+  const beacon = emissiveDot(0xffb020, 0.04 * s);
+  beacon.position.set(-0.6 * s, -0.44 * s, 0.4 * s);
+  c.group.add(beacon);
+}
+
+function buildToy(c: BuildCtx): void {
+  const s = c.s;
+  // friendly robot buddy
+  const torso = new THREE.Mesh(roundedBoxGeo(0.8 * s, 0.85 * s, 0.55 * s, 0.16 * s), c.body);
+  c.group.add(torso);
+  const head = new THREE.Mesh(roundedBoxGeo(0.6 * s, 0.5 * s, 0.5 * s, 0.16 * s), c.body);
+  head.position.y = 0.75 * s;
+  c.group.add(head);
+  for (const dx of [0.14, -0.14] as const) {
+    const eye = emissiveDot(c.product.form.accentColor, 0.06 * s);
+    eye.position.set(dx * s, 0.78 * s, 0.26 * s);
+    c.group.add(eye);
+  }
+  const antennaRod = new THREE.Mesh(new THREE.CylinderGeometry(0.015 * s, 0.015 * s, 0.2 * s, 8), c.accent);
+  antennaRod.position.y = 1.1 * s;
+  c.group.add(antennaRod);
+  const antennaTip = emissiveDot(c.product.form.accentColor, 0.04 * s);
+  antennaTip.position.y = 1.22 * s;
+  c.group.add(antennaTip);
+  for (const dir of [1, -1] as const) {
+    const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.07 * s, 0.4 * s, 6, 12), c.accent);
+    arm.position.set(dir * 0.52 * s, 0.05 * s, 0);
+    arm.rotation.z = dir * 0.3;
+    c.group.add(arm);
+    const foot = new THREE.Mesh(flatRoundedGeo(0.28 * s, 0.36 * s, 0.14 * s, 0.08 * s), c.accent);
+    foot.position.set(dir * 0.22 * s, -0.62 * s, 0.04 * s);
+    c.group.add(foot);
+  }
+  // belly dial
+  const dial = new THREE.Mesh(new THREE.TorusGeometry(0.14 * s, 0.03 * s, 10, 24), c.accent);
+  dial.position.set(0, -0.02 * s, 0.29 * s);
+  c.group.add(dial);
+}
+
+/** Builds the category-specific product model into `group`. */
+function buildProductMesh(group: THREE.Group, product: Product): void {
+  const cat = PRODUCT_CATEGORY_BY_ID[product.category];
+  const f = product.form;
+  const ctx: BuildCtx = {
+    group,
+    product,
+    s: f.size,
+    slim: 1 - f.slimness * 0.55,
+    curve: f.curvature,
+    accentAmt: f.accent,
+    body: productMaterial(product.materials[0], f.finish, f.bodyColor),
+    accent: productMaterial(product.materials[1], f.finish, f.accentColor),
+    brand: product.name.split(' ')[0] || product.name,
+  };
+  switch (product.category) {
+    case 'wearable': buildWatch(ctx); return;
+    case 'audio': buildHeadphones(ctx); return;
+    case 'jewelry': buildRing(ctx); return;
+    case 'gaming': buildConsole(ctx); return;
+    case 'smart_home': buildSpeaker(ctx); return;
+    case 'appliance': buildAppliance(ctx); return;
+    case 'food_beverage': buildBottle(ctx); return;
+    case 'cosmetics': buildPerfume(ctx); return;
+    case 'luxury': buildHandbag(ctx); return;
+    case 'fashion': buildApparel(ctx); return;
+    case 'medical': buildMedical(ctx); return;
+    case 'industrial': buildIndustrial(ctx); return;
+    case 'toys': buildToy(ctx); return;
+    default: break;
+  }
+  switch (cat.archetype) {
+    case 'slab': buildSlab(ctx); break;
+    case 'clamshell': buildClamshell(ctx); break;
+    case 'tower': buildConsole(ctx); break;
+    case 'vessel': buildBottle(ctx); break;
+    case 'seat': buildSeat(ctx); break;
+    case 'vehicle': buildVehicle(ctx); break;
+    case 'shoe': buildSneaker(ctx); break;
+    case 'round': buildWatch(ctx); break;
+    default: buildToy(ctx); break;
+  }
+}
+
+export function ProductStudioScene({ product, tall }: ProductStudioSceneProps) {
+  const ref = useRef<HTMLDivElement>(null);
+  const preset = LIGHTING_PRESETS[product.form.lighting] ?? LIGHTING_PRESETS.studio;
+
+  useThreeScene(
+    ref,
+    ({ scene, camera, renderer, addStars, makeLabel }) => {
+      // Filmic tone mapping + image-based lighting so metals, glass and
+      // clearcoat paint pick up believable reflections.
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = preset.exposure;
+      const pmrem = new THREE.PMREMGenerator(renderer);
+      scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+      pmrem.dispose();
+      scene.environmentIntensity = 0.55;
+
+      scene.fog = new THREE.Fog(preset.fogColor, 9, 30);
+      addStars(220);
+
+      // --- Innovation-lab environment -------------------------------------
+      scene.add(new THREE.AmbientLight(0xffffff, preset.ambient));
+      const key = new THREE.DirectionalLight(preset.keyColor, preset.key);
+      key.position.set(4, 7, 5);
+      scene.add(key);
+      const rim = new THREE.DirectionalLight(preset.rimColor, preset.rim);
+      rim.position.set(-5, 3, -4);
+      scene.add(rim);
+      const fill = new THREE.PointLight(preset.fillColor, preset.fill * 8, 20);
+      fill.position.set(0, 1.5, 4);
+      scene.add(fill);
+
+      // Reflective "glass" floor + soft under-glow
+      const floor = new THREE.Mesh(
+        new THREE.CircleGeometry(8, 64),
+        new THREE.MeshStandardMaterial({ color: 0x10141c, metalness: 0.9, roughness: 0.25 }),
+      );
+      floor.rotation.x = -Math.PI / 2;
+      floor.position.y = -1.31;
+      scene.add(floor);
+
+      // Holographic concentric rings
+      for (let i = 0; i < 3; i++) {
+        const ring = new THREE.Mesh(
+          new THREE.RingGeometry(2.2 + i * 1.4, 2.26 + i * 1.4, 80),
+          new THREE.MeshBasicMaterial({ color: preset.rimColor, transparent: true, opacity: 0.16 - i * 0.04, side: THREE.DoubleSide }),
+        );
+        ring.rotation.x = -Math.PI / 2;
+        ring.position.y = -1.29;
+        scene.add(ring);
+      }
+
+      // Pedestal
+      const pedestal = new THREE.Mesh(
+        new THREE.CylinderGeometry(1.5, 1.7, 0.28, 48),
+        new THREE.MeshStandardMaterial({ color: 0x1d2430, metalness: 0.7, roughness: 0.3 }),
+      );
+      pedestal.position.y = -1.16;
+      scene.add(pedestal);
+      const pedestalGlow = new THREE.Mesh(
+        new THREE.TorusGeometry(1.62, 0.025, 12, 60),
+        new THREE.MeshBasicMaterial({ color: preset.rimColor, transparent: true, opacity: 0.8 }),
+      );
+      pedestalGlow.rotation.x = Math.PI / 2;
+      pedestalGlow.position.y = -1.05;
+      scene.add(pedestalGlow);
+
+      // Robotic gantry arm silhouette at the edge of the lab
+      const armMat = new THREE.MeshStandardMaterial({ color: 0x2a3242, metalness: 0.75, roughness: 0.4 });
+      const armBase = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.3, 0.5, 18), armMat);
+      armBase.position.set(-4.2, -1.05, -2.4);
+      scene.add(armBase);
+      const armLower = new THREE.Mesh(new THREE.BoxGeometry(0.16, 2.0, 0.16), armMat);
+      armLower.position.set(-4.2, 0, -2.4);
+      armLower.rotation.z = 0.25;
+      scene.add(armLower);
+      const armUpper = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.13, 0.13), armMat);
+      armUpper.position.set(-3.4, 0.95, -2.4);
+      armUpper.rotation.z = -0.2;
+      scene.add(armUpper);
+      const armLight = new THREE.Mesh(new THREE.SphereGeometry(0.09, 12, 12), new THREE.MeshBasicMaterial({ color: 0x38f2d4 }));
+      armLight.position.set(-2.65, 0.8, -2.4);
+      scene.add(armLight);
+
+      // Ambient drifting particles
+      const pCount = 90;
+      const pPos = new Float32Array(pCount * 3);
+      for (let i = 0; i < pCount; i++) {
+        pPos[i * 3] = (Math.random() - 0.5) * 12;
+        pPos[i * 3 + 1] = Math.random() * 5 - 1;
+        pPos[i * 3 + 2] = (Math.random() - 0.5) * 12;
+      }
+      const pGeo = new THREE.BufferGeometry();
+      pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+      const particles = new THREE.Points(pGeo, new THREE.PointsMaterial({ color: preset.rimColor, size: 0.05, transparent: true, opacity: 0.55, fog: false }));
+      scene.add(particles);
+
+      // --- The product itself ---------------------------------------------
+      const productGroup = new THREE.Group();
+      buildProductMesh(productGroup, product);
+      // Normalize height so every archetype sits nicely on the pedestal.
+      const bounds = new THREE.Box3().setFromObject(productGroup);
+      const center = bounds.getCenter(new THREE.Vector3());
+      productGroup.position.sub(center);
+      productGroup.position.y += -1.0 - bounds.min.y + center.y + 0.02;
+      const spinner = new THREE.Group();
+      spinner.add(productGroup);
+      scene.add(spinner);
+
+      // Soft contact shadow grounding the product on the pedestal
+      const shadow = new THREE.Mesh(
+        new THREE.PlaneGeometry(3.1, 3.1),
+        new THREE.MeshBasicMaterial({ map: shadowTexture(), transparent: true, depthWrite: false }),
+      );
+      shadow.rotation.x = -Math.PI / 2;
+      shadow.position.y = -1.015;
+      scene.add(shadow);
+
+      const label = makeLabel(`${product.name}${product.generation > 1 ? ` · Gen ${product.generation}` : ''}`, 0.6);
+      label.position.set(0, 1.9, 0);
+      scene.add(label);
+
+      camera.position.set(0, 1.4, 5.4);
+      camera.lookAt(0, 0, 0);
+
+      return (t) => {
+        spinner.rotation.y = t * 0.35;
+        pedestalGlow.material.opacity = 0.55 + Math.sin(t * 2) * 0.25;
+        armLight.position.y = 0.8 + Math.sin(t * 1.4) * 0.06;
+        const pos = pGeo.attributes.position as THREE.BufferAttribute;
+        for (let i = 0; i < pCount; i++) {
+          let y = pos.getY(i) + 0.0035;
+          if (y > 4) y = -1;
+          pos.setY(i, y);
+        }
+        pos.needsUpdate = true;
+        camera.position.x = Math.sin(t * 0.07) * 0.6;
+        camera.lookAt(0, 0, 0);
+      };
+    },
+    [
+      product.id, product.category, product.name, product.tagline, product.generation,
+      product.materials[0], product.materials[1],
+      product.form.size, product.form.slimness, product.form.curvature, product.form.accent,
+      product.form.bodyColor, product.form.accentColor, product.form.finish, product.form.lighting,
+    ],
+  );
+
+  return <div ref={ref} className={`w-full ${tall ? 'h-80' : 'h-60'} rounded-2xl overflow-hidden bg-slate-950`} />;
+}

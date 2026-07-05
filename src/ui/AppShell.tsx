@@ -19,6 +19,7 @@ import {
   IconMoon,
   IconNews,
   IconPolitics,
+  IconSpark,
   IconStats,
   IconSun,
   IconWorld,
@@ -33,6 +34,7 @@ const TABS: { screen: Screen; label: string; Icon: (p: { className?: string }) =
 ];
 
 const MORE_SCREENS: { screen: Screen; label: string; Icon: (p: { className?: string }) => ReactNode }[] = [
+  { screen: 'studio', label: 'Studio', Icon: IconSpark },
   { screen: 'career', label: 'Career', Icon: IconCareer },
   { screen: 'assets', label: 'Assets', Icon: IconAssets },
   { screen: 'family', label: 'Family', Icon: IconHeart },
