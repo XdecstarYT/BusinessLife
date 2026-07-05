@@ -512,6 +512,9 @@ export function endRivalry(state: GameState): RelationResult {
 
 export function networking(state: GameState): RelationResult {
   const p = state.player;
+  if (state.player.actionCooldowns.networking === state.year) {
+    return { ok: false, message: 'Already networked this year — try again next year.' };
+  }
   const rng = new RNG(state.seed);
   rng.state = state.rngState;
   const candidates = relationshipCandidates(state);
@@ -519,6 +522,7 @@ export function networking(state: GameState): RelationResult {
     state.rngState = rng.state;
     return { ok: false, message: 'Nobody new to meet right now.' };
   }
+  state.player.actionCooldowns.networking = state.year;
   const npc = rng.pick(candidates);
   const alreadyKnown = p.relationships.some((r) => r.npcId === npc.id);
   if (!alreadyKnown) {

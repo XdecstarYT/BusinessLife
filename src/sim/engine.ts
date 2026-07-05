@@ -265,6 +265,7 @@ function tickPlayerLife(state: GameState, rng: RNG): void {
     p.cancelledUntilYear = null;
     p.lastSocialPostYear = null;
   }
+  if (p.actionCooldowns === undefined) p.actionCooldowns = {}; // backfill for saves from before the exploit-fix cooldown system
 
   // --- Jail ---------------------------------------------------------------
   if (p.inJailYears > 0) {
@@ -769,6 +770,7 @@ export function continueAsHeir(state: GameState, npcId: string): GameState {
     socialFollowers: 0,
     cancelledUntilYear: null,
     lastSocialPostYear: null,
+    actionCooldowns: {},
   };
   delete state.npcs[npcId];
   state.player = newPlayer;

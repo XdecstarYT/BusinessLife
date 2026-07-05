@@ -37,6 +37,16 @@ function commit(state: GameState, rng: RNG): void {
   state.rngState = rng.state;
 }
 
+/** Per-year rate limiting for repeatable actions with no other natural cost/cooldown
+ * (lifestyle activities, freelance gigs, networking) — without this, a `run()` call can be
+ * dispatched an unlimited number of times in one sitting to farm stats/skills/money for free. */
+function onCooldown(state: GameState, key: string): boolean {
+  return state.player.actionCooldowns[key] === state.year;
+}
+function setCooldown(state: GameState, key: string): void {
+  state.player.actionCooldowns[key] = state.year;
+}
+
 // ---------------------------------------------------------------------------
 // Education & careers
 // ---------------------------------------------------------------------------
@@ -233,6 +243,8 @@ export function networkWithCoworker(state: GameState, coworkerId: string): Actio
   if (!p.job) return { ok: false, message: 'You have no job.' };
   const cw = p.job.coworkers.find((c) => c.id === coworkerId);
   if (!cw) return { ok: false, message: 'Coworker not found.' };
+  if (onCooldown(state, `network_cw_${coworkerId}`)) return { ok: false, message: `Already caught up with ${cw.name} this year — try again next year.` };
+  setCooldown(state, `network_cw_${coworkerId}`);
   const rng = withRng(state);
   const personality = COWORKER_PERSONALITY_BY_ID[cw.personality];
   const gain = rng.range(4, 10) * personality.rapportGainMult;
@@ -294,6 +306,8 @@ export function takeFreelanceGig(state: GameState, gigId: string): ActionResult 
   const gig = FREELANCE_GIG_BY_ID[gigId];
   if (!gig) return { ok: false, message: 'Unknown gig.' };
   if (p.inJailYears > 0) return { ok: false, message: 'Not while incarcerated.' };
+  if (onCooldown(state, `gig_${gigId}`)) return { ok: false, message: 'Already took that gig this year — try again next year.' };
+  setCooldown(state, `gig_${gigId}`);
   const rng = withRng(state);
   const skillLvl = gig.skillId ? (p.skills[gig.skillId] ?? 0) : 30;
   const successChance = clamp(0.5 + skillLvl / 250 + (p.freelanceReputation - 30) / 200, 0.15, 0.95);
@@ -488,7 +502,6 @@ export function spyOnCompany(state: GameState, targetCompanyId: string): ActionR
   const skill = (p.skills[SK.hacking] ?? 0) * 0.6 + (p.skills[SK.streetSmarts] ?? 0) * 0.4;
   const chance = clamp(0.35 + skill * 0.005 - target.cyberDefense * 0.003, 0.05, 0.85);
   const success = rng.chance(chance);
-  commit(state, rng);
   if (success) {
     const beneficiaries = p.companies
       .map((id) => state.companies[id])
@@ -500,6 +513,7 @@ export function spyOnCompany(state: GameState, targetCompanyId: string): ActionR
     target.brand = clamp100(target.brand - 5);
     target.quality = clamp100(target.quality - 3);
     p.notoriety = clamp100(p.notoriety + 4);
+    commit(state, rng);
     log(state, `🕵️ Corporate espionage against ${target.name} paid off.`, 'business');
     return {
       ok: true,
@@ -513,6 +527,7 @@ export function spyOnCompany(state: GameState, targetCompanyId: string): ActionR
   const founder = target.founderId !== 'player' ? state.npcs[target.founderId] : null;
   if (founder) founder.opinionOfPlayer = clamp(founder.opinionOfPlayer - 40, -100, 100);
   if (rng.chance(0.3)) p.criminalRecord++;
+  commit(state, rng);
   log(state, `🚨 Your corporate espionage attempt against ${target.name} was exposed.`, 'bad');
   return { ok: false, message: `Caught red-handed spying on ${target.name}.` };
 }
@@ -1155,16 +1170,17 @@ export function seekCelebrityEndorsement(state: GameState): ActionResult {
   p.money -= cost;
   const chance = clamp(0.5 + (p.reputation - 50) * 0.004 + celeb.opinionOfPlayer * 0.002, 0.15, 0.9);
   const success = rng.chance(chance);
-  commit(state, rng);
   if (success) {
     const gain = rng.range(4, 9);
     p.campaign.momentum = clamp(p.campaign.momentum + gain, -50, 50);
     p.popularity = clamp100(p.popularity + 2);
     if (!state.achievements.includes('celebrity_backed')) state.achievements.push('celebrity_backed');
+    commit(state, rng);
     log(state, `⭐ ${celeb.name} publicly endorsed your campaign.`, 'politics');
     return { ok: true, message: `${celeb.name} endorsed you! Momentum +${gain.toFixed(0)}.` };
   }
   p.campaign.momentum = clamp(p.campaign.momentum - 3, -50, 50);
+  commit(state, rng);
   log(state, `${celeb.name} declined to endorse you — and said so publicly.`, 'bad');
   return { ok: false, message: `${celeb.name} publicly turned you down.` };
 }
@@ -1284,6 +1300,7 @@ export function launchCampaign(state: GameState, officeKind: OfficeKind, warChes
 export function campaignAction(state: GameState, kind: 'ads' | 'rally' | 'doorknock' | 'fundraise' | 'consultant' | 'polling' | 'debate'): ActionResult {
   const p = state.player;
   if (!p.campaign) return { ok: false, message: 'No active campaign.' };
+  if (onCooldown(state, `campaign_${kind}`)) return { ok: false, message: 'Already did that this year — try again next year.' };
   const rng = withRng(state);
   const boost = p.campaign.consultantHired ? 1.25 : 1;
   let msg = '';
@@ -1342,14 +1359,17 @@ export function campaignAction(state: GameState, kind: 'ads' | 'rally' | 'doorkn
       if (success) {
         p.campaign.momentum = clamp(p.campaign.momentum + swing, -50, 50);
         if (!state.achievements.includes('debate_winner')) state.achievements.push('debate_winner');
+        setCooldown(state, `campaign_${kind}`);
         commit(state, rng);
         return { ok: true, message: `You won the debate. Momentum +${swing.toFixed(0)}.` };
       }
       p.campaign.momentum = clamp(p.campaign.momentum - swing * 0.6, -50, 50);
+      setCooldown(state, `campaign_${kind}`);
       commit(state, rng);
       return { ok: false, message: `Your opponent won the exchange. Momentum -${(swing * 0.6).toFixed(0)}.` };
     }
   }
+  setCooldown(state, `campaign_${kind}`);
   commit(state, rng);
   return { ok: true, message: msg };
 }
@@ -1362,17 +1382,18 @@ export function holdPressConference(state: GameState): ActionResult {
   const skill = (p.skills[SK.debate] ?? 0) * 0.5 + (p.skills['media_public_relations'] ?? 0) * 0.5;
   const chance = clamp(0.5 + skill * 0.004 + (p.charisma - 50) * 0.003, 0.15, 0.9);
   const success = rng.chance(chance);
-  commit(state, rng);
   if (success) {
     const gain = rng.range(2, 5);
     p.popularity = clamp100(p.popularity + gain);
     if (p.campaign) p.campaign.momentum = clamp(p.campaign.momentum + gain, -50, 50);
+    commit(state, rng);
     log(state, '🎤 Your press conference landed well with the media.', 'politics');
     return { ok: true, message: 'Press conference was a hit.' };
   }
   const loss = rng.range(1, 4);
   p.popularity = clamp100(p.popularity - loss);
   if (p.campaign) p.campaign.momentum = clamp(p.campaign.momentum - loss, -50, 50);
+  commit(state, rng);
   log(state, '📰 A reporter caught you off guard at your press conference.', 'bad');
   return { ok: false, message: 'The press conference went sideways.' };
 }
@@ -1957,14 +1978,15 @@ export function bidOnGovernmentContract(state: GameState, companyId: string): Ac
   c.lastGovContractBidYear = state.year;
   const chance = clamp(0.2 + (c.brand / 100) * 0.2 + (p.politicalCapital / 100) * 0.2 + (home.corruption / 100) * (p.notoriety > 20 ? 0.15 : -0.05), 0.05, 0.85);
   const won = rng.chance(chance);
-  commit(state, rng);
   if (won) {
     const value = Math.max(20_000, c.revenue * rng.range(0.15, 0.4));
     c.cash += value;
     c.brand = clamp100(c.brand + 3);
+    commit(state, rng);
     log(state, `🏛️ ${c.name} won a government contract worth $${Math.round(value).toLocaleString()}.`, 'business');
     return { ok: true, message: `Won the contract: $${Math.round(value).toLocaleString()}.` };
   }
+  commit(state, rng);
   log(state, `${c.name}'s bid for a government contract was passed over.`, 'bad');
   return { ok: false, message: 'The contract went to another bidder.' };
 }
@@ -2162,7 +2184,10 @@ export function holdCabinetMeeting(state: GameState): ActionResult {
   const rng = withRng(state);
   const [portfolio, npcId] = rng.pick(appointed);
   const minister = state.npcs[npcId];
-  if (!minister || !minister.alive) return { ok: false, message: 'That minister is no longer available.' };
+  if (!minister || !minister.alive) {
+    commit(state, rng);
+    return { ok: false, message: 'That minister is no longer available.' };
+  }
   const theme = PORTFOLIO_THEMES[portfolio as CabinetPortfolio];
   const chance = clamp(0.35 + (minister.competence - 50) * 0.005 + (state.player.politicalCapital - 50) * 0.002, 0.15, 0.85);
   const agreed = rng.chance(chance);
@@ -2470,6 +2495,7 @@ export type ActivityKind =
 
 export function doActivity(state: GameState, kind: ActivityKind): ActionResult {
   const p = state.player;
+  if (onCooldown(state, `activity_${kind}`)) return { ok: false, message: 'You already did that this year — try again next year.' };
   const rng = withRng(state);
   let msg = '';
   switch (kind) {
@@ -2909,6 +2935,7 @@ export function doActivity(state: GameState, kind: ActivityKind): ActionResult {
       break;
     }
   }
+  setCooldown(state, `activity_${kind}`);
   commit(state, rng);
   return { ok: true, message: msg };
 }

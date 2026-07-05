@@ -393,6 +393,7 @@ export function generateWorld(config: NewGameConfig): GameState {
     socialFollowers: 0,
     cancelledUntilYear: null,
     lastSocialPostYear: null,
+    actionCooldowns: {},
   };
   // Parents
   for (const kind of ['parent', 'parent'] as const) {

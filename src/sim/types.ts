@@ -277,6 +277,7 @@ export interface Player {
   socialFollowers: number; // social-media audience size
   cancelledUntilYear: number | null; // a viral backlash is actively depressing reputation/popularity until this year
   lastSocialPostYear: number | null; // cooldown so posting can't be spammed for free rolls
+  actionCooldowns: Record<string, number>; // arbitrary key -> year last used; guards repeatable actions (lifestyle activities, freelance gigs, networking, campaign actions) against being spammed for free stat/money farming within the same year
   campaign: null | {
     officeKind: OfficeKind;
     regionName: string;
