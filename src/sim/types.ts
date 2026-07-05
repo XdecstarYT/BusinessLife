@@ -481,6 +481,12 @@ export interface Country {
   cyberDefense: number; // 0..100, national cyber defense strength; dampens cyberattack severity
   oppositionLeaderId: string | null; // NPC id; reactively critiques the player's government and adapts
   globalGamesYear: number | null; // year this nation hosts the Global Games, if a bid was won
+
+  // V18: military depth — militaryPower above is a raw/latent capability score; readiness is
+  // the trained/supplied/battle-ready sliver of it that actually determines war performance.
+  militaryReadiness: number; // 0..100, drifts toward the Defense budget share; decays if under-funded
+  warExhaustion: number; // 0..100, builds while at war (faster under an invasion strategy), decays at peace; dampens approval and pushes both sides toward peace
+  warCasualtiesTotal: number; // cumulative population lost to war across this playthrough (flavor + real population drag)
 }
 
 export const CABINET_PORTFOLIOS = ['Finance', 'Foreign Affairs', 'Defense', 'Health', 'Education', 'Justice'] as const;

@@ -1705,6 +1705,20 @@ export function fundNationalCyberDefense(state: GameState, amount: number): Acti
   return { ok: true, message: `National cyber defense now ${Math.round(home.cyberDefense)}.` };
 }
 
+/** Direct investment in military readiness — training, logistics, and supply, distinct from
+ * the raw militaryPower score. This is what actually determines war performance, casualty rates
+ * and how quickly exhaustion builds if the country ends up fighting. */
+export function investInMilitaryReadiness(state: GameState, amount: number): ActionResult {
+  const { home, error } = requireLeadership(state);
+  if (error) return error;
+  if (amount <= 0 || amount > state.player.money) return { ok: false, message: 'Invalid funding amount.' };
+  state.player.money -= amount;
+  home.militaryReadiness = clamp100(home.militaryReadiness + amount / 30_000);
+  home.militaryPower = clamp100(home.militaryPower + amount / 80_000);
+  log(state, `Invested $${amount.toLocaleString()} in military readiness.`, 'politics');
+  return { ok: true, message: `Military readiness now ${Math.round(home.militaryReadiness)}.` };
+}
+
 const ADVISOR_COST = 50_000;
 
 export function hireAdvisor(state: GameState, specialty: AdvisorSpecialty): ActionResult {

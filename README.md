@@ -132,6 +132,13 @@ plain JSON you can export and re-import.
   pass or repeal **115 laws** whose effects continuously reshape the economy. As head of state, conduct
   real foreign policy: declare war, sign peace treaties, impose or lift sanctions, send foreign aid, and
   sign trade agreements — on top of the elections, coups, sanctions and wars that unfold on their own.
+- **War has real weight, win or lose** — militaries now have a Readiness score, separate from raw
+  military power, that drifts toward whatever your Defense budget share can actually sustain (neglect
+  it and it erodes; fund it and it builds). Once a war starts, an outmatched readiness gap means faster
+  casualties and a harder-fought peace; war exhaustion accumulates the longer a conflict grinds on,
+  dragging down approval and pushing both sides toward the table, then recovers once you're at peace
+  with everyone. A signed armistice costs a real reconstruction toll to infrastructure. Invest directly
+  in military readiness from the Treasury & National Security panel.
 - **Family, dynasty & wills** — date, marry (with an optional prenup), divorce, have or adopt children who
   age up as real NPCs and eventually have grandchildren of their own, name a successor to inherit a company
   or a political heir to inherit your party and popularity, draft a will naming a primary heir for a bigger

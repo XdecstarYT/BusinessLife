@@ -216,6 +216,9 @@ export function generateWorld(config: NewGameConfig): GameState {
       cyberDefense: rng.range(25, 55),
       oppositionLeaderId: null,
       globalGamesYear: null,
+      militaryReadiness: Math.max(0, Math.min(100, seed.militaryPower * 0.7 + rng.range(-5, 5))),
+      warExhaustion: 0,
+      warCasualtiesTotal: 0,
     };
     countries.push(country);
   }

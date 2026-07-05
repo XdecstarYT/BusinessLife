@@ -233,6 +233,16 @@ export function tickPolitics(state: GameState, country: Country, rng: RNG): stri
   const e = country.economy;
   const playerIsLeader = country.leaderId === 'player';
 
+  if (country.militaryReadiness === undefined) { // backfill for saves from before V18 military depth
+    country.militaryReadiness = country.militaryPower * 0.7;
+    country.warExhaustion = 0;
+    country.warCasualtiesTotal = 0;
+  }
+  // Military readiness drifts toward what the Defense budget share can sustain — chronically
+  // under-funding it (below the ~16.7% even-split baseline) lets it decay; over-funding slowly
+  // builds it. Distinct from the raw militaryPower score, which cabinet meetings/laws move directly.
+  country.militaryReadiness = clamp100(country.militaryReadiness + (country.budgetAllocations.Defense - 16.7) * 0.06 + rng.range(-0.5, 0.5));
+
   // Government approval follows the economy and stability.
   const drift =
     (e.gdpGrowth - 0.02) * 220 -
@@ -482,26 +492,42 @@ export function tickPolitics(state: GameState, country: Country, rng: RNG): stri
     }
     if (country.atWarWith.includes(other.id)) {
       // A war strategy chosen via declareWar() differentiates the yearly toll and peace odds.
+      // Readiness now matters: a country fighting under-prepared racks up exhaustion and
+      // casualties faster than one that invested in its military beforehand.
       const strategy = country.warStrategies[other.id];
-      let peaceChance = 0.35;
+      const readinessGap = other.militaryReadiness - country.militaryReadiness; // positive = country is outmatched
+      let peaceChance = 0.3;
+      let casualtyRate = 0.00015;
       if (strategy === 'blockade') {
         other.economy.businessConfidence = clamp100(other.economy.businessConfidence - 3);
         other.economy.gdpGrowth -= 0.01;
-        peaceChance = 0.22;
+        peaceChance = 0.2;
+        casualtyRate = 0.00008;
       } else if (strategy === 'invasion') {
         country.stability = clamp100(country.stability - 2);
         other.stability = clamp100(other.stability - 4);
-        peaceChance = 0.45;
+        peaceChance = 0.4;
+        casualtyRate = 0.00025;
       }
+      country.warExhaustion = clamp100(country.warExhaustion + 4 + Math.max(0, readinessGap) * 0.08);
+      peaceChance = clamp(peaceChance + country.warExhaustion * 0.006 + Math.max(0, readinessGap) * 0.004, 0.05, 0.9);
+      country.approvalOfGovernment = clamp100(country.approvalOfGovernment - country.warExhaustion * 0.02);
+      const casualties = Math.round(country.population * casualtyRate * (1 + Math.max(0, readinessGap) / 100));
+      country.population = Math.max(1000, country.population - casualties);
+      country.warCasualtiesTotal += casualties;
       if (rng.chance(peaceChance)) {
         country.atWarWith = country.atWarWith.filter((x) => x !== other.id);
         other.atWarWith = other.atWarWith.filter((x) => x !== country.id);
         delete country.warStrategies[other.id];
         country.relations[other.id] = -40;
         other.relations[country.id] = -40;
-        headlines.push(`🕊️ Peace: ${country.name} and ${other.name} sign an armistice`);
+        country.infrastructure = clamp100(country.infrastructure - 4); // reconstruction toll
+        headlines.push(`🕊️ Peace: ${country.name} and ${other.name} sign an armistice after ${Math.round(country.warExhaustion / 6)} years of grinding war`);
       }
     }
+  }
+  if (country.atWarWith.length === 0) {
+    country.warExhaustion = clamp100(country.warExhaustion - 6); // recovers once at peace with everyone
   }
 
   // Coups in unstable autocracies/low-stability states.
