@@ -1461,13 +1461,56 @@ function buildProductMesh(group: THREE.Group, product: Product): void {
   }
 }
 
+/** Disposes a subtree's geometries/materials/textures without touching the renderer. */
+function disposeSubtree(root: THREE.Object3D): void {
+  const disposeMaterial = (m: THREE.Material) => {
+    const tex = m as Partial<THREE.MeshStandardMaterial>;
+    tex.map?.dispose();
+    tex.emissiveMap?.dispose();
+    tex.roughnessMap?.dispose();
+    tex.normalMap?.dispose();
+    tex.alphaMap?.dispose();
+    m.dispose();
+  };
+  root.traverse((obj) => {
+    if (obj instanceof THREE.Mesh || obj instanceof THREE.Line || obj instanceof THREE.Points) {
+      obj.geometry?.dispose();
+      const mat = obj.material;
+      if (Array.isArray(mat)) mat.forEach(disposeMaterial);
+      else if (mat) disposeMaterial(mat);
+    } else if (obj instanceof THREE.Sprite) {
+      obj.material.map?.dispose();
+      obj.material.dispose();
+    }
+  });
+}
+
+/** Everything that changes the product's mesh (not just lighting mood). */
+function meshSignature(p: Product): string {
+  return [
+    p.category, p.name, p.tagline, p.generation,
+    p.materials[0], p.materials[1],
+    p.form.size, p.form.slimness, p.form.curvature, p.form.accent,
+    p.form.bodyColor, p.form.accentColor, p.form.finish,
+    JSON.stringify(p.partOverrides ?? {}),
+  ].join('|');
+}
+
 export function ProductStudioScene({ product, tall }: ProductStudioSceneProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const preset = LIGHTING_PRESETS[product.form.lighting] ?? LIGHTING_PRESETS.studio;
+  // The designer's sliders/color pickers fire on every drag tick. Rebuilding the
+  // whole WebGL context + PMREM environment bake on each tick was catastrophically
+  // slow on phones — so the outer effect below only ever depends on product.id
+  // (mount once per product), and everything that changes while editing (mesh,
+  // label, lighting mood) is updated live in the per-frame callback instead.
+  const productRef = useRef(product);
+  productRef.current = product;
 
   useThreeScene(
     ref,
     ({ scene, camera, renderer, addStars, makeLabel }) => {
+      let preset = LIGHTING_PRESETS[productRef.current.form.lighting] ?? LIGHTING_PRESETS.studio;
+
       // Filmic tone mapping + image-based lighting so metals, glass and
       // clearcoat paint pick up believable reflections.
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -1481,7 +1524,8 @@ export function ProductStudioScene({ product, tall }: ProductStudioSceneProps) {
       addStars(220);
 
       // --- Innovation-lab environment -------------------------------------
-      scene.add(new THREE.AmbientLight(0xffffff, preset.ambient));
+      const ambient = new THREE.AmbientLight(0xffffff, preset.ambient);
+      scene.add(ambient);
       const key = new THREE.DirectionalLight(preset.keyColor, preset.key);
       key.position.set(4, 7, 5);
       scene.add(key);
@@ -1502,14 +1546,14 @@ export function ProductStudioScene({ product, tall }: ProductStudioSceneProps) {
       scene.add(floor);
 
       // Holographic concentric rings
+      const ringMats: THREE.MeshBasicMaterial[] = [];
       for (let i = 0; i < 3; i++) {
-        const ring = new THREE.Mesh(
-          new THREE.RingGeometry(2.2 + i * 1.4, 2.26 + i * 1.4, 80),
-          new THREE.MeshBasicMaterial({ color: preset.rimColor, transparent: true, opacity: 0.16 - i * 0.04, side: THREE.DoubleSide }),
-        );
+        const mat = new THREE.MeshBasicMaterial({ color: preset.rimColor, transparent: true, opacity: 0.16 - i * 0.04, side: THREE.DoubleSide });
+        const ring = new THREE.Mesh(new THREE.RingGeometry(2.2 + i * 1.4, 2.26 + i * 1.4, 80), mat);
         ring.rotation.x = -Math.PI / 2;
         ring.position.y = -1.29;
         scene.add(ring);
+        ringMats.push(mat);
       }
 
       // Pedestal
@@ -1554,20 +1598,29 @@ export function ProductStudioScene({ product, tall }: ProductStudioSceneProps) {
       }
       const pGeo = new THREE.BufferGeometry();
       pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
-      const particles = new THREE.Points(pGeo, new THREE.PointsMaterial({ color: preset.rimColor, size: 0.05, transparent: true, opacity: 0.55, fog: false }));
+      const particleMat = new THREE.PointsMaterial({ color: preset.rimColor, size: 0.05, transparent: true, opacity: 0.55, fog: false });
+      const particles = new THREE.Points(pGeo, particleMat);
       scene.add(particles);
 
-      // --- The product itself ---------------------------------------------
-      const productGroup = new THREE.Group();
-      buildProductMesh(productGroup, product);
-      // Normalize height so every archetype sits nicely on the pedestal.
-      const bounds = new THREE.Box3().setFromObject(productGroup);
-      const center = bounds.getCenter(new THREE.Vector3());
-      productGroup.position.sub(center);
-      productGroup.position.y += -1.0 - bounds.min.y + center.y + 0.02;
+      // --- The product itself, rebuilt live as the designer edits it ------
       const spinner = new THREE.Group();
-      spinner.add(productGroup);
       scene.add(spinner);
+      let productGroup: THREE.Group | null = null;
+      const rebuildProduct = (p: Product) => {
+        if (productGroup) {
+          spinner.remove(productGroup);
+          disposeSubtree(productGroup);
+        }
+        productGroup = new THREE.Group();
+        buildProductMesh(productGroup, p);
+        // Normalize height so every archetype sits nicely on the pedestal.
+        const bounds = new THREE.Box3().setFromObject(productGroup);
+        const center = bounds.getCenter(new THREE.Vector3());
+        productGroup.position.sub(center);
+        productGroup.position.y += -1.0 - bounds.min.y + center.y + 0.02;
+        spinner.add(productGroup);
+      };
+      rebuildProduct(product);
 
       // Soft contact shadow grounding the product on the pedestal
       const shadow = new THREE.Mesh(
@@ -1578,14 +1631,50 @@ export function ProductStudioScene({ product, tall }: ProductStudioSceneProps) {
       shadow.position.y = -1.015;
       scene.add(shadow);
 
-      const label = makeLabel(`${product.name}${product.generation > 1 ? ` · Gen ${product.generation}` : ''}`, 0.6);
-      label.position.set(0, 1.9, 0);
-      scene.add(label);
+      let label: THREE.Sprite | null = null;
+      const rebuildLabel = (p: Product) => {
+        if (label) {
+          scene.remove(label);
+          label.material.map?.dispose();
+          label.material.dispose();
+        }
+        label = makeLabel(`${p.name}${p.generation > 1 ? ` · Gen ${p.generation}` : ''}`, 0.6);
+        label.position.set(0, 1.9, 0);
+        scene.add(label);
+      };
+      rebuildLabel(product);
 
       camera.position.set(0, 1.4, 5.4);
       camera.lookAt(0, 0, 0);
 
+      let sig = meshSignature(product);
+      let lightingKey = product.form.lighting;
+
       return (t) => {
+        const p = productRef.current;
+        const nextSig = meshSignature(p);
+        if (nextSig !== sig) {
+          sig = nextSig;
+          rebuildProduct(p);
+          rebuildLabel(p);
+        }
+        if (p.form.lighting !== lightingKey) {
+          lightingKey = p.form.lighting;
+          preset = LIGHTING_PRESETS[lightingKey] ?? LIGHTING_PRESETS.studio;
+          renderer.toneMappingExposure = preset.exposure;
+          scene.fog = new THREE.Fog(preset.fogColor, 9, 30);
+          ambient.intensity = preset.ambient;
+          key.color.set(preset.keyColor);
+          key.intensity = preset.key;
+          rim.color.set(preset.rimColor);
+          rim.intensity = preset.rim;
+          fill.color.set(preset.fillColor);
+          fill.intensity = preset.fill * 8;
+          for (const m of ringMats) m.color.set(preset.rimColor);
+          (pedestalGlow.material as THREE.MeshBasicMaterial).color.set(preset.rimColor);
+          particleMat.color.set(preset.rimColor);
+        }
+
         spinner.rotation.y = t * 0.35;
         pedestalGlow.material.opacity = 0.55 + Math.sin(t * 2) * 0.25;
         armLight.position.y = 0.8 + Math.sin(t * 1.4) * 0.06;
@@ -1600,13 +1689,7 @@ export function ProductStudioScene({ product, tall }: ProductStudioSceneProps) {
         camera.lookAt(0, 0, 0);
       };
     },
-    [
-      product.id, product.category, product.name, product.tagline, product.generation,
-      product.materials[0], product.materials[1],
-      product.form.size, product.form.slimness, product.form.curvature, product.form.accent,
-      product.form.bodyColor, product.form.accentColor, product.form.finish, product.form.lighting,
-      JSON.stringify(product.partOverrides ?? {}),
-    ],
+    [product.id],
   );
 
   return <div ref={ref} className={`w-full ${tall ? 'h-80' : 'h-60'} rounded-2xl overflow-hidden bg-slate-950`} />;

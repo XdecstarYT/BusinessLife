@@ -537,8 +537,12 @@ function ManageModal({ companyId, onClose }: { companyId: string; onClose: () =>
         <Button size="sm" variant="soft" className={c.isPublic ? '' : 'col-span-2'} onClick={() => run(spinOffCompany, c.id)}>
           ✂️ Spin Off Division
         </Button>
-        <Button size="sm" variant="soft" onClick={() => run(bidOnGovernmentContract, c.id)}>🏛️ Bid on Gov Contract</Button>
-        <Button size="sm" variant="soft" onClick={() => run(applyForGrant, c.id)}>📝 Apply for Grant</Button>
+        <Button size="sm" variant="soft" disabled={c.lastGovContractBidYear === state.year} onClick={() => run(bidOnGovernmentContract, c.id)}>
+          🏛️ {c.lastGovContractBidYear === state.year ? 'Bid Placed This Year' : 'Bid on Gov Contract'}
+        </Button>
+        <Button size="sm" variant="soft" disabled={c.lastGrantYear === state.year} onClick={() => run(applyForGrant, c.id)}>
+          📝 {c.lastGrantYear === state.year ? 'Applied This Year' : 'Apply for Grant'}
+        </Button>
       </div>
 
       {c.isPublic && (

@@ -91,6 +91,8 @@ export function createCompany(opts: FoundCompanyOptions, rng: RNG): Company {
     ceoName: null,
     ceoSkill: 0,
     ceoSalary: 0,
+    lastGovContractBidYear: null,
+    lastGrantYear: null,
     status: 'active',
     history: [],
   };

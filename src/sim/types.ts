@@ -562,6 +562,8 @@ export interface Company {
   ceoName: string | null; // hired professional CEO running day-to-day (chairman mode)
   ceoSkill: number; // 0..100
   ceoSalary: number; // yearly, paid from company cash
+  lastGovContractBidYear: number | null; // gates one bid per company per year
+  lastGrantYear: number | null; // gates one grant application per company per year
 
   status: CompanyStatus;
   history: CompanyHistoryPoint[];

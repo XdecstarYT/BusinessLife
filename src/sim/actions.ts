@@ -1704,16 +1704,18 @@ export function bidOnGovernmentContract(state: GameState, companyId: string): Ac
   const p = state.player;
   const c = state.companies[companyId];
   if (!c || !c.playerOwned || c.status !== 'active') return { ok: false, message: 'Not your company.' };
+  if (c.lastGovContractBidYear === state.year) return { ok: false, message: 'Already bid on a government contract this year — try again next year.' };
   const home = state.countries.find((k) => k.id === c.countryId)!;
-  const bidCost = Math.max(5_000, c.revenue * 0.01);
+  const bidCost = Math.max(8_000, c.revenue * 0.01);
   if (bidCost > c.cash) return { ok: false, message: `Needs $${Math.round(bidCost).toLocaleString()} in company cash to prepare a bid.` };
   const rng = withRng(state);
   c.cash -= bidCost;
+  c.lastGovContractBidYear = state.year;
   const chance = clamp(0.2 + (c.brand / 100) * 0.2 + (p.politicalCapital / 100) * 0.2 + (home.corruption / 100) * (p.notoriety > 20 ? 0.15 : -0.05), 0.05, 0.85);
   const won = rng.chance(chance);
   commit(state, rng);
   if (won) {
-    const value = Math.max(50_000, c.revenue * rng.range(0.15, 0.4));
+    const value = Math.max(20_000, c.revenue * rng.range(0.15, 0.4));
     c.cash += value;
     c.brand = clamp100(c.brand + 3);
     log(state, `🏛️ ${c.name} won a government contract worth $${Math.round(value).toLocaleString()}.`, 'business');
@@ -1726,14 +1728,19 @@ export function bidOnGovernmentContract(state: GameState, companyId: string): Ac
 export function applyForGrant(state: GameState, companyId: string): ActionResult {
   const c = state.companies[companyId];
   if (!c || !c.playerOwned || c.status !== 'active') return { ok: false, message: 'Not your company.' };
+  if (c.lastGrantYear === state.year) return { ok: false, message: 'Already applied for a grant this year — try again next year.' };
   const home = state.countries.find((k) => k.id === c.countryId)!;
   if (home.economy.budgetBalance < -0.08) return { ok: false, message: `${home.name}'s budget is too strained to fund grants right now.` };
+  const applicationCost = Math.max(3_000, c.revenue * 0.003);
+  if (applicationCost > c.cash) return { ok: false, message: `Needs $${Math.round(applicationCost).toLocaleString()} in company cash to prepare the application.` };
   const rng = withRng(state);
+  c.cash -= applicationCost;
+  c.lastGrantYear = state.year;
   const chance = clamp(0.25 + c.rdPct * 2, 0.1, 0.8);
   const approved = rng.chance(chance);
   commit(state, rng);
   if (approved) {
-    const amount = Math.max(20_000, c.revenue * 0.05);
+    const amount = Math.max(15_000, c.revenue * 0.05);
     c.cash += amount;
     c.quality = clamp100(c.quality + 3);
     log(state, `${c.name} was awarded a government R&D grant of $${Math.round(amount).toLocaleString()}.`, 'business');

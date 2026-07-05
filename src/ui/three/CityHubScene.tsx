@@ -354,21 +354,39 @@ export function CityHubScene({ buildings, season, onEnter }: CityHubSceneProps) 
     setJoyKnob({ x: dx, y: dy });
     inputRef.current = { x: dx / r, z: dy / r };
   };
-  const onJoyStart = (e: ReactPointerEvent<HTMLDivElement>) => {
-    joyPointerId.current = e.pointerId;
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    updateJoy(e.clientX, e.clientY);
-  };
-  const onJoyMove = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (joyPointerId.current !== e.pointerId) return;
-    updateJoy(e.clientX, e.clientY);
-  };
-  const onJoyEnd = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (joyPointerId.current !== e.pointerId) return;
+  const endJoy = () => {
     joyPointerId.current = null;
     setJoyKnob(null);
     inputRef.current = { x: 0, z: 0 };
   };
+  // iOS Safari's setPointerCapture support for touch-originated pointers has been
+  // historically unreliable — capture silently no-ops and the base div simply stops
+  // receiving events the moment a finger drags past its small hit area, freezing
+  // movement mid-walk. Track the drag with window-level listeners instead (the same
+  // pattern the orbit-drag controls use) so capture is a nice-to-have, not required.
+  const onJoyStart = (e: ReactPointerEvent<HTMLDivElement>) => {
+    joyPointerId.current = e.pointerId;
+    try { (e.target as HTMLElement).setPointerCapture(e.pointerId); } catch { /* not supported — window listeners still cover it */ }
+    updateJoy(e.clientX, e.clientY);
+  };
+  useEffect(() => {
+    const onMove = (e: PointerEvent) => {
+      if (joyPointerId.current !== e.pointerId) return;
+      updateJoy(e.clientX, e.clientY);
+    };
+    const onUp = (e: PointerEvent) => {
+      if (joyPointerId.current !== e.pointerId) return;
+      endJoy();
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+    };
+  }, []);
 
   useThreeScene(
     ref,
@@ -561,17 +579,20 @@ export function CityHubScene({ buildings, season, onEnter }: CityHubSceneProps) 
   const nearbyBuilding = buildings.find((b) => b.id === nearby);
 
   return (
-    <div className="relative w-full h-[420px] rounded-2xl overflow-hidden bg-slate-950 select-none">
+    <div
+      className="relative w-full h-[420px] rounded-2xl overflow-hidden bg-slate-950 select-none"
+      style={{ touchAction: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' }}
+    >
       <div ref={ref} className="absolute inset-0" />
 
-      {/* Virtual joystick */}
+      {/* Virtual joystick — move/up tracked on window (see onJoyStart), so a
+          drag that leaves this small circle keeps working even where
+          setPointerCapture support is flaky. */}
       <div
         ref={joyBaseRef}
         onPointerDown={onJoyStart}
-        onPointerMove={onJoyMove}
-        onPointerUp={onJoyEnd}
-        onPointerCancel={onJoyEnd}
         className="absolute left-5 bottom-5 w-24 h-24 rounded-full bg-white/10 border border-white/20 touch-none"
+        style={{ touchAction: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' }}
       >
         <div
           className="absolute w-10 h-10 rounded-full bg-white/70"

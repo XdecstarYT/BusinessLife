@@ -68,12 +68,17 @@ export function useThreeScene(
     const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
     let renderer: THREE.WebGLRenderer;
     try {
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
     } catch {
       return;
     }
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    container.appendChild(renderer.domElement);
+    // Phone GPUs (especially at devicePixelRatio 3 on iPhone) choke on a full-res
+    // canvas with several dynamic lights and physical materials; cap lower on
+    // touch devices so mobile stays smooth instead of dropping frames.
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, isTouchDevice ? 1.5 : 2));
+    const el = renderer.domElement;
+    container.appendChild(el);
 
     const resize = () => {
       const w = Math.max(1, container.clientWidth);
@@ -133,7 +138,6 @@ export function useThreeScene(
       pinchDist = d;
     };
     const onTouchEnd = () => { pinchDist = 0; };
-    const el = renderer.domElement;
     if (orbitControls) {
       el.style.touchAction = 'pan-y';
       el.style.cursor = 'grab';
@@ -150,16 +154,36 @@ export function useThreeScene(
     const onFrame = setup({ scene, camera, renderer, addStars, makeLabel });
 
     let raf = 0;
+    let contextLost = false;
     const clock = new THREE.Clock();
     const loop = () => {
-      onFrame?.(clock.getElapsedTime());
-      renderer.render(scene, camera);
+      if (!contextLost) {
+        onFrame?.(clock.getElapsedTime());
+        renderer.render(scene, camera);
+      }
       raf = requestAnimationFrame(loop);
     };
     loop();
 
+    // iOS Safari aggressively reclaims WebGL contexts under memory pressure (backgrounding
+    // the tab, too many contexts alive at once). Without handling this the canvas just
+    // freezes on a stale frame or goes black — the "3D is broken" symptom. We can't cheaply
+    // rebuild all scene geometry, so we pause rendering and let the browser's automatic
+    // context restore (three.js re-uploads GPU resources on the next render call) resume it.
+    const onContextLost = (e: Event) => {
+      e.preventDefault();
+      contextLost = true;
+    };
+    const onContextRestored = () => {
+      contextLost = false;
+    };
+    el.addEventListener('webglcontextlost', onContextLost, false);
+    el.addEventListener('webglcontextrestored', onContextRestored, false);
+
     return () => {
       cancelAnimationFrame(raf);
+      el.removeEventListener('webglcontextlost', onContextLost);
+      el.removeEventListener('webglcontextrestored', onContextRestored);
       ro.disconnect();
       if (orbitControls) {
         el.removeEventListener('pointerdown', onPointerDown);
