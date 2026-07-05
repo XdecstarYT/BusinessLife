@@ -7,6 +7,7 @@
 import { useState, type ReactNode } from 'react';
 import { useGame, type Screen } from '../../store/gameStore';
 import { attemptPrisonEscape, bribeJudge, contestTerritory, CRIME_RANK_TITLES, doActivity, donateToFoundation, enterWitnessProtection, foundCharityFoundation, goStraight, heist, issuePublicApology, joinCrimeFamily, playCasino, retire, writeMemoir } from '../../sim/actions';
+import { titleForRank } from '../../data/careers';
 import { netWorth } from '../../sim/engine';
 import { Badge, Button, Card, CircleTile, Pill, PillRow, SectionHeader, StatBar } from '../components';
 import { money } from '../format';
@@ -74,7 +75,7 @@ export function Life() {
               <div className="text-xs font-bold uppercase tracking-widest opacity-80">Net Worth</div>
               <div className="text-3xl font-black leading-tight">{money(nw, home.currencySymbol)}</div>
               <div className="text-sm opacity-90 mt-1">
-                {p.office ? `${p.office.title} of ${p.office.regionName}` : p.job ? p.job.title : 'Independent'}
+                {p.office ? `${p.office.title} of ${p.office.regionName}` : p.job ? titleForRank(p.job.title, p.job.rank) : 'Independent'}
               </div>
             </div>
             <div className="w-14 h-14 rounded-2xl bg-white/15 flex items-center justify-center">

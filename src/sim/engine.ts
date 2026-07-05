@@ -20,6 +20,8 @@ import { tryFireDailyEvent } from './dailyEvents';
 import { tickLifestyleAssets } from './lifestyle';
 import { tickProducts } from './products';
 import { SK } from '../data/skills';
+import { CAREER_LADDER, COWORKER_PERSONALITIES, COWORKER_PERSONALITY_BY_ID, rankIndex, titleForRank, WORK_STYLE_BY_ID, WORKPLACE_EVENTS } from '../data/careers';
+import { makePersonName } from '../data/names';
 
 const SPECIAL_BIRTHDAYS = new Set([18, 21, 25, 30, 40, 50, 60, 65, 70, 75, 80, 90, 100]);
 
@@ -289,28 +291,109 @@ function tickPlayerLife(state: GameState, rng: RNG): void {
     const tax = gross * e.taxRates.income * 0.7; // effective rate below top marginal
     p.money += gross - tax;
     p.job.yearsInRole++;
+    p.job.yearsAtCompany++;
     const skillLvl = p.skills[INDUSTRY_BY_ID[p.job.industryId]?.skillId ?? ''] ?? 0;
-    p.job.performance = clamp100(p.job.performance + (p.smarts - 50) * 0.06 + skillLvl * 0.03 + rng.range(-6, 6));
-    // Raises & promotions
+    p.job.performance = clamp100(p.job.performance + (p.smarts - 50) * 0.06 + skillLvl * 0.03 - Math.max(0, p.job.stress - 40) * 0.04 + rng.range(-6, 6));
+
+    // Coworkers: rapport drifts, toxic/political personalities add ambient stress and
+    // occasionally cause a real incident that dents performance.
+    for (const cw of p.job.coworkers) {
+      const pers = COWORKER_PERSONALITY_BY_ID[cw.personality];
+      cw.rapport = clamp100(cw.rapport + rng.range(-2, 2));
+      p.job.stress = clamp100(p.job.stress + pers.stressPerYear);
+    }
+    const incident = p.job.coworkers.find((cw) => rng.chance(COWORKER_PERSONALITY_BY_ID[cw.personality].toxicityRisk));
+    if (incident) {
+      p.job.stress = clamp100(p.job.stress + 10);
+      p.job.performance = clamp100(p.job.performance - 4);
+      log(state, `${incident.name} caused friction at work — stress is up.`, 'bad');
+    }
+
+    // Work style, stress, reliability and their spillover into health/happiness.
+    p.job.stress = clamp100(p.job.stress + WORK_STYLE_BY_ID[p.job.workStyle].stressPerYear + rng.range(-2, 2));
+    p.job.reliability = clamp100(p.job.reliability - Math.max(0, p.job.stress - 60) * 0.1 + (p.health - 50) * 0.05);
+    p.happiness = clamp100(p.happiness - Math.max(0, p.job.stress - 70) * 0.05);
+    p.health = clamp100(p.health - Math.max(0, p.job.stress - 80) * 0.03);
+
+    // Raises: always some inflation adjustment, a bigger bump when performance is strong.
     if (p.job.performance > 70 && rng.chance(0.5)) {
       const bump = rng.range(0.04, 0.15);
       p.job.salary = Math.round(p.job.salary * (1 + bump + e.inflation));
-      if (rng.chance(0.3)) {
-        p.job.title = `Senior ${p.job.title.replace(/^Senior /, '')}`;
-        log(state, `Promoted! You are now ${p.job.title} earning $${p.job.salary.toLocaleString()}.`, 'good');
-      }
     } else {
       p.job.salary = Math.round(p.job.salary * (1 + e.inflation * 0.8));
     }
-    // Layoffs in downturns
+    // A small passive promotion chance; applyForPromotion() is the reliable player-driven path.
+    const curIdx = rankIndex(p.job.rank);
+    const curRank = CAREER_LADDER[curIdx];
+    if (curIdx < CAREER_LADDER.length - 1 && p.job.performance >= curRank.minPerformanceToPromote && p.job.yearsInRole >= curRank.minYearsToPromote && rng.chance(0.12)) {
+      const next = CAREER_LADDER[curIdx + 1];
+      p.job.rank = next.id;
+      p.job.yearsInRole = 0;
+      p.job.salary = Math.round(p.job.salary * (next.salaryMult / curRank.salaryMult));
+      log(state, `Promoted! You are now ${titleForRank(p.job.title, next.id)} earning $${p.job.salary.toLocaleString()}.`, 'good');
+      if (next.id === 'executive' && !state.achievements.includes('corner_office')) state.achievements.push('corner_office');
+    }
+    // Layoffs in downturns — sets a reference-check penalty for a few years.
     if ((e.regime === 'recession' || e.regime === 'depression') && rng.chance(0.12 + Math.max(0, 40 - p.job.performance) * 0.004)) {
-      log(state, `You were laid off from your job as ${p.job.title} at ${p.job.employerName}.`, 'bad');
+      log(state, `You were laid off from your job as ${titleForRank(p.job.title, p.job.rank)} at ${p.job.employerName}.`, 'bad');
       p.job = null;
+      p.lastFiredYear = state.year;
       p.happiness = clamp100(p.happiness - 8);
     }
     // Passive skill growth from working
     const ind = p.job ? INDUSTRY_BY_ID[p.job.industryId] : null;
     if (ind) p.skills[ind.skillId] = clamp100((p.skills[ind.skillId] ?? 0) + rng.range(2, 5));
+
+    // Random workplace events — real, bespoke effects rather than pure flavor text.
+    if (p.job && rng.chance(0.18)) {
+      const evt = rng.weighted(WORKPLACE_EVENTS, (x) => x.weight);
+      switch (evt.id) {
+        case 'restructure':
+          p.job.stress = clamp100(p.job.stress + 8);
+          if (rng.chance(0.3)) p.job.coworkers = p.job.coworkers.filter((c) => c.role === 'manager' || rng.chance(0.6));
+          break;
+        case 'manager_change': {
+          p.job.coworkers = p.job.coworkers.filter((c) => c.role !== 'manager');
+          p.job.coworkers.push({
+            id: `cw_${state.year}_m2`,
+            name: makePersonName(rng, rng.chance(0.5) ? 'male' : 'female'),
+            role: 'manager',
+            personality: rng.pick(COWORKER_PERSONALITIES).id,
+            rapport: Math.round(rng.range(35, 55)),
+          });
+          break;
+        }
+        case 'budget_cuts':
+          p.job.salary = Math.round(p.job.salary * 0.99); // effectively freezes/claws back the year's inflation bump
+          break;
+        case 'relocation':
+          p.job.stress = clamp100(p.job.stress + 6);
+          p.happiness = clamp100(p.happiness - 3);
+          break;
+        case 'automation':
+          if (ind) p.skills[ind.skillId] = clamp100((p.skills[ind.skillId] ?? 0) - rng.range(1, 4));
+          p.job.stress = clamp100(p.job.stress + 5);
+          break;
+        case 'accident':
+          p.health = clamp100(p.health - rng.range(3, 8));
+          p.job.stress = clamp100(p.job.stress + 6);
+          break;
+        case 'scandal':
+          p.job.stress = clamp100(p.job.stress + 4);
+          p.reputation = clamp100(p.reputation - 2);
+          break;
+      }
+      if (p.job) log(state, `${evt.icon} ${evt.label} at ${p.job.employerName}: ${evt.blurb}`, 'business');
+    }
+  } else {
+    // --- Unemployment ------------------------------------------------------
+    p.unemployedYears++;
+    const benefit = Math.max(0, 6_000 - p.unemployedYears * 1_200);
+    if (benefit > 0) p.money += benefit;
+    p.happiness = clamp100(p.happiness - Math.min(10, p.unemployedYears * 1.5));
+    if (p.unemployedYears >= 2) {
+      for (const k of Object.keys(p.skills)) p.skills[k] = clamp100(p.skills[k] - 1);
+    }
   }
 
   // --- Office -------------------------------------------------------------
@@ -671,6 +754,10 @@ export function continueAsHeir(state: GameState, npcId: string): GameState {
     memoir: null,
     luxuryAssets: [],
     celebrityStakes: [],
+    lastFiredYear: null,
+    freelanceReputation: 30,
+    freelanceGigsCompleted: 0,
+    unemployedYears: 0,
   };
   delete state.npcs[npcId];
   state.player = newPlayer;

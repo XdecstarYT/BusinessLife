@@ -4,13 +4,17 @@
  * and eligibility so the UI can surface clean errors. RNG-consuming actions
  * advance the persisted stream so outcomes stay deterministic on replay.
  */
-import type { Advisor, AdvisorSpecialty, CabinetPortfolio, Company, Executive, ExecutiveRole, GameState, Gender, InfrastructureKind, ManifestoPromise, MaintenanceLevel, OfficeKind, PropertyAsset, TaxRates } from './types';
+import type { Advisor, AdvisorSpecialty, CabinetPortfolio, Company, Coworker, Executive, ExecutiveRole, GameState, Gender, InfrastructureKind, ManifestoPromise, MaintenanceLevel, OfficeKind, PropertyAsset, TaxRates, WorkStyle } from './types';
 import { CABINET_PORTFOLIOS, clamp, clamp100 } from './types';
 import { RNG } from './rng';
 import { INDUSTRY_BY_ID, INDUSTRIES } from '../data/industries';
 import { LAW_BY_ID } from '../data/laws';
 import { SK } from '../data/skills';
 import { makeCompanyName, makePartyName, makePersonName } from '../data/names';
+import {
+  CAREER_LADDER, COWORKER_PERSONALITIES, COWORKER_PERSONALITY_BY_ID,
+  FREELANCE_GIG_BY_ID, FREELANCE_GIGS, rankIndex, titleForRank, WORK_STYLE_BY_ID,
+} from '../data/careers';
 import { createCompany, nextCompanyId, companyValuation } from './business';
 import { doIPO, marketCap } from './market';
 import { OFFICE_SPEC_BY_KIND, campaignWinChance, eligibleFor, estimateLawVote } from './politics';
@@ -101,30 +105,210 @@ export function jobOpenings(state: GameState): { title: string; industryId: stri
   return out;
 }
 
-export function takeJob(state: GameState, opening: { title: string; industryId: string; salary: number; requiredSmarts: number; track: string }): ActionResult {
+function makeCoworker(state: GameState, rng: RNG, role: 'manager' | 'peer', tag: string): Coworker {
+  return {
+    id: `cw_${state.year}_${tag}`,
+    name: makePersonName(rng, rng.chance(0.5) ? 'male' : 'female'),
+    role,
+    personality: rng.pick(COWORKER_PERSONALITIES).id,
+    rapport: Math.round(rng.range(role === 'manager' ? 40 : 35, role === 'manager' ? 60 : 65)),
+  };
+}
+
+/** A real hiring process: reference/background check, an interview score from your
+ * skills/charisma/reputation, and an optional salary negotiation with real upside and
+ * a small risk of blowing up the offer. Replaces a flat always-succeeds "Apply". */
+export function takeJob(state: GameState, opening: { title: string; industryId: string; salary: number; requiredSmarts: number; track: string }, negotiate = false): ActionResult {
   const p = state.player;
   if (p.inJailYears > 0) return { ok: false, message: 'Not while incarcerated.' };
   if (p.smarts < opening.requiredSmarts) return { ok: false, message: `Requires ${opening.requiredSmarts}+ smarts.` };
+  const rng = withRng(state);
   const ind = INDUSTRY_BY_ID[opening.industryId];
+  const skillLvl = ind ? (p.skills[ind.skillId] ?? 0) : 0;
+
+  // Reference/background check: a firing in the last few years dents your odds.
+  const yearsSinceFired = p.lastFiredYear === null ? 99 : state.year - p.lastFiredYear;
+  const referencePenalty = yearsSinceFired < 3 ? (3 - yearsSinceFired) * 0.1 : 0;
+
+  const interviewScore = clamp100(
+    30 + (p.smarts - 30) * 0.3 + skillLvl * 0.25 + (p.charisma - 30) * 0.15 + (p.reputation - 30) * 0.1 + rng.range(-12, 12),
+  );
+  const passChance = clamp(0.4 + interviewScore / 160 - referencePenalty, 0.05, 0.92);
+  if (!rng.chance(passChance)) {
+    commit(state, rng);
+    const reason = referencePenalty > 0.15
+      ? 'A reference check flagged concerns from your last role.'
+      : rng.pick(['They went with another candidate.', "They passed after the behavioral round — not quite the fit they needed.", 'Strong field this round; no offer.']);
+    log(state, `Interview for ${opening.title} didn't land: ${reason}`, 'bad');
+    return { ok: false, message: reason };
+  }
+
+  let salary = opening.salary;
+  if (negotiate) {
+    const negChance = clamp(0.3 + (p.charisma - 30) * 0.01 + skillLvl * 0.003, 0.1, 0.85);
+    if (rng.chance(negChance)) {
+      const bump = rng.range(0.05, 0.18);
+      salary = Math.round(salary * (1 + bump));
+    } else if (rng.chance(0.15)) {
+      commit(state, rng);
+      log(state, `${opening.title} offer rescinded after a hard negotiating push.`, 'bad');
+      return { ok: false, message: 'You pushed too hard in negotiations and the offer was pulled.' };
+    }
+  }
+
+  const employerName = makeCompanyName(rng, ind?.sector ?? 'default');
+  const coworkers = [makeCoworker(state, rng, 'manager', 'm')];
+  const peerCount = rng.chance(0.5) ? 2 : 1;
+  for (let i = 0; i < peerCount; i++) coworkers.push(makeCoworker(state, rng, 'peer', `p${i}`));
+
   p.job = {
     title: opening.title,
     industryId: opening.industryId,
     employerId: null,
-    employerName: makeCompanyName(new RNG(state.rngState), ind?.sector ?? 'default'),
-    salary: opening.salary,
+    employerName,
+    salary,
     performance: 55,
     yearsInRole: 0,
+    yearsAtCompany: 0,
     track: opening.track as 'corporate' | 'public' | 'media' | 'crime' | 'none',
+    rank: 'junior',
+    stress: 20,
+    reliability: 70,
+    workStyle: 'standard',
+    coworkers,
   };
-  log(state, `Started a new job: ${opening.title} at ${p.job.employerName} ($${opening.salary.toLocaleString()}/yr).`, 'good');
-  return { ok: true, message: `Hired as ${opening.title}.` };
+  p.unemployedYears = 0;
+  commit(state, rng);
+  log(state, `Started a new job: ${titleForRank(opening.title, 'junior')} at ${employerName} ($${salary.toLocaleString()}/yr).`, 'good');
+  return { ok: true, message: `Hired as ${titleForRank(opening.title, 'junior')}${negotiate && salary !== opening.salary ? ` — negotiated up to $${salary.toLocaleString()}` : ''}.` };
 }
 
 export function quitJob(state: GameState): ActionResult {
   if (!state.player.job) return { ok: false, message: 'You have no job.' };
-  log(state, `You quit your job as ${state.player.job.title}.`, 'info');
+  log(state, `You quit your job as ${titleForRank(state.player.job.title, state.player.job.rank)}.`, 'info');
   state.player.job = null;
   return { ok: true, message: 'You quit your job.' };
+}
+
+/** Player-initiated push up the career ladder — separate from (and better odds
+ * than) the small passive promotion chance rolled each year. */
+export function applyForPromotion(state: GameState): ActionResult {
+  const p = state.player;
+  if (!p.job) return { ok: false, message: 'You need a job first.' };
+  const idx = rankIndex(p.job.rank);
+  if (idx >= CAREER_LADDER.length - 1) return { ok: false, message: 'Already at the top of the ladder.' };
+  const current = CAREER_LADDER[idx];
+  const next = CAREER_LADDER[idx + 1];
+  if (p.job.yearsInRole < current.minYearsToPromote) {
+    return { ok: false, message: `Needs ${current.minYearsToPromote}+ year(s) in your current rank first.` };
+  }
+  if (p.job.performance < current.minPerformanceToPromote) {
+    return { ok: false, message: `Performance needs to be ${current.minPerformanceToPromote}+ (currently ${Math.round(p.job.performance)}).` };
+  }
+  const rng = withRng(state);
+  const manager = p.job.coworkers.find((c) => c.role === 'manager');
+  const managerBonus = manager ? (manager.rapport - 50) * 0.006 : 0;
+  const chance = clamp(0.4 + (p.job.performance - current.minPerformanceToPromote) * 0.01 + managerBonus, 0.1, 0.9);
+  const success = rng.chance(chance);
+  commit(state, rng);
+  if (!success) {
+    p.job.stress = clamp100(p.job.stress + 5);
+    log(state, `Passed over for promotion to ${titleForRank(p.job.title, next.id)}.`, 'bad');
+    return { ok: false, message: 'Passed over this time — try again once your case is stronger.' };
+  }
+  p.job.rank = next.id;
+  p.job.yearsInRole = 0;
+  p.job.salary = Math.round(p.job.salary * (next.salaryMult / current.salaryMult));
+  p.reputation = clamp100(p.reputation + 3);
+  if (next.id === 'executive' && !state.achievements.includes('corner_office')) state.achievements.push('corner_office');
+  log(state, `Promoted! You are now ${titleForRank(p.job.title, next.id)} earning $${p.job.salary.toLocaleString()}.`, 'good');
+  return { ok: true, message: `Promoted to ${titleForRank(p.job.title, next.id)}.` };
+}
+
+export function networkWithCoworker(state: GameState, coworkerId: string): ActionResult {
+  const p = state.player;
+  if (!p.job) return { ok: false, message: 'You have no job.' };
+  const cw = p.job.coworkers.find((c) => c.id === coworkerId);
+  if (!cw) return { ok: false, message: 'Coworker not found.' };
+  const rng = withRng(state);
+  const personality = COWORKER_PERSONALITY_BY_ID[cw.personality];
+  const gain = rng.range(4, 10) * personality.rapportGainMult;
+  cw.rapport = clamp100(cw.rapport + gain);
+  p.happiness = clamp100(p.happiness + 1);
+  commit(state, rng);
+  return { ok: true, message: `Rapport with ${cw.name} is now ${Math.round(cw.rapport)}.` };
+}
+
+/** Reporting a genuinely toxic/political coworker is more likely to be upheld; crying
+ * wolf on a friendly one risks your own standing and their rapport with you. */
+export function reportToHR(state: GameState, coworkerId: string): ActionResult {
+  const p = state.player;
+  if (!p.job) return { ok: false, message: 'You have no job.' };
+  const cw = p.job.coworkers.find((c) => c.id === coworkerId);
+  if (!cw) return { ok: false, message: 'Coworker not found.' };
+  const rng = withRng(state);
+  const justified = cw.personality === 'toxic' || cw.personality === 'political';
+  const upheld = rng.chance(justified ? 0.65 : 0.25);
+  if (upheld) {
+    const wasManager = cw.role === 'manager';
+    p.job.coworkers = p.job.coworkers.filter((c) => c.id !== coworkerId);
+    if (wasManager) p.job.coworkers.push(makeCoworker(state, rng, 'manager', `m${state.year}`));
+    p.job.stress = clamp100(p.job.stress - 15);
+    commit(state, rng);
+    log(state, `HR upheld your complaint about ${cw.name}.`, 'good');
+    return { ok: true, message: `HR upheld it — ${cw.name} was moved out${wasManager ? ' and a new manager was assigned' : ''}.` };
+  }
+  p.job.performance = clamp100(p.job.performance - 5);
+  p.job.stress = clamp100(p.job.stress + 8);
+  cw.rapport = clamp100(cw.rapport - 20);
+  commit(state, rng);
+  log(state, `HR found no wrongdoing in your complaint about ${cw.name}.`, 'bad');
+  return { ok: false, message: `HR found no wrongdoing — it's awkward with ${cw.name} now.` };
+}
+
+export function setWorkStyle(state: GameState, style: WorkStyle): ActionResult {
+  const p = state.player;
+  if (!p.job) return { ok: false, message: 'You have no job.' };
+  const oldMult = WORK_STYLE_BY_ID[p.job.workStyle].salaryMult;
+  const newMult = WORK_STYLE_BY_ID[style].salaryMult;
+  p.job.salary = Math.round((p.job.salary / oldMult) * newMult);
+  p.job.workStyle = style;
+  return { ok: true, message: `Now working ${WORK_STYLE_BY_ID[style].label.toLowerCase()}.` };
+}
+
+// ---------------------------------------------------------------------------
+// Freelance & gig economy — independent of any formal employer
+// ---------------------------------------------------------------------------
+
+export function freelanceGigListings() {
+  return FREELANCE_GIGS;
+}
+
+export function takeFreelanceGig(state: GameState, gigId: string): ActionResult {
+  const p = state.player;
+  const gig = FREELANCE_GIG_BY_ID[gigId];
+  if (!gig) return { ok: false, message: 'Unknown gig.' };
+  if (p.inJailYears > 0) return { ok: false, message: 'Not while incarcerated.' };
+  const rng = withRng(state);
+  const skillLvl = gig.skillId ? (p.skills[gig.skillId] ?? 0) : 30;
+  const successChance = clamp(0.5 + skillLvl / 250 + (p.freelanceReputation - 30) / 200, 0.15, 0.95);
+  const success = rng.chance(successChance);
+  if (success) {
+    const pay = Math.round(gig.basePay * rng.range(0.85, 1.3) * (1 + p.freelanceReputation / 200));
+    p.money += pay;
+    p.freelanceReputation = clamp100(p.freelanceReputation + rng.range(1, 4));
+    p.freelanceGigsCompleted++;
+    if (gig.skillId) p.skills[gig.skillId] = clamp100((p.skills[gig.skillId] ?? 0) + rng.range(1, 3));
+    commit(state, rng);
+    if (p.freelanceGigsCompleted === 1 && !state.achievements.includes('first_gig')) state.achievements.push('first_gig');
+    if (p.freelanceGigsCompleted >= 50 && !state.achievements.includes('gig_economy_star')) state.achievements.push('gig_economy_star');
+    log(state, `Freelance: ${gig.label} paid $${pay.toLocaleString()}.`, 'money');
+    return { ok: true, message: `Earned $${pay.toLocaleString()} from ${gig.label}.` };
+  }
+  p.freelanceReputation = clamp100(p.freelanceReputation - rng.range(2, 6));
+  commit(state, rng);
+  log(state, `Freelance gig fell through: ${gig.label}.`, 'bad');
+  return { ok: false, message: `The ${gig.label.toLowerCase()} gig fell through — a bad review hurt your freelance standing.` };
 }
 
 // ---------------------------------------------------------------------------

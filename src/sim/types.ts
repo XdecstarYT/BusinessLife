@@ -166,6 +166,21 @@ export interface Office {
 export const MANIFESTO_PROMISES = ['tax_cuts', 'healthcare', 'education', 'jobs', 'crime_reduction', 'infrastructure'] as const;
 export type ManifestoPromise = (typeof MANIFESTO_PROMISES)[number];
 
+export const CAREER_RANKS = ['intern', 'junior', 'mid', 'senior', 'manager', 'executive'] as const;
+export type CareerRank = (typeof CAREER_RANKS)[number];
+
+export type CoworkerPersonality = 'friendly' | 'competitive' | 'toxic' | 'mentoring' | 'political';
+
+export interface Coworker {
+  id: string;
+  name: string;
+  role: 'manager' | 'peer';
+  personality: CoworkerPersonality;
+  rapport: number; // 0..100
+}
+
+export type WorkStyle = 'standard' | 'overtime' | 'flexible';
+
 export interface PlayerJob {
   title: string;
   industryId: string;
@@ -173,8 +188,14 @@ export interface PlayerJob {
   employerName: string;
   salary: number;
   performance: number; // 0..100
-  yearsInRole: number;
+  yearsInRole: number; // years since the last promotion/rank change
+  yearsAtCompany: number; // total tenure, survives promotions
   track: 'none' | 'corporate' | 'public' | 'media' | 'crime';
+  rank: CareerRank;
+  stress: number; // 0..100, driven by work style and toxic coworkers; hurts health/performance
+  reliability: number; // 0..100, punctuality/attendance proxy; drifts with stress and health
+  workStyle: WorkStyle;
+  coworkers: Coworker[]; // a manager plus one or two peers
 }
 
 export interface Player {
@@ -247,6 +268,10 @@ export interface Player {
   foundation: CharityFoundation | null; // personal charitable foundation, once founded
   retired: boolean; // formally retired from employment
   pensionIncome: number; // yearly pension once retired, based on career at retirement
+  lastFiredYear: number | null; // reference damage window — dents interview odds and offers for a few years
+  freelanceReputation: number; // 0..100, gig-economy standing independent of any employer
+  freelanceGigsCompleted: number;
+  unemployedYears: number; // consecutive years without a job or company; drives skill decay and safety-net support
   memoir: Memoir | null; // published autobiography paying royalties for a few years
   campaign: null | {
     officeKind: OfficeKind;

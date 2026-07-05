@@ -86,6 +86,25 @@ plain JSON you can export and re-import.
   year — insurance (now with a real ongoing premium) softens the loss, going without risks losing it
   outright. Renovate a condemned building back to like-new condition and a real value/efficiency jump,
   including its own achievement for a proper rescue.
+- **Your career is a real workplace, not a stat screen** — apply for a job and clear an actual
+  interview gate (driven by smarts, skills, charisma, reputation, and a reference-check penalty if
+  you were recently fired), optionally negotiating a starting salary at the risk of losing the offer.
+  Every job comes with generated coworkers — a manager and one or two peers, each with a personality
+  (friendly, mentoring, competitive, political, toxic) that drives ambient stress, rapport drift, and a
+  chance of a real toxic incident each year. Network with a coworker to build rapport, or report one to
+  HR (a real, sometimes-backfiring investigation — unjustified reports can cost you rapport and
+  performance). Climb a six-rank ladder (intern to executive) by pushing for promotion once you've put
+  in enough time and performance at your current rank, with salary rescaled by rank, not a repeatedly
+  re-prefixed job title. Pick a work style — standard, overtime (more pay, more stress), or flexible
+  (less pay, less stress) — and watch stress and reliability feed back into performance and even your
+  happiness and health once they run too high. Random workplace events (restructuring, a new manager,
+  budget cuts, relocation, automation, an accident, a scandal) land some years with real mechanical
+  consequences, not just flavor text. Lose your job and it leaves a mark — future interviews get
+  harder for a few years, and drawn-out unemployment slowly erodes your skills despite a small,
+  decaying safety-net benefit. Alongside the corporate ladder runs a parallel **freelance & gig
+  economy** — design work, consulting, coding, writing, rideshare, influencer deals, trades — each gig
+  paying out (or falling through) based on a skill check and your freelance reputation, which compounds
+  with good reviews and stings with bad ones.
 - **Deep politics** — join or found a party, campaign for eight tiers of office (councillor to head of
   state) with rallies/ads/fundraising/consultants/polling, negotiate coalitions, appoint a cabinet, and
   pass or repeal **115 laws** whose effects continuously reshape the economy. As head of state, conduct

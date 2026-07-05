@@ -8,6 +8,7 @@ import { clamp, clamp100 } from './types';
 import { EVENT_TEMPLATES } from '../data/events';
 import { INDUSTRY_BY_ID } from '../data/industries';
 import { companyValuation } from './business';
+import { titleForRank } from '../data/careers';
 import type { RNG } from './rng';
 
 function conditionsMet(t: EventTemplate, state: GameState): boolean {
@@ -176,7 +177,7 @@ export function applyEffects(state: GameState, fx: EffectSpec, event: FiredEvent
     logs.push(`You were sentenced to ${fx.jailYears} year${fx.jailYears > 1 ? 's' : ''} in prison.`);
   }
   if (fx.loseJob && p.job) {
-    logs.push(`You left your job as ${p.job.title}.`);
+    logs.push(`You left your job as ${titleForRank(p.job.title, p.job.rank)}.`);
     p.job = null;
   }
   if (fx.campaignMomentum && p.campaign) {

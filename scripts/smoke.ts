@@ -81,6 +81,27 @@ for (let y = 0; y < 82 && state.player.alive; y++) {
     }
     resolvePending();
 
+    // --- V16: career & work-life realism ---
+    if (y === 4 && !state.player.job) {
+      const openings = A.jobOpenings(state);
+      const qualifying = openings.find((o) => state.player.smarts >= o.requiredSmarts);
+      if (qualifying) A.takeJob(state, qualifying, true);
+      if (state.player.job) {
+        A.setWorkStyle(state, 'overtime');
+        const first = state.player.job.coworkers[0];
+        if (first) A.networkWithCoworker(state, first.id);
+      }
+    }
+    if (y === 7 && state.player.job) {
+      A.applyForPromotion(state);
+      const peer = state.player.job.coworkers.find((c) => c.role === 'peer');
+      if (peer) A.reportToHR(state, peer.id);
+      A.setWorkStyle(state, 'flexible');
+    }
+    if (y === 7) {
+      for (const gigId of ['coding', 'rideshare', 'design_work']) A.takeFreelanceGig(state, gigId);
+    }
+
     // Periodically buy a stock and run for office.
     if (y === 5) {
       const pub = Object.values(state.companies).find((c) => c.isPublic && c.status === 'active');

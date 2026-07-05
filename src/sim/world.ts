@@ -381,6 +381,10 @@ export function generateWorld(config: NewGameConfig): GameState {
     retired: false,
     pensionIncome: 0,
     memoir: null,
+    lastFiredYear: null,
+    freelanceReputation: 30,
+    freelanceGigsCompleted: 0,
+    unemployedYears: 0,
   };
   // Parents
   for (const kind of ['parent', 'parent'] as const) {
