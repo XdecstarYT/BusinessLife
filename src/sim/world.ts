@@ -397,6 +397,10 @@ export function generateWorld(config: NewGameConfig): GameState {
     cancelledUntilYear: null,
     lastSocialPostYear: null,
     actionCooldowns: {},
+    yearsServedThisSentence: 0,
+    stress: rng.range(15, 35),
+    burnoutUntilYear: null,
+    investigationHeat: 0,
   };
   // Parents
   for (const kind of ['parent', 'parent'] as const) {

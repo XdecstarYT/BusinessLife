@@ -65,6 +65,8 @@ const ACHIEVEMENTS: Record<string, { label: string; icon: string }> = {
   first_gig: { label: 'First Gig', icon: '🧰' },
   gig_economy_star: { label: 'Gig Economy Star', icon: '⭐' },
   viral_star: { label: 'Viral Star', icon: '📱' },
+  burned_out: { label: 'Burned Out', icon: '🔥' },
+  early_release: { label: 'Early Release', icon: '🔓' },
   portfolio_titan: { label: 'Portfolio Titan', icon: '📊' },
   patent_powerhouse: { label: 'Patent Powerhouse', icon: '🔬' },
   trademark_empire: { label: 'Trademark Empire', icon: '™️' },

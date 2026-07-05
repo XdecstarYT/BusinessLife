@@ -52,43 +52,71 @@ function setCooldown(state: GameState, key: string): void {
 // ---------------------------------------------------------------------------
 
 export const DEGREES = [
-  { degree: 'Certificate', field: 'Trade', years: 1, cost: 8_000, smarts: 2 },
-  { degree: "Bachelor's", field: 'Business', years: 3, cost: 25_000, smarts: 6 },
-  { degree: "Bachelor's", field: 'Economics', years: 3, cost: 25_000, smarts: 6 },
-  { degree: "Bachelor's", field: 'Law', years: 4, cost: 40_000, smarts: 7 },
-  { degree: "Bachelor's", field: 'Engineering', years: 4, cost: 35_000, smarts: 7 },
-  { degree: "Bachelor's", field: 'Computer Science', years: 3, cost: 30_000, smarts: 7 },
-  { degree: "Bachelor's", field: 'Political Science', years: 3, cost: 24_000, smarts: 6 },
-  { degree: "Bachelor's", field: 'Medicine', years: 6, cost: 70_000, smarts: 9 },
-  { degree: 'MBA', field: 'Business Administration', years: 2, cost: 90_000, smarts: 5 },
-  { degree: 'Doctorate', field: 'Research', years: 4, cost: 20_000, smarts: 8 },
-  { degree: 'Vocational Certificate', field: 'Culinary Arts', years: 1, cost: 12_000, smarts: 2 },
-  { degree: 'Executive MBA', field: 'International Business', years: 2, cost: 140_000, smarts: 6 },
-  { degree: 'PhD', field: 'Artificial Intelligence', years: 5, cost: 60_000, smarts: 10 },
-  { degree: "Juris Doctor", field: 'Advanced Law', years: 3, cost: 85_000, smarts: 8 },
-  { degree: 'Diploma', field: 'Foreign Languages', years: 1, cost: 10_000, smarts: 3 },
-  { degree: "Bachelor's", field: 'Marketing', years: 3, cost: 22_000, smarts: 6 },
-  { degree: "Bachelor's", field: 'Psychology', years: 3, cost: 23_000, smarts: 6 },
-  { degree: "Bachelor's", field: 'Environmental Science', years: 4, cost: 32_000, smarts: 7 },
-  { degree: 'Master\'s', field: 'Finance', years: 2, cost: 55_000, smarts: 6 },
-  { degree: 'Master\'s', field: 'Public Policy', years: 2, cost: 45_000, smarts: 6 },
-  { degree: 'Master\'s', field: 'Data Science', years: 2, cost: 50_000, smarts: 7 },
-  { degree: 'Vocational Certificate', field: 'Aviation', years: 2, cost: 45_000, smarts: 4 },
-  { degree: 'Vocational Certificate', field: 'Electrical Trades', years: 2, cost: 18_000, smarts: 3 },
-  { degree: 'PhD', field: 'Biotechnology', years: 5, cost: 65_000, smarts: 10 },
-  { degree: 'Doctorate', field: 'Public Health', years: 5, cost: 55_000, smarts: 9 },
+  { degree: 'Certificate', field: 'Trade', years: 1, cost: 8_000, smarts: 2, skillId: SK.construction },
+  { degree: "Bachelor's", field: 'Business', years: 3, cost: 25_000, smarts: 6, skillId: SK.management },
+  { degree: "Bachelor's", field: 'Economics', years: 3, cost: 25_000, smarts: 6, skillId: SK.economics },
+  { degree: "Bachelor's", field: 'Law', years: 4, cost: 40_000, smarts: 7, skillId: SK.law },
+  { degree: "Bachelor's", field: 'Engineering', years: 4, cost: 35_000, smarts: 7, skillId: SK.engineering },
+  { degree: "Bachelor's", field: 'Computer Science', years: 3, cost: 30_000, smarts: 7, skillId: SK.programming },
+  { degree: "Bachelor's", field: 'Political Science', years: 3, cost: 24_000, smarts: 6, skillId: SK.policy },
+  { degree: "Bachelor's", field: 'Medicine', years: 6, cost: 70_000, smarts: 9, skillId: SK.medicine },
+  { degree: 'MBA', field: 'Business Administration', years: 2, cost: 90_000, smarts: 5, skillId: SK.management },
+  { degree: 'Doctorate', field: 'Research', years: 4, cost: 20_000, smarts: 8, skillId: SK.research },
+  { degree: 'Vocational Certificate', field: 'Culinary Arts', years: 1, cost: 12_000, smarts: 2, skillId: SK.cooking },
+  { degree: 'Executive MBA', field: 'International Business', years: 2, cost: 140_000, smarts: 6, skillId: SK.diplomacy },
+  { degree: 'PhD', field: 'Artificial Intelligence', years: 5, cost: 60_000, smarts: 10, skillId: SK.ai },
+  { degree: "Juris Doctor", field: 'Advanced Law', years: 3, cost: 85_000, smarts: 8, skillId: SK.law },
+  { degree: 'Diploma', field: 'Foreign Languages', years: 1, cost: 10_000, smarts: 3, skillId: SK.foreignLanguages },
+  { degree: "Bachelor's", field: 'Marketing', years: 3, cost: 22_000, smarts: 6, skillId: SK.marketing },
+  { degree: "Bachelor's", field: 'Psychology', years: 3, cost: 23_000, smarts: 6, skillId: SK.persuasion },
+  { degree: "Bachelor's", field: 'Environmental Science', years: 4, cost: 32_000, smarts: 7, skillId: SK.research },
+  { degree: 'Master\'s', field: 'Finance', years: 2, cost: 55_000, smarts: 6, skillId: SK.investing },
+  { degree: 'Master\'s', field: 'Public Policy', years: 2, cost: 45_000, smarts: 6, skillId: SK.policy },
+  { degree: 'Master\'s', field: 'Data Science', years: 2, cost: 50_000, smarts: 7, skillId: SK.ai },
+  { degree: 'Vocational Certificate', field: 'Aviation', years: 2, cost: 45_000, smarts: 4, skillId: SK.aerospace },
+  { degree: 'Vocational Certificate', field: 'Electrical Trades', years: 2, cost: 18_000, smarts: 3, skillId: SK.construction },
+  { degree: 'PhD', field: 'Biotechnology', years: 5, cost: 65_000, smarts: 10, skillId: SK.biotech },
+  { degree: 'Doctorate', field: 'Public Health', years: 5, cost: 55_000, smarts: 9, skillId: SK.medicine },
 ];
 
+/** Enrolling rolls for a merit scholarship (smarts-driven) that cuts tuition for the whole
+ * programme — a real, one-time-per-enrollment break, not guaranteed. */
 export function enroll(state: GameState, index: number): ActionResult {
   const p = state.player;
   const d = DEGREES[index];
   if (!d) return { ok: false, message: 'Unknown programme.' };
   if (p.studying) return { ok: false, message: 'You are already studying.' };
   if (p.inJailYears > 0) return { ok: false, message: 'Not while incarcerated.' };
-  p.studying = { degree: d.degree, field: d.field, yearsLeft: d.years, costPerYear: Math.round(d.cost / d.years) };
+  const rng = withRng(state);
+  const scholarshipChance = clamp(0.1 + Math.max(0, p.smarts - 60) * 0.01, 0.05, 0.6);
+  const scholarship = rng.chance(scholarshipChance);
+  const costPerYear = Math.round((d.cost / d.years) * (scholarship ? rng.range(0.5, 0.75) : 1));
+  commit(state, rng);
+  p.studying = { degree: d.degree, field: d.field, skillId: d.skillId, yearsLeft: d.years, totalYears: d.years, costPerYear };
   p.smarts = clamp100(p.smarts + d.smarts);
-  log(state, `Enrolled in a ${d.degree} in ${d.field}.`, 'info');
-  return { ok: true, message: `Enrolled. ${d.years} years at $${Math.round(d.cost / d.years).toLocaleString()}/yr.` };
+  log(state, `Enrolled in a ${d.degree} in ${d.field}.${scholarship ? ' Awarded a merit scholarship.' : ''}`, 'info');
+  return {
+    ok: true,
+    message: scholarship
+      ? `Enrolled with a scholarship! ${d.years} years at $${costPerYear.toLocaleString()}/yr.`
+      : `Enrolled. ${d.years} years at $${costPerYear.toLocaleString()}/yr.`,
+  };
+}
+
+/** Withdraw early — the further along you are, the more it costs your reputation and happiness;
+ * no tuition refund. Real consequence for a real choice, not a free undo. */
+export function dropOutOfSchool(state: GameState): ActionResult {
+  const p = state.player;
+  if (!p.studying) return { ok: false, message: 'You are not enrolled in anything.' };
+  const progress = 1 - p.studying.yearsLeft / p.studying.totalYears;
+  const happinessHit = Math.round(4 + progress * 10);
+  const reputationHit = Math.round(2 + progress * 6);
+  const { degree, field } = p.studying;
+  p.happiness = clamp100(p.happiness - happinessHit);
+  p.reputation = clamp100(p.reputation - reputationHit);
+  p.studying = null;
+  log(state, `Dropped out of the ${degree} in ${field}.`, 'bad');
+  return { ok: true, message: `Withdrew from your studies. Happiness -${happinessHit}, reputation -${reputationHit}.` };
 }
 
 /** Job openings generated from home-country industries, scaled by the player. */
@@ -2323,6 +2351,7 @@ export function heist(state: GameState): ActionResult {
     const take = rng.range(20_000, 60_000) * p.crimeRank * (1 + p.turfControl / 200);
     p.dirtyMoney += take;
     p.notoriety = clamp100(p.notoriety + 5);
+    p.investigationHeat = clamp100(p.investigationHeat + 12);
     if (p.crimeRank < 5 && rng.chance(0.25)) {
       p.crimeRank++;
       if (p.crimeRank === 5 && !state.achievements.includes('crime_boss')) state.achievements.push('crime_boss');
@@ -2357,12 +2386,14 @@ export function protectionRacket(state: GameState, targetCompanyId: string): Act
     target.cash -= take;
     p.dirtyMoney += take * (1 + p.turfControl / 200);
     p.notoriety = clamp100(p.notoriety + 3);
+    p.investigationHeat = clamp100(p.investigationHeat + 8);
     commit(state, rng);
     log(state, `Shook down ${target.name} for $${Math.round(take).toLocaleString()}.`, 'bad');
     return { ok: true, message: `Collected $${Math.round(take).toLocaleString()}.` };
   }
   p.reputation = clamp100(p.reputation - 5);
   p.notoriety = clamp100(p.notoriety + 6);
+  p.investigationHeat = clamp100(p.investigationHeat + 20);
   commit(state, rng);
   log(state, `${target.name} refused to pay and reported you.`, 'bad');
   return { ok: false, message: 'They refused and reported you.' };
@@ -2408,6 +2439,36 @@ export function attemptPrisonEscape(state: GameState): ActionResult {
   return { ok: false, message: 'Escape failed. +2 years.' };
 }
 
+/** Request early release once you've served at least a year of the current sentence — real
+ * behavior-based leniency, not a guaranteed out. Odds favor a clean record, low notoriety,
+ * good karma, and time already served; a denial can be appealed again next year. */
+export function requestParole(state: GameState): ActionResult {
+  const p = state.player;
+  if (p.inJailYears <= 0) return { ok: false, message: 'You are not in prison.' };
+  if (p.yearsServedThisSentence < 1) return { ok: false, message: 'You need to serve at least a year before requesting parole.' };
+  if (onCooldown(state, 'parole_request')) return { ok: false, message: 'The board already heard your case this year — try again next year.' };
+  setCooldown(state, 'parole_request');
+  const rng = withRng(state);
+  const chance = clamp(
+    0.25 + (60 - p.criminalRecord * 8) * 0.005 + (p.karma - 50) * 0.003 - p.notoriety * 0.003 + p.yearsServedThisSentence * 0.05,
+    0.05,
+    0.85,
+  );
+  const granted = rng.chance(chance);
+  commit(state, rng);
+  if (granted) {
+    const timeLeft = p.inJailYears;
+    p.inJailYears = 0;
+    p.yearsServedThisSentence = 0;
+    p.happiness = clamp100(p.happiness + 10);
+    log(state, `You were granted parole, ${timeLeft} year(s) early.`, 'good');
+    if (!state.achievements.includes('early_release')) state.achievements.push('early_release');
+    return { ok: true, message: `Parole granted! Released ${timeLeft} year(s) early.` };
+  }
+  log(state, 'The parole board denied your request.', 'bad');
+  return { ok: false, message: 'Parole denied. You can appeal again next year.' };
+}
+
 export function goStraight(state: GameState): ActionResult {
   const p = state.player;
   if (!p.crimeFamilyId) return { ok: false, message: 'You are not in the family.' };
@@ -2439,10 +2500,12 @@ export function launderMoney(state: GameState, companyId: string, amount: number
     c.lawsuits++;
     p.notoriety = clamp100(p.notoriety + 15);
     p.criminalRecord++;
+    p.investigationHeat = clamp100(p.investigationHeat + 18);
     log(state, `🚨 A laundering operation through ${c.name} was flagged by regulators.`, 'bad');
     return { ok: false, message: `The operation was flagged. Dirty money lost, and ${c.name} faces scrutiny.` };
   }
   p.money += clean;
+  p.investigationHeat = clamp100(p.investigationHeat + 6);
   log(state, `Laundered $${Math.round(amount).toLocaleString()} through ${c.name} (${Math.round(cut * 100)}% cut).`, 'bad');
   return { ok: true, message: `Cleaned $${Math.round(clean).toLocaleString()}.` };
 }
@@ -2460,6 +2523,7 @@ export function contestTerritory(state: GameState): ActionResult {
     const gain = rng.range(8, 18);
     p.turfControl = clamp100(p.turfControl + gain);
     p.notoriety = clamp100(p.notoriety + 4);
+    p.investigationHeat = clamp100(p.investigationHeat + 7);
     commit(state, rng);
     log(state, `Your family expanded its turf. Territory control now ${Math.round(p.turfControl)}.`, 'bad');
     return { ok: true, message: `Turf control +${gain.toFixed(0)}.` };
@@ -2467,6 +2531,7 @@ export function contestTerritory(state: GameState): ActionResult {
   const loss = rng.range(5, 12);
   p.turfControl = clamp100(p.turfControl - loss);
   p.health = clamp100(p.health - rng.range(5, 15));
+  p.investigationHeat = clamp100(p.investigationHeat + 10);
   commit(state, rng);
   log(state, `A rival crew pushed back hard on your turf grab.`, 'bad');
   return { ok: false, message: 'The turf war went badly. You took losses.' };
@@ -2519,6 +2584,7 @@ export function doActivity(state: GameState, kind: ActivityKind): ActionResult {
       p.money -= cost;
       p.happiness = clamp100(p.happiness + 10);
       p.health = clamp100(p.health + 3);
+      p.stress = clamp100(p.stress - 12);
       msg = 'You took a rejuvenating vacation.';
       break;
     }
@@ -2560,6 +2626,7 @@ export function doActivity(state: GameState, kind: ActivityKind): ActionResult {
       p.happiness = clamp100(p.happiness + 4);
       p.health = clamp100(p.health + 2);
       p.smarts = clamp100(p.smarts + 1);
+      p.stress = clamp100(p.stress - 8);
       msg = 'A calmer, sharper mind.';
       break;
     }
@@ -2577,6 +2644,7 @@ export function doActivity(state: GameState, kind: ActivityKind): ActionResult {
       p.money -= cost;
       p.happiness = clamp100(p.happiness + 8);
       p.health = clamp100(p.health + 3);
+      p.stress = clamp100(p.stress - 22);
       msg = 'A year of therapy left you feeling lighter and clearer-headed.';
       break;
     }
@@ -2663,6 +2731,7 @@ export function doActivity(state: GameState, kind: ActivityKind): ActionResult {
       p.money -= cost;
       p.happiness = clamp100(p.happiness + 6);
       p.health = clamp100(p.health + 3);
+      p.stress = clamp100(p.stress - 10);
       msg = 'A relaxing spa day recharged you.';
       break;
     }
@@ -2705,6 +2774,7 @@ export function doActivity(state: GameState, kind: ActivityKind): ActionResult {
       p.happiness = clamp100(p.happiness + 4);
       p.health = clamp100(p.health + 4);
       p.skills[SK.fitness] = clamp100((p.skills[SK.fitness] ?? 0) + 4);
+      p.stress = clamp100(p.stress - 7);
       msg = 'A calming yoga session left you centered.';
       break;
     }
@@ -2887,6 +2957,7 @@ export function doActivity(state: GameState, kind: ActivityKind): ActionResult {
       p.money -= cost;
       p.happiness = clamp100(p.happiness + 6);
       p.smarts = clamp100(p.smarts + 2);
+      p.stress = clamp100(p.stress - 9);
       msg = 'A clarifying session on where your life is headed.';
       break;
     }
@@ -2897,6 +2968,7 @@ export function doActivity(state: GameState, kind: ActivityKind): ActionResult {
       p.happiness = clamp100(p.happiness + 8);
       p.health = clamp100(p.health + 4);
       p.karma = clamp100(p.karma + 3);
+      p.stress = clamp100(p.stress - 16);
       msg = 'A quiet retreat left you grounded and clear-headed.';
       break;
     }

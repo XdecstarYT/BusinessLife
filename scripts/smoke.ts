@@ -13,6 +13,7 @@ import * as P from '../src/sim/products';
 import { publicOpinionBreakdown } from '../src/sim/politics';
 import { INDUSTRIES } from '../src/data/industries';
 import { LAW_BY_ID } from '../src/data/laws';
+import { SK } from '../src/data/skills';
 
 // --- V6: scenario presets + difficulty + legacy bonus sanity check (no full sim) ---
 {
@@ -126,6 +127,11 @@ for (let y = 0; y < 82 && state.player.alive; y++) {
     if (y === 22 && state.player.properties.length > 1) {
       A.setMaintenanceLevel(state, state.player.properties[1].id, 'minimal');
     }
+    // --- V19: education depth (enroll then drop out partway through) ---
+    if (y === 23 && !state.player.studying) A.enroll(state, 4);
+    if (y === 25 && state.player.studying) A.dropOutOfSchool(state);
+    // --- V19: mental health (lifestyle actions already tick p.stress; explicit therapy check) ---
+    if (y === 23) A.doActivity(state, 'therapy');
     if (y === 3 && !state.player.spouseId) {
       const candidates = datingPool(state);
       let tries = 0;
@@ -195,6 +201,7 @@ for (let y = 0; y < 82 && state.player.alive; y++) {
     }
     if (y === 15 && state.player.crimeFamilyId) A.goStraight(state);
     if (state.player.inJailYears > 0 && y % 2 === 0) A.bribeJudge(state);
+    if (state.player.inJailYears > 0 && y % 2 === 1) A.requestParole(state);
     // --- V4: relationships ---
     if (y === 16) F.seekMentor(state);
     if (y === 17) F.networking(state);
@@ -555,12 +562,16 @@ console.log('  product tech unlocked:', state.productTech.join(', ') || 'none', 
 const allParts = Object.values(state.customParts ?? {});
 console.log('  custom parts engineered:', allParts.length, '· units sold:', allParts.reduce((s, p) => s + p.unitsSoldTotal, 0).toLocaleString(), '· revenue:', Math.round(allParts.reduce((s, p) => s + p.revenueTotal, 0)).toLocaleString());
 console.log('  properties:', state.player.properties.map((pr) => `${pr.kind} cond=${Math.round(pr.condition)} eff=${Math.round(pr.energyEfficiency)} maint=${pr.maintenanceLevel} val=$${Math.round(pr.value).toLocaleString()}`).join(' | ') || 'none');
+console.log('  education:', state.player.education.map((e) => `${e.degree}/${e.field}`).join(', ') || 'none', '· management skill (graduation bonus):', Math.round(state.player.skills[SK.management] ?? 0));
+console.log('  stress:', Math.round(state.player.stress), '· burnout until:', state.player.burnoutUntilYear ?? 'n/a', '· investigation heat:', Math.round(state.player.investigationHeat), '· years served this sentence:', state.player.yearsServedThisSentence);
 console.log('  errors:', errors);
 
 // Invariant checks
 const bad: string[] = [];
 if (Number.isNaN(nw)) bad.push('net worth is NaN');
 if (Number.isNaN(state.player.money)) bad.push('money is NaN');
+if (Number.isNaN(state.player.stress) || state.player.stress < 0 || state.player.stress > 100) bad.push(`stress out of range: ${state.player.stress}`);
+if (Number.isNaN(state.player.investigationHeat) || state.player.investigationHeat < 0 || state.player.investigationHeat > 100) bad.push(`investigationHeat out of range: ${state.player.investigationHeat}`);
 if (Number.isNaN(state.calendarDay) || state.calendarDay < 0 || state.calendarDay > 364) bad.push(`calendarDay out of range: ${state.calendarDay}`);
 for (const c of state.countries) {
   if (Number.isNaN(c.economy.gdp)) bad.push(`${c.name} gdp NaN`);

@@ -6,7 +6,7 @@
  */
 import { useState, type ReactNode } from 'react';
 import { useGame, type Screen } from '../../store/gameStore';
-import { attemptPrisonEscape, bribeJudge, contestTerritory, CRIME_RANK_TITLES, doActivity, donateToFoundation, enterWitnessProtection, foundCharityFoundation, goStraight, heist, issuePublicApology, joinCrimeFamily, playCasino, postOnSocialMedia, retire, socialMediaPostStyles, writeMemoir } from '../../sim/actions';
+import { attemptPrisonEscape, bribeJudge, contestTerritory, CRIME_RANK_TITLES, doActivity, donateToFoundation, enterWitnessProtection, foundCharityFoundation, goStraight, heist, issuePublicApology, joinCrimeFamily, playCasino, postOnSocialMedia, requestParole, retire, socialMediaPostStyles, writeMemoir } from '../../sim/actions';
 import { titleForRank } from '../../data/careers';
 import { netWorth } from '../../sim/engine';
 import { Badge, Button, Card, CircleTile, Pill, PillRow, SectionHeader, StatBar } from '../components';
@@ -115,6 +115,7 @@ export function Life() {
           <StatBar label="Health" value={p.health} icon={<IconHeart className="w-3.5 h-3.5" />} />
           <StatBar label="Happiness" value={p.happiness} icon={<IconSpark className="w-3.5 h-3.5" />} />
           <StatBar label="Smarts" value={p.smarts} icon={<IconBrain className="w-3.5 h-3.5" />} />
+          <StatBar label={`Stress${p.burnoutUntilYear !== null && state.year <= p.burnoutUntilYear ? ' — burned out' : ''}`} value={p.stress} />
         </Card>
         <Card className="p-4 space-y-3">
           <StatBar label="Reputation" value={p.reputation} />
@@ -137,6 +138,7 @@ export function Life() {
         {p.turfControl > 0 && <Badge tone="bad">Turf {Math.round(p.turfControl)}</Badge>}
         {p.dirtyMoney > 0 && <Badge tone="warn">Dirty {money(p.dirtyMoney)}</Badge>}
         {p.inWitnessProtection && <Badge tone="good">🛡️ Protected</Badge>}
+        {p.investigationHeat > 40 && <Badge tone="warn">🕵️ Heat {Math.round(p.investigationHeat)}</Badge>}
       </PillRow>
 
       {p.inJailYears > 0 && (
@@ -145,9 +147,15 @@ export function Life() {
             <span className="font-extrabold">🔒 In Prison</span>
             <Badge tone="bad">{p.inJailYears} yr{p.inJailYears > 1 ? 's' : ''} left</Badge>
           </div>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
+            Served {p.yearsServedThisSentence} yr{p.yearsServedThisSentence === 1 ? '' : 's'} of this sentence.
+          </p>
           <div className="grid grid-cols-2 gap-2">
             <Button size="sm" variant="soft" onClick={() => run(bribeJudge)}>💵 Bribe Judge</Button>
             <Button size="sm" variant="danger" onClick={() => run(attemptPrisonEscape)}>🏃 Attempt Escape</Button>
+            <Button size="sm" variant="soft" className="col-span-2" disabled={p.yearsServedThisSentence < 1} onClick={() => run(requestParole)}>
+              ⚖️ Request Parole
+            </Button>
           </div>
         </Card>
       )}

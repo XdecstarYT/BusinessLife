@@ -139,6 +139,18 @@ plain JSON you can export and re-import.
   dragging down approval and pushing both sides toward the table, then recovers once you're at peace
   with everyone. A signed armistice costs a real reconstruction toll to infrastructure. Invest directly
   in military readiness from the Treasury & National Security panel.
+- **Mind, school and the law now bite back** — every degree grants smarts *and* a real skill in the
+  field you studied (a CS degree builds programming, a law degree builds law), scholarships knock down
+  tuition for sharper students, and dropping out costs happiness and reputation in proportion to how far
+  you'd gotten. A general-life Stress meter (distinct from job-specific stress) responds to burnout,
+  money trouble and a rocky marriage, and can tip into a real multi-year Burnout debuff past 80 — therapy
+  and rest bring it back down. Crime now carries a lasting Investigation Heat meter that climbs
+  independently of any single job's own risk roll, so a string of "successful" crimes can still catch up
+  with you in a later arrest; time served now gates a genuine Request Parole option. (Honest scope: no
+  literal school timetable, teacher NPCs, exams or detention system, no six-way Stress/Anxiety/Depression/
+  Confidence/Motivation/Burnout meter bank — just Stress plus a binary Burnout state — and no generative
+  AI interrogation or courtroom simulation. What's real: subject-driven degree payoffs, a player-wide
+  mental-health mechanic that feeds job performance, and an arrest/parole pipeline with teeth.)
 - **Family, dynasty & wills** — date, marry (with an optional prenup), divorce, have or adopt children who
   age up as real NPCs and eventually have grandchildren of their own, name a successor to inherit a company
   or a political heir to inherit your party and popularity, draft a will naming a primary heir for a bigger

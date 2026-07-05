@@ -266,26 +266,62 @@ function tickPlayerLife(state: GameState, rng: RNG): void {
     p.lastSocialPostYear = null;
   }
   if (p.actionCooldowns === undefined) p.actionCooldowns = {}; // backfill for saves from before the exploit-fix cooldown system
+  if (p.stress === undefined) { // backfill for saves from before V19 mental health & crime depth
+    p.stress = 25;
+    p.burnoutUntilYear = null;
+    p.investigationHeat = 0;
+    p.yearsServedThisSentence = 0;
+  }
 
   // --- Jail ---------------------------------------------------------------
   if (p.inJailYears > 0) {
     p.inJailYears--;
+    p.yearsServedThisSentence++;
     p.happiness = clamp100(p.happiness - 6);
     p.reputation = clamp100(p.reputation - 2);
     if (p.inJailYears === 0) {
       log(state, 'You were released from prison.', 'milestone');
       if (!state.achievements.includes('jailbird')) state.achievements.push('jailbird');
+      p.yearsServedThisSentence = 0;
     }
     return; // No job/study/campaign progression inside.
   }
 
+  // --- Investigation heat: a life of crime draws real law-enforcement attention over time,
+  // independent of any single crime action's own risk roll. Staying clean lets it cool off.
+  if (p.investigationHeat > 0) {
+    p.investigationHeat = clamp100(p.investigationHeat - (p.crimeFamilyId || p.dirtyMoney > 0 ? 3 : 12));
+  }
+  if (p.investigationHeat > 55 && rng.chance((p.investigationHeat - 50) * 0.01)) {
+    const sentence = Math.max(1, Math.round(rng.range(1, 4) * (1 + p.criminalRecord * 0.15)));
+    p.criminalRecord++;
+    p.inJailYears += sentence;
+    p.investigationHeat = 20;
+    p.job = null;
+    p.campaign = null;
+    if (p.office) {
+      log(state, `You were removed from office as ${p.office.title}.`, 'bad');
+      p.office = null;
+    }
+    p.reputation = clamp100(p.reputation - 20);
+    log(state, `🚨 Investigators finally caught up with you — convicted and sentenced to ${sentence} year(s).`, 'bad');
+  }
+
   // --- Study --------------------------------------------------------------
   if (p.studying) {
+    if (p.studying.skillId === undefined) { // backfill for saves from before V19 education depth
+      p.studying.skillId = SK.research;
+      p.studying.totalYears = p.studying.yearsLeft;
+    }
     p.money -= p.studying.costPerYear;
     p.studying.yearsLeft--;
     p.smarts = clamp100(p.smarts + 2);
     if (p.studying.yearsLeft <= 0) {
       p.education.push({ degree: p.studying.degree, field: p.studying.field, yearCompleted: state.year });
+      // The field you actually studied translates into a real, sizeable skill bump on
+      // graduation — not just generic smarts (a Finance degree makes you better at investing).
+      const skillGain = 12 + p.studying.totalYears * 2;
+      p.skills[p.studying.skillId] = clamp100((p.skills[p.studying.skillId] ?? 0) + skillGain);
       log(state, `You graduated with a ${p.studying.degree} in ${p.studying.field}.`, 'milestone');
       p.reputation = clamp100(p.reputation + 4);
       p.studying = null;
@@ -609,11 +645,39 @@ function tickPlayerLife(state: GameState, rng: RNG): void {
     log(state, `You fell into debt and took emergency credit of $${Math.round(need).toLocaleString()}.`, 'bad');
   }
 
+  // --- Mental health: general life stress, distinct from job-specific stress -----------
+  // Fed by job stress bleeding over, financial pressure, marital tension, and unemployment;
+  // eases with happiness and, absent pressure, drifts back toward a calm baseline.
+  const spouseTension = p.spouseId ? (state.npcs[p.spouseId]?.relationshipTension ?? 0) : 0;
+  const stressPressure =
+    (p.job ? Math.max(0, p.job.stress - 50) * 0.12 : 0) +
+    (p.money < 5_000 ? 10 : p.money < 20_000 ? 4 : p.money > 1_000_000 ? -4 : 0) +
+    spouseTension * 0.06 +
+    (!p.job && !p.retired ? Math.min(18, p.unemployedYears * 2.5) : 0) -
+    Math.max(0, p.happiness - 60) * 0.08;
+  p.stress = clamp100(p.stress + stressPressure * 0.25 + rng.range(-2, 2) - (p.stress - 25) * 0.08);
+
+  if (p.burnoutUntilYear !== null && state.year > p.burnoutUntilYear) {
+    p.burnoutUntilYear = null;
+    p.stress = clamp100(p.stress - 20);
+    log(state, 'You\'ve recovered from burnout — things feel manageable again.', 'good');
+  } else if (p.burnoutUntilYear === null && p.stress > 80 && rng.chance(0.25)) {
+    p.burnoutUntilYear = state.year + rng.int(1, 3);
+    log(state, '🔥 Burnout hit hard this year — you\'re running on empty.', 'bad');
+    if (!state.achievements.includes('burned_out')) state.achievements.push('burned_out');
+  }
+  const burnedOut = p.burnoutUntilYear !== null && state.year <= p.burnoutUntilYear;
+  if (burnedOut) {
+    p.happiness = clamp100(p.happiness - 5);
+    p.health = clamp100(p.health - 3);
+    if (p.job) p.job.performance = clamp100(p.job.performance - 8);
+  }
+
   // --- Body & mind -----------------------------------------------------------
   const ageDecay = p.age > 70 ? 3.5 : p.age > 55 ? 2 : p.age > 40 ? 1 : 0.4;
-  p.health = clamp100(p.health - ageDecay + (p.happiness - 50) * 0.02 + rng.range(-2, 2));
+  p.health = clamp100(p.health - ageDecay + (p.happiness - 50) * 0.02 - Math.max(0, p.stress - 60) * 0.03 + rng.range(-2, 2));
   const moneyComfort = p.money > 100_000 ? 1 : p.money < 2_000 ? -2 : 0;
-  p.happiness = clamp100(p.happiness + moneyComfort + (p.health - 60) * 0.03 + rng.range(-3, 3));
+  p.happiness = clamp100(p.happiness + moneyComfort + (p.health - 60) * 0.03 - Math.max(0, p.stress - 70) * 0.04 + rng.range(-3, 3));
   p.notoriety = Math.max(0, p.notoriety - 1);
 
   // --- Mortality ----------------------------------------------------------------
@@ -771,6 +835,10 @@ export function continueAsHeir(state: GameState, npcId: string): GameState {
     cancelledUntilYear: null,
     lastSocialPostYear: null,
     actionCooldowns: {},
+    yearsServedThisSentence: 0,
+    stress: 25,
+    burnoutUntilYear: null,
+    investigationHeat: 0,
   };
   delete state.npcs[npcId];
   state.player = newPlayer;

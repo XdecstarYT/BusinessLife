@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useGame } from '../../store/gameStore';
 import {
-  applyForPromotion, DEGREES, enroll, freelanceGigListings, jobOpenings, networkWithCoworker,
+  applyForPromotion, DEGREES, dropOutOfSchool, enroll, freelanceGigListings, jobOpenings, networkWithCoworker,
   quitJob, reportToHR, setWorkStyle, takeFreelanceGig, takeJob, takeSabbatical,
 } from '../../sim/actions';
 import { Badge, Button, Card, Pill, PillRow, SectionHeader, StatBar } from '../components';
@@ -117,9 +117,10 @@ export function Career() {
             <Card className="p-5">
               <div className="text-xs font-bold text-brand-500 uppercase mb-1">Studying</div>
               <div className="font-bold">{p.studying.degree} in {p.studying.field}</div>
-              <div className="text-sm text-slate-500 dark:text-slate-400">
-                {p.studying.yearsLeft} year(s) left · {money(p.studying.costPerYear)}/yr
+              <div className="text-sm text-slate-500 dark:text-slate-400 mb-3">
+                {p.studying.yearsLeft} of {p.studying.totalYears} year(s) left · {money(p.studying.costPerYear)}/yr
               </div>
+              <Button size="sm" variant="danger" onClick={() => run(dropOutOfSchool)}>Drop Out</Button>
             </Card>
           )}
         </div>
@@ -179,7 +180,9 @@ export function Career() {
         <div className="mt-4 space-y-3">
           {p.studying ? (
             <Card className="p-6 text-center text-slate-500 dark:text-slate-400">
-              You are currently studying for a {p.studying.degree} in {p.studying.field}. Finish it before enrolling again.
+              <p>You are currently studying for a {p.studying.degree} in {p.studying.field}. Finish it before enrolling again.</p>
+              <p className="text-sm mt-1">{p.studying.yearsLeft} of {p.studying.totalYears} year(s) left · {moneyFull(p.studying.costPerYear)}/yr</p>
+              <Button size="sm" variant="danger" className="mt-3" onClick={() => run(dropOutOfSchool)}>Drop Out</Button>
             </Card>
           ) : (
             DEGREES.map((d, i) => (
@@ -187,7 +190,7 @@ export function Career() {
                 <div>
                   <div className="font-bold">{d.degree} · {d.field}</div>
                   <div className="text-sm text-slate-500 dark:text-slate-400">
-                    {d.years} yrs · {moneyFull(d.cost)} total · +{d.smarts} smarts
+                    {d.years} yrs · {moneyFull(d.cost)} total · +{d.smarts} smarts · graduates with {SKILL_BY_ID[d.skillId]?.name ?? 'a real skill'}
                   </div>
                 </div>
                 <Button size="sm" variant="soft" onClick={() => run(enroll, i)}>

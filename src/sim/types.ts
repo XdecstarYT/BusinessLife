@@ -221,10 +221,16 @@ export interface Player {
   money: number;
   criminalRecord: number; // number of convictions
   inJailYears: number;
+  yearsServedThisSentence: number; // counts up while jailed, resets to 0 on release; gates parole eligibility
 
   skills: Record<string, number>; // skillId -> 0..100
   education: EducationRecord[];
-  studying: { degree: string; field: string; yearsLeft: number; costPerYear: number } | null;
+  studying: { degree: string; field: string; skillId: string; yearsLeft: number; totalYears: number; costPerYear: number } | null;
+
+  // V19: mental health & investigation heat
+  stress: number; // 0..100, general life stress — distinct from PlayerJob.stress, fed by it plus money/relationship/unemployment pressure
+  burnoutUntilYear: number | null; // sustained high stress triggers this; dents performance/happiness/skill-gain until it passes
+  investigationHeat: number; // 0..100, law-enforcement attention built up by a life of crime; can trigger a real arrest independent of any single action's own risk roll
 
   job: PlayerJob | null;
   companies: string[]; // ids of companies the player founded/owns
