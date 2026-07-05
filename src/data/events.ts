@@ -1146,6 +1146,39 @@ ev({
   ],
 });
 ev({
+  id: 'media_misinformation_story', category: 'media', weight: 4, conditions: { minFollowers: 5_000 },
+  text: 'A fabricated story about you is spreading fast online — fake screenshots, no source, and it\'s already trending.',
+  choices: [
+    { label: 'Publicly fact-check it with receipts', skillCheck: { skillId: SK.spin, bonusPerLevel: 0.005 }, outcomes: [
+      { chance: 0.6, text: 'The fact-check landed — most people moved on.', effects: { reputation: 2, karma: 2, socialFollowersPct: 0.01 } },
+      { chance: 0.4, text: 'The fact-check got less reach than the original lie.', effects: { reputation: -4, popularity: -2 } },
+    ] },
+    { label: 'Ignore it and hope it blows over', outcomes: [
+      { chance: 0.55, text: 'It faded within a week, like most fake stories do.', effects: {} },
+      { chance: 0.45, text: 'Silence read as an admission — it kept spreading.', effects: { reputation: -6, popularity: -4, cancelledYears: 1 } },
+    ] },
+    { label: 'Threaten legal action against whoever started it', effects: { money: -8_000, influence: 2 }, outcomes: [
+      { chance: 0.5, text: 'The threat worked — the story was quietly deleted.', effects: { reputation: 3 } },
+      { chance: 0.5, text: 'It backfired — now it\'s a story about you threatening critics.', effects: { reputation: -5, notoriety: 2 } },
+    ] },
+  ],
+});
+ev({
+  id: 'media_cancellation_wave', category: 'media', weight: 5, conditions: { cancelled: true },
+  text: 'The backlash from your post is still going — sponsors are pulling out and old clips keep resurfacing.',
+  choices: [
+    { label: 'Lay low and let it pass', effects: { happiness: -3 } },
+    { label: "Hire a crisis PR firm", effects: { money: -15_000 }, outcomes: [
+      { chance: 0.6, text: 'The firm managed the narrative — the wave is subsiding faster.', effects: { reputation: 3, cancelledYears: -1 } },
+      { chance: 0.4, text: 'Even professional spin couldn\'t slow this one down.', effects: { money: -5_000 } },
+    ] },
+    { label: 'Address it head-on in a long, honest post', skillCheck: { skillId: SK.spin, bonusPerLevel: 0.004 }, outcomes: [
+      { chance: 0.5, text: 'People respected the honesty — you\'re winning some back.', effects: { reputation: 4, popularity: 2, socialFollowersPct: 0.03, cancelledYears: -1 } },
+      { chance: 0.5, text: 'It read as damage control and reopened the wound.', effects: { reputation: -3, popularity: -3 } },
+    ] },
+  ],
+});
+ev({
   id: 'honor_hall_of_fame', category: 'business', weight: 2, once: true, conditions: { minMoney: 500_000_000, minReputation: 60 },
   text: 'A prestigious business hall of fame wants to induct you for your industry impact.',
   choices: [

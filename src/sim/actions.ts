@@ -19,6 +19,8 @@ import { createCompany, nextCompanyId, companyValuation } from './business';
 import { doIPO, marketCap } from './market';
 import { OFFICE_SPEC_BY_KIND, campaignWinChance, eligibleFor, estimateLawVote } from './politics';
 import { log, logHistory } from './engine';
+import { pushMemory } from './npcMind';
+import { POST_STYLE_BY_ID, POST_STYLES } from '../data/socialMedia';
 
 export interface ActionResult {
   ok: boolean;
@@ -112,6 +114,7 @@ function makeCoworker(state: GameState, rng: RNG, role: 'manager' | 'peer', tag:
     role,
     personality: rng.pick(COWORKER_PERSONALITIES).id,
     rapport: Math.round(rng.range(role === 'manager' ? 40 : 35, role === 'manager' ? 60 : 65)),
+    memory: [],
   };
 }
 
@@ -235,6 +238,7 @@ export function networkWithCoworker(state: GameState, coworkerId: string): Actio
   const gain = rng.range(4, 10) * personality.rapportGainMult;
   cw.rapport = clamp100(cw.rapport + gain);
   p.happiness = clamp100(p.happiness + 1);
+  pushMemory(cw, `Made an effort to connect, ${state.year}.`);
   commit(state, rng);
   return { ok: true, message: `Rapport with ${cw.name} is now ${Math.round(cw.rapport)}.` };
 }
@@ -261,6 +265,7 @@ export function reportToHR(state: GameState, coworkerId: string): ActionResult {
   p.job.performance = clamp100(p.job.performance - 5);
   p.job.stress = clamp100(p.job.stress + 8);
   cw.rapport = clamp100(cw.rapport - 20);
+  pushMemory(cw, `Was reported to HR by ${p.name} over an unfounded complaint, ${state.year}.`);
   commit(state, rng);
   log(state, `HR found no wrongdoing in your complaint about ${cw.name}.`, 'bad');
   return { ok: false, message: `HR found no wrongdoing — it's awkward with ${cw.name} now.` };
@@ -309,6 +314,61 @@ export function takeFreelanceGig(state: GameState, gigId: string): ActionResult 
   commit(state, rng);
   log(state, `Freelance gig fell through: ${gig.label}.`, 'bad');
   return { ok: false, message: `The ${gig.label.toLowerCase()} gig fell through — a bad review hurt your freelance standing.` };
+}
+
+// ---------------------------------------------------------------------------
+// Social media
+// ---------------------------------------------------------------------------
+
+export function socialMediaPostStyles() {
+  return POST_STYLES;
+}
+
+/** Post something. Reach and backlash risk both scale with the chosen style, your
+ * socialMedia skill, and how much you already have to lose — the highest-reach styles
+ * are also the ones most likely to blow up. Rate-limited to once a year so it can't be
+ * spammed for free rolls, mirroring the fix applied to the gov-contract/grant exploit. */
+export function postOnSocialMedia(state: GameState, styleId: string): ActionResult {
+  const p = state.player;
+  if (p.cancelledUntilYear !== null && p.cancelledUntilYear >= state.year) {
+    return { ok: false, message: `You're still in the middle of a backlash — lay low until ${p.cancelledUntilYear + 1}.` };
+  }
+  if (p.lastSocialPostYear === state.year) return { ok: false, message: 'Already posted this year — give it time to breathe.' };
+  const style = POST_STYLE_BY_ID[styleId];
+  if (!style) return { ok: false, message: 'Unknown post style.' };
+  const rng = withRng(state);
+  const skillLvl = p.skills[SK.socialMedia] ?? 0;
+  const audienceReach = Math.log10(p.socialFollowers + 100) / 2;
+  const viralityChance = clamp(style.viralityBase + skillLvl * 0.003 + (p.charisma - 50) * 0.002 + audienceReach * 0.05, 0.03, 0.75);
+  const backlashChance = clamp(style.backlashRisk - skillLvl * 0.0025 + (p.reputation < 40 ? 0.05 : 0), 0.01, 0.6);
+  p.lastSocialPostYear = state.year;
+
+  const roll = rng.next();
+  if (roll < backlashChance) {
+    const hit = rng.range(6, 18) * style.reputationSwing;
+    p.reputation = clamp100(p.reputation - hit);
+    p.popularity = clamp100(p.popularity - hit * 0.7);
+    p.socialFollowers = Math.max(0, Math.round(p.socialFollowers * (1 - rng.range(0.1, 0.35))));
+    p.cancelledUntilYear = state.year + rng.int(1, 3);
+    commit(state, rng);
+    log(state, `🔥 Your ${style.label.toLowerCase()} post blew up in the worst way — you're facing a real backlash.`, 'bad');
+    return { ok: false, message: `Backlash! Reputation and popularity took a hit, and you're "cancelled" until ${p.cancelledUntilYear}.` };
+  }
+  if (roll < backlashChance + viralityChance) {
+    const gain = Math.round(rng.range(500, 5000) * (1 + p.socialFollowers / 20_000));
+    p.socialFollowers += gain;
+    const boost = rng.range(2, 6) * style.reputationSwing;
+    p.reputation = clamp100(p.reputation + boost * 0.5);
+    p.popularity = clamp100(p.popularity + boost * 0.6);
+    p.skills[SK.socialMedia] = clamp100((p.skills[SK.socialMedia] ?? 0) + 1);
+    commit(state, rng);
+    log(state, `🚀 Your ${style.label.toLowerCase()} post went viral! Followers: ${p.socialFollowers.toLocaleString()}.`, 'good');
+    if (p.socialFollowers > 100_000 && !state.achievements.includes('viral_star')) state.achievements.push('viral_star');
+    return { ok: true, message: `It went viral! +${gain.toLocaleString()} followers.` };
+  }
+  p.socialFollowers += Math.round(rng.range(5, 60));
+  commit(state, rng);
+  return { ok: true, message: 'Modest engagement — nothing viral this time.' };
 }
 
 // ---------------------------------------------------------------------------

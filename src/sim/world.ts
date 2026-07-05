@@ -12,6 +12,7 @@ import { INDUSTRIES } from '../data/industries';
 import { createCompany, nextCompanyId } from './business';
 import { doIPO } from './market';
 import { SKILLS } from '../data/skills';
+import { randomMindTraits } from './npcMind';
 
 let npcCounter = 0;
 function makeNPC(rng: RNG, countryId: string, role: NPCRole, overrides: Partial<NPC> = {}): NPC {
@@ -41,6 +42,7 @@ function makeNPC(rng: RNG, countryId: string, role: NPCRole, overrides: Partial<
       'protect their family legacy', 'be remembered', 'accumulate power', 'retire early to an island',
     ]),
     memory: [],
+    ...randomMindTraits(rng),
     ...overrides,
   };
 }
@@ -262,6 +264,9 @@ export function generateWorld(config: NewGameConfig): GameState {
     storefront: { name: `${config.playerName.split(' ').pop()} Studio`, theme: 'aurora', featuredProductId: null },
     componentShortage: null,
     customParts: {},
+    culturalProgressivism: rng.int(40, 60),
+    shockHistory: {},
+    industryEraMultiplier: {},
   };
 
   // Public + private NPC companies per country (more in the player's home).
@@ -385,6 +390,9 @@ export function generateWorld(config: NewGameConfig): GameState {
     freelanceReputation: 30,
     freelanceGigsCompleted: 0,
     unemployedYears: 0,
+    socialFollowers: 0,
+    cancelledUntilYear: null,
+    lastSocialPostYear: null,
   };
   // Parents
   for (const kind of ['parent', 'parent'] as const) {

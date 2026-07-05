@@ -54,6 +54,10 @@ const WORLD_EVENT_INFO: Record<WorldEvent['type'], { emoji: string; label: strin
   oil_crisis: { emoji: '🛢️', label: 'Global Oil Crisis', desc: 'Energy prices are spiking; inflation is running hot and confidence is shaken worldwide.', tone: 'bad' },
   banking_collapse: { emoji: '🏦', label: 'Banking Collapse', desc: 'A credit crunch is rattling markets and confidence everywhere; rates are climbing.', tone: 'bad' },
   ai_disruption: { emoji: '🤖', label: 'AI Disruption', desc: 'Automation is reshaping labor markets; unemployment is up even as business confidence rises.', tone: 'bad' },
+  semiconductor_shortage: { emoji: '💾', label: 'Semiconductor Shortage', desc: 'A global chip shortage is squeezing tech, auto and industrial manufacturers; unrest is up as goods sit unfinished.', tone: 'bad' },
+  food_crisis: { emoji: '🌾', label: 'Global Food Crisis', desc: 'Grain and agricultural supply chains are strained; food prices are up and unrest is rising, especially in poorer nations.', tone: 'bad' },
+  shipping_disruption: { emoji: '🚢', label: 'Shipping Disruption', desc: 'Major shipping lanes are blocked or backed up; logistics-heavy industries are stalled and inflation is climbing.', tone: 'bad' },
+  currency_crash: { emoji: '💱', label: 'Currency Crash', desc: 'The exchange rate is in free fall; imports are expensive but exporters are getting a real boost.', tone: 'bad' },
 };
 
 function WorldEventBanner({ event }: { event: WorldEvent }) {

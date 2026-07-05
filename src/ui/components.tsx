@@ -23,11 +23,13 @@ export function Card({ children, className = '', onClick }: { children: ReactNod
 export function Pill({
   label,
   active = false,
+  disabled = false,
   onClick,
   tone = 'neutral',
 }: {
   label: ReactNode;
   active?: boolean;
+  disabled?: boolean;
   onClick?: () => void;
   tone?: 'neutral' | 'brand';
 }) {
@@ -37,7 +39,8 @@ export function Pill({
   return (
     <button
       onClick={onClick}
-      className={`shrink-0 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-semibold transition-colors ${
+      disabled={disabled}
+      className={`shrink-0 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
         active ? activeCls : 'bg-slate-100 text-slate-700 border-transparent dark:bg-ink-800 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-ink-700'
       }`}
     >

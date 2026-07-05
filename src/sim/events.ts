@@ -63,6 +63,8 @@ function conditionsMet(t: EventTemplate, state: GameState): boolean {
   if (c.hasMentor !== undefined && (p.mentorId !== null) !== c.hasMentor) return false;
   if (c.hasRival !== undefined && (p.rivalId !== null) !== c.hasRival) return false;
   if (c.hasProperty !== undefined && (p.properties.length > 0) !== c.hasProperty) return false;
+  if (c.minFollowers !== undefined && p.socialFollowers < c.minFollowers) return false;
+  if (c.cancelled !== undefined && (p.cancelledUntilYear !== null && p.cancelledUntilYear >= state.year) !== c.cancelled) return false;
   return true;
 }
 
@@ -188,6 +190,8 @@ export function applyEffects(state: GameState, fx: EffectSpec, event: FiredEvent
     const country = state.countries.find((k) => k.id === p.countryId)!;
     country.approvalOfGovernment = clamp100(country.approvalOfGovernment + fx.approvalOfGovernment);
   }
+  if (fx.socialFollowersPct) p.socialFollowers = Math.max(0, Math.round(p.socialFollowers * (1 + fx.socialFollowersPct)));
+  if (fx.cancelledYears) p.cancelledUntilYear = state.year + fx.cancelledYears;
   const co = event?.subjectCompanyId ? state.companies[event.subjectCompanyId] : null;
   if (co) {
     if (fx.companyCash) co.cash += fx.companyCash;

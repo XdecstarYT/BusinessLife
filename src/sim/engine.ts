@@ -8,7 +8,7 @@ import type { Country, GameState, LifeLogEntry, MaintenanceLevel, Player, Proper
 import { clamp, clamp100 } from './types';
 import { RNG } from './rng';
 import { tickCommodities, tickEconomy } from './economy';
-import { npcManageCompany, tickCompany, tickMergers, tickCorporateSabotage, companyValuation } from './business';
+import { npcManageCompany, tickCompany, tickMergers, tickCorporateSabotage, tickIndustryEra, companyValuation } from './business';
 import { tickStock, portfolioValue, checkLimitOrders, tickMargin } from './market';
 import { campaignWinChance, electionRegionalBreakdown, OFFICE_SPEC_BY_KIND, promiseFulfillment, promiseMetricValue, tickNPCs, tickPolitics } from './politics';
 import { fireEvents } from './events';
@@ -260,6 +260,12 @@ function tickPlayerLife(state: GameState, rng: RNG): void {
   const city = home.cities.find((c) => c.id === p.cityId) ?? home.cities[0];
   const e = home.economy;
 
+  if (p.socialFollowers === undefined) { // backfill for saves from before V17 social/info layer
+    p.socialFollowers = 0;
+    p.cancelledUntilYear = null;
+    p.lastSocialPostYear = null;
+  }
+
   // --- Jail ---------------------------------------------------------------
   if (p.inJailYears > 0) {
     p.inJailYears--;
@@ -298,6 +304,7 @@ function tickPlayerLife(state: GameState, rng: RNG): void {
     // Coworkers: rapport drifts, toxic/political personalities add ambient stress and
     // occasionally cause a real incident that dents performance.
     for (const cw of p.job.coworkers) {
+      if (cw.memory === undefined) cw.memory = []; // backfill for saves from before V17 NPC minds
       const pers = COWORKER_PERSONALITY_BY_ID[cw.personality];
       cw.rapport = clamp100(cw.rapport + rng.range(-2, 2));
       p.job.stress = clamp100(p.job.stress + pers.stressPerYear);
@@ -360,6 +367,7 @@ function tickPlayerLife(state: GameState, rng: RNG): void {
             role: 'manager',
             personality: rng.pick(COWORKER_PERSONALITIES).id,
             rapport: Math.round(rng.range(35, 55)),
+            memory: [],
           });
           break;
         }
@@ -758,6 +766,9 @@ export function continueAsHeir(state: GameState, npcId: string): GameState {
     freelanceReputation: 30,
     freelanceGigsCompleted: 0,
     unemployedYears: 0,
+    socialFollowers: 0,
+    cancelledUntilYear: null,
+    lastSocialPostYear: null,
   };
   delete state.npcs[npcId];
   state.player = newPlayer;
@@ -777,6 +788,11 @@ export function continueAsHeir(state: GameState, npcId: string): GameState {
  */
 export function advanceYear(state: GameState): GameState {
   if (state.gameOver) return state;
+  if (state.culturalProgressivism === undefined) { // backfill for saves from before V17 world evolution
+    state.culturalProgressivism = 50;
+    state.shockHistory = {};
+    state.industryEraMultiplier = {};
+  }
   const rng = new RNG(state.seed);
   rng.state = state.rngState;
   const netWorthStart = netWorth(state);
@@ -791,8 +807,18 @@ export function advanceYear(state: GameState): GameState {
 
   // 1. World economy
   tickCommodities(state, rng);
+  tickIndustryEra(state, rng);
   const worldEventHeadlines = tickWorldEvents(state, rng);
   for (const h of worldEventHeadlines) logHistory(state, h);
+
+  // Cultural progressivism drifts slowly across decades — tech-forward eras (tech booms, AI
+  // disruption) push it up; crises (banking collapses, food shortages, currency crashes) push
+  // it back down as society turns inward. New births reflect the era they're born into (family.ts).
+  const evTypeNow = state.worldEvent?.type;
+  const culturalDrift = evTypeNow === 'tech_boom' || evTypeNow === 'ai_disruption' ? rng.range(0.1, 0.5)
+    : evTypeNow === 'banking_collapse' || evTypeNow === 'food_crisis' || evTypeNow === 'currency_crash' ? rng.range(-0.5, -0.1)
+    : rng.range(-0.15, 0.15);
+  state.culturalProgressivism = clamp(state.culturalProgressivism + culturalDrift, 0, 100);
   const politicalHeadlines: string[] = [...worldEventHeadlines];
   for (const country of state.countries) {
     const res = tickEconomy(state, country, rng);

@@ -247,21 +247,28 @@ function FoundModal({ open, onClose }: { open: boolean; onClose: () => void }) {
           </PillRow>
           <div className="mt-3 space-y-2 max-h-[50vh] overflow-y-auto">
             {list.length === 0 && <p className="text-center text-slate-400 py-6">No affordable industries in this sector.</p>}
-            {list.map((i) => (
-              <button
-                key={i.id}
-                onClick={() => pick(i.id)}
-                className="w-full text-left p-3 rounded-2xl bg-slate-100 dark:bg-ink-800 hover:bg-slate-200 dark:hover:bg-ink-700"
-              >
-                <div className="flex justify-between gap-2">
-                  <span className="font-semibold truncate min-w-0" title={i.name}>{i.name}</span>
-                  <span className="text-sm font-bold text-brand-500 shrink-0">{money(i.startupCost)}</span>
-                </div>
-                <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                  {i.sector} · margin {pct(i.baseMargin, 0)} · {i.tags.slice(0, 3).join(', ')}
-                </div>
-              </button>
-            ))}
+            {list.map((i) => {
+              const era = state.industryEraMultiplier[i.id] ?? 1;
+              return (
+                <button
+                  key={i.id}
+                  onClick={() => pick(i.id)}
+                  className="w-full text-left p-3 rounded-2xl bg-slate-100 dark:bg-ink-800 hover:bg-slate-200 dark:hover:bg-ink-700"
+                >
+                  <div className="flex justify-between gap-2">
+                    <span className="font-semibold truncate min-w-0" title={i.name}>
+                      {i.name}
+                      {era > 1.12 && <span title="Rising industry — a growing share of the world's economy"> 📈</span>}
+                      {era < 0.9 && <span title="Declining industry — a shrinking share of the world's economy"> 📉</span>}
+                    </span>
+                    <span className="text-sm font-bold text-brand-500 shrink-0">{money(i.startupCost)}</span>
+                  </div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                    {i.sector} · margin {pct(i.baseMargin, 0)} · {i.tags.slice(0, 3).join(', ')}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </>
       ) : (

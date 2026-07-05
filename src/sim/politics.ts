@@ -9,6 +9,7 @@ import { clamp, clamp100 } from './types';
 import { LAW_BY_ID } from '../data/laws';
 import { SK } from '../data/skills';
 import type { RNG } from './rng';
+import { randomMindTraits } from './npcMind';
 
 export interface OfficeSpec {
   kind: OfficeKind;
@@ -526,6 +527,7 @@ export function tickNPCs(state: GameState, rng: RNG): string[] {
   const headlines: string[] = [];
   for (const npc of Object.values(state.npcs)) {
     if (!npc.alive) continue;
+    if (npc.mood === undefined) Object.assign(npc, randomMindTraits(rng)); // backfill for saves from before V17 NPC minds
     npc.age++;
     const deathChance = npc.age > 90 ? 0.25 : npc.age > 80 ? 0.09 : npc.age > 70 ? 0.035 : npc.age > 60 ? 0.012 : 0.004;
     if (rng.chance(deathChance)) {
@@ -547,10 +549,20 @@ export function tickNPCs(state: GameState, rng: RNG): string[] {
       }
       continue;
     }
+    const wealthDelta = rng.range(-0.08, 0.12);
     npc.popularity = clamp100(npc.popularity + rng.range(-4, 4));
-    npc.wealth = Math.max(0, npc.wealth * (1 + rng.range(-0.08, 0.12)));
+    npc.wealth = Math.max(0, npc.wealth * (1 + wealthDelta));
     // Opinions decay toward neutral
     npc.opinionOfPlayer = Math.round(npc.opinionOfPlayer * 0.92);
+
+    // Dynamic mind state: cheap mean-reverting random walks, once a year, for every NPC.
+    // A wealth drop this year raises financial pressure; a rise eases it.
+    npc.financialPressure = clamp100(npc.financialPressure - wealthDelta * 60 + rng.range(-3, 3) - (npc.financialPressure - 25) * 0.06);
+    npc.stress = clamp100(npc.stress + npc.financialPressure * 0.02 + rng.range(-4, 4) - (npc.stress - 35) * 0.08);
+    npc.fatigue = clamp100(npc.fatigue + rng.range(-5, 5) - (npc.fatigue - 30) * 0.1);
+    npc.mood = clamp100(npc.mood + rng.range(-5, 5) - npc.stress * 0.03 - (npc.mood - 55) * 0.05);
+    npc.careerSatisfaction = clamp100(npc.careerSatisfaction + rng.range(-4, 4) + (npc.competence - 50) * 0.01 - (npc.careerSatisfaction - 55) * 0.05);
+    npc.relationshipTension = clamp100(npc.relationshipTension - (npc.relationshipTension - 10) * 0.1);
   }
   return headlines;
 }

@@ -105,6 +105,28 @@ plain JSON you can export and re-import.
   economy** — design work, consulting, coding, writing, rideshare, influencer deals, trades — each gig
   paying out (or falling through) based on a skill check and your freelance reputation, which compounds
   with good reviews and stings with bad ones.
+- **A society that thinks, shocks, talks and evolves** — every relationship NPC (coworkers, mentor,
+  rival, spouse, children) carries a real personality (empathy, aggression, discipline, loyalty,
+  curiosity, social confidence) and a day-to-day mind state (mood, stress, financial pressure) that
+  drifts every year and drives how they actually react to you — a mentor's lessons land harder when
+  they're not burned out, a rival's grudge escalates or cools based on their traits and your history
+  together, not a coin flip. A capped memory log on every notable NPC records what you actually did to
+  them (reported to HR, called a truce, took them on as a protégé) instead of the game forgetting the
+  instant the dialog closes. The world economy can now throw four new global shocks — semiconductor
+  shortages, food crises, shipping disruptions, currency crashes — on top of the original six, each with
+  real ripple effects into unemployment, unrest, government approval, migration and city crime, not just
+  the stock ticker; recent history genuinely dampens the odds of the same shock repeating right away (a
+  real "we just went through this" fatigue, and a nod to post-crisis regulation after a banking
+  collapse). Build a following on social media — five post styles trading reach for backlash risk, real
+  virality and "cancelled" mechanics, and misinformation storylines that can spiral or blow over
+  depending on how you handle them. And industries themselves rise and fall across decades: tech-driven
+  sectors trend up, heavily-regulated low-tech ones trend down, visible as a real 📈/📉 signal when you're
+  choosing where to found your next company — while your own children and grandchildren are born into
+  whatever cultural era the world has drifted into by then, tech booms and crises alike leaving a mark on
+  the next generation's politics. (Honest scope: this isn't a full agent-based simulation running rich
+  decision trees for every one of the world's 400+ background NPCs — that stays lightweight, as it always
+  was, for the sake of a game that runs smoothly on a phone. The deep mind model is reserved for the NPCs
+  you actually have a relationship with, where it's felt.)
 - **Deep politics** — join or found a party, campaign for eight tiers of office (councillor to head of
   state) with rallies/ads/fundraising/consultants/polling, negotiate coalitions, appoint a cabinet, and
   pass or repeal **115 laws** whose effects continuously reshape the economy. As head of state, conduct

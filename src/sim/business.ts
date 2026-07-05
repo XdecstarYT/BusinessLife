@@ -107,6 +107,17 @@ export function companyValuation(c: Company): number {
   return Math.max(0, Math.round(value));
 }
 
+/** Secular industry rise/decline across decades: tech-driven, lightly-regulated industries
+ * trend up over time; capital-heavy, high-regulation, low-tech ones trend down. Cheap flat
+ * pass over the (static) industry catalogue, called once a year from advanceYear. */
+export function tickIndustryEra(state: GameState, rng: RNG): void {
+  for (const ind of state.industries) {
+    const prev = state.industryEraMultiplier[ind.id] ?? 1;
+    const drift = (ind.techIntensity - 0.4) * 0.006 - (ind.regulationSensitivity - 0.5) * 0.002 + rng.range(-0.003, 0.003);
+    state.industryEraMultiplier[ind.id] = clamp(prev + drift, 0.55, 1.85);
+  }
+}
+
 export interface CompanyTickContext {
   state: GameState;
   country: Country;
@@ -196,6 +207,20 @@ export function tickCompany(c: Company, ctx: CompanyTickContext): CompanyTickRes
   } else if (worldEvent?.type === 'ai_disruption') {
     if (ind.tags.includes('ai') || ind.tags.includes('tech') || ind.tags.includes('software')) worldEventMult += worldEvent.severity * 0.25;
     if (ind.laborIntensity > 0.6) worldEventMult -= worldEvent.severity * 0.2;
+  } else if (worldEvent?.type === 'semiconductor_shortage') {
+    if (ind.tags.includes('tech') || ind.tags.includes('auto') || ind.tags.includes('industrial')) {
+      worldEventMult -= worldEvent.severity * 0.3;
+    }
+  } else if (worldEvent?.type === 'food_crisis') {
+    if (ind.tags.includes('agriculture') || ind.tags.includes('commodity_grain')) worldEventMult += worldEvent.severity * 0.3;
+    if (ind.tags.includes('food') && !ind.tags.includes('agriculture')) worldEventMult -= worldEvent.severity * 0.2;
+  } else if (worldEvent?.type === 'shipping_disruption') {
+    if (ind.tags.includes('shipping') || ind.tags.includes('logistics') || ind.tags.includes('export')) {
+      worldEventMult -= worldEvent.severity * 0.35;
+    }
+  } else if (worldEvent?.type === 'currency_crash') {
+    if (ind.tags.includes('export')) worldEventMult += worldEvent.severity * 0.3;
+    if (ind.tags.includes('consumer') && !ind.tags.includes('export')) worldEventMult -= worldEvent.severity * 0.15;
   }
 
   // Market saturation: every industry is finite, so the very largest firms see their upside
@@ -204,7 +229,11 @@ export function tickCompany(c: Company, ctx: CompanyTickContext): CompanyTickRes
   // long playthroughs (e.g. multi-generation play via dynasty succession).
   const saturation = clamp(1 - Math.log10(Math.max(1, c.revenue / 5e9)) * 0.35, 0.15, 1);
 
-  const growthPotential = cycle * confidence * lawMult * priceFit * marketingPower * qualityPull * managerMult * moraleMult * commodityMult * worldEventMult * climateMult * noise;
+  // Secular rise/decline: over decades, tech-driven industries trend up and heavily-regulated,
+  // low-tech ones trend down (see tickIndustryEra). Defaults to 1 for industries with no history yet.
+  const eraMult = state.industryEraMultiplier[ind.id] ?? 1;
+
+  const growthPotential = cycle * confidence * lawMult * priceFit * marketingPower * qualityPull * managerMult * moraleMult * commodityMult * worldEventMult * climateMult * eraMult * noise;
   const cappedGrowth = 1 + (clamp(growthPotential, 0.4, 2.2) - 1) * saturation;
   c.revenue = Math.max(1000, c.revenue * cappedGrowth);
 

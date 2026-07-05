@@ -6,11 +6,12 @@
  * continue across generations.
  */
 import type { Company, GameState, NPC } from './types';
-import { clamp100 } from './types';
+import { clamp, clamp100 } from './types';
 import { RNG } from './rng';
 import { makePersonName } from '../data/names';
 import { log } from './engine';
 import { companyValuation } from './business';
+import { npcWarmth, pushMemory, randomMindTraits } from './npcMind';
 
 let npcCounter = 100_000; // offset from world.ts's own counter space to avoid id collisions
 
@@ -95,6 +96,7 @@ export function propose(state: GameState, candidate: DatingCandidate, withPrenup
     companyId: null,
     goal: 'build a life together',
     memory: [`Married ${p.name} in ${state.year}.`],
+    ...randomMindTraits(rng),
   };
   state.npcs[npc.id] = npc;
   p.spouseId = npc.id;
@@ -115,6 +117,10 @@ export function divorce(state: GameState): FamilyActionResult {
   p.money -= settlement;
   p.happiness = clamp100(p.happiness - 12);
   p.relationships = p.relationships.filter((r) => r.npcId !== p.spouseId);
+  if (spouse) {
+    pushMemory(spouse, `You ended your marriage in ${state.year}.`);
+    spouse.opinionOfPlayer = Math.max(-100, spouse.opinionOfPlayer - 25);
+  }
   log(state, `💔 You divorced ${spouse?.name ?? 'your spouse'}, paying a $${Math.round(settlement).toLocaleString()} settlement${p.hasPrenup ? ' (limited by your prenup)' : ''}.`, 'bad');
   p.spouseId = null;
   p.hasPrenup = false;
@@ -147,7 +153,7 @@ export function haveChild(state: GameState): FamilyActionResult {
     charisma: rng.int(30, 80),
     ambition: rng.int(20, 90),
     riskTolerance: rng.int(20, 80),
-    ideology: rng.int(-40, 40),
+    ideology: clamp(rng.int(-40, 40) - Math.round((state.culturalProgressivism - 50) * 0.5), -100, 100),
     integrity: rng.int(40, 90),
     popularity: 0,
     opinionOfPlayer: 90,
@@ -156,6 +162,7 @@ export function haveChild(state: GameState): FamilyActionResult {
     companyId: null,
     goal: 'grow up',
     memory: [],
+    ...randomMindTraits(rng),
   };
   state.npcs[child.id] = child;
   p.children.push(child.id);
@@ -194,7 +201,7 @@ export function adoptChild(state: GameState): FamilyActionResult {
     charisma: rng.int(30, 80),
     ambition: rng.int(20, 90),
     riskTolerance: rng.int(20, 80),
-    ideology: rng.int(-40, 40),
+    ideology: clamp(rng.int(-40, 40) - Math.round((state.culturalProgressivism - 50) * 0.5), -100, 100),
     integrity: rng.int(40, 90),
     popularity: 0,
     opinionOfPlayer: 80,
@@ -203,6 +210,7 @@ export function adoptChild(state: GameState): FamilyActionResult {
     companyId: null,
     goal: 'grow up',
     memory: [`Adopted by ${p.name} at age ${age}.`],
+    ...randomMindTraits(rng),
   };
   p.money -= cost;
   state.npcs[child.id] = child;
@@ -307,7 +315,7 @@ export function tickFamily(state: GameState, rng: RNG): void {
         charisma: rng.int(30, 80),
         ambition: rng.int(20, 90),
         riskTolerance: rng.int(20, 80),
-        ideology: rng.int(-40, 40),
+        ideology: clamp(rng.int(-40, 40) - Math.round((state.culturalProgressivism - 50) * 0.5), -100, 100),
         integrity: rng.int(40, 90),
         popularity: 0,
         opinionOfPlayer: 70,
@@ -317,6 +325,7 @@ export function tickFamily(state: GameState, rng: RNG): void {
         goal: 'grow up',
         memory: [],
         parentId: child.id,
+        ...randomMindTraits(rng),
       };
       state.npcs[grandchild.id] = grandchild;
       p.grandchildren.push(grandchild.id);
@@ -325,30 +334,55 @@ export function tickFamily(state: GameState, rng: RNG): void {
       p.happiness = clamp100(p.happiness + 5);
     }
   }
-  // Spousal relationship drifts a little each year.
+  // Spousal relationship drifts a little each year — a high-loyalty spouse holds steadier,
+  // and a recent betrayal in their memory drags it down harder than the base random walk.
   if (p.spouseId) {
+    const spouse = state.npcs[p.spouseId];
     const rel = p.relationships.find((r) => r.npcId === p.spouseId);
-    if (rel) rel.closeness = clamp100(rel.closeness + rng.range(-4, 3));
-    if (rel && rel.closeness < 15 && rng.chance(0.08)) {
-      log(state, `Your marriage has grown distant. ${state.npcs[p.spouseId]?.name} may not stay much longer.`, 'bad');
+    if (rel && spouse) {
+      const loyaltyGuard = (spouse.loyalty - 50) * 0.04; // -2..+2
+      spouse.relationshipTension = clamp100(spouse.relationshipTension + (rel.closeness < 40 ? rng.range(1, 6) : rng.range(-4, 1)));
+      rel.closeness = clamp100(rel.closeness + rng.range(-4, 3) + loyaltyGuard - spouse.relationshipTension * 0.03);
+      if (rel.closeness < 15 && rng.chance(0.08 - spouse.loyalty * 0.0005)) {
+        log(state, `Your marriage has grown distant. ${spouse.name} may not stay much longer.`, 'bad');
+      }
     }
   }
 
-  // A mentor passes on a little wisdom each year, if still alive.
+  // A mentor passes on a little wisdom each year, if still alive — a disciplined, empathetic
+  // mentor teaches more, and one who's burned out or unhappy with you gives less.
   if (p.mentorId) {
     const mentor = state.npcs[p.mentorId];
     if (mentor?.alive) {
-      p.smarts = clamp100(p.smarts + 0.5);
-      p.influence = clamp100(p.influence + 0.5);
+      const warmth = npcWarmth(mentor) / 100; // 0..1
+      const effectiveness = 0.3 + (mentor.discipline + mentor.empathy) / 400 + warmth * 0.2 - mentor.stress * 0.002;
+      p.smarts = clamp100(p.smarts + Math.max(0.1, effectiveness));
+      p.influence = clamp100(p.influence + Math.max(0.1, effectiveness));
     } else {
       log(state, 'Your mentor has passed away. Their guidance stays with you.', 'bad');
       p.mentorId = null;
     }
   }
   // A rival keeps the pressure on; if they die, the rivalry ends.
-  if (p.rivalId && !state.npcs[p.rivalId]?.alive) {
-    log(state, 'Your rival has passed away. The rivalry is over.', 'info');
-    p.rivalId = null;
+  if (p.rivalId) {
+    const rival = state.npcs[p.rivalId];
+    if (!rival?.alive) {
+      log(state, 'Your rival has passed away. The rivalry is over.', 'info');
+      p.rivalId = null;
+    } else {
+      // Rivalry heat: aggressive, low-loyalty rivals hold a grudge and occasionally lash out;
+      // empathetic, warming rivals can start to soften and eventually offer a truce.
+      const heat = clamp100((100 - npcWarmth(rival)) * 0.6 + rival.aggression * 0.4);
+      if (heat > 65 && rng.chance(0.05 + rival.aggression / 800)) {
+        const hit = rng.range(2, 6);
+        p.reputation = clamp100(p.reputation - hit);
+        pushMemory(rival, `Undermined ${p.name}'s reputation over a rivalry`);
+        log(state, `😠 ${rival.name} has been undermining you behind your back — your reputation takes a hit.`, 'bad');
+      } else if (heat < 25 && rng.chance(0.04 + rival.empathy / 900)) {
+        rival.opinionOfPlayer = Math.min(100, rival.opinionOfPlayer + 12);
+        log(state, `🕊️ ${rival.name} seems to be softening. Perhaps this rivalry could end.`, 'info');
+      }
+    }
   }
 }
 
@@ -434,7 +468,8 @@ export function seekMentor(state: GameState): RelationResult {
   const candidates = relationshipCandidates(state).filter((n) => n.age > p.age + 8);
   if (!candidates.length) return { ok: false, message: 'Nobody suitable is willing to mentor you right now.' };
   const candidate = rng.weighted(candidates, (n) => n.competence);
-  const chance = 0.3 + (p.charisma - 50) * 0.005 + (p.reputation - 50) * 0.003;
+  // A generous, curious NPC is more likely to take on a protégé than an aloof or guarded one.
+  const chance = 0.25 + (p.charisma - 50) * 0.005 + (p.reputation - 50) * 0.003 + (candidate.empathy - 50) * 0.003 + (candidate.curiosity - 50) * 0.002;
   const accepted = rng.chance(Math.max(0.1, Math.min(0.8, chance)));
   state.rngState = rng.state;
   if (!accepted) {
@@ -444,6 +479,7 @@ export function seekMentor(state: GameState): RelationResult {
   p.mentorId = candidate.id;
   p.relationships.push({ npcId: candidate.id, kind: 'mentor', closeness: 60 });
   candidate.opinionOfPlayer = Math.min(100, candidate.opinionOfPlayer + 20);
+  pushMemory(candidate, `Took ${p.name} on as a protégé in ${state.year}.`);
   log(state, `${candidate.name} agreed to mentor you.`, 'good');
   if (!state.achievements.includes('well_connected')) state.achievements.push('well_connected');
   return { ok: true, message: `${candidate.name} is now your mentor.` };
@@ -457,6 +493,7 @@ export function declareRival(state: GameState, npcId: string): RelationResult {
   p.rivalId = npcId;
   p.relationships.push({ npcId, kind: 'rival', closeness: 10 });
   npc.opinionOfPlayer = Math.max(-100, npc.opinionOfPlayer - 40);
+  pushMemory(npc, `${p.name} declared them a rival in ${state.year}.`);
   log(state, `You made an enemy of ${npc.name}.`, 'bad');
   if (!state.achievements.includes('arch_rival')) state.achievements.push('arch_rival');
   return { ok: true, message: `${npc.name} is now your rival.` };
@@ -467,6 +504,7 @@ export function endRivalry(state: GameState): RelationResult {
   if (!p.rivalId) return { ok: false, message: 'You have no rival.' };
   const npc = state.npcs[p.rivalId];
   p.relationships = p.relationships.filter((r) => r.npcId !== p.rivalId);
+  if (npc) pushMemory(npc, `Called a truce with ${p.name} in ${state.year}.`);
   log(state, `You and ${npc?.name ?? 'your rival'} called a truce.`, 'good');
   p.rivalId = null;
   return { ok: true, message: 'Rivalry ended.' };
@@ -489,6 +527,7 @@ export function networking(state: GameState): RelationResult {
   p.influence = Math.min(100, p.influence + 2);
   p.charisma = Math.min(100, p.charisma + 1);
   npc.opinionOfPlayer = Math.min(100, npc.opinionOfPlayer + 8);
+  pushMemory(npc, `Networked with ${p.name} in ${state.year}.`);
   state.rngState = rng.state;
   log(state, `You made a valuable new connection: ${npc.name}.`, 'info');
   return { ok: true, message: `Met ${npc.name} at a networking event.` };

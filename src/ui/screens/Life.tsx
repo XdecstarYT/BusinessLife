@@ -6,7 +6,7 @@
  */
 import { useState, type ReactNode } from 'react';
 import { useGame, type Screen } from '../../store/gameStore';
-import { attemptPrisonEscape, bribeJudge, contestTerritory, CRIME_RANK_TITLES, doActivity, donateToFoundation, enterWitnessProtection, foundCharityFoundation, goStraight, heist, issuePublicApology, joinCrimeFamily, playCasino, retire, writeMemoir } from '../../sim/actions';
+import { attemptPrisonEscape, bribeJudge, contestTerritory, CRIME_RANK_TITLES, doActivity, donateToFoundation, enterWitnessProtection, foundCharityFoundation, goStraight, heist, issuePublicApology, joinCrimeFamily, playCasino, postOnSocialMedia, retire, socialMediaPostStyles, writeMemoir } from '../../sim/actions';
 import { titleForRank } from '../../data/careers';
 import { netWorth } from '../../sim/engine';
 import { Badge, Button, Card, CircleTile, Pill, PillRow, SectionHeader, StatBar } from '../components';
@@ -166,6 +166,32 @@ export function Life() {
           />
         ))}
       </div>
+
+      {/* Social media */}
+      <SectionHeader title="Social Media" />
+      <Card className="p-4 mb-4">
+        <div className="flex items-center justify-between mb-1">
+          <div className="font-bold text-sm">👥 {p.socialFollowers.toLocaleString()} followers</div>
+          {p.cancelledUntilYear !== null && p.cancelledUntilYear >= state.year && (
+            <Badge tone="bad">🔥 Cancelled until {p.cancelledUntilYear}</Badge>
+          )}
+        </div>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+          {p.cancelledUntilYear !== null && p.cancelledUntilYear >= state.year
+            ? "You're in the middle of a backlash — posting is off the table until it passes."
+            : 'Post once a year. Bigger reach means bigger risk of it blowing up.'}
+        </p>
+        <PillRow>
+          {socialMediaPostStyles().map((s) => (
+            <Pill
+              key={s.id}
+              label={`${s.icon} ${s.label}`}
+              disabled={p.lastSocialPostYear === state.year || (p.cancelledUntilYear !== null && p.cancelledUntilYear >= state.year)}
+              onClick={() => run(postOnSocialMedia, s.id)}
+            />
+          ))}
+        </PillRow>
+      </Card>
 
       {/* Lifestyle quick actions */}
       <SectionHeader title="Lifestyle" />

@@ -177,6 +177,7 @@ export interface Coworker {
   role: 'manager' | 'peer';
   personality: CoworkerPersonality;
   rapport: number; // 0..100
+  memory: string[]; // notable interactions with the player (network, HR reports, incidents)
 }
 
 export type WorkStyle = 'standard' | 'overtime' | 'flexible';
@@ -273,6 +274,9 @@ export interface Player {
   freelanceGigsCompleted: number;
   unemployedYears: number; // consecutive years without a job or company; drives skill decay and safety-net support
   memoir: Memoir | null; // published autobiography paying royalties for a few years
+  socialFollowers: number; // social-media audience size
+  cancelledUntilYear: number | null; // a viral backlash is actively depressing reputation/popularity until this year
+  lastSocialPostYear: number | null; // cooldown so posting can't be spammed for free rolls
   campaign: null | {
     officeKind: OfficeKind;
     regionName: string;
@@ -328,6 +332,24 @@ export interface NPC {
   goal: string;
   memory: string[]; // notable interactions with the player
   parentId?: string; // NPC id of the parent, for tracking grandchildren lineage
+
+  // V17: stable personality dials (0..100), distinct from the career/politics-facing
+  // competence/charisma/ambition/riskTolerance/integrity above — these drive relationship
+  // and social-decision math instead of career/investing behaviour.
+  empathy: number;
+  aggression: number;
+  socialConfidence: number;
+  discipline: number;
+  loyalty: number;
+  curiosity: number;
+
+  // V17: dynamic day-to-day state (0..100), drifts a little every year in tickNPCs.
+  mood: number;
+  stress: number;
+  fatigue: number;
+  financialPressure: number;
+  relationshipTension: number; // specifically about their relationship with the player
+  careerSatisfaction: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -824,6 +846,8 @@ export interface EffectSpec {
   campaignMomentum?: number;
   approvalOfGovernment?: number;
   achievement?: string; // unlocks this achievement id if not already held
+  socialFollowersPct?: number; // fraction change to social-media follower count
+  cancelledYears?: number; // sets/extends a social-media backlash window this many years out
 }
 
 export interface EventOutcome {
@@ -864,10 +888,12 @@ export interface EventConditions {
   hasChildren?: boolean;
   hasProperty?: boolean;
   businessPublic?: boolean; // has an active company that is publicly listed
-  duringWorldEvent?: 'pandemic' | 'trade_war' | 'tech_boom';
+  duringWorldEvent?: WorldEventType;
   inCrimeFamily?: boolean;
   hasMentor?: boolean;
   hasRival?: boolean;
+  minFollowers?: number;
+  cancelled?: boolean; // is currently in the middle of a social-media backlash
 }
 
 export interface EventTemplate {
@@ -960,8 +986,12 @@ export interface GameOverInfo {
   legacyScore: number; // 0..100, a rough composite of wealth, dynasty, office and achievements
 }
 
+export type WorldEventType =
+  | 'pandemic' | 'trade_war' | 'tech_boom' | 'oil_crisis' | 'banking_collapse' | 'ai_disruption'
+  | 'semiconductor_shortage' | 'food_crisis' | 'shipping_disruption' | 'currency_crash';
+
 export interface WorldEvent {
-  type: 'pandemic' | 'trade_war' | 'tech_boom' | 'oil_crisis' | 'banking_collapse' | 'ai_disruption';
+  type: WorldEventType;
   yearsLeft: number;
   severity: number; // 0..1
 }
@@ -1002,6 +1032,11 @@ export interface GameState {
   storefront: Storefront; // the player's customizable product storefront
   componentShortage: { componentId: string; yearsLeft: number } | null; // global supply-chain squeeze
   customParts: Record<string, CustomPart>; // player-engineered components
+
+  // V17: generational world evolution
+  culturalProgressivism: number; // 0..100, drifts slowly across decades; nudged by tech/AI-era world events
+  shockHistory: Partial<Record<WorldEventType, number>>; // world-event type -> years since it last ended (undefined = never happened)
+  industryEraMultiplier: Record<string, number>; // sparse industryId -> growth multiplier from secular rise/decline over decades
 }
 
 export interface SuccessionCandidate {
