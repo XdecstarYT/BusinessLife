@@ -85,10 +85,22 @@ export function PoliticalChamberScene({ parties, totalSeats, isLeader, portfolio
             emissiveIntensity: party.isPlayerParty ? 0.35 : 0,
             roughness: 0.5,
           });
-          const seat = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.32, 0.3), seatMat);
-          seat.position.set(x, 0.16 + row * 0.05, z);
-          seat.lookAt(0, 0.16, 2);
-          scene.add(seat);
+          // A bench unit — seat pad + backrest — instead of one plain cube, so a row reads as
+          // furniture people sit in, not a stack of colored blocks.
+          const unit = new THREE.Group();
+          const cushion = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.14, 0.28), seatMat);
+          cushion.position.y = 0.07;
+          unit.add(cushion);
+          const backrest = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.3, 0.05), seatMat);
+          backrest.position.set(0, 0.2, -0.12);
+          unit.add(backrest);
+          const deskMat = new THREE.MeshStandardMaterial({ color: 0x1c2230, roughness: 0.4, metalness: 0.2 });
+          const desk = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.03, 0.1), deskMat);
+          desk.position.set(0, 0.16, 0.16);
+          unit.add(desk);
+          unit.position.set(x, 0.16 + row * 0.05, z);
+          unit.lookAt(0, 0.16 + row * 0.05, 2);
+          scene.add(unit);
         }
         const midAngle = arcStart + ((shareStart + shareEnd) / 2) * arcSpan;
         const label = makeLabel(`${party.name} · ${party.seats}`, 0.4);

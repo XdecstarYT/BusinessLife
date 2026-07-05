@@ -134,6 +134,34 @@ function signTexture(text: string): THREE.CanvasTexture {
   });
 }
 
+// --------------------------------------------------------------------------- shared props
+
+/** A small clustered canopy (several overlapping icosahedrons over a trunk) instead of a single
+ * cone — reads as a real, roughly-spherical tree crown rather than a traffic-cone silhouette. */
+function makeTree(foliage: string, scale = 1): THREE.Group {
+  const g = new THREE.Group();
+  const trunk = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.05 * scale, 0.08 * scale, 0.5 * scale, 8),
+    new THREE.MeshStandardMaterial({ color: 0x5a3d28, roughness: 0.9 }),
+  );
+  trunk.position.y = 0.25 * scale;
+  g.add(trunk);
+  const canopyMat = new THREE.MeshStandardMaterial({ color: foliage, roughness: 0.85 });
+  const clusters: [number, number, number, number][] = [
+    [0, 0.62, 0, 0.34],
+    [0.18, 0.5, 0.12, 0.22],
+    [-0.16, 0.48, -0.14, 0.24],
+    [0.05, 0.78, -0.08, 0.2],
+  ];
+  for (const [dx, dy, dz, r] of clusters) {
+    const lump = new THREE.Mesh(new THREE.IcosahedronGeometry(r * scale, 1), canopyMat);
+    lump.position.set(dx * scale, dy * scale, dz * scale);
+    lump.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
+    g.add(lump);
+  }
+  return g;
+}
+
 // --------------------------------------------------------------------------- building archetypes
 
 function buildTower(group: THREE.Group, tier: number, accent: string, dormant: boolean): void {
@@ -149,9 +177,22 @@ function buildTower(group: THREE.Group, tier: number, accent: string, dormant: b
   );
   windows.position.set(0, h / 2, d / 2 + 0.01);
   group.add(windows);
-  const roof = new THREE.Mesh(new THREE.BoxGeometry(w * 1.05, 0.15, d * 1.05), new THREE.MeshStandardMaterial({ color: accent, metalness: 0.6, roughness: 0.3 }));
-  roof.position.y = h + 0.08;
+  // Cornice ring at the parapet, then the accent-colored roof cap set back from it — a stepped
+  // roofline instead of one flat slab reads as a real building top, not a box lid.
+  const cornice = new THREE.Mesh(new THREE.BoxGeometry(w * 1.1, 0.08, d * 1.1), new THREE.MeshStandardMaterial({ color: 0x1a2028, roughness: 0.6 }));
+  cornice.position.y = h + 0.04;
+  group.add(cornice);
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(w * 0.94, 0.15, d * 0.94), new THREE.MeshStandardMaterial({ color: accent, metalness: 0.6, roughness: 0.3 }));
+  roof.position.y = h + 0.15;
   group.add(roof);
+  // Recessed entrance: a darker step + doorway at street level so the tower plants into the
+  // ground instead of just floating a flat wall.
+  const step = new THREE.Mesh(new THREE.BoxGeometry(w * 0.5, 0.08, 0.3), new THREE.MeshStandardMaterial({ color: 0x9a9a92, roughness: 0.8 }));
+  step.position.set(0, 0.04, d / 2 + 0.14);
+  group.add(step);
+  const entrance = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.32, 0.55), new THREE.MeshStandardMaterial({ color: 0x0c1018, roughness: 0.4, metalness: 0.3 }));
+  entrance.position.set(0, 0.28, d / 2 + 0.011);
+  group.add(entrance);
   if (dormant) {
     for (let i = 0; i < 3; i++) {
       const plank = new THREE.Mesh(new THREE.BoxGeometry(w * 0.9, 0.22, 0.06), new THREE.MeshStandardMaterial({ color: 0x6b4a2f, roughness: 0.9 }));
@@ -191,6 +232,13 @@ function buildBank(group: THREE.Group, tier: number, accent: string): void {
   const door = new THREE.Mesh(new THREE.PlaneGeometry(0.55 * scale, 0.9 * scale), new THREE.MeshStandardMaterial({ color: accent, metalness: 0.7, roughness: 0.25 }));
   door.position.set(0, 0.5 * scale, 1.06 * scale);
   group.add(door);
+  // Steps up to the portico — grounds the building instead of it just touching a flat plane.
+  const stepMat = new THREE.MeshStandardMaterial({ color: 0xd8d3c4, roughness: 0.7 });
+  for (let i = 0; i < 3; i++) {
+    const step = new THREE.Mesh(new THREE.BoxGeometry((2 * scale) - i * 0.18, 0.08, 0.28 - i * 0.05), stepMat);
+    step.position.set(0, 0.04 + i * 0.08, 1.15 * scale + i * 0.12);
+    group.add(step);
+  }
 }
 
 function buildCapitol(group: THREE.Group, tier: number, accent: string, dormant: boolean): void {
@@ -216,6 +264,9 @@ function buildCapitol(group: THREE.Group, tier: number, accent: string, dormant:
     flag.userData.flag = true;
     group.add(flag);
   }
+  const plinth = new THREE.Mesh(new THREE.CylinderGeometry(1.7 * scale, 1.85 * scale, 0.12, 20), new THREE.MeshStandardMaterial({ color: 0xc9cac2, roughness: 0.75 }));
+  plinth.position.y = 0.06;
+  group.add(plinth);
 }
 
 function buildExchange(group: THREE.Group, tier: number, accent: string): void {
@@ -246,6 +297,12 @@ function buildStorefront(group: THREE.Group, tier: number, accent: string, dorma
   awning.position.set(0, 1.55, 0.9 * scale);
   awning.rotation.x = -0.15;
   group.add(awning);
+  const doorFrame = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.1, 0.06), new THREE.MeshStandardMaterial({ color: 0x151a24, roughness: 0.5 }));
+  doorFrame.position.set(0, 0.55, 0.74 * scale);
+  group.add(doorFrame);
+  const step = new THREE.Mesh(new THREE.BoxGeometry(1.6 * scale, 0.07, 0.22), new THREE.MeshStandardMaterial({ color: 0x8f8a80, roughness: 0.8 }));
+  step.position.set(0, 0.035, 0.85 * scale);
+  group.add(step);
   if (!dormant) {
     const prop = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 12), new THREE.MeshStandardMaterial({ color: accent, emissive: accent, emissiveIntensity: 0.6 }));
     prop.position.set(0, 0.5, 0.9);
@@ -261,6 +318,23 @@ function buildHouse(group: THREE.Group, tier: number, foliage: string): void {
   roof.rotation.y = Math.PI / 4;
   roof.position.y = 1.5;
   group.add(roof);
+  const chimney = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.55, 0.16), new THREE.MeshStandardMaterial({ color: 0x8a6a58, roughness: 0.85 }));
+  chimney.position.set(-0.55, 1.65, -0.3);
+  group.add(chimney);
+  // A small porch overhang above the door, held up on two thin posts — reads as an entrance,
+  // not just a colored rectangle stuck on the wall.
+  const porchRoof = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.06, 0.4), new THREE.MeshStandardMaterial({ color: 0x7a4a3a, roughness: 0.8 }));
+  porchRoof.position.set(0, 0.92, 0.9);
+  group.add(porchRoof);
+  const postMat = new THREE.MeshStandardMaterial({ color: 0xe8e0cf, roughness: 0.6 });
+  for (const dx of [-0.26, 0.26] as const) {
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.55, 8), postMat);
+    post.position.set(dx, 0.63, 1.05);
+    group.add(post);
+  }
+  const step = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.06, 0.24), new THREE.MeshStandardMaterial({ color: 0xb9b0a0, roughness: 0.8 }));
+  step.position.set(0, 0.03, 0.86);
+  group.add(step);
   const door = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.7), new THREE.MeshStandardMaterial({ color: 0x4a3324 }));
   door.position.set(0, 0.35, 0.71);
   group.add(door);
@@ -269,13 +343,16 @@ function buildHouse(group: THREE.Group, tier: number, foliage: string): void {
     const win = new THREE.Mesh(new THREE.PlaneGeometry(0.32, 0.32), winMat);
     win.position.set(dx, 0.75, 0.71);
     group.add(win);
+    const shutterMat = new THREE.MeshStandardMaterial({ color: 0x5c7a5e, roughness: 0.8 });
+    for (const sx of [-0.22, 0.22]) {
+      const shutter = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.34, 0.02), shutterMat);
+      shutter.position.set(dx + sx, 0.75, 0.72);
+      group.add(shutter);
+    }
   }
-  const tree = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.9, 10), new THREE.MeshStandardMaterial({ color: foliage, roughness: 0.8 }));
-  tree.position.set(1.3, 0.9, -0.6);
+  const tree = makeTree(foliage, 1.15);
+  tree.position.set(1.3, 0, -0.6);
   group.add(tree);
-  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 0.5, 8), new THREE.MeshStandardMaterial({ color: 0x5a3d28 }));
-  trunk.position.set(1.3, 0.25, -0.6);
-  group.add(trunk);
 }
 
 function buildOffice(group: THREE.Group, tier: number, accent: string, dormant: boolean): void {
@@ -296,6 +373,17 @@ function buildOffice(group: THREE.Group, tier: number, accent: string, dormant: 
   const sign = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.28), new THREE.MeshStandardMaterial({ map: signTexture('CAREER'), emissive: 0xffffff, emissiveMap: signTexture('CAREER'), emissiveIntensity: 0.8 }));
   sign.position.set(0, h + 0.22, 0);
   group.add(sign);
+  // Rooftop plant — an AC unit and a vent stack — the kind of clutter that keeps a flat-roofed
+  // block from reading as a bare box from the label-view angle above.
+  const acUnit = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.12, 0.22), new THREE.MeshStandardMaterial({ color: 0x555b63, roughness: 0.6 }));
+  acUnit.position.set(w * 0.25, h + 0.06, 0);
+  group.add(acUnit);
+  const vent = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.2, 8), new THREE.MeshStandardMaterial({ color: 0x3a3f47 }));
+  vent.position.set(-w * 0.28, h + 0.1, -d * 0.15);
+  group.add(vent);
+  const doorFrame = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1, 0.06), new THREE.MeshStandardMaterial({ color: 0x11151d, roughness: 0.4 }));
+  doorFrame.position.set(0, 0.5, d / 2 + 0.03);
+  group.add(doorFrame);
   if (!dormant && tier >= 2) {
     const awning = new THREE.Mesh(new THREE.BoxGeometry(w * 1.05, 0.08, 0.35), new THREE.MeshStandardMaterial({ color: accent }));
     awning.position.set(0, 0.5, d / 2 + 0.25);
@@ -312,16 +400,24 @@ function buildPark(group: THREE.Group, tier: number, foliage: string, dormant: b
   for (let i = 0; i < treeCount; i++) {
     const a = (i / treeCount) * Math.PI * 2;
     const r = 0.7 + (i % 2) * 0.3;
-    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 0.4, 8), new THREE.MeshStandardMaterial({ color: 0x5a3d28 }));
-    trunk.position.set(Math.cos(a) * r, 0.2, Math.sin(a) * r);
-    group.add(trunk);
-    const crown = new THREE.Mesh(new THREE.SphereGeometry(0.32, 12, 10), new THREE.MeshStandardMaterial({ color: foliage === '#8a9a95' ? '#c7d2ce' : foliage, roughness: 0.8 }));
-    crown.position.set(Math.cos(a) * r, 0.55, Math.sin(a) * r);
-    group.add(crown);
+    const tree = makeTree(foliage, 0.85);
+    tree.position.set(Math.cos(a) * r, 0, Math.sin(a) * r);
+    group.add(tree);
   }
-  const bench = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.1, 0.22), new THREE.MeshStandardMaterial({ color: 0x8a6a45 }));
-  bench.position.set(0, 0.18, 0.9);
-  group.add(bench);
+  // A proper bench — seat, backrest and two legs — instead of a single floating plank.
+  const benchMat = new THREE.MeshStandardMaterial({ color: 0x8a6a45, roughness: 0.75 });
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.05, 0.22), benchMat);
+  seat.position.set(0, 0.2, 0.9);
+  group.add(seat);
+  const back = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.22, 0.04), benchMat);
+  back.position.set(0, 0.33, 0.79);
+  group.add(back);
+  const legMat = new THREE.MeshStandardMaterial({ color: 0x2a2f22, roughness: 0.6 });
+  for (const dx of [-0.24, 0.24]) {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.2, 0.2), legMat);
+    leg.position.set(dx, 0.1, 0.9);
+    group.add(leg);
+  }
   if (!dormant) {
     const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 10), new THREE.MeshStandardMaterial({ color: 0xfff2c8, emissive: 0xfff2c8, emissiveIntensity: 0.4 + tier * 0.2 }));
     lamp.position.set(-0.8, 0.9, -0.4);
@@ -333,6 +429,19 @@ function buildDock(group: THREE.Group, tier: number, accent: string, dormant: bo
   const pier = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.12, 1), new THREE.MeshStandardMaterial({ color: 0x5a4a38, roughness: 0.9 }));
   pier.position.y = 0.06;
   group.add(pier);
+  // Deck planking seams + edge bollards, so the pier reads as built structure, not a flat slab.
+  const plankMat = new THREE.MeshStandardMaterial({ color: 0x3f3327, roughness: 0.95 });
+  for (let i = -3; i <= 3; i++) {
+    const seam = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.002, 0.98), plankMat);
+    seam.position.set(i * 0.3, 0.121, 0);
+    group.add(seam);
+  }
+  const bollardMat = new THREE.MeshStandardMaterial({ color: 0x2a2f22, roughness: 0.7 });
+  for (const [dx, dz] of [[-1, 0.42], [1, 0.42], [-1, -0.42], [1, -0.42]] as const) {
+    const bollard = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.035, 0.14, 8), bollardMat);
+    bollard.position.set(dx, 0.19, dz);
+    group.add(bollard);
+  }
   const warehouse = new THREE.Mesh(new THREE.BoxGeometry(1.3, 1 + tier * 0.3, 0.9), new THREE.MeshStandardMaterial({ color: dormant ? 0x3a3f47 : 0x3f4a52, roughness: 0.7 }));
   warehouse.position.set(-0.3, (1 + tier * 0.3) / 2 + 0.12, -0.3);
   group.add(warehouse);
@@ -387,23 +496,61 @@ function buildBuilding(group: THREE.Group, b: HubBuilding, foliage: string): voi
 
 function makeCar(color: number): THREE.Group {
   const g = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.16, 0.22), new THREE.MeshStandardMaterial({ color, roughness: 0.5 }));
-  body.position.y = 0.12;
-  g.add(body);
-  const cabin = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.12, 0.19), new THREE.MeshStandardMaterial({ color: 0x0e1420, roughness: 0.3 }));
-  cabin.position.set(-0.02, 0.24, 0);
+  const bodyMat = new THREE.MeshStandardMaterial({ color, roughness: 0.35, metalness: 0.55 });
+  const chassis = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.14, 0.2), bodyMat);
+  chassis.position.y = 0.1;
+  g.add(chassis);
+  const cabin = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.13, 0.18), new THREE.MeshStandardMaterial({ color: 0x0e1420, roughness: 0.3, metalness: 0.2 }));
+  cabin.position.set(-0.02, 0.235, 0);
   g.add(cabin);
+  const glassMat = new THREE.MeshPhysicalMaterial({ color: 0x9fd6ff, roughness: 0.05, transmission: 0.5, transparent: true, opacity: 0.85 });
+  const windshield = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.1, 0.16), glassMat);
+  windshield.position.set(0.09, 0.24, 0);
+  g.add(windshield);
+  const wheelMat = new THREE.MeshStandardMaterial({ color: 0x14171d, roughness: 0.85 });
+  const wheelGeo = new THREE.CylinderGeometry(0.05, 0.05, 0.04, 12);
+  for (const [dx, dz] of [[0.14, 0.11], [0.14, -0.11], [-0.14, 0.11], [-0.14, -0.11]] as const) {
+    const wheel = new THREE.Mesh(wheelGeo, wheelMat);
+    wheel.rotation.x = Math.PI / 2;
+    wheel.position.set(dx, 0.05, dz);
+    g.add(wheel);
+  }
+  const headlightMat = new THREE.MeshStandardMaterial({ color: 0xfff6d8, emissive: 0xfff6d8, emissiveIntensity: 0.7 });
+  const taillightMat = new THREE.MeshStandardMaterial({ color: 0xff2b2b, emissive: 0xff2b2b, emissiveIntensity: 0.8 });
+  for (const dz of [0.075, -0.075]) {
+    const headlight = new THREE.Mesh(new THREE.SphereGeometry(0.018, 8, 8), headlightMat);
+    headlight.position.set(0.22, 0.1, dz);
+    g.add(headlight);
+    const taillight = new THREE.Mesh(new THREE.SphereGeometry(0.017, 8, 8), taillightMat);
+    taillight.position.set(-0.22, 0.1, dz);
+    g.add(taillight);
+  }
   return g;
 }
 
-function makePedestrian(color: number): THREE.Group {
+function makePedestrian(shirtColor: number, pantsColor = 0x2b3140): THREE.Group {
   const g = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.09, 0.28, 4, 8), new THREE.MeshStandardMaterial({ color, roughness: 0.6 }));
-  body.position.y = 0.28;
-  g.add(body);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.08, 12, 10), new THREE.MeshStandardMaterial({ color: 0xe8c9a0 }));
-  head.position.y = 0.48;
+  const legs = new THREE.Mesh(new THREE.CapsuleGeometry(0.075, 0.2, 4, 8), new THREE.MeshStandardMaterial({ color: pantsColor, roughness: 0.75 }));
+  legs.position.y = 0.16;
+  g.add(legs);
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.078, 0.16, 4, 8), new THREE.MeshStandardMaterial({ color: shirtColor, roughness: 0.6 }));
+  torso.position.y = 0.4;
+  g.add(torso);
+  const armMat = new THREE.MeshStandardMaterial({ color: shirtColor, roughness: 0.6 });
+  for (const dx of [-0.11, 0.11]) {
+    const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.028, 0.18, 4, 6), armMat);
+    arm.position.set(dx, 0.37, 0);
+    g.add(arm);
+  }
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.072, 14, 12), new THREE.MeshStandardMaterial({ color: 0xe8c9a0, roughness: 0.65 }));
+  head.position.y = 0.56;
   g.add(head);
+  const hair = new THREE.Mesh(
+    new THREE.SphereGeometry(0.075, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.55),
+    new THREE.MeshStandardMaterial({ color: 0x2a2018, roughness: 0.85 }),
+  );
+  hair.position.y = 0.59;
+  g.add(hair);
   return g;
 }
 

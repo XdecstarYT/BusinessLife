@@ -62,11 +62,20 @@ function tickerTexture(name: string, price: number, gainPct: number): THREE.Canv
 
 function makeTrader(color: number): THREE.Group {
   const g = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.13, 0.34, 4, 8), new THREE.MeshStandardMaterial({ color, roughness: 0.6 }));
-  body.position.y = 0.34;
-  g.add(body);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 10), new THREE.MeshStandardMaterial({ color: 0xe8c9a0 }));
-  head.position.y = 0.58;
+  const legs = new THREE.Mesh(new THREE.CapsuleGeometry(0.1, 0.24, 4, 8), new THREE.MeshStandardMaterial({ color: 0x232733, roughness: 0.7 }));
+  legs.position.y = 0.22;
+  g.add(legs);
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.11, 0.22, 4, 8), new THREE.MeshStandardMaterial({ color, roughness: 0.55 }));
+  torso.position.y = 0.55;
+  g.add(torso);
+  const armMat = new THREE.MeshStandardMaterial({ color, roughness: 0.55 });
+  for (const dx of [-0.15, 0.15]) {
+    const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.038, 0.24, 4, 6), armMat);
+    arm.position.set(dx, 0.5, 0);
+    g.add(arm);
+  }
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.1, 14, 12), new THREE.MeshStandardMaterial({ color: 0xe8c9a0, roughness: 0.65 }));
+  head.position.y = 0.78;
   g.add(head);
   return g;
 }
