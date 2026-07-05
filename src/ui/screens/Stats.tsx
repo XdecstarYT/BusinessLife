@@ -60,6 +60,7 @@ const ACHIEVEMENTS: Record<string, { label: string; icon: string }> = {
   notorious: { label: 'Notorious', icon: '😈' },
   paragon: { label: 'Paragon', icon: '😇' },
   property_baron: { label: 'Property Baron', icon: '🏘️' },
+  condemned_no_more: { label: 'Condemned No More', icon: '🏚️' },
   portfolio_titan: { label: 'Portfolio Titan', icon: '📊' },
   patent_powerhouse: { label: 'Patent Powerhouse', icon: '🔬' },
   trademark_empire: { label: 'Trademark Empire', icon: '™️' },

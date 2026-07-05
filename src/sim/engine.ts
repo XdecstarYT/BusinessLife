@@ -4,7 +4,7 @@
  * player's own life (job, study, office, campaign, assets) → events → news.
  * Pure function of (state, rng): UI-free and worker-friendly.
  */
-import type { Country, GameState, LifeLogEntry, Player } from './types';
+import type { Country, GameState, LifeLogEntry, MaintenanceLevel, Player, PropertyAsset } from './types';
 import { clamp, clamp100 } from './types';
 import { RNG } from './rng';
 import { tickCommodities, tickEconomy } from './economy';
@@ -22,6 +22,15 @@ import { tickProducts } from './products';
 import { SK } from '../data/skills';
 
 const SPECIAL_BIRTHDAYS = new Set([18, 21, 25, 30, 40, 50, 60, 65, 70, 75, 80, 90, 100]);
+
+// Building realism: upkeep spend trades cost for condition; neglected, uninsured
+// buildings risk a costly structural incident, and low condition dents both
+// rental income and resale value.
+const MAINTENANCE_COST_RATE: Record<MaintenanceLevel, number> = { minimal: 0.002, standard: 0.006, premium: 0.014 };
+const MAINTENANCE_DECAY_MULT: Record<MaintenanceLevel, number> = { minimal: 1.7, standard: 1.0, premium: 0.3 };
+const BASE_DECAY_BY_KIND: Record<PropertyAsset['kind'], number> = {
+  apartment: 1.1, house: 1.0, mansion: 1.3, commercial: 1.5, land: 0, island: 1.2, penthouse: 1.0,
+};
 
 export function log(state: GameState, text: string, kind: LifeLogEntry['kind'] = 'info'): void {
   state.lifeLog.push({ year: state.year, age: state.player.age, text, kind });
@@ -460,12 +469,43 @@ function tickPlayerLife(state: GameState, rng: RNG): void {
   if (p.prAgencyHired) p.money -= 10_000;
 
   for (const prop of p.properties) {
-    prop.value = Math.max(10_000, prop.value * (e.housingIndex / Math.max(1, e.history.length >= 2 ? e.history[e.history.length - 2].housingIndex : 100)));
-    if (prop.rentalYield > 0) p.money += prop.value * prop.rentalYield * 0.85; // net of costs
+    if (prop.condition === undefined) { // backfill for saves from before building realism
+      prop.yearBuilt = state.year;
+      prop.condition = 90;
+      prop.energyEfficiency = 90;
+      prop.maintenanceLevel = 'standard';
+      prop.lastRenovatedYear = null;
+    }
+    if (prop.kind !== 'land') {
+      const decay = BASE_DECAY_BY_KIND[prop.kind] * MAINTENANCE_DECAY_MULT[prop.maintenanceLevel] + rng.range(-0.3, 0.3);
+      const upkeepDrift = prop.maintenanceLevel === 'premium' && prop.condition < 88 ? 1.2 : 0;
+      prop.condition = clamp100(prop.condition - decay + upkeepDrift);
+      prop.energyEfficiency = clamp100(prop.energyEfficiency - 0.4 - Math.max(0, 50 - prop.condition) * 0.01);
+      p.money -= prop.value * MAINTENANCE_COST_RATE[prop.maintenanceLevel];
+      if (prop.insured) p.money -= prop.value * 0.004 * (1 + Math.max(0, 50 - prop.condition) * 0.01);
+    }
+
+    const condValueMult = prop.kind === 'land' ? 1 : 1 + (prop.condition - 60) * 0.0006;
+    prop.value = Math.max(10_000, prop.value * (e.housingIndex / Math.max(1, e.history.length >= 2 ? e.history[e.history.length - 2].housingIndex : 100)) * condValueMult);
+
+    if (prop.rentalYield > 0) {
+      const condMult = prop.condition < 40 ? 0.55 : prop.condition < 65 ? 0.8 : prop.condition < 85 ? 1.0 : 1.08;
+      p.money += prop.value * prop.rentalYield * 0.85 * condMult; // net of costs
+    }
     if (prop.mortgage > 0) {
       const pay = prop.mortgage * (e.interestRate + 0.02) + prop.mortgage * 0.05;
       p.money -= pay;
       prop.mortgage = Math.max(0, prop.mortgage - prop.mortgage * 0.05);
+    }
+
+    if (prop.kind !== 'land' && prop.condition < 35 && rng.chance(0.05 + (35 - prop.condition) * 0.006)) {
+      const severity = rng.range(0.15, 0.32);
+      const loss = prop.value * severity * (prop.insured ? 0.4 : 1);
+      prop.value = Math.max(5_000, prop.value - loss);
+      prop.condition = clamp100(prop.condition - rng.range(10, 20));
+      log(state, prop.insured
+        ? `⚠️ Structural failure at ${prop.name} — insurance covered most of the $${Math.round(loss).toLocaleString()} damage.`
+        : `🔥 Structural failure at ${prop.name} — uninsured, you're out $${Math.round(loss).toLocaleString()}.`, 'bad');
     }
   }
 

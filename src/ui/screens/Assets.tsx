@@ -16,15 +16,16 @@ import {
   renovateProperty,
   sellBondEarly,
   sellProperty,
+  setMaintenanceLevel,
   takeLoan,
   toggleRentalStatus,
   togglePropertyInsurance,
   withdrawSavings,
 } from '../../sim/actions';
 import { buyLuxuryAsset, divestCelebrityStake, investInCelebrityBrand, LUXURY_CATALOG, sellLuxuryAsset } from '../../sim/lifestyle';
-import { Badge, Button, Card, Field, Pill, PillRow, SectionHeader } from '../components';
+import { Badge, Button, Card, Field, Pill, PillRow, SectionHeader, StatBar } from '../components';
 import { money, moneyFull, pct } from '../format';
-import type { PropertyAsset } from '../../sim/types';
+import type { MaintenanceLevel, PropertyAsset } from '../../sim/types';
 
 export function Assets() {
   const { state, run } = useGame();
@@ -124,6 +125,8 @@ export function Assets() {
               onToggleRental={() => run(toggleRentalStatus, prop.id)}
               onToggleInsurance={() => run(togglePropertyInsurance, prop.id)}
               onRefinance={() => run(refinanceMortgage, prop.id)}
+              onMaintenance={(level) => run(setMaintenanceLevel, prop.id, level)}
+              year={state.year}
             />
           ))}
         </div>
@@ -356,6 +359,12 @@ export function Assets() {
   );
 }
 
+const MAINTENANCE_LEVELS: { id: MaintenanceLevel; label: string }[] = [
+  { id: 'minimal', label: 'Minimal' },
+  { id: 'standard', label: 'Standard' },
+  { id: 'premium', label: 'Premium' },
+];
+
 function PropertyCard({
   prop,
   onSell,
@@ -363,6 +372,8 @@ function PropertyCard({
   onToggleRental,
   onToggleInsurance,
   onRefinance,
+  onMaintenance,
+  year,
 }: {
   prop: PropertyAsset;
   onSell: () => void;
@@ -370,8 +381,13 @@ function PropertyCard({
   onToggleRental: () => void;
   onToggleInsurance: () => void;
   onRefinance: () => void;
+  onMaintenance: (level: MaintenanceLevel) => void;
+  year: number;
 }) {
   const appreciation = prop.value / prop.purchasePrice - 1;
+  const isLand = prop.kind === 'land';
+  const age = year - prop.yearBuilt;
+  const atRisk = !isLand && prop.condition < 35;
   return (
     <Card className="p-4">
       <div className="flex justify-between items-start gap-2">
@@ -379,6 +395,7 @@ function PropertyCard({
           <div className="font-bold truncate" title={prop.name}>{prop.name}</div>
           <div className="text-xs text-slate-500 dark:text-slate-400 capitalize truncate">
             {prop.kind} · bought at {money(prop.purchasePrice)}
+            {!isLand && ` · built ${prop.yearBuilt} (${age} yr${age !== 1 ? 's' : ''} old)`}
           </div>
         </div>
         <div className="text-right shrink-0">
@@ -392,7 +409,30 @@ function PropertyCard({
         {prop.mortgage > 0 && <Badge tone="warn">Mortgage {money(prop.mortgage)}</Badge>}
         {prop.rentalYield > 0 && <Badge tone="good">Rented</Badge>}
         {prop.insured && <Badge tone="brand">Insured</Badge>}
+        {atRisk && <Badge tone="bad">⚠️ Structural risk</Badge>}
+        {prop.lastRenovatedYear && <Badge>Renovated {prop.lastRenovatedYear}</Badge>}
       </div>
+      {!isLand && (
+        <div className="mt-3 space-y-1.5">
+          <StatBar label="Condition" value={prop.condition} />
+          <StatBar label="Energy efficiency" value={prop.energyEfficiency} />
+        </div>
+      )}
+      {atRisk && (
+        <p className="text-[11px] text-rose-500 mt-2">
+          Badly neglected — real risk of a structural failure each year until you renovate{prop.insured ? ' (insurance would soften the loss)' : ' and you are uninsured'}.
+        </p>
+      )}
+      {!isLand && (
+        <div className="mt-3">
+          <div className="text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Maintenance spend</div>
+          <PillRow>
+            {MAINTENANCE_LEVELS.map((m) => (
+              <Pill key={m.id} label={m.label} active={prop.maintenanceLevel === m.id} onClick={() => onMaintenance(m.id)} />
+            ))}
+          </PillRow>
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-2 mt-3">
         <Button size="sm" variant="soft" onClick={onRenovate}>🔨 Renovate</Button>
         {prop.kind !== 'land' && (

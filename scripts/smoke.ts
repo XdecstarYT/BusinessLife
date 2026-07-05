@@ -97,6 +97,13 @@ for (let y = 0; y < 82 && state.player.alive; y++) {
     if (y === 20) {
       const listings = A.propertyListings(state);
       A.buyProperty(state, listings[0], true);
+      // A second property, deliberately run on minimal upkeep, to exercise
+      // condition decay, structural risk and the renovation recovery path.
+      const neglected = listings.find((l) => l.kind !== 'land') ?? listings[1];
+      if (neglected) A.buyProperty(state, neglected, false);
+    }
+    if (y === 22 && state.player.properties.length > 1) {
+      A.setMaintenanceLevel(state, state.player.properties[1].id, 'minimal');
     }
     if (y === 3 && !state.player.spouseId) {
       const candidates = datingPool(state);
@@ -526,6 +533,7 @@ console.log('  product units sold:', allProducts.reduce((s, p) => s + p.unitsSol
 console.log('  product tech unlocked:', state.productTech.join(', ') || 'none', '· storefront theme:', state.storefront.theme);
 const allParts = Object.values(state.customParts ?? {});
 console.log('  custom parts engineered:', allParts.length, '· units sold:', allParts.reduce((s, p) => s + p.unitsSoldTotal, 0).toLocaleString(), '· revenue:', Math.round(allParts.reduce((s, p) => s + p.revenueTotal, 0)).toLocaleString());
+console.log('  properties:', state.player.properties.map((pr) => `${pr.kind} cond=${Math.round(pr.condition)} eff=${Math.round(pr.energyEfficiency)} maint=${pr.maintenanceLevel} val=$${Math.round(pr.value).toLocaleString()}`).join(' | ') || 'none');
 console.log('  errors:', errors);
 
 // Invariant checks
@@ -539,6 +547,11 @@ for (const c of state.countries) {
 }
 for (const c of Object.values(state.companies)) {
   if (Number.isNaN(c.revenue) || Number.isNaN(c.sharePrice)) bad.push(`company ${c.name} NaN`);
+}
+for (const pr of state.player.properties) {
+  if (Number.isNaN(pr.value) || Number.isNaN(pr.condition) || Number.isNaN(pr.energyEfficiency)) bad.push(`property ${pr.name} NaN`);
+  if (pr.condition < 0 || pr.condition > 100) bad.push(`property ${pr.name} condition out of range: ${pr.condition}`);
+  if (pr.energyEfficiency < 0 || pr.energyEfficiency > 100) bad.push(`property ${pr.name} efficiency out of range: ${pr.energyEfficiency}`);
 }
 if (bad.length) {
   console.error('\nINVARIANT FAILURES:', bad.slice(0, 10));

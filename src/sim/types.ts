@@ -36,6 +36,8 @@ export interface Holding {
   costBasis: number; // average price paid per share
 }
 
+export type MaintenanceLevel = 'minimal' | 'standard' | 'premium';
+
 export interface PropertyAsset {
   id: string;
   name: string;
@@ -47,6 +49,11 @@ export interface PropertyAsset {
   baseRentalYield: number; // remembered yield so toggling rental status is reversible
   mortgage: number; // outstanding principal
   insured: boolean;
+  yearBuilt: number; // construction year — undeveloped land uses the purchase year
+  condition: number; // 0..100, decays with age and neglect, restored by renovation
+  energyEfficiency: number; // 0..100, ages slowly, boosted by renovation
+  maintenanceLevel: MaintenanceLevel; // player-chosen upkeep spend; trades cost for condition
+  lastRenovatedYear: number | null;
 }
 
 export type LuxuryAssetKind = 'private_jet' | 'yacht' | 'island' | 'sports_team' | 'racehorse' | 'artwork';

@@ -78,6 +78,14 @@ plain JSON you can export and re-import.
   surprises, P/E ratios, dividends, short interest and institutional ownership. Buy, sell, and short-sell.
 - **Macro-economy** — business-cycle regimes (boom to depression), a Taylor-rule central bank, inflation,
   unemployment, housing and equity indices, FX, government debt and shared commodity markets.
+- **Buildings age and decay for real** — every property you own gets a construction year and a
+  condition and energy-efficiency rating that actually matter: pick minimal, standard or premium
+  maintenance spend and watch condition drift accordingly, with premium upkeep able to slowly repair a
+  building over time. Neglect a property and it visibly deteriorates, its resale value slides, tenants
+  pay less rent, and once condition is badly degraded it risks a real structural-failure incident each
+  year — insurance (now with a real ongoing premium) softens the loss, going without risks losing it
+  outright. Renovate a condemned building back to like-new condition and a real value/efficiency jump,
+  including its own achievement for a proper rescue.
 - **Deep politics** — join or found a party, campaign for eight tiers of office (councillor to head of
   state) with rallies/ads/fundraising/consultants/polling, negotiate coalitions, appoint a cabinet, and
   pass or repeal **115 laws** whose effects continuously reshape the economy. As head of state, conduct

@@ -4,7 +4,7 @@
  * and eligibility so the UI can surface clean errors. RNG-consuming actions
  * advance the persisted stream so outcomes stay deterministic on replay.
  */
-import type { Advisor, AdvisorSpecialty, CabinetPortfolio, Company, Executive, ExecutiveRole, GameState, Gender, InfrastructureKind, ManifestoPromise, OfficeKind, PropertyAsset, TaxRates } from './types';
+import type { Advisor, AdvisorSpecialty, CabinetPortfolio, Company, Executive, ExecutiveRole, GameState, Gender, InfrastructureKind, ManifestoPromise, MaintenanceLevel, OfficeKind, PropertyAsset, TaxRates } from './types';
 import { CABINET_PORTFOLIOS, clamp, clamp100 } from './types';
 import { RNG } from './rng';
 import { INDUSTRY_BY_ID, INDUSTRIES } from '../data/industries';
@@ -311,7 +311,7 @@ export function attemptHostileTakeover(state: GameState, targetCompanyId: string
 // Property
 // ---------------------------------------------------------------------------
 
-export function propertyListings(state: GameState): Omit<PropertyAsset, 'id' | 'purchasePrice' | 'mortgage' | 'insured'>[] {
+export function propertyListings(state: GameState): Omit<PropertyAsset, 'id' | 'purchasePrice' | 'mortgage' | 'insured' | 'yearBuilt' | 'condition' | 'energyEfficiency' | 'maintenanceLevel' | 'lastRenovatedYear'>[] {
   const p = state.player;
   const home = state.countries.find((c) => c.id === p.countryId)!;
   const rng = new RNG(state.seed ^ (state.year * 40503));
@@ -327,11 +327,19 @@ export function propertyListings(state: GameState): Omit<PropertyAsset, 'id' | '
   });
 }
 
-export function buyProperty(state: GameState, listing: Omit<PropertyAsset, 'id' | 'purchasePrice' | 'mortgage' | 'insured'>, useMortgage: boolean): ActionResult {
+export function buyProperty(state: GameState, listing: Omit<PropertyAsset, 'id' | 'purchasePrice' | 'mortgage' | 'insured' | 'yearBuilt' | 'condition' | 'energyEfficiency' | 'maintenanceLevel' | 'lastRenovatedYear'>, useMortgage: boolean): ActionResult {
   const p = state.player;
   const deposit = useMortgage ? listing.value * 0.2 : listing.value;
   if (deposit > p.money) return { ok: false, message: useMortgage ? 'Cannot afford the 20% deposit.' : 'Cannot afford it outright.' };
+  const rng = withRng(state);
   p.money -= deposit;
+  // Undeveloped land has no structure to age or maintain; built properties get a
+  // believable construction age, with condition/efficiency drawn down accordingly.
+  const isLand = listing.kind === 'land';
+  const age = isLand ? 0 : Math.round(rng.range(0, 45));
+  const yearBuilt = state.year - age;
+  const condition = isLand ? 100 : clamp100(92 - age * 0.7 + rng.range(-8, 8));
+  const energyEfficiency = isLand ? 100 : clamp100(95 - age * 0.9 + rng.range(-8, 8));
   p.properties.push({
     id: `prop_${state.year}_${p.properties.length}`,
     name: listing.name,
@@ -343,7 +351,13 @@ export function buyProperty(state: GameState, listing: Omit<PropertyAsset, 'id' 
     baseRentalYield: listing.baseRentalYield,
     mortgage: useMortgage ? listing.value * 0.8 : 0,
     insured: false,
+    yearBuilt,
+    condition,
+    energyEfficiency,
+    maintenanceLevel: 'standard',
+    lastRenovatedYear: null,
   });
+  commit(state, rng);
   log(state, `🏠 Bought ${listing.name} for $${listing.value.toLocaleString()}${useMortgage ? ' (mortgaged)' : ''}.`, 'money');
   return { ok: true, message: `Purchased ${listing.name}.` };
 }
@@ -363,16 +377,32 @@ export function renovateProperty(state: GameState, propertyId: string): ActionRe
   const p = state.player;
   const prop = p.properties.find((x) => x.id === propertyId);
   if (!prop) return { ok: false, message: 'Property not found.' };
-  const cost = Math.round(prop.value * 0.08);
+  // Neglected properties need deeper (costlier) work to bring back up to code.
+  const neglectSurcharge = Math.max(0, 70 - prop.condition) * 0.0015;
+  const cost = Math.round(prop.value * (0.08 + neglectSurcharge));
   if (cost > p.money) return { ok: false, message: `Renovation costs $${cost.toLocaleString()}.` };
   const rng = withRng(state);
   p.money -= cost;
   const bump = rng.range(0.1, 0.15);
   prop.value = Math.round(prop.value * (1 + bump));
   if (prop.rentalYield > 0) prop.baseRentalYield = Math.min(0.12, prop.baseRentalYield * 1.1);
+  const wasCondemned = prop.condition < 20;
+  prop.condition = clamp100(92 + rng.range(-3, 3));
+  prop.energyEfficiency = clamp100(prop.energyEfficiency + 20);
+  prop.lastRenovatedYear = state.year;
   commit(state, rng);
-  log(state, `Renovated ${prop.name}, boosting its value by ${Math.round(bump * 100)}%.`, 'money');
+  if (wasCondemned && !state.achievements.includes('condemned_no_more')) state.achievements.push('condemned_no_more');
+  log(state, `Renovated ${prop.name}, boosting its value by ${Math.round(bump * 100)}% and restoring it to like-new condition.`, 'money');
   return { ok: true, message: `${prop.name} renovated.` };
+}
+
+export function setMaintenanceLevel(state: GameState, propertyId: string, level: MaintenanceLevel): ActionResult {
+  const p = state.player;
+  const prop = p.properties.find((x) => x.id === propertyId);
+  if (!prop) return { ok: false, message: 'Property not found.' };
+  if (prop.kind === 'land') return { ok: false, message: 'Undeveloped land needs no maintenance.' };
+  prop.maintenanceLevel = level;
+  return { ok: true, message: `${prop.name}: ${level} maintenance.` };
 }
 
 export function toggleRentalStatus(state: GameState, propertyId: string): ActionResult {
