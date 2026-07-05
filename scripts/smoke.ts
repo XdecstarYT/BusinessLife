@@ -397,6 +397,32 @@ for (let y = 0; y < 82 && state.player.alive; y++) {
         P.setProductMaterials(state, pid, 'aluminum', 'glass');
         P.updateProductForm(state, pid, { slimness: 0.8, finish: 'metallic' });
         P.setProductPackaging(state, pid, 'eco');
+        // --- V13: per-part customization, colorways, components, research, warranty ---
+        P.applyColorway(state, pid, 'midnight');
+        P.setPartOverride(state, pid, 'camera', { color: '#e8b84a', materialId: 'titanium' });
+        P.setPartOverride(state, pid, 'buttons', { finish: 'gloss' });
+        P.setPartOverride(state, pid, 'screen', { color: '#8ab4ff' });
+        P.setPartOverride(state, pid, 'logo', { color: '#ffffff' });
+        P.clearPartOverride(state, pid, 'logo');
+        P.setComponentTier(state, pid, 'chip', 'premium');
+        P.setComponentTier(state, pid, 'battery', 'budget');
+        P.setComponentTier(state, pid, 'battery', 'premium');
+        P.setComponentTier(state, pid, 'display_panel', 'premium');
+        P.runFocusGroup(state, pid, 'early_adopters');
+        P.runFocusGroup(state, pid, 'value');
+        P.runFocusGroup(state, pid, 'luxury_buyers');
+        P.runFocusGroup(state, pid, 'eco');
+        P.runFocusGroup(state, pid, 'families');
+        P.setTargetSegment(state, pid, 'early_adopters');
+        P.setWarranty(state, pid, 2);
+        // --- V13: player-engineered components ---
+        const eng = P.engineerPart(state, state.player.companies[0], 'battery', 'Bat62', 300_000);
+        if (eng.ok && eng.productId) {
+          const battId = eng.productId;
+          P.revisePart(state, battId, 75_000);
+          P.setPartForSale(state, battId, true);
+          P.setComponentTier(state, pid, 'battery', battId);
+        }
         P.buildPrototype(state, pid);
         P.runProductTests(state, pid);
         P.refineDesign(state, pid);
@@ -412,6 +438,26 @@ for (let y = 0; y < 82 && state.player.alive; y++) {
       const launched = Object.values(state.products).find((pr) => pr.stage === 'launched');
       if (launched) P.upgradeGeneration(state, launched.id);
       P.setStorefront(state, { theme: 'noir' });
+    }
+    // --- V13: a second product in a new category + recall handling ---
+    if (y === 32 && state.player.companies.length) {
+      const co = state.companies[state.player.companies[0]];
+      if (co) co.cash = Math.max(co.cash, 2_000_000);
+      const created = P.createProduct(state, state.player.companies[0], 'drone', 'Smoke Drone');
+      if (created.ok && created.productId) {
+        const pid = created.productId;
+        P.generateConcept(state, pid, 'futuristic carbon racing drone');
+        P.setPartOverride(state, pid, 'rotors', { color: '#ff6a3d' });
+        P.setComponentTier(state, pid, 'motor', 'premium');
+        P.buildPrototype(state, pid);
+        P.runProductTests(state, pid);
+        P.startProduction(state, pid);
+        P.holdLaunchEvent(state, pid, 'livestream');
+      }
+    }
+    // Any festering defect gets a recall once the company can afford it.
+    for (const pr of Object.values(state.products)) {
+      if (pr.activeDefect) P.issueRecall(state, pr.id);
     }
     // --- V6: continue as heir when a succession offer appears ---
     if (state.pendingSuccession && state.pendingSuccession.candidates.length) {
@@ -478,6 +524,8 @@ const allProducts = Object.values(state.products);
 console.log('  products designed:', allProducts.length, '· launched:', allProducts.filter((p) => p.stage === 'launched').length);
 console.log('  product units sold:', allProducts.reduce((s, p) => s + p.unitsSoldTotal, 0).toLocaleString(), '· product profit:', Math.round(allProducts.reduce((s, p) => s + p.profitTotal, 0)).toLocaleString());
 console.log('  product tech unlocked:', state.productTech.join(', ') || 'none', '· storefront theme:', state.storefront.theme);
+const allParts = Object.values(state.customParts ?? {});
+console.log('  custom parts engineered:', allParts.length, '· units sold:', allParts.reduce((s, p) => s + p.unitsSoldTotal, 0).toLocaleString(), '· revenue:', Math.round(allParts.reduce((s, p) => s + p.revenueTotal, 0)).toLocaleString());
 console.log('  errors:', errors);
 
 // Invariant checks

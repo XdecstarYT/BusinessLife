@@ -6,16 +6,19 @@
  * company, so a hit product lifts the whole empire.
  */
 import type {
-  GameState, LaunchVenue, ManufacturingStrategy, PackagingStyle, Product, ProductCategory,
-  ProductForm, ProductMaterialId, PublishState, SalesChannel,
+  ComponentTier, CustomerSegment, CustomPart, GameState, LaunchVenue, ManufacturingStrategy,
+  PackagingStyle, PartOverride, Product, ProductCategory, ProductForm, ProductMaterialId,
+  PublishState, SalesChannel,
 } from './types';
 import { clamp, clamp100 } from './types';
 import { RNG } from './rng';
 import { log } from './engine';
 import {
-  CONCEPT_ADJECTIVES, CONCEPT_PALETTES, CONCEPT_SUFFIXES, CONCEPT_TAGLINES,
-  LAUNCH_VENUES, MANUFACTURING_BY_ID, PACKAGING_STYLES, PRODUCT_CATEGORY_BY_ID,
-  PRODUCT_MATERIAL_BY_ID, PRODUCT_TECH_BY_ID, PRODUCT_TECH_TREE,
+  COLORWAYS, COMPONENT_BY_ID, COMPONENT_MARKET, COMPONENT_TIERS, CONCEPT_ADJECTIVES,
+  CONCEPT_PALETTES, CONCEPT_SUFFIXES, CONCEPT_TAGLINES, CUSTOMER_SEGMENTS, DEFECT_NAMES,
+  LAUNCH_VENUES, MANUFACTURING_BY_ID, PACKAGING_STYLES, PART_NAME_PREFIX,
+  PRODUCT_CATEGORY_BY_ID, PRODUCT_COMPONENTS, PRODUCT_MATERIAL_BY_ID, PRODUCT_PARTS,
+  PRODUCT_TECH_BY_ID, PRODUCT_TECH_TREE, SEGMENT_BY_ID,
 } from '../data/productData';
 
 export interface StudioResult {
@@ -41,6 +44,23 @@ export function playerProducts(state: GameState): Product[] {
   return Object.values(state.products).filter((p) => state.companies[p.companyId]?.playerOwned);
 }
 
+function defaultComponents(category: ProductCategory): Record<string, ComponentTier> {
+  return Object.fromEntries((PRODUCT_COMPONENTS[category] ?? []).map((c) => [c, 'standard' as ComponentTier]));
+}
+
+/** Backfills fields added after a save was created, so older products stay valid. */
+export function normalizeProduct(p: Product): Product {
+  if (!p.partOverrides) p.partOverrides = {};
+  if (!p.components) p.components = defaultComponents(p.category);
+  if (p.targetSegment === undefined) p.targetSegment = null;
+  if (!p.segmentInsights) p.segmentInsights = {};
+  if (p.warrantyYears === undefined) p.warrantyYears = 1;
+  if (p.trust === undefined) p.trust = 70;
+  if (p.activeDefect === undefined) p.activeDefect = null;
+  if (p.recalls === undefined) p.recalls = 0;
+  return p;
+}
+
 // --------------------------------------------------------------------------- creation
 
 export function createProduct(state: GameState, companyId: string, category: ProductCategory, name: string): StudioResult {
@@ -64,6 +84,14 @@ export function createProduct(state: GameState, companyId: string, category: Pro
     publishState: 'draft',
     materials: ['plastic', 'aluminum'],
     form: { size: 1, slimness: 0.5, curvature: 0.5, accent: 0.5, bodyColor: '#1c1e26', accentColor: '#e8b84a', finish: 'matte', lighting: 'studio' },
+    partOverrides: {},
+    components: defaultComponents(category),
+    targetSegment: null,
+    segmentInsights: {},
+    warrantyYears: 1,
+    trust: 70,
+    activeDefect: null,
+    recalls: 0,
     features: [],
     packaging: 'minimal',
     manufacturing: 'regional',
@@ -227,6 +255,274 @@ export function brandProduct(state: GameState, productId: string, tagline: strin
   return { ok: true, message: 'Brand identity sharpened.' };
 }
 
+// --------------------------------------------------------------------------- per-part customization
+
+export function setPartOverride(state: GameState, productId: string, partId: string, patch: Partial<PartOverride>): StudioResult {
+  const p = state.products[productId];
+  if (!p) return { ok: false, message: 'Product not found.' };
+  normalizeProduct(p);
+  const parts = PRODUCT_PARTS[p.category] ?? [];
+  if (!parts.some((x) => x.id === partId)) return { ok: false, message: 'That part does not exist on this product.' };
+  if (patch.materialId) {
+    const def = PRODUCT_MATERIAL_BY_ID[patch.materialId];
+    if (!def) return { ok: false, message: 'Unknown material.' };
+    if (def.unlockTech && !state.productTech.includes(def.unlockTech)) {
+      return { ok: false, message: `${def.label} requires ${PRODUCT_TECH_BY_ID[def.unlockTech].label} research.` };
+    }
+  }
+  const current = p.partOverrides[partId] ?? { color: null, materialId: null, finish: null };
+  p.partOverrides[partId] = { ...current, ...patch };
+  const customized = Object.values(p.partOverrides).filter((o) => o.color || o.materialId || o.finish).length;
+  if (customized >= 4 && !state.achievements.includes('master_customizer')) state.achievements.push('master_customizer');
+  return { ok: true, message: 'Part updated.' };
+}
+
+export function clearPartOverride(state: GameState, productId: string, partId: string): StudioResult {
+  const p = state.products[productId];
+  if (!p) return { ok: false, message: 'Product not found.' };
+  normalizeProduct(p);
+  delete p.partOverrides[partId];
+  return { ok: true, message: 'Part reset to the base design.' };
+}
+
+/** Applies a curated colorway and clears per-part color overrides so it reads cleanly. */
+export function applyColorway(state: GameState, productId: string, colorwayId: string): StudioResult {
+  const p = state.products[productId];
+  if (!p) return { ok: false, message: 'Product not found.' };
+  normalizeProduct(p);
+  const cw = COLORWAYS.find((c) => c.id === colorwayId);
+  if (!cw) return { ok: false, message: 'Unknown colorway.' };
+  p.form.bodyColor = cw.body;
+  p.form.accentColor = cw.accent;
+  for (const partId of Object.keys(p.partOverrides)) {
+    p.partOverrides[partId] = { ...p.partOverrides[partId], color: null };
+  }
+  return { ok: true, message: `${cw.label} colorway applied.` };
+}
+
+// --------------------------------------------------------------------------- component supply chain
+
+/** Sets a component slot to a sourcing tier ('budget'|'standard'|'premium') or an engineered CustomPart id. */
+export function setComponentTier(state: GameState, productId: string, componentId: string, tier: string): StudioResult {
+  const p = state.products[productId];
+  if (!p) return { ok: false, message: 'Product not found.' };
+  normalizeProduct(p);
+  if (!(PRODUCT_COMPONENTS[p.category] ?? []).includes(componentId)) {
+    return { ok: false, message: 'This product does not use that component.' };
+  }
+  const asTier = COMPONENT_TIERS[tier as ComponentTier];
+  if (!asTier) {
+    const cp = (state.customParts ?? {})[tier];
+    if (!cp) return { ok: false, message: 'Unknown component tier or part.' };
+    if (cp.componentId !== componentId) return { ok: false, message: `${cp.name} is a ${COMPONENT_BY_ID[cp.componentId].label.toLowerCase()} — it does not fit this slot.` };
+    p.components[componentId] = cp.id;
+    return { ok: true, message: `${COMPONENT_BY_ID[componentId].label}: your own ${cp.name} installed.` };
+  }
+  p.components[componentId] = tier;
+  const def = COMPONENT_BY_ID[componentId];
+  return { ok: true, message: `${def.label}: ${asTier.label} tier.` };
+}
+
+/** Average sourcing effects across the product's bill of materials (tiers and engineered parts). */
+function componentProfile(state: GameState, p: Product): { costMult: number; quality: number; defectMod: number; luxury: number; premiumOnly: boolean } {
+  const slots = PRODUCT_COMPONENTS[p.category] ?? [];
+  if (slots.length === 0) return { costMult: 1, quality: 0, defectMod: 0, luxury: 0, premiumOnly: false };
+  let cost = 0, quality = 0, defect = 0, lux = 0, premium = 0;
+  for (const slot of slots) {
+    const v = (p.components ?? {})[slot] ?? 'standard';
+    const t = COMPONENT_TIERS[v as ComponentTier];
+    if (t) {
+      cost += t.costMult;
+      quality += t.quality;
+      defect += t.defectMod;
+      lux += t.luxury;
+      if (t === COMPONENT_TIERS.premium) premium++;
+    } else {
+      const cp = (state.customParts ?? {})[v];
+      if (cp) {
+        cost += cp.costMult;
+        quality += cp.quality;
+        defect += cp.defectMod;
+        lux += cp.luxury;
+        if (cp.quality >= COMPONENT_TIERS.premium.quality) premium++;
+      } else {
+        cost += 1; // dangling reference — treat as standard
+      }
+    }
+  }
+  const n = slots.length;
+  return { costMult: cost / n, quality: quality / n, defectMod: defect / n, luxury: lux / n, premiumOnly: premium === n };
+}
+
+// --------------------------------------------------------------------------- engineered parts
+
+function partStatsFromGrade(grade: number): Pick<CustomPart, 'quality' | 'defectMod' | 'costMult' | 'luxury'> {
+  return {
+    quality: Math.round((grade - 50) * 0.3 * 10) / 10,
+    defectMod: -Math.round((grade - 50) * 0.0004 * 10000) / 10000,
+    costMult: Math.round((0.9 + grade * 0.006) * 100) / 100,
+    luxury: Math.round((grade - 50) * 0.2),
+  };
+}
+
+function partTechBonus(state: GameState, componentId: string): number {
+  let bonus = state.productTech.includes('precision_tooling') ? 4 : 0;
+  if (componentId === 'battery' && state.productTech.includes('dense_batteries')) bonus += 10;
+  if (componentId === 'chip' && state.productTech.includes('fast_chips')) bonus += 10;
+  if (componentId === 'chip' && state.productTech.includes('ai_integration')) bonus += 5;
+  if (componentId === 'display_panel' && state.productTech.includes('haptic_glass')) bonus += 8;
+  if (componentId === 'frame_parts' && state.productTech.includes('adv_alloys')) bonus += 8;
+  if (componentId === 'materials_stock' && state.productTech.includes('green_materials')) bonus += 6;
+  return bonus;
+}
+
+/** Designs a brand-new component from scratch — your own silicon, cells, optics… */
+export function engineerPart(state: GameState, companyId: string, componentId: string, name: string, investment: number): StudioResult {
+  if (!state.customParts) state.customParts = {};
+  const company = state.companies[companyId];
+  if (!company || !company.playerOwned || company.status !== 'active') return { ok: false, message: 'Pick one of your active companies.' };
+  if (!COMPONENT_BY_ID[componentId]) return { ok: false, message: 'Unknown component type.' };
+  const invest = Math.round(investment);
+  if (invest < 50_000) return { ok: false, message: 'Component engineering starts at $50,000.' };
+  if (company.cash < invest) return { ok: false, message: `${company.name} cannot cover a $${invest.toLocaleString()} engineering program.` };
+  const rng = withRng(state);
+  company.cash -= invest;
+  const grade = clamp100(20 + Math.sqrt(invest / 1_000) * 1.6 + partTechBonus(state, componentId) + rng.range(-6, 8));
+  const id = `cp_${state.year}_${Object.keys(state.customParts).length + 1}`;
+  const autoName = `${PART_NAME_PREFIX[componentId] ?? 'Part'}${Math.round(rng.range(10, 99))}`;
+  const part: CustomPart = {
+    id,
+    companyId,
+    name: (name.trim() || autoName).slice(0, 20),
+    componentId,
+    version: 1,
+    grade: Math.round(grade),
+    ...partStatsFromGrade(grade),
+    forSale: false,
+    unitsSoldTotal: 0,
+    revenueTotal: 0,
+    yearDesigned: state.year,
+  };
+  commit(state, rng);
+  state.customParts[id] = part;
+  if (!state.achievements.includes('part_engineer')) state.achievements.push('part_engineer');
+  log(state, `⚙️ ${company.name} engineered its own ${COMPONENT_BY_ID[componentId].label.toLowerCase()}: ${part.name} (grade ${part.grade}).`, 'business');
+  return { ok: true, message: `${part.name} is real — grade ${part.grade}. Install it in your products or sell it to the industry.`, productId: id };
+}
+
+/** A revision program: raises the grade, bumps the version. */
+export function revisePart(state: GameState, partId: string, investment: number): StudioResult {
+  const cp = (state.customParts ?? {})[partId];
+  if (!cp) return { ok: false, message: 'Part not found.' };
+  const company = state.companies[cp.companyId];
+  const invest = Math.round(investment);
+  if (invest < 25_000) return { ok: false, message: 'Revisions start at $25,000.' };
+  if (!company || company.cash < invest) return { ok: false, message: `Needs $${invest.toLocaleString()} in company cash.` };
+  const rng = withRng(state);
+  company.cash -= invest;
+  const gain = Math.max(1, Math.sqrt(invest / 1_000) * 0.9 * (1 - cp.grade / 130) + rng.range(-1, 2));
+  cp.grade = Math.round(clamp100(cp.grade + gain));
+  Object.assign(cp, partStatsFromGrade(cp.grade));
+  cp.version++;
+  commit(state, rng);
+  return { ok: true, message: `${cp.name} v${cp.version}: grade now ${cp.grade}.` };
+}
+
+export function setPartForSale(state: GameState, partId: string, forSale: boolean): StudioResult {
+  const cp = (state.customParts ?? {})[partId];
+  if (!cp) return { ok: false, message: 'Part not found.' };
+  cp.forSale = forSale;
+  return { ok: true, message: forSale ? `${cp.name} is now listed on the global component market.` : `${cp.name} delisted — exclusive to your products.` };
+}
+
+export function playerParts(state: GameState): CustomPart[] {
+  return Object.values(state.customParts ?? {});
+}
+
+// --------------------------------------------------------------------------- market research & segments
+
+/** How well this product fits one customer segment, 0..100. */
+export function segmentFit(state: GameState, p: Product, segmentId: CustomerSegment): number {
+  const seg = SEGMENT_BY_ID[segmentId];
+  const cat = PRODUCT_CATEGORY_BY_ID[p.category];
+  const primary = PRODUCT_MATERIAL_BY_ID[p.materials[0]];
+  const accent = PRODUCT_MATERIAL_BY_ID[p.materials[1]];
+  const q = productQuality(state, p);
+  const priceRatio = p.price / cat.basePrice;
+  // Price above the anchor punishes sensitive segments; luxury buyers read cheap as off-brand.
+  const pricePenalty = (priceRatio - 1) * seg.priceSensitivity * 35;
+  const cheapPenalty = segmentId === 'luxury_buyers' && priceRatio < 0.9 ? (0.9 - priceRatio) * 30 : 0;
+  const techScore = (p.features.length * 10 + cat.techAffinity * 22) * seg.lovesTech;
+  const luxScore = (primary.luxury * 0.7 + accent.luxury * 0.3) * seg.lovesLuxury * 0.35;
+  const ecoScore = productSustainability(state, p) * seg.lovesEco * 0.3;
+  const reliability = primary.durability * 0.5 + (p.warrantyYears ?? 0) * 8 + (p.trust ?? 70) * 0.2;
+  const relScore = reliability * seg.lovesReliability * 0.3;
+  return clamp100(18 + q * 0.3 + techScore + luxScore + ecoScore + relScore - pricePenalty - cheapPenalty);
+}
+
+export function runFocusGroup(state: GameState, productId: string, segmentId: CustomerSegment): StudioResult {
+  const p = state.products[productId];
+  if (!p) return { ok: false, message: 'Product not found.' };
+  normalizeProduct(p);
+  const company = state.companies[p.companyId];
+  const cost = 8_000;
+  if (!company || company.cash < cost) return { ok: false, message: `A focus group costs $${cost.toLocaleString()} in company cash.` };
+  company.cash -= cost;
+  const seg = SEGMENT_BY_ID[segmentId];
+  const fit = Math.round(segmentFit(state, p, segmentId));
+  p.segmentInsights[segmentId] = fit;
+  if (CUSTOMER_SEGMENTS.every((s) => p.segmentInsights[s.id] !== undefined) && !state.achievements.includes('segment_master')) {
+    state.achievements.push('segment_master');
+  }
+  const tip = fit >= 70 ? 'They would buy it today.'
+    : fit >= 45 ? (seg.priceSensitivity > 0.6 ? 'Interested, but the price gives them pause.' : 'Interested — sharpen what makes it special.')
+    : seg.lovesLuxury > 0.7 ? 'It does not feel exclusive enough for them yet.'
+    : seg.lovesEco > 0.7 ? 'They asked hard questions about materials and footprint.'
+    : 'Not their product — or not at this price.';
+  log(state, `🗣️ Focus group with ${seg.label} on ${p.name}: fit ${fit}/100.`, 'business');
+  return { ok: true, message: `${seg.label}: fit ${fit}/100. ${tip}` };
+}
+
+export function setTargetSegment(state: GameState, productId: string, segmentId: CustomerSegment | null): StudioResult {
+  const p = state.products[productId];
+  if (!p) return { ok: false, message: 'Product not found.' };
+  normalizeProduct(p);
+  p.targetSegment = segmentId;
+  return { ok: true, message: segmentId ? `Marketing now targets ${SEGMENT_BY_ID[segmentId].label}.` : 'Marketing back to broad targeting.' };
+}
+
+// --------------------------------------------------------------------------- warranty, recalls & trust
+
+export function setWarranty(state: GameState, productId: string, years: number): StudioResult {
+  const p = state.products[productId];
+  if (!p) return { ok: false, message: 'Product not found.' };
+  normalizeProduct(p);
+  p.warrantyYears = clamp(Math.round(years), 0, 3);
+  return { ok: true, message: p.warrantyYears === 0 ? 'No warranty — cheap, but buyers notice.' : `${p.warrantyYears}-year warranty set.` };
+}
+
+export function issueRecall(state: GameState, productId: string): StudioResult {
+  const p = state.products[productId];
+  if (!p) return { ok: false, message: 'Product not found.' };
+  normalizeProduct(p);
+  if (!p.activeDefect) return { ok: false, message: 'No active defect to recall.' };
+  const company = state.companies[p.companyId];
+  const lastYear = p.salesHistory[p.salesHistory.length - 1];
+  const affected = Math.max(1_000, Math.round((lastYear?.units ?? 5_000) * 0.6));
+  const cost = Math.round(50_000 + affected * productUnitCost(state, p) * 0.35);
+  if (!company || company.cash < cost) return { ok: false, message: `A full recall would cost $${cost.toLocaleString()} — the company cannot cover it.` };
+  company.cash -= cost;
+  const defectName = p.activeDefect.name;
+  p.activeDefect = null;
+  p.recalls++;
+  p.trust = clamp100(p.trust + 14);
+  p.rating = clamp(p.rating + 0.2, 0, 5);
+  company.brand = clamp100(company.brand + 2);
+  if (!state.achievements.includes('recall_survivor')) state.achievements.push('recall_survivor');
+  log(state, `🛟 ${company.name} voluntarily recalled ${p.name} over ${defectName} — customers applauded the honesty.`, 'business');
+  return { ok: true, message: `Recall complete ($${cost.toLocaleString()}). Trust rebounded to ${Math.round(p.trust)}.` };
+}
+
 // --------------------------------------------------------------------------- pipeline
 
 export function buildPrototype(state: GameState, productId: string): StudioResult {
@@ -253,12 +549,13 @@ export function productQuality(state: GameState, p: Product): number {
   const matLuxury = primary.luxury * 0.7 + accent.luxury * 0.3;
   const techBonus = p.features.length * 6 * cat.techAffinity;
   const precision = state.productTech.includes('precision_tooling') ? 6 : 0;
+  const compBonus = componentProfile(state, p).quality;
   return clamp100(
-    p.designQuality * 0.45 + matDurability * 0.2 + matLuxury * 0.15 * cat.luxuryAffinity + techBonus + precision + p.iterations * 2,
+    p.designQuality * 0.45 + matDurability * 0.2 + matLuxury * 0.15 * cat.luxuryAffinity + techBonus + precision + compBonus + p.iterations * 2,
   );
 }
 
-export function productUnitCost(_state: GameState, p: Product): number {
+export function productUnitCost(state: GameState, p: Product): number {
   const cat = PRODUCT_CATEGORY_BY_ID[p.category];
   const primary = PRODUCT_MATERIAL_BY_ID[p.materials[0]];
   const accent = PRODUCT_MATERIAL_BY_ID[p.materials[1]];
@@ -266,7 +563,12 @@ export function productUnitCost(_state: GameState, p: Product): number {
   const mfg = MANUFACTURING_BY_ID[p.manufacturing];
   const pack = PACKAGING_STYLES.find((x) => x.id === p.packaging)!;
   const qualityMult = 1 + (p.designQuality - 50) / 250;
-  return Math.max(0.5, cat.baseUnitCost * matMult * mfg.costMult * qualityMult + pack.costPerUnit);
+  // Components are ~55% of the bill of materials; a global shortage inflates affected categories.
+  const comp = componentProfile(state, p);
+  let compMult = 0.45 + 0.55 * comp.costMult;
+  const shortage = state.componentShortage;
+  if (shortage && (PRODUCT_COMPONENTS[p.category] ?? []).includes(shortage.componentId)) compMult *= 1.25;
+  return Math.max(0.5, cat.baseUnitCost * matMult * mfg.costMult * qualityMult * compMult + pack.costPerUnit);
 }
 
 export function productSustainability(_state: GameState, p: Product): number {
@@ -432,6 +734,14 @@ export function upgradeGeneration(state: GameState, productId: string): StudioRe
     materials: [...old.materials] as [ProductMaterialId, ProductMaterialId],
     form: { ...old.form },
     channels: [...old.channels],
+    partOverrides: Object.fromEntries(Object.entries(old.partOverrides ?? {}).map(([k, v]) => [k, { ...v }])),
+    components: { ...(old.components ?? defaultComponents(old.category)) },
+    segmentInsights: {},
+    targetSegment: old.targetSegment ?? null,
+    warrantyYears: old.warrantyYears ?? 1,
+    trust: clamp100((old.trust ?? 70) * 0.5 + 38),
+    activeDefect: null,
+    recalls: 0,
   };
   state.products[id] = next;
   if (next.generation >= 3 && !state.achievements.includes('product_dynasty')) state.achievements.push('product_dynasty');
@@ -479,6 +789,21 @@ export function tickProducts(state: GameState, rng: RNG): string[] {
   const headlines: string[] = [];
   const home = state.countries.find((c) => c.isPlayerHome)!;
   const e = home.economy;
+  if (!state.customParts) state.customParts = {};
+  for (const p of Object.values(state.products)) normalizeProduct(p);
+
+  // Global component shortages ripple through every affected category's costs.
+  if (state.componentShortage) {
+    state.componentShortage.yearsLeft--;
+    if (state.componentShortage.yearsLeft <= 0) {
+      headlines.push(`Global ${COMPONENT_BY_ID[state.componentShortage.componentId].label.toLowerCase()} supply finally normalizes`);
+      state.componentShortage = null;
+    }
+  } else if (rng.chance(0.08)) {
+    const comp = rng.pick(Object.values(COMPONENT_BY_ID));
+    state.componentShortage = { componentId: comp.id, yearsLeft: rng.chance(0.4) ? 2 : 1 };
+    headlines.push(`Global ${comp.label.toLowerCase()} shortage squeezes manufacturers`);
+  }
 
   const launched = Object.values(state.products).filter((p) => p.stage === 'launched');
   // Category crowding: your own products cannibalize each other.
@@ -507,19 +832,33 @@ export function tickProducts(state: GameState, rng: RNG): string[] {
     const lifecycleMult = clamp(1 - Math.max(0, ageYears - 2) * 0.15, 0.15, 1);
     const crowding = 1 / Math.sqrt(perCategory[p.category] ?? 1);
 
-    const appeal = qualityFit * brandMult * hypeMult * channelMult * sustainMult * economyMult * patentMult * marketingMult * lifecycleMult * crowding;
+    // Segment demand: how each slice of the market rates this product, with targeting focus.
+    let segAcc = 0;
+    for (const seg of CUSTOMER_SEGMENTS) {
+      const fit = segmentFit(state, p, seg.id) / 100;
+      let w = seg.share;
+      if (p.targetSegment === seg.id) w *= 1.5;
+      else if (p.targetSegment) w *= 0.85;
+      segAcc += w * fit;
+    }
+    const segmentMult = clamp(segAcc * 1.7, 0.25, 1.5);
+    const trustMult = clamp(p.trust / 70, 0.35, 1.25);
+
+    const appeal = qualityFit * brandMult * hypeMult * channelMult * sustainMult * economyMult * patentMult * marketingMult * lifecycleMult * crowding * segmentMult * trustMult;
     let units = Math.round(cat.marketUnits * clamp(appeal * 0.22, 0, 0.9) * rng.range(0.8, 1.2));
     units = Math.min(units, mfg.capacity);
 
-    // Defects & returns.
-    const defectRate = clamp(mfg.defectRate * (state.productTech.includes('self_healing') ? 0.5 : 1) * (2 - q / 100), 0.002, 0.15);
-    p.returnRate = defectRate * rng.range(0.8, 1.5);
+    // Defects & returns — component tiers and warranty coverage both matter.
+    const comp = componentProfile(state, p);
+    const defectRate = clamp((mfg.defectRate + comp.defectMod) * (state.productTech.includes('self_healing') ? 0.5 : 1) * (2 - q / 100), 0.002, 0.15);
+    p.returnRate = defectRate * rng.range(0.8, 1.5) * (1 - p.warrantyYears * 0.1);
     const returnedUnits = Math.round(units * p.returnRate);
     const netUnits = Math.max(0, units - returnedUnits);
 
     const revenue = netUnits * p.price;
     const marketing = Math.min(p.marketingBudget, company.cash > 0 ? p.marketingBudget : 0);
-    const costs = units * unitCost + marketing;
+    const warrantyReserve = netUnits * unitCost * 0.035 * p.warrantyYears;
+    const costs = units * unitCost + marketing + warrantyReserve;
     const profit = revenue - costs;
 
     company.cash += profit;
@@ -543,6 +882,29 @@ export function tickProducts(state: GameState, rng: RNG): string[] {
       if (p.reviews.length > 12) p.reviews.shift();
     }
 
+    // Consumer trust drifts with warranty generosity, delivered quality — and festering defects.
+    p.trust = clamp100(p.trust + p.warrantyYears * 1.2 - 0.5 + (p.rating - 3) * 1.5);
+    if (!p.activeDefect && units > 2_000 && rng.chance(clamp(defectRate * 4, 0.02, 0.3))) {
+      const severity = rng.chance(0.3) ? 3 : rng.chance(0.5) ? 2 : 1;
+      p.activeDefect = { name: rng.pick(DEFECT_NAMES), severity, year: state.year };
+      p.trust = clamp100(p.trust - 5 * severity);
+      headlines.push(`${p.name} hit by ${p.activeDefect.name}`);
+      log(state, `⚠️ Field defect on ${p.name}: ${p.activeDefect.name} (severity ${severity}). Recall or ride it out?`, 'business');
+    } else if (p.activeDefect && p.activeDefect.year < state.year) {
+      p.trust = clamp100(p.trust - 7 * p.activeDefect.severity);
+      p.rating = clamp(p.rating - 0.15, 0, 5);
+      if (rng.chance(0.3)) {
+        const damages = p.activeDefect.severity * 250_000;
+        company.cash -= damages;
+        headlines.push(`${company.name} settles lawsuits over ${p.name} ${p.activeDefect.name}`);
+      }
+    }
+    if (p.trust >= 95 && !state.achievements.includes('trusted_brand')) {
+      state.achievements.push('trusted_brand');
+      log(state, `🏆 ${p.name} tops consumer-trust rankings.`, 'milestone');
+    }
+    if (comp.premiumOnly && !state.achievements.includes('premium_engineering')) state.achievements.push('premium_engineering');
+
     p.hype = clamp100(p.hype * 0.55);
     if (p.rating >= 4.5 && p.unitsSoldTotal > 10_000 && !state.achievements.includes('design_icon')) {
       state.achievements.push('design_icon');
@@ -554,6 +916,33 @@ export function tickProducts(state: GameState, rng: RNG): string[] {
     }
     if (profit > 5_000_000 && rng.chance(0.4)) headlines.push(`${p.name} is flying off shelves for ${company.name}`);
     if (p.returnRate > 0.08) headlines.push(`${company.name} faces returns headache over ${p.name} defects`);
+  }
+
+  // Global component market: parts listed for sale compete for OEM contracts.
+  const listed = Object.values(state.customParts ?? {}).filter((cp) => cp.forSale);
+  const byComponent: Record<string, CustomPart[]> = {};
+  for (const cp of listed) (byComponent[cp.componentId] ??= []).push(cp);
+  for (const [componentId, parts] of Object.entries(byComponent)) {
+    const market = COMPONENT_MARKET[componentId];
+    if (!market) continue;
+    const totalGrade = parts.reduce((sum, cp) => sum + cp.grade, 0);
+    for (const cp of parts) {
+      const company = state.companies[cp.companyId];
+      if (!company || company.status !== 'active') continue;
+      const shareOfDemand = cp.grade / (totalGrade + 200); // competes against the rest of the industry too
+      const units = Math.round(market.units * shareOfDemand * rng.range(0.7, 1.3));
+      const price = market.price * (0.6 + cp.grade / 100);
+      const revenue = units * price;
+      company.cash += revenue * 0.7; // 30% goes to distribution/licensing overhead
+      company.revenue += revenue * 0.1;
+      cp.unitsSoldTotal += units;
+      cp.revenueTotal += revenue;
+      if (cp.unitsSoldTotal >= 500_000 && !state.achievements.includes('component_supplier')) {
+        state.achievements.push('component_supplier');
+        log(state, `🏆 ${cp.name} has shipped to half a million devices industry-wide.`, 'milestone');
+      }
+      if (revenue > 1_000_000 && rng.chance(0.3)) headlines.push(`${cp.name} becomes a go-to ${COMPONENT_BY_ID[componentId].label.toLowerCase()} for the industry`);
+    }
   }
   return headlines;
 }

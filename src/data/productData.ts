@@ -5,7 +5,8 @@
  * numbers live here so new industries/materials/tech are pure data additions.
  */
 import type {
-  LaunchVenue, ManufacturingStrategy, PackagingStyle, ProductCategory, ProductMaterialId,
+  ComponentTier, CustomerSegment, LaunchVenue, ManufacturingStrategy, PackagingStyle,
+  ProductCategory, ProductMaterialId,
 } from '../sim/types';
 
 // --------------------------------------------------------------------------- categories
@@ -46,6 +47,14 @@ export const PRODUCT_CATEGORIES: ProductCategoryDef[] = [
   { id: 'toys', label: 'Toys', icon: '🧸', archetype: 'device', baseUnitCost: 14, basePrice: 45, marketUnits: 1_500_000, techAffinity: 0.35, luxuryAffinity: 0.2 },
   { id: 'sports', label: 'Sports Equipment', icon: '🏀', archetype: 'shoe', baseUnitCost: 35, basePrice: 140, marketUnits: 800_000, techAffinity: 0.4, luxuryAffinity: 0.3 },
   { id: 'luxury', label: 'Luxury Goods', icon: '👜', archetype: 'vessel', baseUnitCost: 350, basePrice: 2_800, marketUnits: 80_000, techAffinity: 0.1, luxuryAffinity: 1.0 },
+  { id: 'drone', label: 'Drone', icon: '🛸', archetype: 'device', baseUnitCost: 180, basePrice: 620, marketUnits: 250_000, techAffinity: 0.95, luxuryAffinity: 0.25 },
+  { id: 'camera', label: 'Camera', icon: '📷', archetype: 'device', baseUnitCost: 380, basePrice: 1_250, marketUnits: 180_000, techAffinity: 0.85, luxuryAffinity: 0.6 },
+  { id: 'tv', label: 'Television', icon: '📺', archetype: 'slab', baseUnitCost: 400, basePrice: 1_100, marketUnits: 500_000, techAffinity: 0.8, luxuryAffinity: 0.4 },
+  { id: 'bicycle', label: 'Bicycle', icon: '🚲', archetype: 'device', baseUnitCost: 220, basePrice: 850, marketUnits: 350_000, techAffinity: 0.4, luxuryAffinity: 0.5 },
+  { id: 'eyewear', label: 'Eyewear', icon: '🕶️', archetype: 'device', baseUnitCost: 30, basePrice: 190, marketUnits: 900_000, techAffinity: 0.2, luxuryAffinity: 0.85 },
+  { id: 'instrument', label: 'Musical Instrument', icon: '🎸', archetype: 'device', baseUnitCost: 240, basePrice: 950, marketUnits: 120_000, techAffinity: 0.25, luxuryAffinity: 0.7 },
+  { id: 'kitchenware', label: 'Kitchenware', icon: '🫖', archetype: 'vessel', baseUnitCost: 25, basePrice: 95, marketUnits: 1_500_000, techAffinity: 0.3, luxuryAffinity: 0.45 },
+  { id: 'powertool', label: 'Power Tools', icon: '🔧', archetype: 'device', baseUnitCost: 60, basePrice: 220, marketUnits: 600_000, techAffinity: 0.55, luxuryAffinity: 0.1 },
 ];
 
 export const PRODUCT_CATEGORY_BY_ID: Record<string, ProductCategoryDef> =
@@ -167,6 +176,266 @@ export const LAUNCH_VENUES: { id: LaunchVenue; label: string; icon: string; cost
   { id: 'convention_keynote', label: 'Convention Keynote', icon: '🎤', cost: 250_000, hype: 60, blurb: 'The industry watches you walk the stage.' },
   { id: 'flagship_theater', label: 'Flagship Theater Event', icon: '🎬', cost: 700_000, hype: 85, blurb: 'A cinematic unveiling the whole world streams.' },
 ];
+
+// --------------------------------------------------------------------------- customizable parts
+
+export interface ProductPartDef {
+  id: string;
+  label: string;
+  /** Which default material bucket the part uses when not overridden. */
+  base: 'body' | 'accent';
+}
+
+/** Every named piece of every category's 3D model — each is individually customizable. */
+export const PRODUCT_PARTS: Record<ProductCategory, ProductPartDef[]> = {
+  smartphone: [
+    { id: 'body', label: 'Body', base: 'body' }, { id: 'screen', label: 'Screen', base: 'accent' },
+    { id: 'camera', label: 'Camera Island', base: 'accent' }, { id: 'buttons', label: 'Buttons', base: 'accent' },
+    { id: 'logo', label: 'Logo', base: 'accent' },
+  ],
+  tablet: [
+    { id: 'body', label: 'Body', base: 'body' }, { id: 'screen', label: 'Screen', base: 'accent' },
+    { id: 'camera', label: 'Camera', base: 'accent' }, { id: 'buttons', label: 'Buttons', base: 'accent' },
+    { id: 'logo', label: 'Logo', base: 'accent' },
+  ],
+  laptop: [
+    { id: 'chassis', label: 'Chassis', base: 'body' }, { id: 'keyboard', label: 'Keyboard Deck', base: 'body' },
+    { id: 'display', label: 'Display', base: 'accent' }, { id: 'hinge', label: 'Hinge', base: 'accent' },
+    { id: 'logo', label: 'Lid Logo', base: 'accent' },
+  ],
+  wearable: [
+    { id: 'case', label: 'Case', base: 'body' }, { id: 'face', label: 'Watch Face', base: 'accent' },
+    { id: 'crown', label: 'Crown & Buttons', base: 'accent' }, { id: 'strap', label: 'Strap', base: 'accent' },
+  ],
+  audio: [
+    { id: 'headband', label: 'Headband', base: 'body' }, { id: 'cups', label: 'Ear Cups', base: 'body' },
+    { id: 'cushions', label: 'Cushions', base: 'accent' }, { id: 'yokes', label: 'Yokes', base: 'accent' },
+  ],
+  jewelry: [
+    { id: 'band', label: 'Band', base: 'body' }, { id: 'gem', label: 'Gemstone', base: 'accent' },
+    { id: 'setting', label: 'Setting', base: 'accent' },
+  ],
+  gaming: [
+    { id: 'shell', label: 'Shell', base: 'body' }, { id: 'lightstrip', label: 'Light Strip', base: 'accent' },
+    { id: 'vents', label: 'Vents', base: 'accent' }, { id: 'stand', label: 'Stand', base: 'accent' },
+  ],
+  smart_home: [
+    { id: 'wrap', label: 'Speaker Wrap', base: 'body' }, { id: 'top', label: 'Top Plate', base: 'accent' },
+    { id: 'led', label: 'Light Ring', base: 'accent' },
+  ],
+  appliance: [
+    { id: 'shell', label: 'Housing', base: 'body' }, { id: 'head', label: 'Brew Head', base: 'accent' },
+    { id: 'tray', label: 'Drip Tray', base: 'accent' }, { id: 'dial', label: 'Dial', base: 'accent' },
+  ],
+  furniture: [
+    { id: 'cushion', label: 'Seat Cushion', base: 'body' }, { id: 'backrest', label: 'Backrest', base: 'body' },
+    { id: 'pillow', label: 'Lumbar Pillow', base: 'accent' }, { id: 'legs', label: 'Legs', base: 'accent' },
+  ],
+  fashion: [
+    { id: 'garment', label: 'Garment', base: 'body' }, { id: 'collar', label: 'Collar', base: 'accent' },
+    { id: 'buttons', label: 'Buttons', base: 'accent' },
+  ],
+  shoes: [
+    { id: 'sole', label: 'Sole', base: 'accent' }, { id: 'upper', label: 'Upper', base: 'body' },
+    { id: 'laces', label: 'Laces', base: 'accent' }, { id: 'stripe', label: 'Side Stripe', base: 'accent' },
+  ],
+  sports: [
+    { id: 'sole', label: 'Sole', base: 'accent' }, { id: 'upper', label: 'Body', base: 'body' },
+    { id: 'laces', label: 'Straps', base: 'accent' }, { id: 'stripe', label: 'Stripe', base: 'accent' },
+  ],
+  cosmetics: [
+    { id: 'flacon', label: 'Flacon', base: 'body' }, { id: 'liquid', label: 'Liquid', base: 'accent' },
+    { id: 'cap', label: 'Cap', base: 'accent' },
+  ],
+  automotive: [
+    { id: 'paint', label: 'Body Paint', base: 'body' }, { id: 'glass', label: 'Glass', base: 'accent' },
+    { id: 'rims', label: 'Rims', base: 'accent' }, { id: 'tires', label: 'Tires', base: 'accent' },
+    { id: 'lights', label: 'Lights', base: 'accent' }, { id: 'grille', label: 'Grille', base: 'accent' },
+  ],
+  food_beverage: [
+    { id: 'vessel', label: 'Bottle', base: 'body' }, { id: 'label', label: 'Label', base: 'accent' },
+    { id: 'cap', label: 'Cap', base: 'accent' },
+  ],
+  medical: [
+    { id: 'shell', label: 'Housing', base: 'body' }, { id: 'screen', label: 'Display', base: 'accent' },
+    { id: 'buttons', label: 'Controls', base: 'accent' }, { id: 'handle', label: 'Handle', base: 'accent' },
+  ],
+  industrial: [
+    { id: 'base', label: 'Base Plate', base: 'body' }, { id: 'arm', label: 'Arm Segments', base: 'body' },
+    { id: 'joints', label: 'Joints', base: 'accent' }, { id: 'claw', label: 'Gripper', base: 'accent' },
+  ],
+  toys: [
+    { id: 'body', label: 'Body', base: 'body' }, { id: 'eyes', label: 'Eyes', base: 'accent' },
+    { id: 'limbs', label: 'Arms & Feet', base: 'accent' }, { id: 'antenna', label: 'Antenna', base: 'accent' },
+  ],
+  luxury: [
+    { id: 'body', label: 'Bag Body', base: 'body' }, { id: 'flap', label: 'Flap', base: 'body' },
+    { id: 'hardware', label: 'Hardware', base: 'accent' }, { id: 'handle', label: 'Handle', base: 'accent' },
+  ],
+  drone: [
+    { id: 'frame', label: 'Frame', base: 'body' }, { id: 'rotors', label: 'Rotors', base: 'accent' },
+    { id: 'gimbal', label: 'Camera Gimbal', base: 'accent' }, { id: 'led', label: 'Nav Lights', base: 'accent' },
+  ],
+  camera: [
+    { id: 'body', label: 'Body', base: 'body' }, { id: 'lens', label: 'Lens', base: 'accent' },
+    { id: 'grip', label: 'Grip', base: 'accent' }, { id: 'dials', label: 'Dials', base: 'accent' },
+  ],
+  tv: [
+    { id: 'panel', label: 'Panel', base: 'accent' }, { id: 'bezel', label: 'Bezel', base: 'body' },
+    { id: 'stand', label: 'Stand', base: 'accent' }, { id: 'speaker', label: 'Soundbar', base: 'accent' },
+  ],
+  bicycle: [
+    { id: 'frame', label: 'Frame', base: 'body' }, { id: 'wheels', label: 'Wheels', base: 'accent' },
+    { id: 'saddle', label: 'Saddle', base: 'accent' }, { id: 'handlebar', label: 'Handlebar', base: 'accent' },
+  ],
+  eyewear: [
+    { id: 'frame', label: 'Frame', base: 'body' }, { id: 'lenses', label: 'Lenses', base: 'accent' },
+    { id: 'temples', label: 'Temples', base: 'body' }, { id: 'hinges', label: 'Hinges', base: 'accent' },
+  ],
+  instrument: [
+    { id: 'body', label: 'Body', base: 'body' }, { id: 'neck', label: 'Neck', base: 'accent' },
+    { id: 'pickguard', label: 'Pickguard', base: 'accent' }, { id: 'hardware', label: 'Hardware', base: 'accent' },
+  ],
+  kitchenware: [
+    { id: 'body', label: 'Body', base: 'body' }, { id: 'handle', label: 'Handle', base: 'accent' },
+    { id: 'lid', label: 'Lid', base: 'accent' }, { id: 'spout', label: 'Spout', base: 'body' },
+  ],
+  powertool: [
+    { id: 'body', label: 'Body', base: 'body' }, { id: 'chuck', label: 'Chuck', base: 'accent' },
+    { id: 'grip', label: 'Grip', base: 'accent' }, { id: 'battery', label: 'Battery Pack', base: 'accent' },
+  ],
+};
+
+// --------------------------------------------------------------------------- colorways
+
+/** One-tap curated palettes; applying one also clears per-part color overrides. */
+export const COLORWAYS: { id: string; label: string; body: string; accent: string }[] = [
+  { id: 'midnight', label: 'Midnight', body: '#16181f', accent: '#8ab4ff' },
+  { id: 'porcelain', label: 'Porcelain', body: '#f2efe9', accent: '#1f2937' },
+  { id: 'ember', label: 'Ember', body: '#2a1416', accent: '#ff6a3d' },
+  { id: 'sage', label: 'Sage', body: '#dfe7dc', accent: '#3f6b4f' },
+  { id: 'royal', label: 'Royal', body: '#1d2a5a', accent: '#e8b84a' },
+  { id: 'blush', label: 'Blush', body: '#f6e3e0', accent: '#b4485e' },
+  { id: 'graphite', label: 'Graphite', body: '#3a3f47', accent: '#d4d8de' },
+  { id: 'aurora', label: 'Aurora', body: '#101c2c', accent: '#5eead4' },
+];
+
+/** Curated swatches offered in the part color picker (plus a free color input). */
+export const PART_SWATCHES = [
+  '#16181f', '#3a3f47', '#f2efe9', '#e8e6e1', '#1d2a5a', '#0f2a3d', '#2a1416', '#3b2f2a',
+  '#8ab4ff', '#5eead4', '#3f6b4f', '#e8b84a', '#ff6a3d', '#b4485e', '#f472b6', '#ef4444',
+];
+
+// --------------------------------------------------------------------------- component supply chain
+
+export interface ComponentDef { id: string; label: string; icon: string }
+
+export const COMPONENT_DEFS: ComponentDef[] = [
+  { id: 'chip', label: 'Processor', icon: '🧠' },
+  { id: 'display_panel', label: 'Display Panel', icon: '🖥️' },
+  { id: 'battery', label: 'Battery Cells', icon: '🔋' },
+  { id: 'sensor', label: 'Sensor Suite', icon: '📡' },
+  { id: 'motor', label: 'Motor & Drive', icon: '⚙️' },
+  { id: 'drivers', label: 'Audio Drivers', icon: '🔊' },
+  { id: 'optics', label: 'Optics', icon: '🔭' },
+  { id: 'frame_parts', label: 'Frame & Structure', icon: '🩻' },
+  { id: 'hardware_kit', label: 'Hardware & Trims', icon: '🔩' },
+  { id: 'materials_stock', label: 'Raw Materials', icon: '📦' },
+];
+
+export const COMPONENT_BY_ID: Record<string, ComponentDef> =
+  Object.fromEntries(COMPONENT_DEFS.map((c) => [c.id, c]));
+
+/** Bill-of-materials slots per category; each slot is sourced at a chosen tier. */
+export const PRODUCT_COMPONENTS: Record<ProductCategory, string[]> = {
+  smartphone: ['chip', 'display_panel', 'battery'],
+  laptop: ['chip', 'display_panel', 'battery'],
+  tablet: ['chip', 'display_panel', 'battery'],
+  wearable: ['chip', 'sensor', 'battery'],
+  gaming: ['chip', 'frame_parts', 'hardware_kit'],
+  audio: ['drivers', 'chip', 'battery'],
+  appliance: ['motor', 'frame_parts', 'hardware_kit'],
+  smart_home: ['chip', 'drivers', 'sensor'],
+  furniture: ['frame_parts', 'materials_stock', 'hardware_kit'],
+  fashion: ['materials_stock', 'hardware_kit'],
+  shoes: ['materials_stock', 'frame_parts', 'hardware_kit'],
+  jewelry: ['materials_stock', 'hardware_kit'],
+  cosmetics: ['materials_stock', 'hardware_kit'],
+  automotive: ['motor', 'battery', 'frame_parts', 'hardware_kit'],
+  food_beverage: ['materials_stock', 'hardware_kit'],
+  medical: ['chip', 'sensor', 'display_panel'],
+  industrial: ['motor', 'frame_parts', 'chip'],
+  toys: ['materials_stock', 'motor', 'hardware_kit'],
+  sports: ['materials_stock', 'frame_parts'],
+  luxury: ['materials_stock', 'hardware_kit'],
+  drone: ['motor', 'battery', 'optics', 'chip'],
+  camera: ['optics', 'sensor', 'chip'],
+  tv: ['display_panel', 'chip', 'drivers'],
+  bicycle: ['frame_parts', 'hardware_kit', 'materials_stock'],
+  eyewear: ['optics', 'frame_parts'],
+  instrument: ['materials_stock', 'hardware_kit'],
+  kitchenware: ['materials_stock', 'frame_parts'],
+  powertool: ['motor', 'battery', 'frame_parts'],
+};
+
+export const COMPONENT_TIERS: Record<ComponentTier, { label: string; costMult: number; quality: number; defectMod: number; luxury: number }> = {
+  budget: { label: 'Budget', costMult: 0.72, quality: -8, defectMod: 0.018, luxury: -6 },
+  standard: { label: 'Standard', costMult: 1.0, quality: 0, defectMod: 0, luxury: 0 },
+  premium: { label: 'Premium', costMult: 1.5, quality: 9, defectMod: -0.012, luxury: 8 },
+};
+
+/** Suggested naming prefixes for player-engineered parts (Bat62, Core9, Vue X1…). */
+export const PART_NAME_PREFIX: Record<string, string> = {
+  chip: 'Core', display_panel: 'Vue', battery: 'Bat', sensor: 'Sense', motor: 'Torq',
+  drivers: 'Wave', optics: 'Lux', frame_parts: 'Frame', hardware_kit: 'Kit', materials_stock: 'Mat',
+};
+
+/** The global component market: annual external demand and average unit price per type.
+ * Player-engineered parts listed for sale compete here for OEM contracts. */
+export const COMPONENT_MARKET: Record<string, { units: number; price: number }> = {
+  chip: { units: 2_500_000, price: 55 },
+  display_panel: { units: 1_800_000, price: 60 },
+  battery: { units: 3_000_000, price: 18 },
+  sensor: { units: 1_500_000, price: 22 },
+  motor: { units: 900_000, price: 80 },
+  drivers: { units: 1_200_000, price: 12 },
+  optics: { units: 500_000, price: 95 },
+  frame_parts: { units: 800_000, price: 30 },
+  hardware_kit: { units: 2_000_000, price: 8 },
+  materials_stock: { units: 4_000_000, price: 5 },
+};
+
+/** Field-defect flavor names surfaced by the warranty/recall system. */
+export const DEFECT_NAMES = [
+  'battery swelling reports', 'hinge fatigue failures', 'display flicker batch', 'overheating under load',
+  'coating peeling in sunlight', 'intermittent power fault', 'stress cracks near mounts', 'moisture ingress complaints',
+];
+
+// --------------------------------------------------------------------------- customer segments
+
+export interface SegmentDef {
+  id: CustomerSegment;
+  label: string;
+  icon: string;
+  share: number; // slice of the addressable market
+  priceSensitivity: number; // 0..1 — punishes price above category anchor
+  lovesTech: number; // 0..1 weights on product qualities
+  lovesLuxury: number;
+  lovesEco: number;
+  lovesReliability: number;
+  blurb: string;
+}
+
+export const CUSTOMER_SEGMENTS: SegmentDef[] = [
+  { id: 'value', label: 'Value Seekers', icon: '🏷️', share: 0.30, priceSensitivity: 1.0, lovesTech: 0.2, lovesLuxury: 0.05, lovesEco: 0.2, lovesReliability: 0.5, blurb: 'Price first. Deals, durability, no frills.' },
+  { id: 'families', label: 'Families', icon: '👨‍👩‍👧', share: 0.25, priceSensitivity: 0.75, lovesTech: 0.3, lovesLuxury: 0.15, lovesEco: 0.35, lovesReliability: 1.0, blurb: 'Reliability and safety beat everything.' },
+  { id: 'early_adopters', label: 'Early Adopters', icon: '🚀', share: 0.18, priceSensitivity: 0.25, lovesTech: 1.0, lovesLuxury: 0.35, lovesEco: 0.3, lovesReliability: 0.3, blurb: 'First in line for anything genuinely new.' },
+  { id: 'eco', label: 'Eco-Conscious', icon: '🌿', share: 0.15, priceSensitivity: 0.5, lovesTech: 0.35, lovesLuxury: 0.2, lovesEco: 1.0, lovesReliability: 0.4, blurb: 'Materials, footprint and repairability matter.' },
+  { id: 'luxury_buyers', label: 'Luxury Buyers', icon: '💎', share: 0.12, priceSensitivity: 0.05, lovesTech: 0.3, lovesLuxury: 1.0, lovesEco: 0.2, lovesReliability: 0.4, blurb: 'Craft, exclusivity and story. Price is a feature.' },
+];
+
+export const SEGMENT_BY_ID: Record<string, SegmentDef> =
+  Object.fromEntries(CUSTOMER_SEGMENTS.map((s) => [s.id, s]));
 
 // --------------------------------------------------------------------------- concept generator grammar
 

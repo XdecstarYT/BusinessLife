@@ -7,16 +7,17 @@
  * rounded-extruded unibodies, canvas-drawn screens / keyboards / watch faces /
  * bottle labels, physically-based materials with clearcoat and glass
  * transmission, image-based environment reflections, ACES tone mapping and a
- * soft contact shadow. Every category gets its own model — a smartwatch, a pair
- * of headphones, a perfume bottle and a car are all distinct objects — and the
- * whole mesh rebuilds live from the form sliders, colors, materials and finish.
+ * soft contact shadow. Every category gets its own model, and every named part
+ * of every model resolves its material through the per-part customization
+ * system (PRODUCT_PARTS + Product.partOverrides), so any piece can carry its
+ * own color, material and finish. The whole mesh rebuilds live as you design.
  */
 import { useRef } from 'react';
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { useThreeScene } from './useThreeScene';
-import type { Product, StudioLighting } from '../../sim/types';
-import { PRODUCT_CATEGORY_BY_ID, PRODUCT_MATERIAL_BY_ID } from '../../data/productData';
+import type { Product, ProductFinish, ProductMaterialId, StudioLighting } from '../../sim/types';
+import { PRODUCT_CATEGORY_BY_ID, PRODUCT_MATERIAL_BY_ID, PRODUCT_PARTS } from '../../data/productData';
 
 interface ProductStudioSceneProps {
   product: Product;
@@ -381,10 +382,10 @@ function productMaterial(matId: string, finish: string, colorOverride?: string):
   return mat;
 }
 
-function screenMaterial(tex: THREE.CanvasTexture): THREE.MeshStandardMaterial {
+function screenMaterial(tex: THREE.CanvasTexture, tint = '#ffffff'): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({
     color: 0x000000,
-    emissive: 0xffffff,
+    emissive: new THREE.Color(tint),
     emissiveMap: tex,
     emissiveIntensity: 0.95,
     roughness: 0.15,
@@ -409,8 +410,17 @@ function wordmarkPlane(text: string, height: number): THREE.Mesh {
 }
 
 // ---------------------------------------------------------------------------
-// Per-category product builders
+// Per-category product builders — every mesh resolves its material per part
 // ---------------------------------------------------------------------------
+
+/** Bespoke defaults for a part when the player has not overridden it. */
+interface PartDefault {
+  materialId?: ProductMaterialId;
+  color?: string;
+  finish?: ProductFinish;
+  /** Fully custom material (screens, rubber, tinted glass) used when untouched. */
+  custom?: () => THREE.Material;
+}
 
 interface BuildCtx {
   group: THREE.Group;
@@ -419,23 +429,59 @@ interface BuildCtx {
   slim: number;   // thickness multiplier from slimness slider
   curve: number;  // curvature 0..1
   accentAmt: number;
-  body: THREE.MeshPhysicalMaterial;
-  accent: THREE.MeshPhysicalMaterial;
   brand: string;
+  /** Resolve a part's material: player override → bespoke default → body/accent base. */
+  mat: (partId: string, dflt?: PartDefault) => THREE.Material;
+  /** Resolve a part's display color (for emissive details like LEDs and lights). */
+  pc: (partId: string, fallback: string) => string;
 }
+
+function makeBuildCtx(group: THREE.Group, product: Product): BuildCtx {
+  const f = product.form;
+  const parts = PRODUCT_PARTS[product.category] ?? [];
+  const overrides = product.partOverrides ?? {};
+  const mat = (partId: string, dflt?: PartDefault): THREE.Material => {
+    const o = overrides[partId];
+    const hasOverride = !!(o && (o.color || o.materialId || o.finish));
+    if (!hasOverride && dflt?.custom) return dflt.custom();
+    const base = parts.find((x) => x.id === partId)?.base ?? 'body';
+    const matId = o?.materialId ?? dflt?.materialId ?? (base === 'body' ? product.materials[0] : product.materials[1]);
+    const finish = o?.finish ?? dflt?.finish ?? f.finish;
+    const color = o?.color ?? dflt?.color ?? (base === 'body' ? f.bodyColor : f.accentColor);
+    return productMaterial(matId, finish, color);
+  };
+  const pc = (partId: string, fallback: string): string => overrides[partId]?.color ?? fallback;
+  return {
+    group,
+    product,
+    s: f.size,
+    slim: 1 - f.slimness * 0.55,
+    curve: f.curvature,
+    accentAmt: f.accent,
+    brand: product.name.split(' ')[0] || product.name,
+    mat,
+    pc,
+  };
+}
+
+const RUBBER = () => new THREE.MeshStandardMaterial({ color: 0x14171c, roughness: 0.92 });
+const DARK_GLASS = () => new THREE.MeshPhysicalMaterial({ color: 0x101826, metalness: 0.5, roughness: 0.04, clearcoat: 1 });
 
 function buildSlab(c: BuildCtx): void {
   const isTablet = c.product.category === 'tablet';
   const s = c.s;
   const w = (isTablet ? 1.5 : 0.92) * s, h = (isTablet ? 2.0 : 1.86) * s, d = (isTablet ? 0.095 : 0.13) * s * c.slim;
   const r = w * (0.07 + c.curve * 0.12);
-  c.group.add(new THREE.Mesh(roundedBoxGeo(w, h, d, r), c.body));
+  c.group.add(new THREE.Mesh(roundedBoxGeo(w, h, d, r), c.mat('body')));
   // display with a drawn home screen
-  const screen = new THREE.Mesh(roundedBoxGeo(w * 0.93, h * 0.95, 0.012, r * 0.85), screenMaterial(phoneScreenTexture(c.product.form.accentColor)));
+  const screen = new THREE.Mesh(
+    roundedBoxGeo(w * 0.93, h * 0.95, 0.012, r * 0.85),
+    c.mat('screen', { custom: () => screenMaterial(phoneScreenTexture(c.product.form.accentColor), c.pc('screen', '#ffffff')) }),
+  );
   screen.position.z = d / 2 + 0.004;
   c.group.add(screen);
   // rear camera island: plate + lenses + flash
-  const plate = new THREE.Mesh(roundedBoxGeo(w * 0.38, w * 0.38, 0.035, w * 0.09), c.accent);
+  const plate = new THREE.Mesh(roundedBoxGeo(w * 0.38, w * 0.38, 0.035, w * 0.09), c.mat('camera'));
   plate.position.set(-w * 0.24, h * 0.32, -d / 2 - 0.014);
   c.group.add(plate);
   const lensGlass = new THREE.MeshPhysicalMaterial({ color: 0x0a1018, metalness: 0.4, roughness: 0.05, clearcoat: 1 });
@@ -456,7 +502,7 @@ function buildSlab(c: BuildCtx): void {
   c.group.add(flash);
   // side buttons
   for (const [by, bh] of [[h * 0.22, 0.16 * s], [h * 0.05, 0.1 * s]] as const) {
-    const btn = new THREE.Mesh(roundedBoxGeo(0.02 * s, bh, d * 0.5, 0.008), c.accent);
+    const btn = new THREE.Mesh(roundedBoxGeo(0.02 * s, bh, d * 0.5, 0.008), c.mat('buttons'));
     btn.rotation.y = Math.PI / 2;
     btn.position.set(w / 2 + 0.008, by, 0);
     c.group.add(btn);
@@ -472,11 +518,14 @@ function buildClamshell(c: BuildCtx): void {
   const s = c.s;
   const w = 1.95 * s, dpt = 1.35 * s, t = 0.085 * s * c.slim;
   const r = w * (0.03 + c.curve * 0.04);
-  const base = new THREE.Mesh(flatRoundedGeo(w, dpt, t, r), c.body);
+  const base = new THREE.Mesh(flatRoundedGeo(w, dpt, t, r), c.mat('chassis'));
   base.position.y = t / 2;
   c.group.add(base);
   // keyboard + trackpad deck
-  const deck = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.96, dpt * 0.92), new THREE.MeshStandardMaterial({ map: deckTexture(c.product.form.bodyColor), roughness: 0.6, metalness: 0.3 }));
+  const deck = new THREE.Mesh(
+    new THREE.PlaneGeometry(w * 0.96, dpt * 0.92),
+    c.mat('keyboard', { custom: () => new THREE.MeshStandardMaterial({ map: deckTexture(c.pc('keyboard', c.product.form.bodyColor)), roughness: 0.6, metalness: 0.3 }) }),
+  );
   deck.rotation.x = -Math.PI / 2;
   deck.position.y = t + 0.003;
   c.group.add(deck);
@@ -485,10 +534,13 @@ function buildClamshell(c: BuildCtx): void {
   lid.position.set(0, t, -dpt / 2 + 0.02);
   lid.rotation.x = -Math.PI / 2 + 1.92;
   const lidH = 1.3 * s;
-  const lidMesh = new THREE.Mesh(roundedBoxGeo(w, lidH, t * 0.75, r), c.body);
+  const lidMesh = new THREE.Mesh(roundedBoxGeo(w, lidH, t * 0.75, r), c.mat('chassis'));
   lidMesh.position.y = lidH / 2;
   lid.add(lidMesh);
-  const display = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.92, lidH * 0.88), screenMaterial(laptopScreenTexture(c.product.form.accentColor, c.product.name)));
+  const display = new THREE.Mesh(
+    new THREE.PlaneGeometry(w * 0.92, lidH * 0.88),
+    c.mat('display', { custom: () => screenMaterial(laptopScreenTexture(c.product.form.accentColor, c.product.name), c.pc('display', '#ffffff')) }),
+  );
   display.position.set(0, lidH / 2, t * 0.75 / 2 + 0.003);
   lid.add(display);
   const mark = wordmarkPlane(c.brand, lidH * 0.08);
@@ -497,13 +549,13 @@ function buildClamshell(c: BuildCtx): void {
   lid.add(mark);
   c.group.add(lid);
   // hinge bar
-  const hinge = new THREE.Mesh(new THREE.CylinderGeometry(t * 0.55, t * 0.55, w * 0.94, 14), c.accent);
+  const hinge = new THREE.Mesh(new THREE.CylinderGeometry(t * 0.55, t * 0.55, w * 0.94, 14), c.mat('hinge'));
   hinge.rotation.z = Math.PI / 2;
   hinge.position.set(0, t, -dpt / 2 + 0.02);
   c.group.add(hinge);
   // rubber feet
   for (const [fx, fz] of [[-0.44, -0.4], [0.44, -0.4], [-0.44, 0.4], [0.44, 0.4]] as const) {
-    const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.035 * s, 0.045 * s, 0.02, 10), new THREE.MeshStandardMaterial({ color: 0x14171c, roughness: 0.9 }));
+    const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.035 * s, 0.045 * s, 0.02, 10), RUBBER());
     foot.position.set(fx * w, -0.01, fz * dpt);
     c.group.add(foot);
   }
@@ -513,9 +565,11 @@ function buildWatch(c: BuildCtx): void {
   const s = c.s;
   const caseW = 0.95 * s, caseH = 1.08 * s, caseD = 0.26 * s * c.slim;
   const r = caseW * (0.2 + c.curve * 0.28); // curvature morphs square → round case
-  const caseMesh = new THREE.Mesh(roundedBoxGeo(caseW, caseH, caseD, r), c.body);
-  c.group.add(caseMesh);
-  const face = new THREE.Mesh(roundedBoxGeo(caseW * 0.86, caseH * 0.88, 0.012, r * 0.9), screenMaterial(watchFaceTexture(c.product.form.accentColor)));
+  c.group.add(new THREE.Mesh(roundedBoxGeo(caseW, caseH, caseD, r), c.mat('case')));
+  const face = new THREE.Mesh(
+    roundedBoxGeo(caseW * 0.86, caseH * 0.88, 0.012, r * 0.9),
+    c.mat('face', { custom: () => screenMaterial(watchFaceTexture(c.product.form.accentColor), c.pc('face', '#ffffff')) }),
+  );
   face.position.z = caseD / 2 + 0.004;
   c.group.add(face);
   // crystal dome
@@ -525,17 +579,17 @@ function buildWatch(c: BuildCtx): void {
   crystal.position.z = caseD / 2 - 0.02;
   c.group.add(crystal);
   // crown + side button
-  const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.055 * s, 0.055 * s, 0.09 * s, 14), c.accent);
+  const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.055 * s, 0.055 * s, 0.09 * s, 14), c.mat('crown'));
   crown.rotation.z = Math.PI / 2;
   crown.position.set(caseW / 2 + 0.04 * s, caseH * 0.16, 0);
   c.group.add(crown);
-  const sideBtn = new THREE.Mesh(roundedBoxGeo(0.05 * s, 0.22 * s, 0.05 * s, 0.02 * s), c.accent);
+  const sideBtn = new THREE.Mesh(roundedBoxGeo(0.05 * s, 0.22 * s, 0.05 * s, 0.02 * s), c.mat('crown'));
   sideBtn.rotation.y = Math.PI / 2;
   sideBtn.position.set(caseW / 2 + 0.015 * s, -caseH * 0.12, 0);
   c.group.add(sideBtn);
   // strap: two curved bands
   for (const dir of [1, -1] as const) {
-    const strap = new THREE.Mesh(roundedBoxGeo(caseW * 0.62, caseH * 0.85, caseD * 0.4, caseW * 0.12), c.accent);
+    const strap = new THREE.Mesh(roundedBoxGeo(caseW * 0.62, caseH * 0.85, caseD * 0.4, caseW * 0.12), c.mat('strap'));
     strap.position.set(0, dir * (caseH * 0.85), -caseD * 0.16);
     strap.rotation.x = -dir * 0.5;
     c.group.add(strap);
@@ -544,23 +598,23 @@ function buildWatch(c: BuildCtx): void {
 
 function buildHeadphones(c: BuildCtx): void {
   const s = c.s;
-  const band = new THREE.Mesh(new THREE.TorusGeometry(0.85 * s, 0.06 * s, 14, 40, Math.PI), c.body);
+  const band = new THREE.Mesh(new THREE.TorusGeometry(0.85 * s, 0.06 * s, 14, 40, Math.PI), c.mat('headband'));
   c.group.add(band);
-  const pad = new THREE.Mesh(new THREE.TorusGeometry(0.85 * s, 0.075 * s, 12, 24, Math.PI * 0.5), c.accent);
+  const pad = new THREE.Mesh(new THREE.TorusGeometry(0.85 * s, 0.075 * s, 12, 24, Math.PI * 0.5), c.mat('cushions', { custom: RUBBER }));
   pad.rotation.z = Math.PI * 0.25;
   c.group.add(pad);
   for (const dir of [1, -1] as const) {
     const cup = new THREE.Group();
     cup.position.set(dir * 0.85 * s, -0.1 * s, 0);
-    const shell = new THREE.Mesh(new THREE.SphereGeometry(0.34 * s, 24, 18, 0, Math.PI * 2, 0, Math.PI / 2), c.body);
+    const shell = new THREE.Mesh(new THREE.SphereGeometry(0.34 * s, 24, 18, 0, Math.PI * 2, 0, Math.PI / 2), c.mat('cups'));
     shell.rotation.z = dir * Math.PI / 2;
     shell.scale.set(0.75, 1, 1);
     cup.add(shell);
-    const cushion = new THREE.Mesh(new THREE.TorusGeometry(0.26 * s, 0.085 * s, 12, 26), new THREE.MeshStandardMaterial({ color: 0x181b21, roughness: 0.92 }));
+    const cushion = new THREE.Mesh(new THREE.TorusGeometry(0.26 * s, 0.085 * s, 12, 26), c.mat('cushions', { custom: RUBBER }));
     cushion.rotation.y = Math.PI / 2;
     cushion.position.x = -dir * 0.06 * s;
     cup.add(cushion);
-    const yoke = new THREE.Mesh(new THREE.CylinderGeometry(0.022 * s, 0.022 * s, 0.34 * s, 8), c.accent);
+    const yoke = new THREE.Mesh(new THREE.CylinderGeometry(0.022 * s, 0.022 * s, 0.34 * s, 8), c.mat('yokes'));
     yoke.position.set(dir * 0.02 * s, 0.36 * s, 0);
     cup.add(yoke);
     const dot = wordmarkPlane(c.brand.slice(0, 1), 0.22 * s);
@@ -573,11 +627,11 @@ function buildHeadphones(c: BuildCtx): void {
 
 function buildRing(c: BuildCtx): void {
   const s = c.s;
-  const band = new THREE.Mesh(new THREE.TorusGeometry(0.52 * s, 0.075 * s * (0.7 + c.curve * 0.5), 18, 48), c.body);
+  const band = new THREE.Mesh(new THREE.TorusGeometry(0.52 * s, 0.075 * s * (0.7 + c.curve * 0.5), 18, 48), c.mat('band'));
   c.group.add(band);
   // gem on a prong setting
   const gemMat = new THREE.MeshPhysicalMaterial({
-    color: c.product.form.accentColor, metalness: 0.1, roughness: 0.02,
+    color: c.pc('gem', c.product.form.accentColor), metalness: 0.1, roughness: 0.02,
     transmission: 0.7, thickness: 0.4, ior: 2.2, envMapIntensity: 2.2,
   });
   const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.17 * s, 0), gemMat);
@@ -586,11 +640,11 @@ function buildRing(c: BuildCtx): void {
   c.group.add(gem);
   for (let i = 0; i < 4; i++) {
     const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
-    const prong = new THREE.Mesh(new THREE.CylinderGeometry(0.015 * s, 0.02 * s, 0.16 * s, 8), c.accent);
+    const prong = new THREE.Mesh(new THREE.CylinderGeometry(0.015 * s, 0.02 * s, 0.16 * s, 8), c.mat('setting'));
     prong.position.set(Math.cos(a) * 0.09 * s, 0.56 * s, Math.sin(a) * 0.09 * s);
     c.group.add(prong);
   }
-  const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.1 * s, 0.13 * s, 0.1 * s, 16), c.accent);
+  const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.1 * s, 0.13 * s, 0.1 * s, 16), c.mat('setting'));
   collar.position.y = 0.5 * s;
   c.group.add(collar);
 }
@@ -599,14 +653,15 @@ function buildConsole(c: BuildCtx): void {
   const s = c.s;
   const w = 0.72 * s, h = 1.7 * s, d = 0.36 * s * c.slim;
   const r = w * (0.08 + c.curve * 0.1);
-  c.group.add(new THREE.Mesh(roundedBoxGeo(w, h, d, r), c.body));
+  c.group.add(new THREE.Mesh(roundedBoxGeo(w, h, d, r), c.mat('shell')));
   // center light strip
-  const strip = new THREE.Mesh(roundedBoxGeo(0.03 * s, h * 0.86, 0.01, 0.01), new THREE.MeshStandardMaterial({ color: c.product.form.accentColor, emissive: c.product.form.accentColor, emissiveIntensity: 1.6 }));
+  const stripColor = c.pc('lightstrip', c.product.form.accentColor);
+  const strip = new THREE.Mesh(roundedBoxGeo(0.03 * s, h * 0.86, 0.01, 0.01), new THREE.MeshStandardMaterial({ color: stripColor, emissive: stripColor, emissiveIntensity: 1.6 }));
   strip.position.z = d / 2 + 0.005;
   c.group.add(strip);
   // side vent lines
   for (let i = 0; i < 6; i++) {
-    const vent = new THREE.Mesh(new THREE.BoxGeometry(0.01, h * 0.4, d * 0.55), c.accent);
+    const vent = new THREE.Mesh(new THREE.BoxGeometry(0.01, h * 0.4, d * 0.55), c.mat('vents'));
     vent.position.set(-w / 2 - 0.004, h * 0.12, 0);
     vent.position.y = h * 0.28 - i * 0.1 * s;
     c.group.add(vent);
@@ -615,24 +670,26 @@ function buildConsole(c: BuildCtx): void {
   const slot = new THREE.Mesh(new THREE.BoxGeometry(0.015, h * 0.3, 0.012), new THREE.MeshStandardMaterial({ color: 0x0a0d12 }));
   slot.position.set(w * 0.28, -h * 0.05, d / 2 + 0.004);
   c.group.add(slot);
-  const power = emissiveDot(c.product.form.accentColor, 0.018 * s);
+  const power = emissiveDot(stripColor, 0.018 * s);
   power.position.set(w * 0.28, -h * 0.34, d / 2 + 0.004);
   c.group.add(power);
   // stand
-  const stand = new THREE.Mesh(new THREE.CylinderGeometry(0.34 * s, 0.4 * s, 0.045 * s, 28), c.accent);
+  const stand = new THREE.Mesh(new THREE.CylinderGeometry(0.34 * s, 0.4 * s, 0.045 * s, 28), c.mat('stand'));
   stand.position.y = -h / 2 - 0.02;
   c.group.add(stand);
 }
 
 function buildSpeaker(c: BuildCtx): void {
   const s = c.s;
-  const bodyMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.52 * s, 0.56 * s, 1.15 * s, 40), c.body);
-  c.body.roughness = Math.max(c.body.roughness, 0.75); // fabric wrap reads matte
+  const wrapMat = c.mat('wrap') as THREE.MeshPhysicalMaterial;
+  if ('roughness' in wrapMat) wrapMat.roughness = Math.max(wrapMat.roughness, 0.75); // fabric wrap reads matte
+  const bodyMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.52 * s, 0.56 * s, 1.15 * s, 40), wrapMat);
   c.group.add(bodyMesh);
-  const top = new THREE.Mesh(new THREE.CylinderGeometry(0.52 * s, 0.52 * s, 0.06 * s, 40), c.accent);
+  const top = new THREE.Mesh(new THREE.CylinderGeometry(0.52 * s, 0.52 * s, 0.06 * s, 40), c.mat('top'));
   top.position.y = 0.6 * s;
   c.group.add(top);
-  const led = new THREE.Mesh(new THREE.TorusGeometry(0.4 * s, 0.014 * s, 10, 48), new THREE.MeshStandardMaterial({ color: c.product.form.accentColor, emissive: c.product.form.accentColor, emissiveIntensity: 1.8 }));
+  const ledColor = c.pc('led', c.product.form.accentColor);
+  const led = new THREE.Mesh(new THREE.TorusGeometry(0.4 * s, 0.014 * s, 10, 48), new THREE.MeshStandardMaterial({ color: ledColor, emissive: ledColor, emissiveIntensity: 1.8 }));
   led.rotation.x = Math.PI / 2;
   led.position.y = 0.635 * s;
   c.group.add(led);
@@ -645,19 +702,19 @@ function buildAppliance(c: BuildCtx): void {
   const s = c.s;
   const w = 1.15 * s, h = 1.35 * s, d = 0.85 * s * c.slim;
   const r = w * (0.05 + c.curve * 0.08);
-  c.group.add(new THREE.Mesh(roundedBoxGeo(w, h, d, r), c.body));
+  c.group.add(new THREE.Mesh(roundedBoxGeo(w, h, d, r), c.mat('shell')));
   // brew head + platform (espresso-machine silhouette)
-  const head = new THREE.Mesh(roundedBoxGeo(w * 0.5, h * 0.28, d * 0.5, r * 0.6), c.accent);
+  const head = new THREE.Mesh(roundedBoxGeo(w * 0.5, h * 0.28, d * 0.5, r * 0.6), c.mat('head'));
   head.position.set(0, h * 0.12, d * 0.45);
   c.group.add(head);
-  const tray = new THREE.Mesh(flatRoundedGeo(w * 0.6, d * 0.5, 0.04 * s, 0.04), c.accent);
+  const tray = new THREE.Mesh(flatRoundedGeo(w * 0.6, d * 0.5, 0.04 * s, 0.04), c.mat('tray'));
   tray.position.set(0, -h / 2 + 0.05 * s, d * 0.35);
   c.group.add(tray);
   // control screen + dial
   const panel = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.34, h * 0.14), screenMaterial(vitalsTexture(c.product.form.accentColor)));
   panel.position.set(0, h * 0.34, d / 2 + 0.004);
   c.group.add(panel);
-  const dial = new THREE.Mesh(new THREE.CylinderGeometry(0.075 * s, 0.075 * s, 0.05 * s, 24), productMaterial('chrome', 'metallic'));
+  const dial = new THREE.Mesh(new THREE.CylinderGeometry(0.075 * s, 0.075 * s, 0.05 * s, 24), c.mat('dial', { materialId: 'chrome', finish: 'metallic', color: '#dfe5ea' }));
   dial.rotation.x = Math.PI / 2;
   dial.position.set(w * 0.3, h * 0.34, d / 2 + 0.02);
   c.group.add(dial);
@@ -674,16 +731,16 @@ function buildBottle(c: BuildCtx): void {
     [0.32, 1.12], [0.2, 1.28], [0.13, 1.38], [0.12, 1.52], [0.12, 1.62],
   ];
   const pts = profile.map(([px, py]) => new THREE.Vector2(px * s * (0.8 + c.curve * 0.4), py * s * 1.15));
-  const bottle = new THREE.Mesh(new THREE.LatheGeometry(pts, 48), c.body);
+  const bottle = new THREE.Mesh(new THREE.LatheGeometry(pts, 48), c.mat('vessel'));
   c.group.add(bottle);
   // wraparound printed label
   const label = new THREE.Mesh(
     new THREE.CylinderGeometry(0.355 * s * (0.8 + c.curve * 0.4), 0.355 * s * (0.8 + c.curve * 0.4), 0.5 * s, 48, 1, true),
-    new THREE.MeshStandardMaterial({ map: labelTexture(c.product.name, c.product.tagline), roughness: 0.8 }),
+    c.mat('label', { custom: () => new THREE.MeshStandardMaterial({ map: labelTexture(c.product.name, c.product.tagline), roughness: 0.8, color: c.pc('label', '#ffffff') }) }),
   );
   label.position.y = 0.72 * s;
   c.group.add(label);
-  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.135 * s, 0.135 * s, 0.14 * s, 28), c.accent);
+  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.135 * s, 0.135 * s, 0.14 * s, 28), c.mat('cap'));
   cap.position.y = 1.9 * s;
   c.group.add(cap);
 }
@@ -691,18 +748,29 @@ function buildBottle(c: BuildCtx): void {
 function buildPerfume(c: BuildCtx): void {
   const s = c.s;
   const w = 0.85 * s, h = 1.0 * s, d = 0.38 * s * c.slim;
-  const glass = productMaterial('glass', 'gloss');
-  glass.color = new THREE.Color(c.product.form.bodyColor);
-  glass.transmission = 0.9;
-  c.group.add(new THREE.Mesh(roundedBoxGeo(w, h, d, w * (0.08 + c.curve * 0.2)), glass));
+  const flacon = new THREE.Mesh(
+    roundedBoxGeo(w, h, d, w * (0.08 + c.curve * 0.2)),
+    c.mat('flacon', {
+      custom: () => {
+        const glass = productMaterial('glass', 'gloss');
+        glass.color = new THREE.Color(c.pc('flacon', c.product.form.bodyColor));
+        glass.transmission = 0.9;
+        return glass;
+      },
+    }),
+  );
+  c.group.add(flacon);
   // liquid inside
-  const liquid = new THREE.Mesh(roundedBoxGeo(w * 0.82, h * 0.68, d * 0.6, w * 0.07), new THREE.MeshPhysicalMaterial({ color: c.product.form.accentColor, transmission: 0.5, roughness: 0.1, thickness: 0.3 }));
+  const liquid = new THREE.Mesh(
+    roundedBoxGeo(w * 0.82, h * 0.68, d * 0.6, w * 0.07),
+    c.mat('liquid', { custom: () => new THREE.MeshPhysicalMaterial({ color: c.pc('liquid', c.product.form.accentColor), transmission: 0.5, roughness: 0.1, thickness: 0.3 }) }),
+  );
   liquid.position.y = -h * 0.12;
   c.group.add(liquid);
-  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.09 * s, 0.11 * s, 0.12 * s, 20), c.accent);
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.09 * s, 0.11 * s, 0.12 * s, 20), c.mat('cap'));
   neck.position.y = h / 2 + 0.06 * s;
   c.group.add(neck);
-  const capSphere = new THREE.Mesh(new THREE.SphereGeometry(0.16 * s, 24, 18), c.accent);
+  const capSphere = new THREE.Mesh(new THREE.SphereGeometry(0.16 * s, 24, 18), c.mat('cap'));
   capSphere.position.y = h / 2 + 0.26 * s;
   c.group.add(capSphere);
   const mark = wordmarkPlane(c.product.name.slice(0, 12), h * 0.09);
@@ -714,21 +782,21 @@ function buildHandbag(c: BuildCtx): void {
   const s = c.s;
   const w = 1.3 * s, h = 0.9 * s, d = 0.42 * s * c.slim;
   const r = w * (0.06 + c.curve * 0.1);
-  c.group.add(new THREE.Mesh(roundedBoxGeo(w, h, d, r), c.body));
+  c.group.add(new THREE.Mesh(roundedBoxGeo(w, h, d, r), c.mat('body')));
   // front flap
-  const flap = new THREE.Mesh(roundedBoxGeo(w * 0.98, h * 0.55, 0.03 * s, r), c.body);
+  const flap = new THREE.Mesh(roundedBoxGeo(w * 0.98, h * 0.55, 0.03 * s, r), c.mat('flap'));
   flap.position.set(0, h * 0.22, d / 2 + 0.012);
   c.group.add(flap);
   // clasp
-  const clasp = new THREE.Mesh(roundedBoxGeo(0.14 * s, 0.1 * s, 0.03 * s, 0.03 * s), c.accent);
+  const clasp = new THREE.Mesh(roundedBoxGeo(0.14 * s, 0.1 * s, 0.03 * s, 0.03 * s), c.mat('hardware'));
   clasp.position.set(0, -h * 0.02, d / 2 + 0.035);
   c.group.add(clasp);
   // handle arc
-  const handle = new THREE.Mesh(new THREE.TorusGeometry(0.42 * s, 0.035 * s, 12, 32, Math.PI), c.accent);
+  const handle = new THREE.Mesh(new THREE.TorusGeometry(0.42 * s, 0.035 * s, 12, 32, Math.PI), c.mat('handle'));
   handle.position.y = h / 2;
   c.group.add(handle);
   // stitching hint: thin darker outline on flap edge
-  const stitch = new THREE.Mesh(new THREE.BoxGeometry(w * 0.94, 0.008, 0.032 * s), c.accent);
+  const stitch = new THREE.Mesh(new THREE.BoxGeometry(w * 0.94, 0.008, 0.032 * s), c.mat('hardware'));
   stitch.position.set(0, -h * 0.05, d / 2 + 0.012);
   c.group.add(stitch);
   const mark = wordmarkPlane(c.brand, h * 0.08);
@@ -738,21 +806,21 @@ function buildHandbag(c: BuildCtx): void {
 
 function buildSeat(c: BuildCtx): void {
   const s = c.s;
-  const cushion = new THREE.Mesh(flatRoundedGeo(1.35 * s, 1.25 * s, 0.24 * s, 0.14 * s), c.body);
+  const cushion = new THREE.Mesh(flatRoundedGeo(1.35 * s, 1.25 * s, 0.24 * s, 0.14 * s), c.mat('cushion'));
   c.group.add(cushion);
-  const back = new THREE.Mesh(roundedBoxGeo(1.35 * s, 1.15 * s, 0.16 * s, 0.12 * s), c.body);
+  const back = new THREE.Mesh(roundedBoxGeo(1.35 * s, 1.15 * s, 0.16 * s, 0.12 * s), c.mat('backrest'));
   back.position.set(0, 0.62 * s, -0.56 * s);
   back.rotation.x = -0.12 - c.curve * 0.22;
   c.group.add(back);
   // lumbar pillow
-  const pillow = new THREE.Mesh(roundedBoxGeo(1.1 * s, 0.4 * s, 0.14 * s, 0.14 * s), c.accent);
+  const pillow = new THREE.Mesh(roundedBoxGeo(1.1 * s, 0.4 * s, 0.14 * s, 0.14 * s), c.mat('pillow'));
   pillow.position.set(0, 0.34 * s, -0.44 * s);
   pillow.rotation.x = back.rotation.x;
   c.group.add(pillow);
   // armrests when accent is dialed up
   if (c.accentAmt > 0.4) {
     for (const dir of [1, -1] as const) {
-      const arm = new THREE.Mesh(roundedBoxGeo(0.14 * s, 0.5 * s, 0.9 * s, 0.06 * s), c.body);
+      const arm = new THREE.Mesh(roundedBoxGeo(0.14 * s, 0.5 * s, 0.9 * s, 0.06 * s), c.mat('backrest'));
       arm.rotation.y = Math.PI / 2;
       arm.position.set(dir * 0.68 * s, 0.22 * s, 0);
       c.group.add(arm);
@@ -760,11 +828,11 @@ function buildSeat(c: BuildCtx): void {
   }
   // splayed tapered legs with floor pads
   for (const [lx, lz] of [[-0.52, -0.48], [0.52, -0.48], [-0.52, 0.48], [0.52, 0.48]] as const) {
-    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.035 * s, 0.05 * s, 0.8 * s, 12), c.accent);
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.035 * s, 0.05 * s, 0.8 * s, 12), c.mat('legs'));
     leg.position.set(lx * s * 1.15, -0.48 * s, lz * s * 1.15);
     leg.rotation.set(lz * 0.14, 0, -lx * 0.14);
     c.group.add(leg);
-    const pad = new THREE.Mesh(new THREE.CylinderGeometry(0.05 * s, 0.05 * s, 0.02, 10), new THREE.MeshStandardMaterial({ color: 0x14171c, roughness: 0.9 }));
+    const pad = new THREE.Mesh(new THREE.CylinderGeometry(0.05 * s, 0.05 * s, 0.02, 10), RUBBER());
     pad.position.set(lx * s * 1.21, -0.87 * s, lz * s * 1.21);
     c.group.add(pad);
   }
@@ -793,7 +861,7 @@ function buildVehicle(c: BuildCtx): void {
   shape.closePath();
   const bodyGeo = new THREE.ExtrudeGeometry(shape, { depth: W - 0.14 * s, bevelEnabled: true, bevelThickness: 0.07 * s, bevelSize: 0.06 * s, bevelSegments: 3, curveSegments: 14 });
   bodyGeo.translate(0, 0, -(W - 0.14 * s) / 2);
-  c.group.add(new THREE.Mesh(bodyGeo, c.body));
+  c.group.add(new THREE.Mesh(bodyGeo, c.mat('paint')));
   // greenhouse: tinted glass canopy above the beltline (windshield → roof → rear glass)
   const glassShape = new THREE.Shape();
   glassShape.moveTo(-L * 0.1, belt - 0.02 * s);
@@ -803,27 +871,27 @@ function buildVehicle(c: BuildCtx): void {
   glassShape.closePath();
   const glassGeo = new THREE.ExtrudeGeometry(glassShape, { depth: W - 0.3 * s, bevelEnabled: true, bevelThickness: 0.03 * s, bevelSize: 0.03 * s, bevelSegments: 2, curveSegments: 10 });
   glassGeo.translate(0, 0, -(W - 0.3 * s) / 2);
-  const tinted = new THREE.MeshPhysicalMaterial({ color: 0x101826, metalness: 0.5, roughness: 0.04, clearcoat: 1 });
-  c.group.add(new THREE.Mesh(glassGeo, tinted));
+  c.group.add(new THREE.Mesh(glassGeo, c.mat('glass', { custom: DARK_GLASS })));
   // wheels: tire + rim + spokes
   for (const [wx, wz] of [[-L * 0.28, W / 2], [-L * 0.28, -W / 2], [L * 0.28, W / 2], [L * 0.28, -W / 2]] as const) {
     const wheel = new THREE.Group();
     wheel.position.set(wx, 0.12 * s, wz);
-    const tire = new THREE.Mesh(new THREE.TorusGeometry(wheelR * 0.78, wheelR * 0.3, 14, 28), new THREE.MeshStandardMaterial({ color: 0x14161a, roughness: 0.92 }));
+    const tire = new THREE.Mesh(new THREE.TorusGeometry(wheelR * 0.78, wheelR * 0.3, 14, 28), c.mat('tires', { custom: RUBBER }));
     wheel.add(tire);
-    const rim = new THREE.Mesh(new THREE.CylinderGeometry(wheelR * 0.55, wheelR * 0.55, 0.06 * s, 20), c.accent);
+    const rim = new THREE.Mesh(new THREE.CylinderGeometry(wheelR * 0.55, wheelR * 0.55, 0.06 * s, 20), c.mat('rims'));
     rim.rotation.x = Math.PI / 2;
     wheel.add(rim);
     for (let i = 0; i < 5; i++) {
-      const spoke = new THREE.Mesh(new THREE.BoxGeometry(wheelR * 0.16, wheelR * 1.05, 0.05 * s), c.accent);
+      const spoke = new THREE.Mesh(new THREE.BoxGeometry(wheelR * 0.16, wheelR * 1.05, 0.05 * s), c.mat('rims'));
       spoke.rotation.z = (i / 5) * Math.PI * 2;
       wheel.add(spoke);
     }
     c.group.add(wheel);
   }
   // lights, grille, mirrors
+  const headColor = c.pc('lights', '#cfe4ff');
   for (const dz of [1, -1] as const) {
-    const head = new THREE.Mesh(roundedBoxGeo(0.16 * s, 0.06 * s, 0.05 * s, 0.02 * s), new THREE.MeshStandardMaterial({ color: 0xf3f8ff, emissive: 0xcfe4ff, emissiveIntensity: 1.5 }));
+    const head = new THREE.Mesh(roundedBoxGeo(0.16 * s, 0.06 * s, 0.05 * s, 0.02 * s), new THREE.MeshStandardMaterial({ color: 0xf3f8ff, emissive: headColor, emissiveIntensity: 1.5 }));
     head.rotation.y = Math.PI / 2;
     head.position.set(-L / 2 - 0.055 * s, 0.34 * s, dz * W * 0.3);
     c.group.add(head);
@@ -831,11 +899,11 @@ function buildVehicle(c: BuildCtx): void {
     tail.rotation.y = Math.PI / 2;
     tail.position.set(L / 2 + 0.055 * s, 0.35 * s, dz * W * 0.3);
     c.group.add(tail);
-    const mirror = new THREE.Mesh(roundedBoxGeo(0.1 * s, 0.06 * s, 0.04 * s, 0.02 * s), c.body);
+    const mirror = new THREE.Mesh(roundedBoxGeo(0.1 * s, 0.06 * s, 0.04 * s, 0.02 * s), c.mat('paint'));
     mirror.position.set(-L * 0.05, 0.52 * s, dz * (W / 2 + 0.05 * s));
     c.group.add(mirror);
   }
-  const grille = new THREE.Mesh(roundedBoxGeo(0.4 * s, 0.1 * s, 0.03 * s, 0.03 * s), new THREE.MeshStandardMaterial({ color: 0x101318, metalness: 0.6, roughness: 0.4 }));
+  const grille = new THREE.Mesh(roundedBoxGeo(0.4 * s, 0.1 * s, 0.03 * s, 0.03 * s), c.mat('grille', { custom: () => new THREE.MeshStandardMaterial({ color: 0x101318, metalness: 0.6, roughness: 0.4 }) }));
   grille.rotation.y = Math.PI / 2;
   grille.position.set(-L / 2 - 0.055 * s, 0.22 * s, 0);
   c.group.add(grille);
@@ -844,40 +912,40 @@ function buildVehicle(c: BuildCtx): void {
 function buildSneaker(c: BuildCtx): void {
   const s = c.s;
   // sole: flat rounded outline with a slight heel wedge
-  const sole = new THREE.Mesh(flatRoundedGeo(1.9 * s, 0.72 * s, 0.18 * s, 0.3 * s), c.accent);
+  const sole = new THREE.Mesh(flatRoundedGeo(1.9 * s, 0.72 * s, 0.18 * s, 0.3 * s), c.mat('sole'));
   sole.position.y = -0.32 * s;
   c.group.add(sole);
-  const wedge = new THREE.Mesh(flatRoundedGeo(0.8 * s, 0.7 * s, 0.1 * s, 0.28 * s), c.accent);
+  const wedge = new THREE.Mesh(flatRoundedGeo(0.8 * s, 0.7 * s, 0.1 * s, 0.28 * s), c.mat('sole'));
   wedge.position.set(0.5 * s, -0.22 * s, 0);
   c.group.add(wedge);
   // upper: toe box + midfoot + heel counter
-  const toe = new THREE.Mesh(new THREE.SphereGeometry(0.34 * s, 22, 16), c.body);
+  const toe = new THREE.Mesh(new THREE.SphereGeometry(0.34 * s, 22, 16), c.mat('upper'));
   toe.scale.set(1.25, 0.72, 1);
   toe.position.set(-0.62 * s, -0.12 * s, 0);
   c.group.add(toe);
-  const mid = new THREE.Mesh(new THREE.SphereGeometry(0.42 * s, 22, 16, 0, Math.PI * 2, 0, Math.PI / 2), c.body);
+  const mid = new THREE.Mesh(new THREE.SphereGeometry(0.42 * s, 22, 16, 0, Math.PI * 2, 0, Math.PI / 2), c.mat('upper'));
   mid.scale.set(1.5, 0.95 + c.curve * 0.3, 0.78);
   mid.position.set(-0.05 * s, -0.24 * s, 0);
   c.group.add(mid);
-  const heel = new THREE.Mesh(new THREE.SphereGeometry(0.34 * s, 20, 16, 0, Math.PI * 2, 0, Math.PI / 2), c.body);
+  const heel = new THREE.Mesh(new THREE.SphereGeometry(0.34 * s, 20, 16, 0, Math.PI * 2, 0, Math.PI / 2), c.mat('upper'));
   heel.scale.set(0.95, 1.35, 0.8);
   heel.position.set(0.62 * s, -0.24 * s, 0);
   c.group.add(heel);
   // laces across the instep
   for (let i = 0; i < 4; i++) {
-    const lace = new THREE.Mesh(new THREE.CylinderGeometry(0.022 * s, 0.022 * s, 0.34 * s, 8), c.accent);
+    const lace = new THREE.Mesh(new THREE.CylinderGeometry(0.022 * s, 0.022 * s, 0.34 * s, 8), c.mat('laces'));
     lace.rotation.z = Math.PI / 2 + 0.35;
     lace.rotation.y = 0.15;
     lace.position.set(-0.38 * s + i * 0.17 * s, 0.02 * s + i * 0.07 * s, 0);
     c.group.add(lace);
   }
   // side swoosh stripe
-  const stripe = new THREE.Mesh(roundedBoxGeo(0.75 * s, 0.07 * s, 0.02 * s, 0.03 * s), c.accent);
+  const stripe = new THREE.Mesh(roundedBoxGeo(0.75 * s, 0.07 * s, 0.02 * s, 0.03 * s), c.mat('stripe'));
   stripe.rotation.z = 0.28;
   stripe.position.set(0.12 * s, -0.18 * s, 0.31 * s);
   c.group.add(stripe);
   // heel pull tab
-  const tab = new THREE.Mesh(roundedBoxGeo(0.06 * s, 0.16 * s, 0.02 * s, 0.02 * s), c.accent);
+  const tab = new THREE.Mesh(roundedBoxGeo(0.06 * s, 0.16 * s, 0.02 * s, 0.02 * s), c.mat('stripe'));
   tab.position.set(0.86 * s, 0.28 * s, 0);
   c.group.add(tab);
 }
@@ -891,16 +959,16 @@ function buildApparel(c: BuildCtx): void {
     [0.44, 1.25], [0.5, 1.5], [0.42, 1.62], [0.14, 1.7],
   ];
   for (const [px, py] of profile) pts.push(new THREE.Vector2(px * s * (0.85 + c.curve * 0.3), py * s));
-  const form = new THREE.Mesh(new THREE.LatheGeometry(pts, 40), c.body);
+  const form = new THREE.Mesh(new THREE.LatheGeometry(pts, 40), c.mat('garment'));
   form.position.y = -0.85 * s;
   c.group.add(form);
   // collar + buttons
-  const collar = new THREE.Mesh(new THREE.TorusGeometry(0.15 * s, 0.035 * s, 10, 24), c.accent);
+  const collar = new THREE.Mesh(new THREE.TorusGeometry(0.15 * s, 0.035 * s, 10, 24), c.mat('collar'));
   collar.rotation.x = Math.PI / 2;
   collar.position.y = 0.86 * s;
   c.group.add(collar);
   for (let i = 0; i < 3; i++) {
-    const btn = emissiveDot(c.product.form.accentColor, 0.025 * s);
+    const btn = emissiveDot(c.pc('buttons', c.product.form.accentColor), 0.025 * s);
     btn.position.set(0, 0.55 * s - i * 0.3 * s, 0.46 * s - i * 0.015 * s);
     c.group.add(btn);
   }
@@ -916,18 +984,23 @@ function buildApparel(c: BuildCtx): void {
 function buildMedical(c: BuildCtx): void {
   const s = c.s;
   const w = 1.35 * s, h = 1.0 * s, d = 0.5 * s * c.slim;
-  const shellWhite = productMaterial(c.product.materials[0], c.product.form.finish, '#e9edf2');
-  c.group.add(new THREE.Mesh(roundedBoxGeo(w, h, d, w * (0.06 + c.curve * 0.08)), shellWhite));
-  const display = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.72, h * 0.56), screenMaterial(vitalsTexture(c.product.form.accentColor)));
+  c.group.add(new THREE.Mesh(
+    roundedBoxGeo(w, h, d, w * (0.06 + c.curve * 0.08)),
+    c.mat('shell', { color: '#e9edf2' }),
+  ));
+  const display = new THREE.Mesh(
+    new THREE.PlaneGeometry(w * 0.72, h * 0.56),
+    c.mat('screen', { custom: () => screenMaterial(vitalsTexture(c.product.form.accentColor), c.pc('screen', '#ffffff')) }),
+  );
   display.position.set(-w * 0.08, h * 0.08, d / 2 + 0.004);
   c.group.add(display);
   for (let i = 0; i < 3; i++) {
-    const btn = new THREE.Mesh(new THREE.CylinderGeometry(0.045 * s, 0.045 * s, 0.03, 14), c.accent);
+    const btn = new THREE.Mesh(new THREE.CylinderGeometry(0.045 * s, 0.045 * s, 0.03, 14), c.mat('buttons'));
     btn.rotation.x = Math.PI / 2;
     btn.position.set(w * 0.36, h * 0.26 - i * 0.2 * s, d / 2 + 0.012);
     c.group.add(btn);
   }
-  const handle = new THREE.Mesh(new THREE.TorusGeometry(0.24 * s, 0.035 * s, 10, 24, Math.PI), c.accent);
+  const handle = new THREE.Mesh(new THREE.TorusGeometry(0.24 * s, 0.035 * s, 10, 24, Math.PI), c.mat('handle'));
   handle.position.y = h / 2;
   c.group.add(handle);
   const cross = wordmarkPlane('+', h * 0.2);
@@ -937,26 +1010,26 @@ function buildMedical(c: BuildCtx): void {
 
 function buildIndustrial(c: BuildCtx): void {
   const s = c.s;
-  const base = new THREE.Mesh(flatRoundedGeo(1.6 * s, 1.1 * s, 0.22 * s, 0.06 * s), c.body);
+  const base = new THREE.Mesh(flatRoundedGeo(1.6 * s, 1.1 * s, 0.22 * s, 0.06 * s), c.mat('base'));
   base.position.y = -0.6 * s;
   c.group.add(base);
   // robotic arm: base → shoulder → forearm → claw
-  const pivot = new THREE.Mesh(new THREE.CylinderGeometry(0.22 * s, 0.28 * s, 0.3 * s, 20), c.accent);
+  const pivot = new THREE.Mesh(new THREE.CylinderGeometry(0.22 * s, 0.28 * s, 0.3 * s, 20), c.mat('joints'));
   pivot.position.y = -0.35 * s;
   c.group.add(pivot);
-  const upper = new THREE.Mesh(roundedBoxGeo(0.16 * s, 0.9 * s, 0.16 * s, 0.05 * s), c.body);
+  const upper = new THREE.Mesh(roundedBoxGeo(0.16 * s, 0.9 * s, 0.16 * s, 0.05 * s), c.mat('arm'));
   upper.position.set(0.1 * s, 0.1 * s, 0);
   upper.rotation.z = -0.35;
   c.group.add(upper);
-  const joint = new THREE.Mesh(new THREE.SphereGeometry(0.12 * s, 16, 12), c.accent);
+  const joint = new THREE.Mesh(new THREE.SphereGeometry(0.12 * s, 16, 12), c.mat('joints'));
   joint.position.set(0.26 * s, 0.5 * s, 0);
   c.group.add(joint);
-  const fore = new THREE.Mesh(roundedBoxGeo(0.12 * s, 0.72 * s, 0.12 * s, 0.04 * s), c.body);
+  const fore = new THREE.Mesh(roundedBoxGeo(0.12 * s, 0.72 * s, 0.12 * s, 0.04 * s), c.mat('arm'));
   fore.position.set(0.55 * s, 0.62 * s, 0);
   fore.rotation.z = -1.25;
   c.group.add(fore);
   for (const dz of [0.05, -0.05] as const) {
-    const finger = new THREE.Mesh(roundedBoxGeo(0.04 * s, 0.2 * s, 0.03 * s, 0.012 * s), c.accent);
+    const finger = new THREE.Mesh(roundedBoxGeo(0.04 * s, 0.2 * s, 0.03 * s, 0.012 * s), c.mat('claw'));
     finger.position.set(0.92 * s, 0.52 * s, dz * s);
     finger.rotation.z = -0.5;
     c.group.add(finger);
@@ -969,52 +1042,388 @@ function buildIndustrial(c: BuildCtx): void {
 function buildToy(c: BuildCtx): void {
   const s = c.s;
   // friendly robot buddy
-  const torso = new THREE.Mesh(roundedBoxGeo(0.8 * s, 0.85 * s, 0.55 * s, 0.16 * s), c.body);
+  const torso = new THREE.Mesh(roundedBoxGeo(0.8 * s, 0.85 * s, 0.55 * s, 0.16 * s), c.mat('body'));
   c.group.add(torso);
-  const head = new THREE.Mesh(roundedBoxGeo(0.6 * s, 0.5 * s, 0.5 * s, 0.16 * s), c.body);
+  const head = new THREE.Mesh(roundedBoxGeo(0.6 * s, 0.5 * s, 0.5 * s, 0.16 * s), c.mat('body'));
   head.position.y = 0.75 * s;
   c.group.add(head);
   for (const dx of [0.14, -0.14] as const) {
-    const eye = emissiveDot(c.product.form.accentColor, 0.06 * s);
+    const eye = emissiveDot(c.pc('eyes', c.product.form.accentColor), 0.06 * s);
     eye.position.set(dx * s, 0.78 * s, 0.26 * s);
     c.group.add(eye);
   }
-  const antennaRod = new THREE.Mesh(new THREE.CylinderGeometry(0.015 * s, 0.015 * s, 0.2 * s, 8), c.accent);
+  const antennaRod = new THREE.Mesh(new THREE.CylinderGeometry(0.015 * s, 0.015 * s, 0.2 * s, 8), c.mat('antenna'));
   antennaRod.position.y = 1.1 * s;
   c.group.add(antennaRod);
-  const antennaTip = emissiveDot(c.product.form.accentColor, 0.04 * s);
+  const antennaTip = emissiveDot(c.pc('antenna', c.product.form.accentColor), 0.04 * s);
   antennaTip.position.y = 1.22 * s;
   c.group.add(antennaTip);
   for (const dir of [1, -1] as const) {
-    const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.07 * s, 0.4 * s, 6, 12), c.accent);
+    const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.07 * s, 0.4 * s, 6, 12), c.mat('limbs'));
     arm.position.set(dir * 0.52 * s, 0.05 * s, 0);
     arm.rotation.z = dir * 0.3;
     c.group.add(arm);
-    const foot = new THREE.Mesh(flatRoundedGeo(0.28 * s, 0.36 * s, 0.14 * s, 0.08 * s), c.accent);
+    const foot = new THREE.Mesh(flatRoundedGeo(0.28 * s, 0.36 * s, 0.14 * s, 0.08 * s), c.mat('limbs'));
     foot.position.set(dir * 0.22 * s, -0.62 * s, 0.04 * s);
     c.group.add(foot);
   }
   // belly dial
-  const dial = new THREE.Mesh(new THREE.TorusGeometry(0.14 * s, 0.03 * s, 10, 24), c.accent);
+  const dial = new THREE.Mesh(new THREE.TorusGeometry(0.14 * s, 0.03 * s, 10, 24), c.mat('limbs'));
   dial.position.set(0, -0.02 * s, 0.29 * s);
   c.group.add(dial);
+}
+
+// --- V13: eight new category models ----------------------------------------
+
+function buildDrone(c: BuildCtx): void {
+  const s = c.s;
+  // center pod
+  const pod = new THREE.Mesh(roundedBoxGeo(0.62 * s, 0.42 * s, 0.24 * s * c.slim, 0.1 * s), c.mat('frame'));
+  pod.rotation.x = -Math.PI / 2;
+  c.group.add(pod);
+  // four arms + motor pods + rotor discs
+  for (const [dx, dz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]] as const) {
+    const arm = new THREE.Mesh(roundedBoxGeo(0.5 * s, 0.06 * s, 0.05 * s, 0.02 * s), c.mat('frame'));
+    arm.rotation.y = Math.atan2(dz, dx);
+    arm.position.set(dx * 0.42 * s, 0.02 * s, dz * 0.42 * s);
+    c.group.add(arm);
+    const motor = new THREE.Mesh(new THREE.CylinderGeometry(0.07 * s, 0.08 * s, 0.1 * s, 16), c.mat('rotors'));
+    motor.position.set(dx * 0.62 * s, 0.06 * s, dz * 0.62 * s);
+    c.group.add(motor);
+    // rotor: translucent spin disc + two blades
+    const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.3 * s, 0.3 * s, 0.006, 28), new THREE.MeshBasicMaterial({ color: 0xaebdd4, transparent: true, opacity: 0.14 }));
+    disc.position.set(dx * 0.62 * s, 0.12 * s, dz * 0.62 * s);
+    c.group.add(disc);
+    for (const a of [0, Math.PI / 2] as const) {
+      const blade = new THREE.Mesh(roundedBoxGeo(0.56 * s, 0.05 * s, 0.008, 0.02 * s), c.mat('rotors'));
+      blade.rotation.x = -Math.PI / 2;
+      blade.rotation.z = a + (dx * dz > 0 ? 0.4 : -0.4);
+      blade.position.set(dx * 0.62 * s, 0.12 * s, dz * 0.62 * s);
+      c.group.add(blade);
+    }
+    // nav lights: green starboard, red port
+    const nav = emissiveDot(dz > 0 ? c.pc('led', '#3ddc74') : '#ff4d4d', 0.022 * s);
+    nav.position.set(dx * 0.62 * s, -0.01 * s, dz * 0.62 * s);
+    c.group.add(nav);
+    // landing skid
+    const skid = new THREE.Mesh(new THREE.CylinderGeometry(0.015 * s, 0.02 * s, 0.16 * s, 8), c.mat('frame'));
+    skid.position.set(dx * 0.4 * s, -0.14 * s, dz * 0.4 * s);
+    c.group.add(skid);
+  }
+  // camera gimbal under the nose
+  const gimbal = new THREE.Mesh(new THREE.SphereGeometry(0.11 * s, 18, 14), c.mat('gimbal'));
+  gimbal.position.set(0.24 * s, -0.14 * s, 0);
+  c.group.add(gimbal);
+  const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.05 * s, 0.05 * s, 0.05 * s, 16), DARK_GLASS());
+  lens.rotation.z = Math.PI / 2;
+  lens.position.set(0.34 * s, -0.14 * s, 0);
+  c.group.add(lens);
+}
+
+function buildCamera(c: BuildCtx): void {
+  const s = c.s;
+  const w = 1.3 * s, h = 0.85 * s, d = 0.5 * s * c.slim;
+  c.group.add(new THREE.Mesh(roundedBoxGeo(w, h, d, w * (0.04 + c.curve * 0.06)), c.mat('body')));
+  // grip bulge
+  const grip = new THREE.Mesh(roundedBoxGeo(0.3 * s, h * 0.95, d * 1.15, 0.1 * s), c.mat('grip', { custom: RUBBER }));
+  grip.position.set(-w * 0.42, 0, 0.02 * s);
+  c.group.add(grip);
+  // lens barrel with rings + front element
+  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.32 * s, 0.34 * s, 0.5 * s, 32), c.mat('lens'));
+  barrel.rotation.x = Math.PI / 2;
+  barrel.position.set(0.1 * s, 0, d / 2 + 0.25 * s);
+  c.group.add(barrel);
+  for (const zOff of [0.12, 0.3] as const) {
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.335 * s, 0.02 * s, 10, 32), c.mat('grip', { custom: RUBBER }));
+    ring.position.set(0.1 * s, 0, d / 2 + zOff * s);
+    c.group.add(ring);
+  }
+  const element = new THREE.Mesh(new THREE.CylinderGeometry(0.26 * s, 0.26 * s, 0.02, 28), DARK_GLASS());
+  element.rotation.x = Math.PI / 2;
+  element.position.set(0.1 * s, 0, d / 2 + 0.5 * s);
+  c.group.add(element);
+  // viewfinder hump + top dials + shutter
+  const hump = new THREE.Mesh(roundedBoxGeo(0.42 * s, 0.18 * s, d * 0.7, 0.05 * s), c.mat('body'));
+  hump.position.set(0.1 * s, h / 2 + 0.08 * s, 0);
+  c.group.add(hump);
+  for (const dx of [0.42, 0.62] as const) {
+    const dial = new THREE.Mesh(new THREE.CylinderGeometry(0.07 * s, 0.07 * s, 0.05 * s, 20), c.mat('dials'));
+    dial.position.set(dx * s * 0.7, h / 2 + 0.03 * s, 0);
+    c.group.add(dial);
+  }
+  const shutter = emissiveDot(c.pc('dials', c.product.form.accentColor), 0.03 * s);
+  shutter.position.set(-w * 0.38, h / 2 + 0.03 * s, 0.08 * s);
+  c.group.add(shutter);
+  const mark = wordmarkPlane(c.brand, h * 0.12);
+  mark.position.set(0.35 * s, h * 0.22, d / 2 + 0.004);
+  c.group.add(mark);
+}
+
+function buildTV(c: BuildCtx): void {
+  const s = c.s;
+  const w = 2.5 * s, h = 1.45 * s, d = 0.07 * s * c.slim;
+  // bezel frame with the screen inset
+  c.group.add(new THREE.Mesh(roundedBoxGeo(w, h, d, 0.02 * s + c.curve * 0.02 * s), c.mat('bezel')));
+  const panel = new THREE.Mesh(
+    new THREE.PlaneGeometry(w * 0.97, h * 0.95),
+    c.mat('panel', { custom: () => screenMaterial(laptopScreenTexture(c.product.form.accentColor, c.product.name), c.pc('panel', '#ffffff')) }),
+  );
+  panel.position.z = d / 2 + 0.003;
+  c.group.add(panel);
+  // center pedestal
+  const neck = new THREE.Mesh(roundedBoxGeo(0.14 * s, 0.3 * s, 0.06 * s, 0.02 * s), c.mat('stand'));
+  neck.position.y = -h / 2 - 0.14 * s;
+  c.group.add(neck);
+  const foot = new THREE.Mesh(flatRoundedGeo(0.9 * s, 0.42 * s, 0.035 * s, 0.1 * s), c.mat('stand'));
+  foot.position.y = -h / 2 - 0.3 * s;
+  c.group.add(foot);
+  // soundbar
+  const bar = new THREE.Mesh(roundedBoxGeo(w * 0.62, 0.09 * s, 0.09 * s, 0.04 * s), c.mat('speaker', { custom: RUBBER }));
+  bar.position.y = -h / 2 - 0.08 * s;
+  bar.position.z = 0.1 * s;
+  c.group.add(bar);
+  const mark = wordmarkPlane(c.brand, h * 0.05);
+  mark.position.set(0, -h / 2 + 0.05 * s, d / 2 + 0.005);
+  c.group.add(mark);
+}
+
+function buildBicycle(c: BuildCtx): void {
+  const s = c.s;
+  const wheelR = 0.5 * s;
+  const frameMat = c.mat('frame');
+  const tube = (x1: number, y1: number, x2: number, y2: number, r = 0.035) => {
+    const from = new THREE.Vector3(x1 * s, y1 * s, 0);
+    const to = new THREE.Vector3(x2 * s, y2 * s, 0);
+    const len = from.distanceTo(to);
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(r * s, r * s, len, 12), frameMat);
+    m.position.copy(from).add(to).multiplyScalar(0.5);
+    m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), to.clone().sub(from).normalize());
+    c.group.add(m);
+  };
+  // wheels
+  for (const wx of [-0.85, 0.85] as const) {
+    const tire = new THREE.Mesh(new THREE.TorusGeometry(wheelR, 0.045 * s, 12, 40), c.mat('wheels', { custom: RUBBER }));
+    tire.position.set(wx * s, 0, 0);
+    c.group.add(tire);
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.05 * s, 0.05 * s, 0.08 * s, 12), c.mat('wheels'));
+    hub.rotation.x = Math.PI / 2;
+    hub.position.set(wx * s, 0, 0);
+    c.group.add(hub);
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      const spoke = new THREE.Mesh(new THREE.CylinderGeometry(0.006 * s, 0.006 * s, wheelR * 1.9, 6), c.mat('wheels'));
+      spoke.rotation.z = a;
+      spoke.position.set(wx * s, 0, 0);
+      c.group.add(spoke);
+    }
+  }
+  // diamond frame (curvature relaxes the geometry)
+  const seatX = -0.18 - c.curve * 0.06;
+  tube(-0.85, 0, seatX, 0.72); // seat tube
+  tube(seatX, 0.72, 0.62, 0.6); // top tube
+  tube(0.62, 0.6, 0.85, 0);    // fork
+  tube(-0.85, 0, 0.05, 0.02, 0.028);  // chainstay
+  tube(0.05, 0.02, 0.62, 0.6); // down tube
+  tube(0.05, 0.02, seatX, 0.72, 0.028);
+  // crank + chainring
+  const chainring = new THREE.Mesh(new THREE.CylinderGeometry(0.12 * s, 0.12 * s, 0.02 * s, 24), c.mat('frame'));
+  chainring.rotation.x = Math.PI / 2;
+  chainring.position.set(0.05 * s, 0.02 * s, 0.03 * s);
+  c.group.add(chainring);
+  for (const dz of [0.06, -0.06] as const) {
+    const pedal = new THREE.Mesh(roundedBoxGeo(0.14 * s, 0.03 * s, 0.06 * s, 0.01 * s), c.mat('handlebar', { custom: RUBBER }));
+    pedal.position.set(0.05 * s + (dz > 0 ? 0.1 : -0.1) * s, 0.02 * s + (dz > 0 ? -0.12 : 0.12) * s, dz * s * 1.6);
+    c.group.add(pedal);
+  }
+  // saddle + seatpost
+  tube(seatX, 0.72, seatX - 0.02, 0.86, 0.022);
+  const saddle = new THREE.Mesh(flatRoundedGeo(0.34 * s, 0.14 * s, 0.05 * s, 0.05 * s), c.mat('saddle', { custom: RUBBER }));
+  saddle.position.set((seatX - 0.03) * s, 0.9 * s, 0);
+  c.group.add(saddle);
+  // handlebar
+  tube(0.62, 0.6, 0.58, 0.82, 0.024);
+  const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.022 * s, 0.022 * s, 0.5 * s, 12), c.mat('handlebar'));
+  bar.rotation.x = Math.PI / 2;
+  bar.position.set(0.58 * s, 0.82 * s, 0);
+  c.group.add(bar);
+  for (const dz of [0.22, -0.22] as const) {
+    const gripEnd = new THREE.Mesh(new THREE.CylinderGeometry(0.026 * s, 0.026 * s, 0.1 * s, 10), c.mat('saddle', { custom: RUBBER }));
+    gripEnd.rotation.x = Math.PI / 2;
+    gripEnd.position.set(0.58 * s, 0.82 * s, dz * s);
+    c.group.add(gripEnd);
+  }
+}
+
+function buildEyewear(c: BuildCtx): void {
+  const s = c.s;
+  const lensR = 0.34 * s;
+  for (const dx of [1, -1] as const) {
+    // rims + tinted lenses
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(lensR, 0.035 * s * (0.6 + c.curve * 0.6), 12, 36), c.mat('frame'));
+    rim.position.set(dx * 0.42 * s, 0, 0);
+    rim.scale.y = 0.85;
+    c.group.add(rim);
+    const lens = new THREE.Mesh(new THREE.CylinderGeometry(lensR * 0.94, lensR * 0.94, 0.015, 28), c.mat('lenses', { custom: DARK_GLASS }));
+    lens.rotation.x = Math.PI / 2;
+    lens.scale.y = 0.85;
+    lens.position.set(dx * 0.42 * s, 0, 0);
+    c.group.add(lens);
+    // temples folding back
+    const temple = new THREE.Mesh(roundedBoxGeo(0.05 * s, 0.045 * s, 0.85 * s, 0.02 * s), c.mat('temples'));
+    temple.position.set(dx * 0.76 * s, 0.08 * s, -0.42 * s);
+    c.group.add(temple);
+    const hinge = emissiveDot(c.pc('hinges', c.product.form.accentColor), 0.022 * s);
+    hinge.position.set(dx * 0.76 * s, 0.08 * s, 0);
+    c.group.add(hinge);
+  }
+  // bridge
+  const bridge = new THREE.Mesh(new THREE.TorusGeometry(0.09 * s, 0.025 * s, 10, 20, Math.PI), c.mat('frame'));
+  bridge.position.set(0, 0.05 * s, 0);
+  c.group.add(bridge);
+}
+
+function buildGuitar(c: BuildCtx): void {
+  const s = c.s;
+  // double-cutaway electric body, extruded
+  const shape = new THREE.Shape();
+  shape.moveTo(0, -0.75 * s);
+  shape.bezierCurveTo(0.55 * s, -0.75 * s, 0.62 * s, -0.2 * s, 0.4 * s, 0.02 * s);
+  shape.bezierCurveTo(0.3 * s, 0.14 * s, 0.42 * s, 0.22 * s, 0.28 * s, 0.32 * s);
+  shape.lineTo(0.14 * s, 0.28 * s);
+  shape.lineTo(-0.14 * s, 0.28 * s);
+  shape.bezierCurveTo(-0.42 * s, 0.22 * s, -0.3 * s, 0.14 * s, -0.4 * s, 0.02 * s);
+  shape.bezierCurveTo(-0.62 * s, -0.2 * s, -0.55 * s, -0.75 * s, 0, -0.75 * s);
+  const bodyGeo = new THREE.ExtrudeGeometry(shape, { depth: 0.12 * s, bevelEnabled: true, bevelThickness: 0.02 * s, bevelSize: 0.02 * s, bevelSegments: 2, curveSegments: 16 });
+  bodyGeo.translate(0, 0, -0.06 * s);
+  c.group.add(new THREE.Mesh(bodyGeo, c.mat('body')));
+  // pickguard
+  const pg = new THREE.Mesh(flatRoundedGeo(0.42 * s, 0.5 * s, 0.008, 0.12 * s), c.mat('pickguard'));
+  pg.rotation.x = Math.PI / 2;
+  pg.position.set(0.1 * s, -0.3 * s, 0.085 * s);
+  c.group.add(pg);
+  // neck + fretboard + headstock
+  const neck = new THREE.Mesh(roundedBoxGeo(0.11 * s, 1.15 * s, 0.05 * s, 0.02 * s), c.mat('neck'));
+  neck.position.set(0, 0.85 * s, 0.02 * s);
+  c.group.add(neck);
+  const head = new THREE.Mesh(roundedBoxGeo(0.16 * s, 0.3 * s, 0.04 * s, 0.03 * s), c.mat('neck'));
+  head.position.set(0, 1.55 * s, 0.02 * s);
+  c.group.add(head);
+  for (let i = 0; i < 6; i++) {
+    const peg = new THREE.Mesh(new THREE.CylinderGeometry(0.016 * s, 0.016 * s, 0.05 * s, 8), c.mat('hardware'));
+    peg.rotation.z = Math.PI / 2;
+    peg.position.set((i % 2 === 0 ? -0.1 : 0.1) * s, (1.44 + Math.floor(i / 2) * 0.09) * s, 0.02 * s);
+    c.group.add(peg);
+  }
+  // pickups + bridge + knobs
+  for (const py of [-0.18, -0.44] as const) {
+    const pickup = new THREE.Mesh(roundedBoxGeo(0.26 * s, 0.07 * s, 0.03 * s, 0.02 * s), c.mat('hardware'));
+    pickup.position.set(0, py * s, 0.085 * s);
+    c.group.add(pickup);
+  }
+  const bridge = new THREE.Mesh(roundedBoxGeo(0.28 * s, 0.05 * s, 0.035 * s, 0.015 * s), c.mat('hardware'));
+  bridge.position.set(0, -0.58 * s, 0.085 * s);
+  c.group.add(bridge);
+  for (const [kx, ky] of [[0.26, -0.5], [0.34, -0.38]] as const) {
+    const knob = new THREE.Mesh(new THREE.CylinderGeometry(0.035 * s, 0.035 * s, 0.03 * s, 16), c.mat('hardware'));
+    knob.rotation.x = Math.PI / 2;
+    knob.position.set(kx * s, ky * s, 0.085 * s);
+    c.group.add(knob);
+  }
+  // strings
+  for (let i = 0; i < 6; i++) {
+    const string = new THREE.Mesh(new THREE.CylinderGeometry(0.004 * s, 0.004 * s, 2.1 * s, 4), productMaterial('chrome', 'metallic'));
+    string.position.set((-0.045 + i * 0.018) * s, 0.42 * s, 0.095 * s);
+    c.group.add(string);
+  }
+}
+
+function buildKettle(c: BuildCtx): void {
+  const s = c.s;
+  // rounded kettle body via lathe
+  const profile: Array<[number, number]> = [
+    [0.04, 0], [0.42, 0.02], [0.5, 0.18], [0.52, 0.5], [0.44, 0.82], [0.3, 0.98], [0.24, 1.02],
+  ];
+  const pts = profile.map(([px, py]) => new THREE.Vector2(px * s * (0.85 + c.curve * 0.3), py * s));
+  const body = new THREE.Mesh(new THREE.LatheGeometry(pts, 44), c.mat('body'));
+  body.position.y = -0.5 * s;
+  c.group.add(body);
+  // lid + knob
+  const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.25 * s, 0.28 * s, 0.06 * s, 28), c.mat('lid'));
+  lid.position.y = 0.54 * s;
+  c.group.add(lid);
+  const knob = new THREE.Mesh(new THREE.SphereGeometry(0.06 * s, 16, 12), c.mat('lid'));
+  knob.position.y = 0.62 * s;
+  c.group.add(knob);
+  // spout: angled tapered cylinder
+  const spout = new THREE.Mesh(new THREE.CylinderGeometry(0.05 * s, 0.09 * s, 0.55 * s, 16), c.mat('spout'));
+  spout.rotation.z = -0.8;
+  spout.position.set(0.52 * s, 0.22 * s, 0);
+  c.group.add(spout);
+  // handle arc
+  const handle = new THREE.Mesh(new THREE.TorusGeometry(0.3 * s, 0.04 * s, 12, 28, Math.PI * 0.9), c.mat('handle', { custom: RUBBER }));
+  handle.rotation.z = 0.25;
+  handle.position.set(-0.42 * s, 0.28 * s, 0);
+  c.group.add(handle);
+  // power base
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.5 * s, 0.54 * s, 0.05 * s, 36), c.mat('handle', { custom: RUBBER }));
+  base.position.y = -0.54 * s;
+  c.group.add(base);
+  const led = emissiveDot(c.pc('spout', c.product.form.accentColor), 0.025 * s);
+  led.position.set(0.3 * s, -0.42 * s, 0.35 * s);
+  c.group.add(led);
+}
+
+function buildDrill(c: BuildCtx): void {
+  const s = c.s;
+  // motor housing: horizontal capsule-ish body
+  const housing = new THREE.Mesh(roundedBoxGeo(1.1 * s, 0.36 * s, 0.3 * s * c.slim, 0.12 * s), c.mat('body'));
+  housing.position.y = 0.3 * s;
+  c.group.add(housing);
+  // torque ring + chuck at the front
+  const torque = new THREE.Mesh(new THREE.CylinderGeometry(0.17 * s, 0.17 * s, 0.14 * s, 24), c.mat('chuck'));
+  torque.rotation.z = Math.PI / 2;
+  torque.position.set(-0.62 * s, 0.3 * s, 0);
+  c.group.add(torque);
+  const chuck = new THREE.Mesh(new THREE.CylinderGeometry(0.1 * s, 0.13 * s, 0.22 * s, 20), c.mat('chuck'));
+  chuck.rotation.z = Math.PI / 2;
+  chuck.position.set(-0.8 * s, 0.3 * s, 0);
+  c.group.add(chuck);
+  const bit = new THREE.Mesh(new THREE.CylinderGeometry(0.02 * s, 0.012 * s, 0.3 * s, 8), productMaterial('steel', 'metallic'));
+  bit.rotation.z = Math.PI / 2;
+  bit.position.set(-1.02 * s, 0.3 * s, 0);
+  c.group.add(bit);
+  // pistol grip, slightly raked
+  const grip = new THREE.Mesh(roundedBoxGeo(0.26 * s, 0.7 * s, 0.26 * s * c.slim, 0.08 * s), c.mat('grip', { custom: RUBBER }));
+  grip.rotation.z = 0.15;
+  grip.position.set(0.18 * s, -0.12 * s, 0);
+  c.group.add(grip);
+  // trigger
+  const trigger = new THREE.Mesh(roundedBoxGeo(0.06 * s, 0.14 * s, 0.1 * s, 0.02 * s), c.mat('chuck'));
+  trigger.position.set(0.0 * s, 0.08 * s, 0);
+  c.group.add(trigger);
+  // battery pack
+  const battery = new THREE.Mesh(roundedBoxGeo(0.44 * s, 0.2 * s, 0.34 * s, 0.05 * s), c.mat('battery'));
+  battery.rotation.x = -Math.PI / 2;
+  battery.position.set(0.24 * s, -0.52 * s, 0);
+  c.group.add(battery);
+  const charge = emissiveDot(c.pc('battery', '#3ddc74'), 0.025 * s);
+  charge.position.set(0.42 * s, -0.44 * s, 0.12 * s);
+  c.group.add(charge);
+  // side vents
+  for (let i = 0; i < 3; i++) {
+    const vent = new THREE.Mesh(new THREE.BoxGeometry(0.12 * s, 0.015 * s, 0.32 * s), c.mat('chuck'));
+    vent.position.set(0.2 * s + i * 0.12 * s, 0.38 * s, 0);
+    c.group.add(vent);
+  }
+  const mark = wordmarkPlane(c.brand, 0.09 * s);
+  mark.position.set(-0.1 * s, 0.3 * s, 0.16 * s);
+  c.group.add(mark);
 }
 
 /** Builds the category-specific product model into `group`. */
 function buildProductMesh(group: THREE.Group, product: Product): void {
   const cat = PRODUCT_CATEGORY_BY_ID[product.category];
-  const f = product.form;
-  const ctx: BuildCtx = {
-    group,
-    product,
-    s: f.size,
-    slim: 1 - f.slimness * 0.55,
-    curve: f.curvature,
-    accentAmt: f.accent,
-    body: productMaterial(product.materials[0], f.finish, f.bodyColor),
-    accent: productMaterial(product.materials[1], f.finish, f.accentColor),
-    brand: product.name.split(' ')[0] || product.name,
-  };
+  const ctx = makeBuildCtx(group, product);
   switch (product.category) {
     case 'wearable': buildWatch(ctx); return;
     case 'audio': buildHeadphones(ctx); return;
@@ -1029,6 +1438,14 @@ function buildProductMesh(group: THREE.Group, product: Product): void {
     case 'medical': buildMedical(ctx); return;
     case 'industrial': buildIndustrial(ctx); return;
     case 'toys': buildToy(ctx); return;
+    case 'drone': buildDrone(ctx); return;
+    case 'camera': buildCamera(ctx); return;
+    case 'tv': buildTV(ctx); return;
+    case 'bicycle': buildBicycle(ctx); return;
+    case 'eyewear': buildEyewear(ctx); return;
+    case 'instrument': buildGuitar(ctx); return;
+    case 'kitchenware': buildKettle(ctx); return;
+    case 'powertool': buildDrill(ctx); return;
     default: break;
   }
   switch (cat.archetype) {
@@ -1188,6 +1605,7 @@ export function ProductStudioScene({ product, tall }: ProductStudioSceneProps) {
       product.materials[0], product.materials[1],
       product.form.size, product.form.slimness, product.form.curvature, product.form.accent,
       product.form.bodyColor, product.form.accentColor, product.form.finish, product.form.lighting,
+      JSON.stringify(product.partOverrides ?? {}),
     ],
   );
 

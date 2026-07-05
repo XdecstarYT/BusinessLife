@@ -573,7 +573,8 @@ export type ProductCategory =
   | 'smartphone' | 'laptop' | 'tablet' | 'wearable' | 'gaming' | 'audio'
   | 'appliance' | 'smart_home' | 'furniture' | 'fashion' | 'shoes' | 'jewelry'
   | 'cosmetics' | 'automotive' | 'food_beverage' | 'medical' | 'industrial'
-  | 'toys' | 'sports' | 'luxury';
+  | 'toys' | 'sports' | 'luxury'
+  | 'drone' | 'camera' | 'tv' | 'bicycle' | 'eyewear' | 'instrument' | 'kitchenware' | 'powertool';
 
 export type ProductMaterialId =
   | 'aluminum' | 'titanium' | 'steel' | 'carbon_fiber' | 'glass' | 'leather'
@@ -588,6 +589,45 @@ export type ProductFinish = 'matte' | 'gloss' | 'metallic' | 'brushed';
 export type StudioLighting = 'studio' | 'sunset' | 'showroom' | 'noir';
 export type LaunchVenue = 'livestream' | 'rooftop_party' | 'convention_keynote' | 'flagship_theater';
 export type SalesChannel = 'storefront' | 'online' | 'retail' | 'boutique';
+
+/** Per-part customization: overrides the body/accent defaults for one named piece of the model. */
+export interface PartOverride {
+  color: string | null;
+  materialId: ProductMaterialId | null;
+  finish: ProductFinish | null;
+}
+
+/** Component sourcing tiers — every slot of a product's bill of materials is chosen per tier. */
+export type ComponentTier = 'budget' | 'standard' | 'premium';
+
+/** Customer segments for market research and demand targeting. */
+export type CustomerSegment = 'value' | 'early_adopters' | 'luxury_buyers' | 'eco' | 'families';
+
+/** An active quality defect discovered in the field; resolve it with a recall or risk trust. */
+export interface ProductDefect {
+  name: string;
+  severity: number; // 1..3
+  year: number;
+}
+
+/** A player-engineered component (e.g. the "Bat62" battery): installable in your
+ * products in place of a sourcing tier, and sellable on the global component market. */
+export interface CustomPart {
+  id: string;
+  companyId: string; // owning company — engineering costs and sales revenue flow here
+  name: string;
+  componentId: string; // which component slot type it fits ('battery', 'chip', …)
+  version: number; // revision count; revisions raise the grade
+  grade: number; // 0..100 engineering grade — drives every stat below
+  quality: number; // quality bonus contributed to products using it
+  defectMod: number; // defect-rate delta
+  costMult: number; // unit-cost multiplier vs a standard sourced part
+  luxury: number; // perceived-premium bonus
+  forSale: boolean; // listed on the global component market
+  unitsSoldTotal: number;
+  revenueTotal: number;
+  yearDesigned: number;
+}
 
 /** Parametric 3D form: drives the procedural product mesh in the Studio viewport. */
 export interface ProductForm {
@@ -631,6 +671,14 @@ export interface Product {
   publishState: PublishState;
   materials: [ProductMaterialId, ProductMaterialId]; // primary body + accent
   form: ProductForm;
+  partOverrides: Record<string, PartOverride>; // per-part color/material/finish, keyed by part id
+  components: Record<string, string>; // per slot: a ComponentTier, or a CustomPart id
+  targetSegment: CustomerSegment | null; // demand focus after market research
+  segmentInsights: Partial<Record<CustomerSegment, number>>; // fit scores revealed by focus groups
+  warrantyYears: number; // 0..3 — costs per unit, lifts trust and rating
+  trust: number; // 0..100 consumer trust; scales demand
+  activeDefect: ProductDefect | null;
+  recalls: number;
   features: string[]; // granted by unlocked product tech
   packaging: PackagingStyle;
   manufacturing: ManufacturingStrategy;
@@ -918,6 +966,8 @@ export interface GameState {
   products: Record<string, Product>; // the Studio: player-designed products
   productTech: string[]; // unlocked product R&D node ids
   storefront: Storefront; // the player's customizable product storefront
+  componentShortage: { componentId: string; yearsLeft: number } | null; // global supply-chain squeeze
+  customParts: Record<string, CustomPart>; // player-engineered components
 }
 
 export interface SuccessionCandidate {

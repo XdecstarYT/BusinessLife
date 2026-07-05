@@ -101,6 +101,13 @@ const ACHIEVEMENTS: Record<string, { label: string; icon: string }> = {
   rnd_visionary: { label: 'R&D Visionary', icon: '🔬' },
   design_icon: { label: 'Design Icon', icon: '✨' },
   million_units: { label: 'Million Units', icon: '📦' },
+  master_customizer: { label: 'Master Customizer', icon: '🧩' },
+  premium_engineering: { label: 'Premium Engineering', icon: '🔩' },
+  segment_master: { label: 'Segment Master', icon: '🎯' },
+  trusted_brand: { label: 'Trusted Brand', icon: '🛡️' },
+  recall_survivor: { label: 'Recall Survivor', icon: '🛟' },
+  part_engineer: { label: 'Part Engineer', icon: '⚙️' },
+  component_supplier: { label: 'Component Supplier', icon: '🏭' },
 };
 
 export function Stats() {

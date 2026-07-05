@@ -30,7 +30,28 @@ plain JSON you can export and re-import.
   event** (livestream to flagship theater) whose hype shapes demand; then compete in a yearly market sim
   where ratings, reviews, returns and lifecycle decay all feed an **analytics dashboard** — and profits
   flow straight into the owning company. Ship successor **generations**, retire icons to the portfolio,
-  and curate your own themed **storefront**.
+  and curate your own themed **storefront**. **28 total categories** now, including drones, cameras,
+  TVs, bicycles, eyewear, musical instruments, kitchenware and power tools — each with its own bespoke
+  3D model (quadcopter rotors and gimbal, an SLR with a real lens barrel, a diamond bike frame with
+  spoked wheels, an electric guitar with strings and pickups…).
+- **Every piece of every product is individually customizable** — a dedicated Part Customizer lets you
+  give any named part (a phone's camera island, a car's rims, a watch's strap, a guitar's pickguard) its
+  own color, material and finish independently of the rest of the product, with one-tap curated
+  **colorways** for a cohesive look in a single click, and a reset to fall back to the base design.
+- **Component sourcing & your own engineered parts** — every product has a real bill of materials
+  (processor, battery, sensors, motor, optics…); source each slot at a Budget/Standard/Premium tier with
+  honest cost/quality/defect tradeoffs, or open the **Parts** workshop to engineer your own component
+  from scratch — name it whatever you like ("Bat62", "Core9"), fund a research investment that sets its
+  engineering grade, install it in your own products, revise it in later versions, and list it for sale
+  on the **global component market** where other manufacturers license it for real recurring revenue.
+  A random global component shortage occasionally squeezes an entire category's costs.
+- **Market research & audience targeting** — run focus groups with five distinct customer segments
+  (Value Seekers, Families, Early Adopters, Eco-Conscious, Luxury Buyers), see a revealed fit score for
+  each, and aim your marketing at the segment that loves the product to shift real yearly demand.
+- **Warranty, consumer trust & recalls** — choose 0–3 years of warranty coverage that costs a slice of
+  unit economics but builds trust and cuts returns; field defects surface on their own over a product's
+  life, and you can ride one out or issue a voluntary recall that costs real money but rebuilds trust
+  before lawsuits and bad headlines pile up.
 - **Daily / Weekly / Yearly time control** — advance a single day, a week, or a full year. Day/week
   ticks are lightweight (a small chance of a flavor moment, tiny stat drift) so you can fast-forward
   without interruption; the full economy/company/politics simulation still resolves exactly once a
@@ -151,7 +172,7 @@ plain JSON you can export and re-import.
   a political party, issue a public apology to shed notoriety, or take a career sabbatical.
 - **Meta progression** — a Legacy Score computed at game over from your wealth, dynasty, office and
   achievements (with a New Game+ bonus into your next life), a life timeline of every milestone you hit,
-  95+ achievements, a Year in Review recap after every year, random mid-game challenges with cash rewards,
+  102+ achievements, a Year in Review recap after every year, random mid-game challenges with cash rewards,
   a Casual/Standard/Iron Man difficulty choice, and four starting-economy scenarios (Modern, Boom, Recession,
   Crisis) to change the game you're playing from turn one.
 - **Dynamic news** synthesised from what actually happened that year, plus a personal life log and an
@@ -227,7 +248,7 @@ only moves when you tell it to, using the three buttons on the Life hub:
   unrest), diplomacy actions, commodities, national debt/cyber-defense tools, and any active global event
   (pandemic, trade war, tech boom, oil crisis, banking collapse, or AI disruption).
 - **News / Stats** — the dynamic wire (now with editorials, investigative pieces, interviews and election
-  coverage) plus a World History chronicle tab, your net-worth curve, 95+ achievements, a life timeline,
+  coverage) plus a World History chronicle tab, your net-worth curve, 102+ achievements, a life timeline,
   and save tools.
 - **Underworld** — join a crime family and climb its ranks through heists and protection rackets, contest
   rival turf, launder illicit proceeds through a front business, bribe a judge or attempt a prison escape if
