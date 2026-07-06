@@ -599,6 +599,67 @@ export function startPriceWar(state: GameState, companyId: string, targetCompany
   };
 }
 
+/** Sue a named competitor for patent infringement — turns the existing (until now purely
+ * passive) patents counter into a real, actionable weapon: win and they pay a real settlement,
+ * lose and you eat the legal costs plus a brand hit for a suit that didn't stick. */
+export function filePatentLawsuit(state: GameState, companyId: string, targetCompanyId: string): ActionResult {
+  const mine = state.companies[companyId];
+  const target = state.companies[targetCompanyId];
+  if (!mine || !mine.playerOwned || mine.status !== 'active') return { ok: false, message: 'Not your company.' };
+  if (!target || target.status !== 'active' || target.playerOwned) return { ok: false, message: 'Invalid target.' };
+  if (target.industryId !== mine.industryId) return { ok: false, message: `${target.name} isn't a direct competitor.` };
+  if (mine.patents === 0) return { ok: false, message: 'File a patent of your own first — nothing to sue over yet.' };
+  if (onCooldown(state, `patent_suit_${companyId}_${targetCompanyId}`)) return { ok: false, message: 'Already litigating against them this year.' };
+  const cost = Math.max(20_000, mine.revenue * 0.01);
+  if (cost > mine.cash) return { ok: false, message: `Legal fees cost $${Math.round(cost).toLocaleString()}.` };
+  const rng = withRng(state);
+  mine.cash -= cost;
+  setCooldown(state, `patent_suit_${companyId}_${targetCompanyId}`);
+  // Win chance: your patent strength helps; a bigger, more R&D-sophisticated defendant can better
+  // argue independent invention or prior art.
+  const sizeRatio = Math.log10(Math.max(1, target.revenue) / Math.max(1, mine.revenue));
+  const chance = clamp(0.35 + mine.patents * 0.05 - target.rdPct * 1.5 - sizeRatio * 0.08, 0.1, 0.8);
+  const win = rng.chance(chance);
+  target.lawsuits++;
+  if (win) {
+    const settlement = Math.min(target.cash * 0.4, target.revenue * rng.range(0.03, 0.08));
+    target.cash -= settlement;
+    mine.cash += settlement;
+    target.brand = clamp100(target.brand - rng.range(4, 10));
+    commit(state, rng);
+    log(state, `${mine.name} won a patent-infringement suit against ${target.name}.`, 'business');
+    return { ok: true, message: `Won! ${target.name} pays a $${Math.round(settlement).toLocaleString()} settlement.` };
+  }
+  mine.cash -= cost * rng.range(0.5, 1.2);
+  mine.brand = clamp100(mine.brand - rng.range(2, 6));
+  commit(state, rng);
+  log(state, `${mine.name} lost a patent-infringement suit against ${target.name}.`, 'bad');
+  return { ok: false, message: `Lost the case — ${target.name} successfully defended itself, plus extra legal costs.` };
+}
+
+/** Pool capital with a named partner company for a multi-year joint venture — distinct from a
+ * full merger (ownership stays independent): a modest ongoing synergy boost while it runs, then
+ * a one-time payout (which can be a real loss) weighted by both companies' actual strength. */
+export function proposeJointVenture(state: GameState, companyId: string, partnerCompanyId: string, investment: number): ActionResult {
+  const mine = state.companies[companyId];
+  const partner = state.companies[partnerCompanyId];
+  if (!mine || !mine.playerOwned || mine.status !== 'active') return { ok: false, message: 'Not your company.' };
+  if (!partner || partner.status !== 'active' || partner.playerOwned || partner.countryId !== mine.countryId) {
+    return { ok: false, message: 'Invalid partner.' };
+  }
+  if (mine.jointVenturePartnerId) return { ok: false, message: 'Already committed to a joint venture.' };
+  const minInvestment = 50_000;
+  if (investment < minInvestment) return { ok: false, message: `Needs at least $${minInvestment.toLocaleString()}.` };
+  if (investment > mine.cash) return { ok: false, message: 'Not enough company cash.' };
+  mine.cash -= investment;
+  mine.jointVenturePartnerId = partner.id;
+  mine.jointVentureYearsLeft = 3;
+  mine.jointVentureInvestment = investment;
+  mine.brand = clamp100(mine.brand + 3);
+  log(state, `${mine.name} launched a joint venture with ${partner.name}.`, 'business');
+  return { ok: true, message: `Joint venture formed with ${partner.name}. Committed $${investment.toLocaleString()} for 3 years.` };
+}
+
 /** Attempt to acquire an NPC-owned public company by outbidding the market. */
 export function attemptHostileTakeover(state: GameState, targetCompanyId: string, offerAmount: number): ActionResult {
   const p = state.player;
@@ -1573,6 +1634,53 @@ export function negotiateCoalition(state: GameState, partnerPartyId: string): Ac
   if (!state.achievements.includes('coalition_builder')) state.achievements.push('coalition_builder');
   log(state, `🤝 Formed a governing coalition with the ${partner.name}.`, 'politics');
   return { ok: true, message: `Coalition formed with the ${partner.name}.` };
+}
+
+/** Force a formal no-confidence motion against the sitting leader in a parliamentary system —
+ * distinct from the automatic legislative risk that can oust the player when THEY hold power
+ * (see tickPlayerLife). Needs real seat weight and political capital; a big enough bloc can walk
+ * straight into power if the motion succeeds, otherwise a caretaker NPC steps in. */
+export function callNoConfidenceVote(state: GameState): ActionResult {
+  const p = state.player;
+  const home = state.countries.find((c) => c.id === p.countryId)!;
+  if (home.system !== 'parliamentary') return { ok: false, message: 'Only meaningful in a parliamentary system.' };
+  if (home.leaderId === 'player') return { ok: false, message: 'You already lead the government.' };
+  if (!home.leaderId) return { ok: false, message: 'No sitting leader to challenge.' };
+  if (!p.partyId) return { ok: false, message: 'Join or found a party first.' };
+  const myParty = home.parties.find((x) => x.id === p.partyId);
+  if (!myParty) return { ok: false, message: 'Party not found.' };
+  if (onCooldown(state, 'no_confidence_vote')) return { ok: false, message: 'Already called for a vote this year.' };
+  if (p.politicalCapital < 25) return { ok: false, message: 'Needs at least 25 political capital.' };
+  const seatShare = myParty.seats / Math.max(1, home.totalSeats);
+  if (seatShare < 0.15) return { ok: false, message: 'Your party holds too few seats to force a vote.' };
+  const rng = withRng(state);
+  p.politicalCapital = clamp(p.politicalCapital - 25, 0, 100);
+  setCooldown(state, 'no_confidence_vote');
+  const chance = clamp(seatShare * 0.6 + (60 - home.approvalOfGovernment) * 0.006 + (home.unrest - 40) * 0.003, 0.05, 0.75);
+  const success = rng.chance(chance);
+  if (!success) {
+    p.popularity = clamp100(p.popularity - 4);
+    commit(state, rng);
+    log(state, 'Your no-confidence motion failed to gather enough support.', 'bad');
+    return { ok: false, message: 'The motion failed. The government survives — for now.' };
+  }
+  const oustedLeaderId = home.leaderId;
+  const takesPower = seatShare >= 0.35;
+  if (takesPower) {
+    home.leaderId = 'player';
+    myParty.leaderId = 'player';
+    p.politicalCapital = clamp(p.politicalCapital + 15, 0, 100);
+    log(state, '🏛️ No-confidence vote succeeds — you take power as the new head of government.', 'politics');
+  } else {
+    const successor = Object.values(state.npcs).find((n) => n.alive && n.countryId === home.id && n.role === 'politician' && n.id !== oustedLeaderId);
+    home.leaderId = successor?.id ?? null;
+    log(state, "🏛️ No-confidence vote succeeds — the government falls, though your party doesn't hold enough seats to take over.", 'politics');
+  }
+  home.approvalOfGovernment = clamp100(home.approvalOfGovernment - 10);
+  home.electionInYears = Math.min(home.electionInYears, 1);
+  if (!state.achievements.includes('kingmaker')) state.achievements.push('kingmaker');
+  commit(state, rng);
+  return { ok: true, message: takesPower ? 'The government has fallen — you take power!' : 'The government has fallen. A caretaker leader steps in.' };
 }
 
 // ---------------------------------------------------------------------------

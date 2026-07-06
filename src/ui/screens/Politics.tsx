@@ -5,6 +5,7 @@ import {
   appointMinister,
   availableOffices,
   cabinetCandidates,
+  callNoConfidenceVote,
   campaignAction,
   deliverBudgetSpeech,
   dismissMinister,
@@ -433,6 +434,25 @@ function PartyTab({ party }: { party: { id: string; name: string; ideology: numb
               </div>
             </>
           )}
+        </Card>
+      )}
+
+      {party && home.system === 'parliamentary' && home.leaderId && home.leaderId !== 'player' && (
+        <Card className="p-5">
+          <div className="font-bold mb-1">No-Confidence Motion</div>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
+            Force a vote to topple the sitting government (needs 15%+ seat share and 25 political capital). A big
+            enough bloc can walk straight into power if it succeeds — otherwise a caretaker takes over and a snap
+            election follows.
+          </p>
+          <Button
+            size="sm"
+            variant="danger"
+            disabled={!party || party.seats / home.totalSeats < 0.15 || p.politicalCapital < 25}
+            onClick={() => run(callNoConfidenceVote)}
+          >
+            Call Vote (25 PC)
+          </Button>
         </Card>
       )}
 

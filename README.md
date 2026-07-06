@@ -184,6 +184,18 @@ plain JSON you can export and re-import.
   recent memory of you, not just a name and a number. National news now covers your own life when it's
   genuinely newsworthy — a conviction, a release, or burning out under the pressure — alongside the
   economy and world events it already tracked.
+- **Power can be taken, not just won — and it can be lost overnight** — in a parliamentary system,
+  force a formal no-confidence motion against the sitting government with real seat weight and
+  political capital (a big enough bloc walks straight into power); the same fate can just as easily
+  befall you as leader if approval collapses, unrest spikes, and your own party can't protect you.
+  Anyone with real political standing now carries genuine scandal risk tied to how dirty their life
+  actually is — notoriety, convictions, laundered money, law-enforcement heat — that a retained PR
+  agency measurably softens, and a severe uncontained scandal can force a resignation outright.
+- **Patents and partnerships now have real teeth** — sue a named competitor for patent infringement
+  and either collect a real settlement or eat the legal costs and a brand hit for a suit that didn't
+  stick; pool capital with a named partner company in a multi-year joint venture for an ongoing
+  synergy boost and a payout at the end weighted by both companies' actual strength — a genuine bet,
+  not a guaranteed win.
 - **Family, dynasty & wills** — date, marry (with an optional prenup), divorce, have or adopt children who
   age up as real NPCs and eventually have grandchildren of their own, name a successor to inherit a company
   or a political heir to inherit your party and popularity, draft a will naming a primary heir for a bigger

@@ -19,6 +19,7 @@ const ACHIEVEMENTS: Record<string, { label: string; icon: string }> = {
   dynasty_founder: { label: 'Dynasty Founder', icon: '👑' },
   jailbird: { label: 'Survived Prison', icon: '⛓️' },
   coalition_builder: { label: 'Coalition Builder', icon: '🤝' },
+  kingmaker: { label: 'Kingmaker', icon: '⚔️' },
   philanthropist: { label: 'Philanthropist', icon: '❤️' },
   crime_boss: { label: 'Crime Boss', icon: '🕶️' },
   bond_investor: { label: 'Bond Investor', icon: '📜' },

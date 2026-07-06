@@ -493,6 +493,8 @@ export interface Country {
   militaryReadiness: number; // 0..100, drifts toward the Defense budget share; decays if under-funded
   warExhaustion: number; // 0..100, builds while at war (faster under an invasion strategy), decays at peace; dampens approval and pushes both sides toward peace
   warCasualtiesTotal: number; // cumulative population lost to war across this playthrough (flavor + real population drag)
+
+  lastNoConfidenceYear: number | null; // gates automatic legislative no-confidence risk to at most one attempt per year
 }
 
 export const CABINET_PORTFOLIOS = ['Finance', 'Foreign Affairs', 'Defense', 'Health', 'Education', 'Justice'] as const;
@@ -624,6 +626,14 @@ export interface Company {
   ceoSalary: number; // yearly, paid from company cash
   lastGovContractBidYear: number | null; // gates one bid per company per year
   lastGrantYear: number | null; // gates one grant application per company per year
+
+  // Joint venture: a multi-year capital-pooling deal with a named partner company, distinct from
+  // a full merger (tickMergers) — both sides keep independent ownership, gain a modest ongoing
+  // synergy boost while it runs, and the investment resolves into a one-time payout (which can be
+  // a loss) when the term ends.
+  jointVenturePartnerId: string | null;
+  jointVentureYearsLeft: number;
+  jointVentureInvestment: number;
 
   status: CompanyStatus;
   history: CompanyHistoryPoint[];

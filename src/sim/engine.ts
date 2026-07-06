@@ -511,6 +511,60 @@ function tickPlayerLife(state: GameState, rng: RNG): string[] {
     }
   }
 
+  // Parliamentary systems can formally vote out a sitting player head of state — distinct from
+  // the dictator-coup above — when approval collapses, unrest is high, and the player's own party
+  // (if any) doesn't hold a working majority to protect them. Gated to at most once per year.
+  if (
+    home.leaderId === 'player' &&
+    home.system === 'parliamentary' &&
+    home.approvalOfGovernment < 22 &&
+    home.unrest > 45 &&
+    home.lastNoConfidenceYear !== state.year &&
+    rng.chance(0.2)
+  ) {
+    home.lastNoConfidenceYear = state.year;
+    const myParty = home.parties.find((x) => x.id === p.partyId);
+    const hasMajority = myParty ? myParty.seats / Math.max(1, home.totalSeats) >= 0.5 : false;
+    if (!hasMajority) {
+      log(state, '🏛️ Parliament passes a motion of no confidence — your government has fallen.', 'bad');
+      headlines.push(`${p.name}'s government falls in a no-confidence vote`);
+      const successor = Object.values(state.npcs).find((n) => n.alive && n.countryId === home.id && n.role === 'politician');
+      home.leaderId = successor?.id ?? null;
+      p.popularity = clamp100(p.popularity - 15);
+      p.politicalCapital = clamp(p.politicalCapital - 20, 0, 100);
+      home.electionInYears = Math.min(home.electionInYears, 1);
+    }
+  }
+
+  // --- Political scandal risk ---------------------------------------------
+  // Anyone with real political standing carries scandal risk proportional to how dirty their
+  // life actually is (notoriety, convictions, laundered money, law-enforcement heat) — a retained
+  // PR agency measurably softens the blow, same as it already does for the generic reputation
+  // hits elsewhere, and a severe uncontained scandal can force a resignation outright.
+  if (p.office || home.leaderId === 'player') {
+    const riskScore = p.notoriety * 0.4 + p.criminalRecord * 8 + (p.dirtyMoney > 0 ? 15 : 0) + Math.max(0, p.investigationHeat - 30) * 0.3;
+    const lastScandalYear = p.actionCooldowns.political_scandal ?? -999;
+    if (riskScore > 20 && state.year - lastScandalYear >= 2 && rng.chance(clamp(riskScore * 0.004, 0, 0.3))) {
+      p.actionCooldowns.political_scandal = state.year;
+      const dampened = p.prAgencyHired;
+      const popularityHit = dampened ? rng.range(4, 10) : rng.range(10, 22);
+      const reputationHit = dampened ? rng.range(3, 8) : rng.range(8, 18);
+      p.popularity = clamp100(p.popularity - popularityHit);
+      p.reputation = clamp100(p.reputation - reputationHit);
+      log(state, `📰 A political scandal broke over ${p.name}'s conduct.`, 'bad');
+      headlines.push(`${p.name} engulfed in a political scandal`);
+      if (!dampened && p.office && rng.chance(0.15)) {
+        log(state, `Pressure over the scandal forced ${p.name} to resign as ${p.office.title}.`, 'bad');
+        headlines.push(`${p.name} resigns as ${p.office.title} amid scandal`);
+        if (p.office.kind === 'head_of_state' && home.leaderId === 'player') {
+          const successor = Object.values(state.npcs).find((n) => n.alive && n.countryId === home.id && n.role === 'politician');
+          home.leaderId = successor?.id ?? null;
+        }
+        p.office = null;
+      }
+    }
+  }
+
   // --- Campaign -----------------------------------------------------------
   if (p.campaign) {
     p.campaign.yearsToElection--;

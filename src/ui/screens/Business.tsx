@@ -11,6 +11,7 @@ import {
   CULTURE_INFO,
   diversifySupplyChain,
   fileTrademark,
+  filePatentLawsuit,
   fireCEO,
   fireExecutive,
   franchiseCompany,
@@ -27,6 +28,7 @@ import {
   protectionRacket,
   proactiveRecall,
   proposeBoardResolution,
+  proposeJointVenture,
   qualityAudit,
   raceForInnovation,
   renameCompany,
@@ -75,6 +77,7 @@ export function Business() {
   const [selected, setSelected] = useState<string | null>(null);
   const [view, setView] = useState<'mine' | 'rivals'>('mine');
   const [takeoverTarget, setTakeoverTarget] = useState<string | null>(null);
+  const [jvTarget, setJvTarget] = useState<{ mineId: string; partnerId: string } | null>(null);
   if (!state) return null;
   const p = state.player;
   const companies = p.companies.map((id) => state.companies[id]).filter((c): c is Company => !!c && c.status === 'active');
@@ -119,6 +122,16 @@ export function Business() {
                       ⚔️ Price War (with {myRival.name})
                     </Button>
                   )}
+                  {myRival && myRival.patents > 0 && (
+                    <Button size="sm" variant="soft" className="col-span-2" onClick={() => run(filePatentLawsuit, myRival.id, c.id)}>
+                      ⚖️ Sue for Patent Infringement (with {myRival.name})
+                    </Button>
+                  )}
+                  {myRival && !myRival.jointVenturePartnerId && (
+                    <Button size="sm" variant="soft" className="col-span-2" onClick={() => setJvTarget({ mineId: myRival.id, partnerId: c.id })}>
+                      🤝 Propose Joint Venture (with {myRival.name})
+                    </Button>
+                  )}
                 </div>
                 {!c.isPublic && c.revenue <= 3_000_000 && (
                   <Button size="sm" variant="soft" className="w-full mt-2" onClick={() => run(investInStartup, c.id, 50_000)}>
@@ -142,6 +155,7 @@ export function Business() {
       <FoundModal open={founding} onClose={() => setFounding(false)} />
       {selected && <ManageModal companyId={selected} onClose={() => setSelected(null)} />}
       {takeoverTarget && <TakeoverModal companyId={takeoverTarget} onClose={() => setTakeoverTarget(null)} />}
+      {jvTarget && <JointVentureModal mineId={jvTarget.mineId} partnerId={jvTarget.partnerId} onClose={() => setJvTarget(null)} />}
     </div>
   );
 }
@@ -656,6 +670,45 @@ function TakeoverModal({ companyId, onClose }: { companyId: string; onClose: () 
         }}
       >
         Launch Bid for {money(offer)}
+      </Button>
+    </Modal>
+  );
+}
+
+function JointVentureModal({ mineId, partnerId, onClose }: { mineId: string; partnerId: string; onClose: () => void }) {
+  const { state, run } = useGame();
+  const mine = state?.companies[mineId];
+  const partner = state?.companies[partnerId];
+  const [investment, setInvestment] = useState(50_000);
+  if (!state || !mine || !partner) return null;
+
+  return (
+    <Modal open onClose={onClose} title={`Joint Venture with ${partner.name}`}>
+      <p className="text-xs text-slate-400 mb-4">
+        Pool capital with {partner.name} for 3 years: a modest ongoing brand/quality boost while it runs, then a
+        one-time payout weighted by both companies' real strength — a strong partner is a genuinely better bet, but
+        it can still come back a loss.
+      </p>
+      <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Investment: {moneyFull(investment)}</label>
+      <input
+        type="range"
+        min={50_000}
+        max={Math.max(50_000, Math.round(mine.cash))}
+        step={5_000}
+        value={investment}
+        onChange={(e) => setInvestment(Number(e.target.value))}
+        className="w-full mt-1 mb-4"
+      />
+      <Button
+        className="w-full"
+        size="lg"
+        disabled={investment > mine.cash}
+        onClick={() => {
+          const r = run(proposeJointVenture, mineId, partnerId, investment);
+          if (r.ok) onClose();
+        }}
+      >
+        Commit {money(investment)}
       </Button>
     </Modal>
   );

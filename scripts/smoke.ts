@@ -152,6 +152,22 @@ for (let y = 0; y < 82 && state.player.alive; y++) {
       );
       if (rival) A.spyOnCompany(state, rival.id);
     }
+    if (y === 31 && state.player.companies.length) {
+      const myCo = state.companies[state.player.companies[0]];
+      const rival = myCo && Object.values(state.companies).find(
+        (c) => c.status === 'active' && !c.playerOwned && c.industryId === myCo.industryId,
+      );
+      if (myCo && rival) {
+        if (myCo.patents > 0) A.filePatentLawsuit(state, myCo.id, rival.id);
+        if (!myCo.jointVenturePartnerId) A.proposeJointVenture(state, myCo.id, rival.id, Math.min(myCo.cash * 0.3, 100_000));
+      }
+    }
+    if (y === 32) {
+      const home = state.countries.find((c) => c.id === state.player.countryId)!;
+      if (home.system === 'parliamentary' && home.leaderId && home.leaderId !== 'player' && state.player.partyId) {
+        A.callNoConfidenceVote(state);
+      }
+    }
     if (y === 35) {
       const home = state.countries.find((c) => c.id === state.player.countryId)!;
       if (home.leaderId === 'player') {
@@ -564,6 +580,8 @@ console.log('  custom parts engineered:', allParts.length, '· units sold:', all
 console.log('  properties:', state.player.properties.map((pr) => `${pr.kind} cond=${Math.round(pr.condition)} eff=${Math.round(pr.energyEfficiency)} maint=${pr.maintenanceLevel} val=$${Math.round(pr.value).toLocaleString()}`).join(' | ') || 'none');
 console.log('  education:', state.player.education.map((e) => `${e.degree}/${e.field}`).join(', ') || 'none', '· management skill (graduation bonus):', Math.round(state.player.skills[SK.management] ?? 0));
 console.log('  stress:', Math.round(state.player.stress), '· burnout until:', state.player.burnoutUntilYear ?? 'n/a', '· investigation heat:', Math.round(state.player.investigationHeat), '· years served this sentence:', state.player.yearsServedThisSentence);
+const jvActive = Object.values(state.companies).filter((c) => c.jointVenturePartnerId).length;
+console.log('  joint ventures active:', jvActive, '· total lawsuits across all companies:', Object.values(state.companies).reduce((s, c) => s + c.lawsuits, 0));
 console.log('  errors:', errors);
 
 // Invariant checks

@@ -93,6 +93,9 @@ export function createCompany(opts: FoundCompanyOptions, rng: RNG): Company {
     ceoSalary: 0,
     lastGovContractBidYear: null,
     lastGrantYear: null,
+    jointVenturePartnerId: null,
+    jointVentureYearsLeft: 0,
+    jointVentureInvestment: 0,
     status: 'active',
     history: [],
   };
@@ -323,6 +326,37 @@ export function tickCompany(c: Company, ctx: CompanyTickContext): CompanyTickRes
   // Franchised locations pay a small ongoing royalty back to the parent brand.
   if (c.franchiseCount > 0) c.cash += c.franchiseCount * c.revenue * 0.006;
   if (c.loyaltyProgram) c.customerSatisfaction = clamp100(c.customerSatisfaction + 3);
+
+  // Joint venture: a modest ongoing synergy boost while it runs (shared marketing/R&D with the
+  // partner), then a one-time payout when the term ends — weighted by both companies' real
+  // strength, so a strong partner is a genuinely better bet, not just flavor text. If the partner
+  // collapses mid-term, the deal quietly dissolves and the investment is forfeited.
+  if (c.jointVenturePartnerId) {
+    const partner = state.companies[c.jointVenturePartnerId];
+    if (!partner || partner.status !== 'active') {
+      c.jointVenturePartnerId = null;
+      c.jointVentureYearsLeft = 0;
+      c.jointVentureInvestment = 0;
+    } else {
+      c.brand = clamp100(c.brand + 0.5);
+      c.quality = clamp100(c.quality + 0.3);
+      c.jointVentureYearsLeft--;
+      if (c.jointVentureYearsLeft <= 0) {
+        const combinedStrength = (c.managerQuality + c.brand + c.quality + partner.managerQuality + partner.brand + partner.quality) / 600;
+        const payoutMult = clamp(0.4 + (combinedStrength + rng.range(-0.3, 0.3)) * 2.6, 0.2, 3.5);
+        const payout = c.jointVentureInvestment * payoutMult;
+        c.cash += payout;
+        headline = headline ?? (
+          payoutMult >= 1.5 ? `${c.name}'s joint venture with ${partner.name} pays off big`
+          : payoutMult >= 0.9 ? `${c.name}'s joint venture with ${partner.name} wraps up`
+          : `${c.name}'s joint venture with ${partner.name} falls short of expectations`
+        );
+        c.jointVenturePartnerId = null;
+        c.jointVentureYearsLeft = 0;
+        c.jointVentureInvestment = 0;
+      }
+    }
+  }
 
   // Media & influence companies slowly build political/cultural sway with reach and reputation.
   if (ind.tags.includes('media')) {
