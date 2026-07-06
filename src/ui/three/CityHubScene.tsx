@@ -21,6 +21,7 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } f
 import * as THREE from 'three';
 import { useThreeScene } from './useThreeScene';
 import { makeTexture, windowGridTexture } from './textures';
+import { loadModel } from './modelLoader';
 
 export type HubBuildingId = 'hq' | 'bank' | 'parliament' | 'exchange' | 'studio' | 'home' | 'office' | 'park' | 'docks' | 'newsstand';
 export type HubArchetype = 'tower' | 'bank' | 'capitol' | 'exchange' | 'storefront' | 'house' | 'office' | 'park' | 'dock' | 'kiosk';
@@ -658,6 +659,18 @@ export function CityHubScene({ buildings, season, onEnter, onQuickAction }: City
         label.position.set(x, 3.6, z);
         scene.add(label);
         buildingMeshes.push({ id: b.id, group, pos: { x, z } });
+
+        // Real-model pipeline proof of concept: if a real office_tower.glb ever gets dropped
+        // into public/models/, the HQ tower swaps to it automatically. Nothing ships there
+        // today, so loadModel resolves null and the procedural tower above stays exactly as
+        // built — this is a fallback path, not a placeholder that needs removing later.
+        if (b.archetype === 'tower') {
+          loadModel('/models/office_tower.glb').then((model) => {
+            if (!model) return;
+            while (group.children.length) group.remove(group.children[0]);
+            group.add(model.clone(true));
+          });
+        }
       });
 
       // Plaza props: lamp posts, a fountain, a couple of trees.

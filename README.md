@@ -172,9 +172,12 @@ plain JSON you can export and re-import.
   courtyard and proportioned-figure treatment as the City hub. The render pipeline also picked up
   real ambient occlusion (contact shadows where geometry meets geometry) and proper multisampled
   antialiasing on the composer path, so desktop's shadow/bloom pass no longer trades away the edge
-  smoothing plain rendering had. (Honest scope: still a stylized, procedurally-built diorama, not a
-  full open-world engine with physics or pathfinding — but every shape, color and light on screen is
-  driven by real simulation state, not decoration.)
+  smoothing plain rendering had. There's also a real (optional) pipeline for dropping in actual
+  `.glb`/`.gltf` model files — see `public/models/README.md` — that falls back to the procedural
+  geometry above whenever a model isn't present, which is the case everywhere today. (Honest scope:
+  still a stylized, procedurally-built diorama, not a full open-world engine with physics or
+  pathfinding — but every shape, color and light on screen is driven by real simulation state, not
+  decoration.)
 - **The world and your rivals react back** — a real, player-vs-named-rival price war: undercut a
   specific competitor's price and they may cut right back at you, shifting real market share both ways.
   Everyone in your inner circle (spouse, mentor, rival) now shows a real mood, disposition and their most
