@@ -21,6 +21,7 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 
@@ -123,11 +124,24 @@ export function useThreeScene(
     // emissive accent in these scenes (windows, screens, beacons, seals) actually glows instead
     // of just being a flat bright color. Desktop only: two extra full-screen passes per frame is
     // real GPU cost, and phones already have shadows/lights to worry about.
+    //
+    // EffectComposer's default render target has no MSAA of its own — the renderer's
+    // `antialias: true` only smooths edges when drawing straight to the canvas, and once a
+    // composer is in the loop every frame goes through an off-screen target instead. Without
+    // this, desktop (the tier that actually gets the composer) would silently lose the
+    // antialiasing mobile still has, undoing rather than improving on the plain-renderer look.
     let composer: EffectComposer | null = null;
     let bloomPass: UnrealBloomPass | null = null;
     if (quality === 'desktop') {
-      composer = new EffectComposer(renderer);
+      const msaaTarget = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 });
+      composer = new EffectComposer(renderer, msaaTarget);
       composer.addPass(new RenderPass(scene, camera));
+      // Ambient occlusion: darkens the crevices where geometry meets geometry (a building base
+      // against the ground, a seat against its neighbor) — the single biggest cue that grounds
+      // objects in a real space instead of having them float, cheap-looking, over a flat plane.
+      const aoPass = new GTAOPass(scene, camera, 1, 1);
+      aoPass.blendIntensity = 0.6;
+      composer.addPass(aoPass);
       bloomPass = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.4, 0.55, 0.82);
       composer.addPass(bloomPass);
       composer.addPass(new OutputPass());

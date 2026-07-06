@@ -168,9 +168,13 @@ plain JSON you can export and re-import.
   have actual wheels/glass/head-and-taillights instead of two stacked boxes, pedestrians and traders
   have proportioned legs/torso/arms/hair instead of a capsule-and-sphere blob, and buildings pick up
   real architectural detail (entrance steps, cornices, porches, rooftop clutter, dock pilings and
-  bollards) instead of reading as a bare box. (Honest scope: still a stylized, procedurally-built
-  diorama, not a full open-world engine with physics or pathfinding — but every shape, color and
-  light on screen is driven by real simulation state, not decoration.)
+  bollards) instead of reading as a bare box, and the HQ Tour scene got the same windowed-facade,
+  courtyard and proportioned-figure treatment as the City hub. The render pipeline also picked up
+  real ambient occlusion (contact shadows where geometry meets geometry) and proper multisampled
+  antialiasing on the composer path, so desktop's shadow/bloom pass no longer trades away the edge
+  smoothing plain rendering had. (Honest scope: still a stylized, procedurally-built diorama, not a
+  full open-world engine with physics or pathfinding — but every shape, color and light on screen is
+  driven by real simulation state, not decoration.)
 - **The world and your rivals react back** — a real, player-vs-named-rival price war: undercut a
   specific competitor's price and they may cut right back at you, shifting real market share both ways.
   Everyone in your inner circle (spouse, mentor, rival) now shows a real mood, disposition and their most
