@@ -1,10 +1,12 @@
 /**
  * The casino floor: every named slot machine cabinet real and distinct (its own color, its own
- * screen showing its own name and live jackpot pool), a spinning roulette wheel, and blackjack
- * / poker tables — laid out as one room so the whole floor reads as a real place, not a menu.
- * Selecting a game in the panel below highlights its cabinet here (glow + a gentle pulse) so the
- * two stay visibly connected. Ambient only (orbit-drag/zoom via useThreeScene, no walking) — the
- * actual play controls live in ordinary, always-reliable HTML below the canvas.
+ * screen showing its own name and live jackpot pool), a real red/black roulette wheel with an
+ * orbiting ball, a spinning coin stand for heads-or-tails, and card tables — laid out as one
+ * enclosed room (patterned carpet, back wall, an overhead light rig) so the floor reads as a real
+ * place, not a menu floating in a void. Selecting a game in the panel below highlights its
+ * cabinet/table here (glow + a spin-up) so the two stay visibly connected. Ambient only
+ * (orbit-drag/zoom via useThreeScene, no walking) — sized by its parent container, so the caller
+ * controls whether it's a small preview or a fullscreen takeover.
  */
 import { useRef } from 'react';
 import * as THREE from 'three';
@@ -53,9 +55,66 @@ function cabinetScreenTexture(name: string, jackpot: number, locked: boolean): T
   });
 }
 
+function carpetTexture(): THREE.CanvasTexture {
+  const tex = makeTexture(128, 128, (ctx, w, h) => {
+    ctx.fillStyle = '#1c0f24';
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = '#3a2049';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(w / 2, 0); ctx.lineTo(w, h / 2); ctx.lineTo(w / 2, h); ctx.lineTo(0, h / 2); ctx.closePath();
+    ctx.stroke();
+    ctx.fillStyle = '#c9a227';
+    ctx.beginPath(); ctx.arc(w / 2, h / 2, 4, 0, Math.PI * 2); ctx.fill();
+  });
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(10, 10);
+  return tex;
+}
+
+function rouletteWheelTexture(): THREE.CanvasTexture {
+  return makeTexture(256, 256, (ctx, w, h) => {
+    const cx = w / 2, cy = h / 2, r = w / 2;
+    const segments = 37;
+    for (let i = 0; i < segments; i++) {
+      const color = i === 0 ? '#16a34a' : i % 2 === 0 ? '#111827' : '#dc2626';
+      const a0 = (i / segments) * Math.PI * 2;
+      const a1 = ((i + 1) / segments) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, r, a0, a1);
+      ctx.closePath();
+      ctx.fillStyle = color;
+      ctx.fill();
+    }
+    ctx.strokeStyle = '#d4af37';
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r - 3, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = '#d4af37';
+    ctx.beginPath(); ctx.arc(cx, cy, 8, 0, Math.PI * 2); ctx.fill();
+  });
+}
+
+function coinFaceTexture(label: string, color: number): THREE.CanvasTexture {
+  return makeTexture(128, 128, (ctx, w, h) => {
+    ctx.fillStyle = `#${color.toString(16).padStart(6, '0')}`;
+    ctx.beginPath(); ctx.arc(w / 2, h / 2, w / 2 - 4, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#7c5e0a';
+    ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.arc(w / 2, h / 2, w / 2 - 6, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = '#3a2c05';
+    ctx.font = '700 56px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, w / 2, h / 2 + 2);
+  });
+}
+
 function makeSlotCabinet(m: CasinoMachineView): THREE.Group {
   const g = new THREE.Group();
-  const bodyMat = new THREE.MeshStandardMaterial({ color: m.color, roughness: 0.45, metalness: 0.3 });
+  const bodyMat = new THREE.MeshStandardMaterial({ color: m.color, roughness: 0.4, metalness: 0.35 });
   const body = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.5, 0.6), bodyMat);
   body.position.y = 0.75;
   body.castShadow = true;
@@ -65,23 +124,41 @@ function makeSlotCabinet(m: CasinoMachineView): THREE.Group {
   const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.52, 0.34), screenMat);
   screen.position.set(0, 1.05, 0.305);
   g.add(screen);
-  const topper = new THREE.Mesh(new THREE.SphereGeometry(0.14, 12, 10, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: m.color, emissive: m.color, emissiveIntensity: 0.4 }));
+  const topper = new THREE.Mesh(new THREE.SphereGeometry(0.14, 12, 10, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: m.color, emissive: m.color, emissiveIntensity: 0.45 }));
   topper.position.y = 1.5;
   g.add(topper);
+  // A classic side lever — cosmetic, but it's the single detail that reads "slot machine" at a glance.
+  const armMat = new THREE.MeshStandardMaterial({ color: 0xb0b8c4, metalness: 0.8, roughness: 0.25 });
+  const armBase = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.5, 8), armMat);
+  armBase.rotation.z = Math.PI * 0.12;
+  armBase.position.set(0.37, 1.15, 0);
+  g.add(armBase);
+  const armKnob = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.4 }));
+  armKnob.position.set(0.43, 1.38, 0);
+  g.add(armKnob);
   g.userData.screenMat = screenMat;
+  g.userData.arm = armBase;
   g.userData.baseY = 0;
   return g;
 }
 
-function makeRouletteTable(color: number): THREE.Group {
+function makeRouletteTable(): THREE.Group {
   const g = new THREE.Group();
-  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.8, 0.75, 24), new THREE.MeshStandardMaterial({ color: 0x2b1b12, roughness: 0.6 }));
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.8, 0.75, 32), new THREE.MeshStandardMaterial({ color: 0x2b1b12, roughness: 0.55 }));
   base.position.y = 0.375;
   g.add(base);
-  const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.08, 24), new THREE.MeshStandardMaterial({ color, roughness: 0.3, metalness: 0.5, emissive: color, emissiveIntensity: 0.12 }));
+  const wheelTex = rouletteWheelTexture();
+  const rimMat = new THREE.MeshStandardMaterial({ color: 0x1a1512, roughness: 0.35, metalness: 0.7 });
+  const topMat = new THREE.MeshStandardMaterial({ map: wheelTex, roughness: 0.3, metalness: 0.15, emissive: 0xffffff, emissiveMap: wheelTex, emissiveIntensity: 0.18 });
+  const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.08, 32), [rimMat, topMat, topMat]);
   wheel.position.y = 0.78;
   g.add(wheel);
+  const ball = new THREE.Mesh(new THREE.SphereGeometry(0.035, 12, 10), new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.85, roughness: 0.08 }));
+  ball.position.set(0.45, 0.85, 0);
+  g.add(ball);
   g.userData.wheel = wheel;
+  g.userData.ball = ball;
+  g.userData.ballAngle = 0;
   return g;
 }
 
@@ -93,6 +170,30 @@ function makeCardTable(color: number): THREE.Group {
   const felt = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.62, 0.06, 24), new THREE.MeshStandardMaterial({ color, roughness: 0.8 }));
   felt.position.y = 0.72;
   g.add(felt);
+  // Two face-down cards resting on the felt — cheap detail that reads as a card table.
+  const cardMat = new THREE.MeshStandardMaterial({ color: 0xf1f1f1, roughness: 0.5 });
+  for (const dx of [-0.14, 0.1]) {
+    const card = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.01, 0.22), cardMat);
+    card.position.set(dx, 0.76, 0.05);
+    card.rotation.y = dx * 0.6;
+    g.add(card);
+  }
+  return g;
+}
+
+function makeCoinStand(color: number): THREE.Group {
+  const g = new THREE.Group();
+  const stand = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.12, 0.7, 10), new THREE.MeshStandardMaterial({ color: 0x2b1b12, roughness: 0.65 }));
+  stand.position.y = 0.35;
+  g.add(stand);
+  const edgeMat = new THREE.MeshStandardMaterial({ color, metalness: 0.75, roughness: 0.3 });
+  const headsMat = new THREE.MeshStandardMaterial({ map: coinFaceTexture('H', color), metalness: 0.4, roughness: 0.35 });
+  const tailsMat = new THREE.MeshStandardMaterial({ map: coinFaceTexture('T', color), metalness: 0.4, roughness: 0.35 });
+  const coin = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.06, 28), [edgeMat, headsMat, tailsMat]);
+  coin.rotation.x = Math.PI / 2;
+  coin.position.y = 0.9;
+  g.add(coin);
+  g.userData.coin = coin;
   return g;
 }
 
@@ -102,11 +203,11 @@ export function CasinoScene({ machines, tables, selectedId }: CasinoSceneProps) 
   useThreeScene(
     ref,
     ({ scene, camera, addStars }) => {
-      scene.fog = new THREE.Fog(0x120a1a, 8, 26);
+      scene.fog = new THREE.Fog(0x120a1a, 9, 28);
       scene.background = new THREE.Color(0x120a1a);
       addStars(150);
-      scene.add(new THREE.AmbientLight(0x6644aa, 0.35));
-      const warm = new THREE.PointLight(0xffb347, 1.3, 14);
+      scene.add(new THREE.AmbientLight(0x6644aa, 0.32));
+      const warm = new THREE.PointLight(0xffb347, 1.3, 15);
       warm.position.set(0, 4, 2);
       scene.add(warm);
       const magenta = new THREE.PointLight(0xd946ef, 0.7, 12);
@@ -116,9 +217,27 @@ export function CasinoScene({ machines, tables, selectedId }: CasinoSceneProps) 
       cyan.position.set(4, 3, -3);
       scene.add(cyan);
 
-      const floor = new THREE.Mesh(new THREE.CircleGeometry(8, 40), new THREE.MeshStandardMaterial({ color: 0x1c0f24, roughness: 0.85 }));
+      const floor = new THREE.Mesh(new THREE.CircleGeometry(9, 48), new THREE.MeshStandardMaterial({ map: carpetTexture(), roughness: 0.95 }));
       floor.rotation.x = -Math.PI / 2;
       scene.add(floor);
+
+      // Enclosing back wall + a light rig overhead so the floor reads as a real room, not a
+      // fog-shrouded void — the single biggest cue that this is a place you could walk into.
+      const wall = new THREE.Mesh(
+        new THREE.CylinderGeometry(9, 9, 5, 48, 1, true, -Math.PI * 0.95, Math.PI * 1.9),
+        new THREE.MeshStandardMaterial({ color: 0x2a1533, roughness: 0.9, side: THREE.BackSide }),
+      );
+      wall.position.y = 2.5;
+      scene.add(wall);
+      const rigLightMat = new THREE.MeshStandardMaterial({ color: 0xfff4d6, emissive: 0xffe9a8, emissiveIntensity: 1.4 });
+      for (let i = -2; i <= 2; i++) {
+        const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), rigLightMat);
+        bulb.position.set(i * 1.6, 4.6, 0.5 - Math.abs(i) * 0.3);
+        scene.add(bulb);
+        const spot = new THREE.PointLight(0xffdca0, 0.35, 6);
+        spot.position.copy(bulb.position);
+        scene.add(spot);
+      }
 
       // Slot machines, arced along the back wall.
       const cabinets = machines.map((m, i) => {
@@ -136,7 +255,7 @@ export function CasinoScene({ machines, tables, selectedId }: CasinoSceneProps) 
 
       // Table games, front and center.
       const tableGroups = tables.map((t, i) => {
-        const grp = t.id === 'roulette' ? makeRouletteTable(t.color) : makeCardTable(t.color);
+        const grp = t.id === 'roulette' ? makeRouletteTable() : t.id === 'heads_or_tails' ? makeCoinStand(t.color) : makeCardTable(t.color);
         grp.position.set((i - (tables.length - 1) / 2) * 1.8, 0, 2.2);
         grp.userData.id = t.id;
         grp.userData.baseY = grp.position.y;
@@ -156,11 +275,21 @@ export function CasinoScene({ machines, tables, selectedId }: CasinoSceneProps) 
           cab.position.y = cab.userData.baseY + bob;
           const mat = cab.userData.screenMat as THREE.MeshStandardMaterial;
           mat.emissiveIntensity = selected ? 1.1 + Math.sin(t * 5) * 0.25 : 0.7;
+          if (cab.userData.arm) {
+            const arm = cab.userData.arm as THREE.Mesh;
+            arm.rotation.z = Math.PI * 0.12 + (selected ? Math.sin(t * 6) * 0.15 : 0);
+          }
         }
         for (const grp of tableGroups) {
           const selected = grp.userData.id === selectedId;
           if (grp.userData.wheel) {
-            grp.userData.wheel.rotation.y += selected ? 0.12 : 0.01;
+            const spin = selected ? 3.4 : 0.15;
+            (grp.userData.wheel as THREE.Mesh).rotation.y += spin * 0.02;
+            grp.userData.ballAngle -= (selected ? 4.2 : 0.05) * 0.016;
+            const ba = grp.userData.ballAngle as number;
+            (grp.userData.ball as THREE.Mesh).position.set(Math.cos(ba) * 0.45, 0.85, Math.sin(ba) * 0.45);
+          } else if (grp.userData.coin) {
+            (grp.userData.coin as THREE.Mesh).rotation.y += selected ? 0.35 : 0.02;
           } else {
             grp.rotation.y = selected ? Math.sin(t * 2) * 0.05 : 0;
           }
@@ -170,5 +299,5 @@ export function CasinoScene({ machines, tables, selectedId }: CasinoSceneProps) 
     [machines.map((m) => `${m.id}:${m.jackpot.toFixed(0)}:${m.locked}`).join(','), tables.map((t) => t.id).join(','), selectedId],
   );
 
-  return <div ref={ref} className="w-full h-64 rounded-2xl overflow-hidden bg-slate-950" />;
+  return <div ref={ref} className="w-full h-full bg-slate-950" />;
 }

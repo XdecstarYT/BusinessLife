@@ -389,12 +389,15 @@ only moves when you tell it to, using the three buttons on the Life hub:
   or declare war on a specific named rival family, and if your family gets crushed or wiped out you lose your
   standing with it (this is a family-level strength/turf/heat state machine, not a simulation of individual
   soldiers or a literal open-world crime map).
-- **Casino** — a real 3D casino floor (see the Casino tab) with six named, distinct slot machines — each its
-  own theme, stakes and volatility, with a real progressive jackpot pool that grows every spin and resets
-  when someone finally hits it — plus blackjack, roulette and high-stakes poker tables, and a VIP room
-  (Diamond Royale) unlocked once you're liquid enough. Every game keeps a genuine house edge: skill narrows
-  it (poker skill on the table games) but can never flip it into the player's favor, the same principle a
-  real casino runs on.
+- **Casino** — a real 3D casino floor (see the Casino tab, expandable to fullscreen for an immersive view — an
+  enclosed room with a patterned carpet, an overhead light rig, and a fully playable bet panel even while
+  fullscreen) with six named, distinct slot machines — each its own theme, stakes and volatility, with a real
+  progressive jackpot pool that grows every spin and resets when someone finally hits it — plus blackjack,
+  high-stakes poker, a genuine European roulette wheel (37 pockets, straight-number or red/black/odd/even/
+  high/low outside bets, real payouts), and a fair 50/50 heads-or-tails coin toss. Every game keeps a genuine
+  house edge: skill narrows it (poker skill on the card tables) but can never flip it into the player's
+  favor, the same principle a real casino runs on. A VIP room (Diamond Royale) unlocks once you're liquid
+  enough.
 - **Lifestyle** — 20+ quick activities on the Life hub, from the gym and charity to book clubs, therapy,
   adopting a pet, art collecting, wine tasting, poker nights, blogging and learning a language.
 

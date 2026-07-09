@@ -12,7 +12,7 @@ import { buyLuxuryAsset, sellLuxuryAsset, investInCelebrityBrand, divestCelebrit
 import * as P from '../src/sim/products';
 import { publicOpinionBreakdown } from '../src/sim/politics';
 import { playerCrimeFamily } from '../src/sim/crime';
-import { spinSlotMachine, playTableGame } from '../src/sim/casino';
+import { spinSlotMachine, playTableGame, spinRoulette, playCoinFlip } from '../src/sim/casino';
 import { SLOT_MACHINES } from '../src/data/casino';
 import { INDUSTRIES } from '../src/data/industries';
 import { LAW_BY_ID } from '../src/data/laws';
@@ -439,6 +439,9 @@ for (let y = 0; y < 82 && state.player.alive; y++) {
       playTableGame(state, 'poker', 500);
       spinSlotMachine(state, 'lucky_sevens', 100);
       if (state.player.money + state.player.savingsBalance >= 2_000_000) spinSlotMachine(state, 'diamond_royale', 5_000);
+      spinRoulette(state, { kind: 'red' }, 200);
+      spinRoulette(state, { kind: 'straight', number: 17 }, 50);
+      playCoinFlip(state, 'heads', 100);
       if (state.player.money > 300_000) A.foundCharityFoundation(state, 'Smoke Test Foundation');
       A.writeMemoir(state, 'Smoke: A Life');
     }
