@@ -75,17 +75,22 @@ export function Casino() {
     setBet((b) => Math.max(50, Math.min(b, Math.round(p.money) || 50)));
   };
 
-  const canAffordBet = bet > 0 && bet <= p.money;
+  // Derived, not stored: if a loss drops p.money below the last-chosen bet (e.g. betting most of
+  // your cash on one spin), this keeps the slider's value/max and the Play button in sync with
+  // what's actually affordable right now, instead of leaving `bet` stale until manually dragged.
+  const betMax = Math.max(selectedMachine?.minBet ?? 50, Math.min(selectedMachine?.maxBet ?? 100_000, Math.round(p.money) || 50));
+  const effectiveBet = Math.min(bet, betMax);
+  const canAffordBet = effectiveBet > 0 && effectiveBet <= p.money;
 
   const playSelected = () => {
-    if (selectedMachine) { run(spinSlotMachine, selectedMachine.id, bet); return; }
+    if (selectedMachine) { run(spinSlotMachine, selectedMachine.id, effectiveBet); return; }
     if (!selectedTable) return;
     if (selectedTable.id === 'roulette') {
-      run(spinRoulette, rouletteBet === 'straight' ? { kind: 'straight', number: rouletteNumber } : { kind: rouletteBet }, bet);
+      run(spinRoulette, rouletteBet === 'straight' ? { kind: 'straight', number: rouletteNumber } : { kind: rouletteBet }, effectiveBet);
     } else if (selectedTable.id === 'heads_or_tails') {
-      run(playCoinFlip, coinSide, bet);
+      run(playCoinFlip, coinSide, effectiveBet);
     } else {
-      run(playTableGame, selectedTable.id, bet);
+      run(playTableGame, selectedTable.id, effectiveBet);
     }
   };
 
@@ -152,18 +157,18 @@ export function Casino() {
         </div>
       )}
 
-      <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Bet: {money(bet)}</label>
+      <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Bet: {money(effectiveBet)}</label>
       <input
         type="range"
         min={selectedMachine?.minBet ?? 50}
-        max={Math.max(selectedMachine?.minBet ?? 50, Math.min(selectedMachine?.maxBet ?? 100_000, Math.round(p.money) || 50))}
+        max={betMax}
         step={Math.max(10, Math.round((selectedMachine?.minBet ?? 50) / 5))}
-        value={bet}
+        value={effectiveBet}
         onChange={(e) => setBet(Number(e.target.value))}
         className="w-full mt-1 mb-3"
       />
       <Button className="w-full" size="lg" disabled={!canAffordBet} onClick={playSelected}>
-        {selectedMachine ? '🎰 Spin' : selectedTable?.id === 'roulette' ? '🎡 Spin' : selectedTable?.id === 'heads_or_tails' ? '🪙 Flip' : '🃏 Play'} ({money(bet)})
+        {selectedMachine ? '🎰 Spin' : selectedTable?.id === 'roulette' ? '🎡 Spin' : selectedTable?.id === 'heads_or_tails' ? '🪙 Flip' : '🃏 Play'} ({money(effectiveBet)})
       </Button>
     </Card>
   );

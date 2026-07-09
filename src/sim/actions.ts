@@ -1096,13 +1096,17 @@ export function buybackShares(state: GameState, companyId: string, amount: numbe
   const c = state.companies[companyId];
   if (!c || !c.playerOwned || !c.isPublic || c.status !== 'active') return { ok: false, message: 'Only public companies you control can buy back shares.' };
   if (amount <= 0 || amount > c.cash) return { ok: false, message: `Needs $${Math.round(amount).toLocaleString()} in company cash.` };
-  const cap = Math.max(1, marketCap(c));
   const sharesRetired = amount / c.sharePrice;
   if (sharesRetired >= c.sharesOutstanding * 0.5) return { ok: false, message: 'Cannot retire more than half of shares outstanding at once.' };
   c.cash -= amount;
   c.sharesOutstanding -= sharesRetired;
+  // Retiring shares at the current price is value-neutral by construction: the founder's stake
+  // % rises (the same math a real buyback uses — fewer shares split the same equity), but the
+  // company is now worth exactly `amount` less in cash, so the founder's dollar-value stake is
+  // unchanged. There is deliberately no share-price bump here — an earlier version added one on
+  // top of the dilution math, which let a single deterministic call mint real founder value out
+  // of the company's own cash (fixed; see git history for the exploit this closed).
   c.playerSharePct = clamp(c.playerSharePct * (c.sharesOutstanding + sharesRetired) / c.sharesOutstanding, 0, 1);
-  c.sharePrice = c.sharePrice * (1 + clamp(amount / cap, 0, 0.3) * 0.5);
   log(state, `${c.name} bought back $${Math.round(amount).toLocaleString()} of its own shares.`, 'business');
   return { ok: true, message: `Retired ${Math.round(sharesRetired).toLocaleString()} shares.` };
 }
