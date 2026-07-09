@@ -11,6 +11,7 @@ import * as F from '../src/sim/family';
 import { buyLuxuryAsset, sellLuxuryAsset, investInCelebrityBrand, divestCelebrityStake } from '../src/sim/lifestyle';
 import * as P from '../src/sim/products';
 import { publicOpinionBreakdown } from '../src/sim/politics';
+import { playerCrimeFamily } from '../src/sim/crime';
 import { INDUSTRIES } from '../src/data/industries';
 import { LAW_BY_ID } from '../src/data/laws';
 import { SK } from '../src/data/skills';
@@ -214,6 +215,16 @@ for (let y = 0; y < 82 && state.player.alive; y++) {
     if (y === 14 && state.player.crimeFamilyId) {
       const target = Object.values(state.companies).find((c) => c.status === 'active' && !c.playerOwned && c.countryId === state.player.countryId);
       if (target) A.protectionRacket(state, target.id);
+    }
+    if (y === 14 && state.player.crimeFamilyId) {
+      const mine = playerCrimeFamily(state);
+      const rival = mine && state.crimeFamilies.find((f) => f.countryId === state.player.countryId && f.id !== mine.id && !f.disbanded);
+      if (rival) A.proposeCrimeAlliance(state, rival.id);
+    }
+    if (y === 14 && state.player.crimeFamilyId) {
+      const mine = playerCrimeFamily(state);
+      const rival = mine && state.crimeFamilies.find((f) => f.countryId === state.player.countryId && f.id !== mine.id && !f.disbanded && !mine.alliedWith.includes(f.id));
+      if (rival) A.declareCrimeWar(state, rival.id);
     }
     if (y === 15 && state.player.crimeFamilyId) A.goStraight(state);
     if (state.player.inJailYears > 0 && y % 2 === 0) A.bribeJudge(state);
@@ -539,6 +550,16 @@ console.log('  generation:', state.generation);
 console.log('  daily flavor events fired (day/week ticks):', dailyFlavorCount);
 console.log('  calendarDay at end:', state.calendarDay);
 console.log('  crime rank:', state.player.crimeRank, 'in family:', !!state.player.crimeFamilyId);
+console.log(
+  '  crime families: active',
+  state.crimeFamilies.filter((f) => !f.disbanded).length,
+  '· disbanded',
+  state.crimeFamilies.filter((f) => f.disbanded).length,
+  '· at war',
+  state.crimeFamilies.filter((f) => f.atWarWith.length > 0).length,
+  '· allied',
+  state.crimeFamilies.filter((f) => f.alliedWith.length > 0).length,
+);
 console.log('  mentor:', state.player.mentorId ? state.npcs[state.player.mentorId]?.name ?? 'unknown' : 'none');
 console.log('  rival:', state.player.rivalId ? state.npcs[state.player.rivalId]?.name ?? 'unknown' : 'none');
 console.log('  bonds:', state.player.bonds.length, 'forex positions:', state.player.forexPositions.length, 'life insurance:', !!state.player.lifeInsurance);

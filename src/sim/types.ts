@@ -1060,6 +1060,24 @@ export interface GameState {
   culturalProgressivism: number; // 0..100, drifts slowly across decades; nudged by tech/AI-era world events
   shockHistory: Partial<Record<WorldEventType, number>>; // world-event type -> years since it last ended (undefined = never happened)
   industryEraMultiplier: Record<string, number>; // sparse industryId -> growth multiplier from secular rise/decline over decades
+
+  // Crime Syndicate Engine: real, named organized-crime families competing with each other in
+  // every country, not just an abstract "rival crew" backdrop to the player's own crimeRank —
+  // see sim/crime.ts. The player's own family (if any) is one of these, found by bossId.
+  crimeFamilies: CrimeFamily[];
+}
+
+export interface CrimeFamily {
+  id: string;
+  name: string;
+  countryId: string;
+  bossId: string; // NPC id, role: 'criminal'
+  strength: number; // 0..100, combat/economic power — drives turf-war and crackdown outcomes
+  turf: number; // 0..100, share of the country's criminal territory this family controls
+  heat: number; // 0..100, law-enforcement attention specifically on this family
+  alliedWith: string[]; // other CrimeFamily ids, mutual non-aggression + turf-war backup
+  atWarWith: string[]; // other CrimeFamily ids, actively fighting for turf
+  disbanded: boolean; // true once taken down by a crackdown or wiped out in a war
 }
 
 export interface SuccessionCandidate {

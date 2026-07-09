@@ -11,6 +11,7 @@ import { tickCommodities, tickEconomy } from './economy';
 import { npcManageCompany, tickCompany, tickMergers, tickCorporateSabotage, tickIndustryEra, companyValuation } from './business';
 import { tickStock, portfolioValue, checkLimitOrders, tickMargin } from './market';
 import { campaignWinChance, electionRegionalBreakdown, OFFICE_SPEC_BY_KIND, promiseFulfillment, promiseMetricValue, tickNPCs, tickPolitics } from './politics';
+import { tickCrimeFamilies } from './crime';
 import { fireEvents } from './events';
 import { generateNews } from './news';
 import { INDUSTRY_BY_ID } from '../data/industries';
@@ -925,6 +926,29 @@ export function advanceYear(state: GameState): GameState {
     state.shockHistory = {};
     state.industryEraMultiplier = {};
   }
+  if (state.crimeFamilies === undefined) { // backfill for saves from before the Crime Syndicate Engine
+    state.crimeFamilies = [];
+    // Preserve an existing player membership as one real family so it isn't silently orphaned;
+    // other countries simply start without NPC families rather than retroactively regenerating
+    // a whole world of them for a save that predates this system.
+    if (state.player.crimeFamilyId) {
+      const home = state.countries.find((c) => c.id === state.player.countryId);
+      if (home) {
+        state.crimeFamilies.push({
+          id: `crime_${home.id}_legacy`,
+          name: 'The Old Guard',
+          countryId: home.id,
+          bossId: state.player.crimeFamilyId,
+          strength: clamp(50 + state.player.turfControl * 0.3, 0, 100),
+          turf: state.player.turfControl,
+          heat: state.player.investigationHeat ?? 20,
+          alliedWith: [],
+          atWarWith: [],
+          disbanded: false,
+        });
+      }
+    }
+  }
   const rng = new RNG(state.seed);
   rng.state = state.rngState;
   const netWorthStart = netWorth(state);
@@ -972,6 +996,7 @@ export function advanceYear(state: GameState): GameState {
     politicalHeadlines.push(...gamesHeadlines);
   }
   politicalHeadlines.push(...tickNPCs(state, rng));
+  politicalHeadlines.push(...tickCrimeFamilies(state, rng));
 
   // 3. Companies & markets
   const businessHeadlines: string[] = [];

@@ -377,6 +377,13 @@ only moves when you tell it to, using the three buttons on the Life hub:
 - **Underworld** — join a crime family and climb its ranks through heists and protection rackets, contest
   rival turf, launder illicit proceeds through a front business, bribe a judge or attempt a prison escape if
   caught, pay your way out and go straight, or enter witness protection to wipe your record.
+- **Crime Syndicate Engine** — every country now runs 2-3 real, named crime families with their own boss,
+  strength, turf and heat, simulated year over year whether or not you ever join one: they skirmish over
+  territory, form alliances, declare wars on each other, and get dismantled by law-enforcement crackdowns tied
+  to that country's judicial integrity. Join one and its turf war becomes yours to fight — propose an alliance
+  or declare war on a specific named rival family, and if your family gets crushed or wiped out you lose your
+  standing with it (this is a family-level strength/turf/heat state machine, not a simulation of individual
+  soldiers or a literal open-world crime map).
 - **Lifestyle** — 20+ quick activities on the Life hub, from the gym and charity to book clubs, therapy,
   adopting a pet, art collecting, wine tasting, poker nights, blogging and learning a language.
 

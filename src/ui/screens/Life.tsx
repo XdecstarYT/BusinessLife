@@ -6,7 +6,8 @@
  */
 import { useState, type ReactNode } from 'react';
 import { useGame, type Screen } from '../../store/gameStore';
-import { attemptPrisonEscape, bribeJudge, contestTerritory, CRIME_RANK_TITLES, doActivity, donateToFoundation, enterWitnessProtection, foundCharityFoundation, goStraight, heist, issuePublicApology, joinCrimeFamily, playCasino, postOnSocialMedia, requestParole, retire, socialMediaPostStyles, writeMemoir } from '../../sim/actions';
+import { attemptPrisonEscape, bribeJudge, contestTerritory, CRIME_RANK_TITLES, declareCrimeWar, doActivity, donateToFoundation, enterWitnessProtection, foundCharityFoundation, goStraight, heist, issuePublicApology, joinCrimeFamily, playCasino, postOnSocialMedia, proposeCrimeAlliance, requestParole, retire, socialMediaPostStyles, writeMemoir } from '../../sim/actions';
+import { playerCrimeFamily } from '../../sim/crime';
 import { titleForRank } from '../../data/careers';
 import { netWorth } from '../../sim/engine';
 import { Badge, Button, Card, CircleTile, Pill, PillRow, SectionHeader, StatBar } from '../components';
@@ -283,6 +284,43 @@ export function Life() {
           </>
         )}
       </PillRow>
+      {(() => {
+        const myFamily = playerCrimeFamily(state);
+        const families = state.crimeFamilies.filter((f) => f.countryId === p.countryId && !f.disbanded);
+        if (families.length === 0) return null;
+        return (
+          <div className="mt-2 space-y-2">
+            <p className="text-xs text-slate-400 px-1">
+              The real crime families operating in your country — they war, ally, and get crushed by the law on their own, whether or not you're in one.
+            </p>
+            {families.map((f) => {
+              const isMine = myFamily?.id === f.id;
+              const atWar = myFamily ? myFamily.atWarWith.includes(f.id) : false;
+              const allied = myFamily ? myFamily.alliedWith.includes(f.id) : false;
+              const boss = state.npcs[f.bossId];
+              return (
+                <Card key={f.id} className="p-4">
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="min-w-0 pr-2">
+                      <div className="font-bold truncate" title={f.name}>{f.name}</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                        Boss: {boss?.name ?? 'Unknown'} · strength {Math.round(f.strength)} · turf {Math.round(f.turf)}% · heat {Math.round(f.heat)}
+                      </div>
+                    </div>
+                    {isMine ? <Badge tone="brand">Your Family</Badge> : atWar ? <Badge tone="bad">At War</Badge> : allied ? <Badge tone="good">Allied</Badge> : null}
+                  </div>
+                  {myFamily && !isMine && !atWar && !allied && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <Pill label="🤝 Propose Alliance" onClick={() => run(proposeCrimeAlliance, f.id)} />
+                      <Pill label="⚔️ Declare War" onClick={() => run(declareCrimeWar, f.id)} />
+                    </div>
+                  )}
+                </Card>
+              );
+            })}
+          </div>
+        );
+      })()}
 
       <SectionHeader title="Casino" />
       <PillRow>

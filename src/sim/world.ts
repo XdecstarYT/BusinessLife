@@ -3,7 +3,7 @@
  * cities, parties, politicians, executives and publicly listed companies,
  * then creates the 18-year-old player character inside it.
  */
-import type { City, Country, CountryState, Difficulty, GameState, Gender, NPC, NPCRole, Party, Player } from './types';
+import type { City, Country, CountryState, CrimeFamily, Difficulty, GameState, Gender, NPC, NPCRole, Party, Player } from './types';
 import { RNG, hashSeed } from './rng';
 import { COUNTRY_SEEDS } from '../data/countries';
 import { initEconomy } from './economy';
@@ -13,6 +13,7 @@ import { createCompany, nextCompanyId } from './business';
 import { doIPO } from './market';
 import { SKILLS } from '../data/skills';
 import { randomMindTraits } from './npcMind';
+import { generateCrimeFamilies } from './crime';
 
 let npcCounter = 0;
 function makeNPC(rng: RNG, countryId: string, role: NPCRole, overrides: Partial<NPC> = {}): NPC {
@@ -98,6 +99,7 @@ export function generateWorld(config: NewGameConfig): GameState {
 
   const npcs: Record<string, NPC> = {};
   const countries: Country[] = [];
+  const crimeFamilies: CrimeFamily[] = [];
 
   for (const seed of COUNTRY_SEEDS) {
     const totalSeats = seed.system === 'dictatorship' || seed.system === 'monarchy' ? 0 : rng.pick([120, 150, 200, 300]);
@@ -222,6 +224,10 @@ export function generateWorld(config: NewGameConfig): GameState {
       lastNoConfidenceYear: null,
     };
     countries.push(country);
+
+    const { families, npcs: crimeNpcs } = generateCrimeFamilies(rng, country, (role) => makeNPC(rng, seed.id, role));
+    crimeFamilies.push(...families);
+    for (const n of crimeNpcs) npcs[n.id] = n;
   }
 
   // Diplomatic relations
@@ -271,6 +277,7 @@ export function generateWorld(config: NewGameConfig): GameState {
     culturalProgressivism: rng.int(40, 60),
     shockHistory: {},
     industryEraMultiplier: {},
+    crimeFamilies,
   };
 
   // Public + private NPC companies per country (more in the player's home).

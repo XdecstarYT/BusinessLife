@@ -19,6 +19,7 @@ import { createCompany, nextCompanyId, companyValuation } from './business';
 import { doIPO, marketCap } from './market';
 import { OFFICE_SPEC_BY_KIND, campaignWinChance, eligibleFor, estimateLawVote } from './politics';
 import { log, logHistory } from './engine';
+import { playerCrimeFamily } from './crime';
 import { pushMemory } from './npcMind';
 import { POST_STYLE_BY_ID, POST_STYLES } from '../data/socialMedia';
 
@@ -2474,16 +2475,19 @@ export function joinCrimeFamily(state: GameState): ActionResult {
   const p = state.player;
   if (p.crimeFamilyId) return { ok: false, message: 'You are already in the family.' };
   if (p.inJailYears > 0) return { ok: false, message: 'Not while incarcerated.' };
+  const candidates = state.crimeFamilies.filter((f) => f.countryId === p.countryId && !f.disbanded);
+  if (!candidates.length) return { ok: false, message: 'No organized crime family operates here right now.' };
   const rng = withRng(state);
-  const candidates = Object.values(state.npcs).filter((n) => n.alive && n.countryId === p.countryId && n.role === 'criminal');
-  const boss = candidates.length ? rng.pick(candidates) : null;
-  p.crimeFamilyId = boss?.id ?? 'unknown_boss';
+  const family = rng.pick(candidates);
+  const boss = state.npcs[family.bossId];
+  p.crimeFamilyId = family.bossId;
   p.crimeRank = 1;
+  p.turfControl = Math.min(p.turfControl, family.turf);
   p.notoriety = clamp100(p.notoriety + 10);
   p.karma = clamp100(p.karma - 10);
   commit(state, rng);
-  log(state, `🕶️ You were initiated into ${boss?.name ?? 'a criminal organization'}'s family as an Associate.`, 'bad');
-  return { ok: true, message: `Welcome to the family, Associate.` };
+  log(state, `🕶️ You were initiated into ${family.name} as an Associate.`, 'bad');
+  return { ok: true, message: `Welcome to ${family.name}, Associate${boss ? ` — ${boss.name} runs the show` : ''}.` };
 }
 
 export function heist(state: GameState): ActionResult {
@@ -2494,11 +2498,13 @@ export function heist(state: GameState): ActionResult {
   const skill = (p.skills[SK.streetSmarts] ?? 0) * 0.6 + (p.skills[SK.evasion] ?? 0) * 0.4;
   const chance = clamp(0.4 + skill * 0.004 + p.crimeRank * 0.03, 0.1, 0.85);
   const success = rng.chance(chance);
+  const family = playerCrimeFamily(state);
   if (success) {
     const take = rng.range(20_000, 60_000) * p.crimeRank * (1 + p.turfControl / 200);
     p.dirtyMoney += take;
     p.notoriety = clamp100(p.notoriety + 5);
     p.investigationHeat = clamp100(p.investigationHeat + 12);
+    if (family) family.heat = clamp100(family.heat + 4);
     if (p.crimeRank < 5 && rng.chance(0.25)) {
       p.crimeRank++;
       if (p.crimeRank === 5 && !state.achievements.includes('crime_boss')) state.achievements.push('crime_boss');
@@ -2662,26 +2668,85 @@ export function contestTerritory(state: GameState): ActionResult {
   if (!p.crimeFamilyId) return { ok: false, message: 'You need to be in the family first.' };
   if (p.inJailYears > 0) return { ok: false, message: 'Not while incarcerated.' };
   if (p.turfControl >= 100) return { ok: false, message: 'You already control all the turf worth having.' };
+  const family = playerCrimeFamily(state);
+  const rival = family
+    ? state.crimeFamilies.filter((f) => f.countryId === p.countryId && f.id !== family.id && !f.disbanded && !family.alliedWith.includes(f.id))
+      .sort((a, b) => a.strength - b.strength)[0]
+    : null;
+  if (!rival) return { ok: false, message: 'No rival family left to push against here.' };
   const rng = withRng(state);
   const skill = (p.skills[SK.streetSmarts] ?? 0) * 0.6 + (p.skills[SK.bribery] ?? 0) * 0.4;
-  const chance = clamp(0.35 + skill * 0.004 + p.crimeRank * 0.05, 0.15, 0.85);
+  const chance = clamp(0.35 + skill * 0.004 + p.crimeRank * 0.05 + ((family!.strength - rival.strength) / 200), 0.15, 0.85);
   const success = rng.chance(chance);
   if (success) {
     const gain = rng.range(8, 18);
     p.turfControl = clamp100(p.turfControl + gain);
+    family!.turf = clamp100(family!.turf + gain * 0.5);
+    rival.turf = clamp100(rival.turf - gain * 0.5);
+    family!.heat = clamp100(family!.heat + 6);
     p.notoriety = clamp100(p.notoriety + 4);
     p.investigationHeat = clamp100(p.investigationHeat + 7);
     commit(state, rng);
-    log(state, `Your family expanded its turf. Territory control now ${Math.round(p.turfControl)}.`, 'bad');
-    return { ok: true, message: `Turf control +${gain.toFixed(0)}.` };
+    log(state, `Your family pushed ${rival.name} off some turf. Territory control now ${Math.round(p.turfControl)}.`, 'bad');
+    return { ok: true, message: `Turf control +${gain.toFixed(0)} at ${rival.name}'s expense.` };
   }
   const loss = rng.range(5, 12);
   p.turfControl = clamp100(p.turfControl - loss);
+  family!.turf = clamp100(family!.turf - loss * 0.5);
+  rival.turf = clamp100(rival.turf + loss * 0.5);
   p.health = clamp100(p.health - rng.range(5, 15));
   p.investigationHeat = clamp100(p.investigationHeat + 10);
   commit(state, rng);
-  log(state, `A rival crew pushed back hard on your turf grab.`, 'bad');
-  return { ok: false, message: 'The turf war went badly. You took losses.' };
+  log(state, `${rival.name} pushed back hard on your turf grab.`, 'bad');
+  return { ok: false, message: `The turf war with ${rival.name} went badly. You took losses.` };
+}
+
+/** Ally the player's family with another named family in the same country — mutual, and reduces
+ * the chance either side ends up dragged into the other's future turf wars. */
+export function proposeCrimeAlliance(state: GameState, targetFamilyId: string): ActionResult {
+  const p = state.player;
+  const family = playerCrimeFamily(state);
+  if (!family) return { ok: false, message: 'You need to be in the family first.' };
+  const target = state.crimeFamilies.find((f) => f.id === targetFamilyId && f.countryId === p.countryId && !f.disbanded);
+  if (!target || target.id === family.id) return { ok: false, message: 'Invalid family.' };
+  if (family.alliedWith.includes(target.id)) return { ok: false, message: 'Already allied with them.' };
+  if (family.atWarWith.includes(target.id)) return { ok: false, message: 'At war with them — make peace first.' };
+  if (onCooldown(state, `crime_alliance_${targetFamilyId}`)) return { ok: false, message: 'Already reached out to them this year.' };
+  const rng = withRng(state);
+  setCooldown(state, `crime_alliance_${targetFamilyId}`);
+  const chance = clamp(0.3 + p.crimeRank * 0.08 + (p.skills[SK.bribery] ?? 0) * 0.003, 0.1, 0.75);
+  const accepted = rng.chance(chance);
+  if (accepted) {
+    family.alliedWith.push(target.id);
+    target.alliedWith.push(family.id);
+    commit(state, rng);
+    log(state, `🤝 ${family.name} formed an alliance with ${target.name}.`, 'bad');
+    return { ok: true, message: `${target.name} agrees to an alliance.` };
+  }
+  commit(state, rng);
+  return { ok: false, message: `${target.name} isn't interested — for now.` };
+}
+
+/** Declare a real turf war on a named rival family — distinct from contestTerritory's automatic
+ * skirmish against whoever's weakest; this deliberately opens hostilities that then play out over
+ * the following years' ticks in tickCrimeFamilies, win or lose. */
+export function declareCrimeWar(state: GameState, targetFamilyId: string): ActionResult {
+  const p = state.player;
+  const family = playerCrimeFamily(state);
+  if (!family) return { ok: false, message: 'You need to be in the family first.' };
+  if (p.inJailYears > 0) return { ok: false, message: 'Not while incarcerated.' };
+  const target = state.crimeFamilies.find((f) => f.id === targetFamilyId && f.countryId === p.countryId && !f.disbanded);
+  if (!target || target.id === family.id) return { ok: false, message: 'Invalid target.' };
+  if (family.alliedWith.includes(target.id)) return { ok: false, message: "Can't attack an ally." };
+  if (family.atWarWith.includes(target.id)) return { ok: false, message: 'Already at war with them.' };
+  const rng = withRng(state);
+  family.atWarWith.push(target.id);
+  target.atWarWith.push(family.id);
+  family.heat = clamp100(family.heat + 10);
+  p.investigationHeat = clamp100(p.investigationHeat + 8);
+  commit(state, rng);
+  log(state, `⚔️ ${family.name} declares war on ${target.name}.`, 'bad');
+  return { ok: true, message: `War declared on ${target.name}. It'll play out over the coming years.` };
 }
 
 export function enterWitnessProtection(state: GameState): ActionResult {
