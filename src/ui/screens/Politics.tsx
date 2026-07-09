@@ -1,10 +1,11 @@
 /** Politics: party membership, offices/campaigns, legislation, government. */
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { useGame } from '../../store/gameStore';
 import {
   appointMinister,
   availableOffices,
   cabinetCandidates,
+  callNoConfidenceVote,
   campaignAction,
   deliverBudgetSpeech,
   dismissMinister,
@@ -31,6 +32,9 @@ import { LAW_CATEGORIES } from '../../data/laws';
 import { BarList, Badge, Button, Card, Field, Modal, Pill, PillRow, SectionHeader, StatBar, TextInput } from '../components';
 import { money, moneyFull, pct } from '../format';
 import { CABINET_PORTFOLIOS, MANIFESTO_PROMISES, type CabinetPortfolio, type Country, type ManifestoPromise } from '../../sim/types';
+
+const PoliticalChamberScene = lazy(() => import('../three/PoliticalChamberScene').then((m) => ({ default: m.PoliticalChamberScene })));
+const ChamberFallback = <div className="w-full h-56 rounded-2xl bg-slate-100 dark:bg-ink-800 animate-pulse" />;
 
 const PROMISE_LABELS: Record<ManifestoPromise, string> = {
   tax_cuts: 'Cut Taxes',
@@ -60,6 +64,23 @@ export function Politics() {
         <Pill label="Party" active={tab === 'party'} onClick={() => setTab('party')} />
         {isLeader && <Pill label="Cabinet" active={tab === 'cabinet'} onClick={() => setTab('cabinet')} />}
       </PillRow>
+
+      {home.totalSeats > 0 && (
+        <div className="mt-4">
+          <Suspense fallback={ChamberFallback}>
+            <PoliticalChamberScene
+              parties={home.parties.map((party) => ({ id: party.id, name: party.name, seats: party.seats, ideology: party.ideology, isPlayerParty: party.id === p.partyId }))}
+              totalSeats={home.totalSeats}
+              isLeader={isLeader}
+              portfolios={CABINET_PORTFOLIOS.map((portfolio) => ({
+                name: portfolio,
+                filled: !!home.cabinet[portfolio],
+                byPlayer: home.cabinet[portfolio] === 'player',
+              }))}
+            />
+          </Suspense>
+        </div>
+      )}
 
       {tab === 'status' && (
         <div className="mt-4 space-y-4">
@@ -413,6 +434,25 @@ function PartyTab({ party }: { party: { id: string; name: string; ideology: numb
               </div>
             </>
           )}
+        </Card>
+      )}
+
+      {party && home.system === 'parliamentary' && home.leaderId && home.leaderId !== 'player' && (
+        <Card className="p-5">
+          <div className="font-bold mb-1">No-Confidence Motion</div>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
+            Force a vote to topple the sitting government (needs 15%+ seat share and 25 political capital). A big
+            enough bloc can walk straight into power if it succeeds — otherwise a caretaker takes over and a snap
+            election follows.
+          </p>
+          <Button
+            size="sm"
+            variant="danger"
+            disabled={!party || party.seats / home.totalSeats < 0.15 || p.politicalCapital < 25}
+            onClick={() => run(callNoConfidenceVote)}
+          >
+            Call Vote (25 PC)
+          </Button>
         </Card>
       )}
 

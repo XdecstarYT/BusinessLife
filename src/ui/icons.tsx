@@ -33,6 +33,9 @@ export const IconPolitics = (p: P) => (
 export const IconWorld = (p: P) => (
   <svg {...base(p)}><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c2.5 3 2.5 15 0 18M12 3c-2.5 3-2.5 15 0 18" /></svg>
 );
+export const IconExplore = (p: P) => (
+  <svg {...base(p)}><circle cx="12" cy="5" r="2" /><path d="M12 7v5l-3 7M12 12l3 7M9 10l-3 2M15 10l3 2" /></svg>
+);
 export const IconNews = (p: P) => (
   <svg {...base(p)}><path d="M4 5h13a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a2 2 0 0 1-2-2V5ZM18 8h2a1 1 0 0 1 1 1v9a2 2 0 0 1-2 2M7 8h7M7 12h7M7 16h5" /></svg>
 );
@@ -68,6 +71,9 @@ export const IconTrophy = (p: P) => (
 );
 export const IconClose = (p: P) => (
   <svg {...base(p)}><path d="M6 6l12 12M18 6 6 18" /></svg>
+);
+export const IconCasino = (p: P) => (
+  <svg {...base(p)}><rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="8" cy="8" r="1.2" fill="currentColor" /><circle cx="16" cy="8" r="1.2" fill="currentColor" /><circle cx="12" cy="12" r="1.2" fill="currentColor" /><circle cx="8" cy="16" r="1.2" fill="currentColor" /><circle cx="16" cy="16" r="1.2" fill="currentColor" /></svg>
 );
 export const IconBrain = (p: P) => (
   <svg {...base(p)}><path d="M9 3a3 3 0 0 0-3 3 3 3 0 0 0-1 5 3 3 0 0 0 2 5 3 3 0 0 0 5 1V4a2 2 0 0 0-3-1ZM15 3a3 3 0 0 1 3 3 3 3 0 0 1 1 5 3 3 0 0 1-2 5 3 3 0 0 1-5 1" /></svg>

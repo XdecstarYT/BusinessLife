@@ -3,7 +3,7 @@
  * cities, parties, politicians, executives and publicly listed companies,
  * then creates the 18-year-old player character inside it.
  */
-import type { City, Country, CountryState, Difficulty, GameState, Gender, NPC, NPCRole, Party, Player } from './types';
+import type { City, Country, CountryState, CrimeFamily, Difficulty, GameState, Gender, NPC, NPCRole, Party, Player } from './types';
 import { RNG, hashSeed } from './rng';
 import { COUNTRY_SEEDS } from '../data/countries';
 import { initEconomy } from './economy';
@@ -12,6 +12,8 @@ import { INDUSTRIES } from '../data/industries';
 import { createCompany, nextCompanyId } from './business';
 import { doIPO } from './market';
 import { SKILLS } from '../data/skills';
+import { randomMindTraits } from './npcMind';
+import { generateCrimeFamilies } from './crime';
 
 let npcCounter = 0;
 function makeNPC(rng: RNG, countryId: string, role: NPCRole, overrides: Partial<NPC> = {}): NPC {
@@ -41,6 +43,7 @@ function makeNPC(rng: RNG, countryId: string, role: NPCRole, overrides: Partial<
       'protect their family legacy', 'be remembered', 'accumulate power', 'retire early to an island',
     ]),
     memory: [],
+    ...randomMindTraits(rng),
     ...overrides,
   };
 }
@@ -96,6 +99,7 @@ export function generateWorld(config: NewGameConfig): GameState {
 
   const npcs: Record<string, NPC> = {};
   const countries: Country[] = [];
+  const crimeFamilies: CrimeFamily[] = [];
 
   for (const seed of COUNTRY_SEEDS) {
     const totalSeats = seed.system === 'dictatorship' || seed.system === 'monarchy' ? 0 : rng.pick([120, 150, 200, 300]);
@@ -214,8 +218,16 @@ export function generateWorld(config: NewGameConfig): GameState {
       cyberDefense: rng.range(25, 55),
       oppositionLeaderId: null,
       globalGamesYear: null,
+      militaryReadiness: Math.max(0, Math.min(100, seed.militaryPower * 0.7 + rng.range(-5, 5))),
+      warExhaustion: 0,
+      warCasualtiesTotal: 0,
+      lastNoConfidenceYear: null,
     };
     countries.push(country);
+
+    const { families, npcs: crimeNpcs } = generateCrimeFamilies(rng, country, (role) => makeNPC(rng, seed.id, role));
+    crimeFamilies.push(...families);
+    for (const n of crimeNpcs) npcs[n.id] = n;
   }
 
   // Diplomatic relations
@@ -257,6 +269,16 @@ export function generateWorld(config: NewGameConfig): GameState {
     worldHistory: [],
     cryptoPrice: rng.range(800, 3_000),
     cryptoHistory: [],
+    products: {},
+    productTech: [],
+    storefront: { name: `${config.playerName.split(' ').pop()} Studio`, theme: 'aurora', featuredProductId: null },
+    componentShortage: null,
+    customParts: {},
+    culturalProgressivism: rng.int(40, 60),
+    shockHistory: {},
+    industryEraMultiplier: {},
+    crimeFamilies,
+    casinoJackpots: {},
   };
 
   // Public + private NPC companies per country (more in the player's home).
@@ -356,6 +378,8 @@ export function generateWorld(config: NewGameConfig): GameState {
     advisors: [],
     campaign: null,
     lastElectionResult: null,
+    casinoTotalWagered: 0,
+    casinoBiggestWin: 0,
     hasPrenup: false,
     lobbyingFirmHired: false,
     marginDebt: 0,
@@ -376,6 +400,18 @@ export function generateWorld(config: NewGameConfig): GameState {
     retired: false,
     pensionIncome: 0,
     memoir: null,
+    lastFiredYear: null,
+    freelanceReputation: 30,
+    freelanceGigsCompleted: 0,
+    unemployedYears: 0,
+    socialFollowers: 0,
+    cancelledUntilYear: null,
+    lastSocialPostYear: null,
+    actionCooldowns: {},
+    yearsServedThisSentence: 0,
+    stress: rng.range(15, 35),
+    burnoutUntilYear: null,
+    investigationHeat: 0,
   };
   // Parents
   for (const kind of ['parent', 'parent'] as const) {

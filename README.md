@@ -11,6 +11,58 @@ plain JSON you can export and re-import.
 
 ## Highlights
 
+- **✨ The Studio: a full Product Design & Commerce pillar** — walk into an innovation lab (a live 3D
+  environment with a reflective glass floor, holographic rings, ambient particles and a robotic assembly
+  arm) and take products from a spark of an idea to global launch. Design in a real-time parametric 3D
+  viewport (form sliders, body/accent colors, four finishes, four lighting moods — drag to rotate,
+  pinch to zoom) where every category renders as a **photoreal-style product model** — phones with live
+  home screens and camera islands, laptops with drawn keyboards, watches with ticking dials, headphones,
+  cars with tinted greenhouses and wheel arches, labeled bottles, sneakers, handbags and more — lit by
+  image-based reflections, ACES tone mapping and physically-based materials (clearcoat paint, real glass
+  transmission); choose from **20 product categories** (smartphones to automotive to jewelry) and
+  **16 engineering materials** (aluminum to gold to recycled composites) that genuinely drive cost,
+  durability, luxury, weight and sustainability; brief the in-game **AI design assistant**
+  ("luxury futuristic coffee machine…") to draft a full editable concept; run a **12-node product R&D
+  tree** (advanced alloys, AI integration, robotic assembly, self-healing coatings…); prototype, lab-test
+  against nine criteria, iterate, and **patent** your inventions; pick one of **8 manufacturing
+  strategies** (handmade to mass production) with real capacity/defect/perception tradeoffs; design
+  packaging, build product brand power, set pricing/marketing/channels; stage a cinematic **launch
+  event** (livestream to flagship theater) whose hype shapes demand; then compete in a yearly market sim
+  where ratings, reviews, returns and lifecycle decay all feed an **analytics dashboard** — and profits
+  flow straight into the owning company. Ship successor **generations**, retire icons to the portfolio,
+  and curate your own themed **storefront**. **28 total categories** now, including drones, cameras,
+  TVs, bicycles, eyewear, musical instruments, kitchenware and power tools — each with its own bespoke
+  3D model (quadcopter rotors and gimbal, an SLR with a real lens barrel, a diamond bike frame with
+  spoked wheels, an electric guitar with strings and pickups…).
+- **Every piece of every product is individually customizable** — a dedicated Part Customizer lets you
+  give any named part (a phone's camera island, a car's rims, a watch's strap, a guitar's pickguard) its
+  own color, material and finish independently of the rest of the product, with one-tap curated
+  **colorways** for a cohesive look in a single click, and a reset to fall back to the base design.
+- **Component sourcing & your own engineered parts** — every product has a real bill of materials
+  (processor, battery, sensors, motor, optics…); source each slot at a Budget/Standard/Premium tier with
+  honest cost/quality/defect tradeoffs, or open the **Parts** workshop to engineer your own component
+  from scratch — name it whatever you like ("Bat62", "Core9"), fund a research investment that sets its
+  engineering grade, install it in your own products, revise it in later versions, and list it for sale
+  on the **global component market** where other manufacturers license it for real recurring revenue.
+  A random global component shortage occasionally squeezes an entire category's costs.
+- **Market research & audience targeting** — run focus groups with five distinct customer segments
+  (Value Seekers, Families, Early Adopters, Eco-Conscious, Luxury Buyers), see a revealed fit score for
+  each, and aim your marketing at the segment that loves the product to shift real yearly demand.
+- **Warranty, consumer trust & recalls** — choose 0–3 years of warranty coverage that costs a slice of
+  unit economics but builds trust and cuts returns; field defects surface on their own over a product's
+  life, and you can ride one out or issue a voluntary recall that costs real money but rebuilds trust
+  before lawsuits and bad headlines pile up.
+- **🧭 Explore: a walkable 3D hub layered over the real simulation** — leave the menus and walk your
+  city block in third-person (drag a virtual joystick, or WASD/arrows on desktop) around a plaza with
+  six buildings that are computed fresh from live game state every time you visit, not decoration: your
+  HQ is a boarded vacant lot until you found a company, then a lit tower that gains a construction crane
+  once it's thriving — or goes dark the moment it's bankrupt; Parliament only raises a flag if you hold
+  office, sized by your real approval; the Exchange's ticker ring glows green or red with the actual
+  market move this year; your Studio storefront lights up once a product goes public; your home's
+  windows glow warmer the happier and healthier you are; the Bank scales with your real net worth. A
+  continuous day/night cycle sweeps the sky, streetlamps switch on at dusk, trees shift with the season,
+  and a few ambient pedestrians and cars loop the plaza for atmosphere. Walk up to any building and an
+  Enter prompt hands off straight to that system's real screen.
 - **Daily / Weekly / Yearly time control** — advance a single day, a week, or a full year. Day/week
   ticks are lightweight (a small chance of a flavor moment, tiny stat drift) so you can fast-forward
   without interruption; the full economy/company/politics simulation still resolves exactly once a
@@ -26,11 +78,124 @@ plain JSON you can export and re-import.
   surprises, P/E ratios, dividends, short interest and institutional ownership. Buy, sell, and short-sell.
 - **Macro-economy** — business-cycle regimes (boom to depression), a Taylor-rule central bank, inflation,
   unemployment, housing and equity indices, FX, government debt and shared commodity markets.
+- **Buildings age and decay for real** — every property you own gets a construction year and a
+  condition and energy-efficiency rating that actually matter: pick minimal, standard or premium
+  maintenance spend and watch condition drift accordingly, with premium upkeep able to slowly repair a
+  building over time. Neglect a property and it visibly deteriorates, its resale value slides, tenants
+  pay less rent, and once condition is badly degraded it risks a real structural-failure incident each
+  year — insurance (now with a real ongoing premium) softens the loss, going without risks losing it
+  outright. Renovate a condemned building back to like-new condition and a real value/efficiency jump,
+  including its own achievement for a proper rescue.
+- **Your career is a real workplace, not a stat screen** — apply for a job and clear an actual
+  interview gate (driven by smarts, skills, charisma, reputation, and a reference-check penalty if
+  you were recently fired), optionally negotiating a starting salary at the risk of losing the offer.
+  Every job comes with generated coworkers — a manager and one or two peers, each with a personality
+  (friendly, mentoring, competitive, political, toxic) that drives ambient stress, rapport drift, and a
+  chance of a real toxic incident each year. Network with a coworker to build rapport, or report one to
+  HR (a real, sometimes-backfiring investigation — unjustified reports can cost you rapport and
+  performance). Climb a six-rank ladder (intern to executive) by pushing for promotion once you've put
+  in enough time and performance at your current rank, with salary rescaled by rank, not a repeatedly
+  re-prefixed job title. Pick a work style — standard, overtime (more pay, more stress), or flexible
+  (less pay, less stress) — and watch stress and reliability feed back into performance and even your
+  happiness and health once they run too high. Random workplace events (restructuring, a new manager,
+  budget cuts, relocation, automation, an accident, a scandal) land some years with real mechanical
+  consequences, not just flavor text. Lose your job and it leaves a mark — future interviews get
+  harder for a few years, and drawn-out unemployment slowly erodes your skills despite a small,
+  decaying safety-net benefit. Alongside the corporate ladder runs a parallel **freelance & gig
+  economy** — design work, consulting, coding, writing, rideshare, influencer deals, trades — each gig
+  paying out (or falling through) based on a skill check and your freelance reputation, which compounds
+  with good reviews and stings with bad ones.
+- **A society that thinks, shocks, talks and evolves** — every relationship NPC (coworkers, mentor,
+  rival, spouse, children) carries a real personality (empathy, aggression, discipline, loyalty,
+  curiosity, social confidence) and a day-to-day mind state (mood, stress, financial pressure) that
+  drifts every year and drives how they actually react to you — a mentor's lessons land harder when
+  they're not burned out, a rival's grudge escalates or cools based on their traits and your history
+  together, not a coin flip. A capped memory log on every notable NPC records what you actually did to
+  them (reported to HR, called a truce, took them on as a protégé) instead of the game forgetting the
+  instant the dialog closes. The world economy can now throw four new global shocks — semiconductor
+  shortages, food crises, shipping disruptions, currency crashes — on top of the original six, each with
+  real ripple effects into unemployment, unrest, government approval, migration and city crime, not just
+  the stock ticker; recent history genuinely dampens the odds of the same shock repeating right away (a
+  real "we just went through this" fatigue, and a nod to post-crisis regulation after a banking
+  collapse). Build a following on social media — five post styles trading reach for backlash risk, real
+  virality and "cancelled" mechanics, and misinformation storylines that can spiral or blow over
+  depending on how you handle them. And industries themselves rise and fall across decades: tech-driven
+  sectors trend up, heavily-regulated low-tech ones trend down, visible as a real 📈/📉 signal when you're
+  choosing where to found your next company — while your own children and grandchildren are born into
+  whatever cultural era the world has drifted into by then, tech booms and crises alike leaving a mark on
+  the next generation's politics. (Honest scope: this isn't a full agent-based simulation running rich
+  decision trees for every one of the world's 400+ background NPCs — that stays lightweight, as it always
+  was, for the sake of a game that runs smoothly on a phone. The deep mind model is reserved for the NPCs
+  you actually have a relationship with, where it's felt.)
 - **Deep politics** — join or found a party, campaign for eight tiers of office (councillor to head of
   state) with rallies/ads/fundraising/consultants/polling, negotiate coalitions, appoint a cabinet, and
   pass or repeal **115 laws** whose effects continuously reshape the economy. As head of state, conduct
   real foreign policy: declare war, sign peace treaties, impose or lift sanctions, send foreign aid, and
   sign trade agreements — on top of the elections, coups, sanctions and wars that unfold on their own.
+- **War has real weight, win or lose** — militaries now have a Readiness score, separate from raw
+  military power, that drifts toward whatever your Defense budget share can actually sustain (neglect
+  it and it erodes; fund it and it builds). Once a war starts, an outmatched readiness gap means faster
+  casualties and a harder-fought peace; war exhaustion accumulates the longer a conflict grinds on,
+  dragging down approval and pushing both sides toward the table, then recovers once you're at peace
+  with everyone. A signed armistice costs a real reconstruction toll to infrastructure. Invest directly
+  in military readiness from the Treasury & National Security panel.
+- **Mind, school and the law now bite back** — every degree grants smarts *and* a real skill in the
+  field you studied (a CS degree builds programming, a law degree builds law), scholarships knock down
+  tuition for sharper students, and dropping out costs happiness and reputation in proportion to how far
+  you'd gotten. A general-life Stress meter (distinct from job-specific stress) responds to burnout,
+  money trouble and a rocky marriage, and can tip into a real multi-year Burnout debuff past 80 — therapy
+  and rest bring it back down. Crime now carries a lasting Investigation Heat meter that climbs
+  independently of any single job's own risk roll, so a string of "successful" crimes can still catch up
+  with you in a later arrest; time served now gates a genuine Request Parole option. (Honest scope: no
+  literal school timetable, teacher NPCs, exams or detention system, no six-way Stress/Anxiety/Depression/
+  Confidence/Motivation/Burnout meter bank — just Stress plus a binary Burnout state — and no generative
+  AI interrogation or courtroom simulation. What's real: subject-driven degree payoffs, a player-wide
+  mental-health mechanic that feeds job performance, and an arrest/parole pipeline with teeth.)
+- **3D is now a main way you play, not a side visualization** — the walkable City hub gets its own
+  primary tab, and has grown from 6 buildings to 10: a Career office (push for a promotion right there),
+  a Park (family, and a free moment to meditate), the Docks (foreign relations) and a Newsstand (skims
+  the day's real headline) join HQ, Bank, Parliament, Exchange, Studio and Home — several offering a
+  quick action you can take without leaving the plaza. Politics and the stock market each get a
+  dedicated 3D scene of their own: a legislative Chamber with a real hemicycle of seat blocks sized and
+  colored by actual party seat counts and ideology (your own party outlined gold, cabinet podiums lit
+  when filled), and an Exchange Trading Floor with a big board tracking the real national index and
+  ticker booths for the day's biggest real movers. Every 3D scene now renders through a filmic
+  (ACES) tone-mapped pipeline with a procedural studio environment map for real reflections on
+  metal and glass, plus soft shadows and a bloom pass on desktop so lit windows, screens and seals
+  actually glow instead of just being a flat bright color (phones get the tone-mapped, reflection-lit
+  look without the two most expensive pieces, to protect frame rate). The geometry itself got a real
+  pass too — trees are now clustered, rounded canopies instead of a single traffic-cone shape, cars
+  have actual wheels/glass/head-and-taillights instead of two stacked boxes, pedestrians and traders
+  have proportioned legs/torso/arms/hair instead of a capsule-and-sphere blob, and buildings pick up
+  real architectural detail (entrance steps, cornices, porches, rooftop clutter, dock pilings and
+  bollards) instead of reading as a bare box, and the HQ Tour scene got the same windowed-facade,
+  courtyard and proportioned-figure treatment as the City hub. The render pipeline also picked up
+  real ambient occlusion (contact shadows where geometry meets geometry) and proper multisampled
+  antialiasing on the composer path, so desktop's shadow/bloom pass no longer trades away the edge
+  smoothing plain rendering had. There's also a real (optional) pipeline for dropping in actual
+  `.glb`/`.gltf` model files — see `public/models/README.md` — that falls back to the procedural
+  geometry above whenever a model isn't present, which is the case everywhere today. (Honest scope:
+  still a stylized, procedurally-built diorama, not a full open-world engine with physics or
+  pathfinding — but every shape, color and light on screen is driven by real simulation state, not
+  decoration.)
+- **The world and your rivals react back** — a real, player-vs-named-rival price war: undercut a
+  specific competitor's price and they may cut right back at you, shifting real market share both ways.
+  Everyone in your inner circle (spouse, mentor, rival) now shows a real mood, disposition and their most
+  recent memory of you, not just a name and a number. National news now covers your own life when it's
+  genuinely newsworthy — a conviction, a release, or burning out under the pressure — alongside the
+  economy and world events it already tracked.
+- **Power can be taken, not just won — and it can be lost overnight** — in a parliamentary system,
+  force a formal no-confidence motion against the sitting government with real seat weight and
+  political capital (a big enough bloc walks straight into power); the same fate can just as easily
+  befall you as leader if approval collapses, unrest spikes, and your own party can't protect you.
+  Anyone with real political standing now carries genuine scandal risk tied to how dirty their life
+  actually is — notoriety, convictions, laundered money, law-enforcement heat — that a retained PR
+  agency measurably softens, and a severe uncontained scandal can force a resignation outright.
+- **Patents and partnerships now have real teeth** — sue a named competitor for patent infringement
+  and either collect a real settlement or eat the legal costs and a brand hit for a suit that didn't
+  stick; pool capital with a named partner company in a multi-year joint venture for an ongoing
+  synergy boost and a payout at the end weighted by both companies' actual strength — a genuine bet,
+  not a guaranteed win.
 - **Family, dynasty & wills** — date, marry (with an optional prenup), divorce, have or adopt children who
   age up as real NPCs and eventually have grandchildren of their own, name a successor to inherit a company
   or a political heir to inherit your party and popularity, draft a will naming a primary heir for a bigger
@@ -131,7 +296,7 @@ plain JSON you can export and re-import.
   a political party, issue a public apology to shed notoriety, or take a career sabbatical.
 - **Meta progression** — a Legacy Score computed at game over from your wealth, dynasty, office and
   achievements (with a New Game+ bonus into your next life), a life timeline of every milestone you hit,
-  88+ achievements, a Year in Review recap after every year, random mid-game challenges with cash rewards,
+  102+ achievements, a Year in Review recap after every year, random mid-game challenges with cash rewards,
   a Casual/Standard/Iron Man difficulty choice, and four starting-economy scenarios (Modern, Boom, Recession,
   Crisis) to change the game you're playing from turn one.
 - **Dynamic news** synthesised from what actually happened that year, plus a personal life log and an
@@ -187,11 +352,16 @@ only moves when you tell it to, using the three buttons on the Life hub:
 - **Markets** — trade the stock exchange of your home nation with a live scrolling ticker of top movers;
   go long or short, trade on margin, collect and optionally reinvest dividends (DRIP), and set standing
   limit orders that fire on their own.
-- **Assets** — buy property (cash or mortgage, including penthouses) for rental income and appreciation,
-  renovate it, insure it, or move in yourself; take personal loans; buy government bonds; speculate long
-  or short on foreign currencies; take out life insurance for your family; and once you're rich enough,
-  buy into the billionaire lifestyle (private jets, yachts, islands, sports teams, racehorses, art) or
-  take a royalty stake in a celebrity's brand.
+- **Assets** — buy property (cash or mortgage) for rental income and appreciation, renovate it, insure it,
+  or move in yourself; take personal loans; buy government bonds; speculate long or short on foreign
+  currencies; take out life insurance for your family; and once you're rich enough, buy into the billionaire
+  lifestyle (private jets, yachts, islands, sports teams, racehorses, art) or take a royalty stake in a
+  celebrity's brand. Every property kind (apartment through private island) now lists a standard tier plus
+  one or two genuinely more expensive luxury tiers — a Billionaire's Compound runs 5x a base mansion — and
+  any listing or owned property can be viewed as a real, condition-aware 3D massing model (procedural, not a
+  literal architectural rendering — see public/models/README.md for why). Renovation now requires the
+  property to actually need it (condition below 88), closing a same-turn spam exploit that used to make
+  repeated renovation free money.
 - **Politics** — join/found a party, run for office with a manifesto of promises tracked through your term,
   campaign (rallies, ads, debates, press conferences, celebrity endorsements, consultants, polling),
   negotiate coalitions, appoint a cabinet if you lead the country, and legislate — or call a referendum to
@@ -207,11 +377,28 @@ only moves when you tell it to, using the three buttons on the Life hub:
   unrest), diplomacy actions, commodities, national debt/cyber-defense tools, and any active global event
   (pandemic, trade war, tech boom, oil crisis, banking collapse, or AI disruption).
 - **News / Stats** — the dynamic wire (now with editorials, investigative pieces, interviews and election
-  coverage) plus a World History chronicle tab, your net-worth curve, 88+ achievements, a life timeline,
+  coverage) plus a World History chronicle tab, your net-worth curve, 102+ achievements, a life timeline,
   and save tools.
 - **Underworld** — join a crime family and climb its ranks through heists and protection rackets, contest
   rival turf, launder illicit proceeds through a front business, bribe a judge or attempt a prison escape if
   caught, pay your way out and go straight, or enter witness protection to wipe your record.
+- **Crime Syndicate Engine** — every country now runs 2-3 real, named crime families with their own boss,
+  strength, turf and heat, simulated year over year whether or not you ever join one: they skirmish over
+  territory, form alliances, declare wars on each other, and get dismantled by law-enforcement crackdowns tied
+  to that country's judicial integrity. Join one and its turf war becomes yours to fight — propose an alliance
+  or declare war on a specific named rival family, and if your family gets crushed or wiped out you lose your
+  standing with it (this is a family-level strength/turf/heat state machine, not a simulation of individual
+  soldiers or a literal open-world crime map).
+- **Casino** — a real 3D casino floor (see the Casino tab, expandable to fullscreen for an immersive view — an
+  enclosed room with a patterned carpet, flanking columns, two hanging chandeliers, and a fully playable bet
+  panel even while fullscreen) with six named, distinct slot machines — each its own theme, stakes and
+  volatility, a reel-window symbol strip and coin tray, and a real progressive jackpot pool that grows every
+  spin and resets when someone finally hits it — plus blackjack, high-stakes poker with chip stacks on the
+  felt, a genuine European roulette wheel (37 pockets, a numbered felt betting layout, straight-number or
+  red/black/odd/even/high/low outside bets, real payouts), and a fair 50/50 heads-or-tails coin toss on a
+  spinning stand. Every game keeps a genuine house edge: skill narrows it (poker skill on the card tables)
+  but can never flip it into the player's favor, the same principle a real casino runs on. A VIP room
+  (Diamond Royale) unlocks once you're liquid enough.
 - **Lifestyle** — 20+ quick activities on the Life hub, from the gym and charity to book clubs, therapy,
   adopting a pet, art collecting, wine tasting, poker nights, blogging and learning a language.
 

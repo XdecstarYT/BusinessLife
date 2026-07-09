@@ -9,9 +9,14 @@ import { buyShares, marketCap, buyOnMargin, placeLimitOrder, cancelLimitOrder, t
 import { datingPool, propose, haveChild, nameSuccessor, namePoliticalHeir, namePrimaryHeir, adoptChild, dynastyScore } from '../src/sim/family';
 import * as F from '../src/sim/family';
 import { buyLuxuryAsset, sellLuxuryAsset, investInCelebrityBrand, divestCelebrityStake } from '../src/sim/lifestyle';
+import * as P from '../src/sim/products';
 import { publicOpinionBreakdown } from '../src/sim/politics';
+import { playerCrimeFamily } from '../src/sim/crime';
+import { spinSlotMachine, playTableGame, spinRoulette, playCoinFlip } from '../src/sim/casino';
+import { SLOT_MACHINES } from '../src/data/casino';
 import { INDUSTRIES } from '../src/data/industries';
 import { LAW_BY_ID } from '../src/data/laws';
+import { SK } from '../src/data/skills';
 
 // --- V6: scenario presets + difficulty + legacy bonus sanity check (no full sim) ---
 {
@@ -80,6 +85,27 @@ for (let y = 0; y < 82 && state.player.alive; y++) {
     }
     resolvePending();
 
+    // --- V16: career & work-life realism ---
+    if (y === 4 && !state.player.job) {
+      const openings = A.jobOpenings(state);
+      const qualifying = openings.find((o) => state.player.smarts >= o.requiredSmarts);
+      if (qualifying) A.takeJob(state, qualifying, true);
+      if (state.player.job) {
+        A.setWorkStyle(state, 'overtime');
+        const first = state.player.job.coworkers[0];
+        if (first) A.networkWithCoworker(state, first.id);
+      }
+    }
+    if (y === 7 && state.player.job) {
+      A.applyForPromotion(state);
+      const peer = state.player.job.coworkers.find((c) => c.role === 'peer');
+      if (peer) A.reportToHR(state, peer.id);
+      A.setWorkStyle(state, 'flexible');
+    }
+    if (y === 7) {
+      for (const gigId of ['coding', 'rideshare', 'design_work']) A.takeFreelanceGig(state, gigId);
+    }
+
     // Periodically buy a stock and run for office.
     if (y === 5) {
       const pub = Object.values(state.companies).find((c) => c.isPublic && c.status === 'active');
@@ -96,7 +122,19 @@ for (let y = 0; y < 82 && state.player.alive; y++) {
     if (y === 20) {
       const listings = A.propertyListings(state);
       A.buyProperty(state, listings[0], true);
+      // A second property, deliberately run on minimal upkeep, to exercise
+      // condition decay, structural risk and the renovation recovery path.
+      const neglected = listings.find((l) => l.kind !== 'land') ?? listings[1];
+      if (neglected) A.buyProperty(state, neglected, false);
     }
+    if (y === 22 && state.player.properties.length > 1) {
+      A.setMaintenanceLevel(state, state.player.properties[1].id, 'minimal');
+    }
+    // --- V19: education depth (enroll then drop out partway through) ---
+    if (y === 23 && !state.player.studying) A.enroll(state, 4);
+    if (y === 25 && state.player.studying) A.dropOutOfSchool(state);
+    // --- V19: mental health (lifestyle actions already tick p.stress; explicit therapy check) ---
+    if (y === 23) A.doActivity(state, 'therapy');
     if (y === 3 && !state.player.spouseId) {
       const candidates = datingPool(state);
       let tries = 0;
@@ -116,6 +154,22 @@ for (let y = 0; y < 82 && state.player.alive; y++) {
         (c) => c.status === 'active' && !c.playerOwned && c.countryId === state.player.countryId,
       );
       if (rival) A.spyOnCompany(state, rival.id);
+    }
+    if (y === 31 && state.player.companies.length) {
+      const myCo = state.companies[state.player.companies[0]];
+      const rival = myCo && Object.values(state.companies).find(
+        (c) => c.status === 'active' && !c.playerOwned && c.industryId === myCo.industryId,
+      );
+      if (myCo && rival) {
+        if (myCo.patents > 0) A.filePatentLawsuit(state, myCo.id, rival.id);
+        if (!myCo.jointVenturePartnerId) A.proposeJointVenture(state, myCo.id, rival.id, Math.min(myCo.cash * 0.3, 100_000));
+      }
+    }
+    if (y === 32) {
+      const home = state.countries.find((c) => c.id === state.player.countryId)!;
+      if (home.system === 'parliamentary' && home.leaderId && home.leaderId !== 'player' && state.player.partyId) {
+        A.callNoConfidenceVote(state);
+      }
     }
     if (y === 35) {
       const home = state.countries.find((c) => c.id === state.player.countryId)!;
@@ -164,8 +218,19 @@ for (let y = 0; y < 82 && state.player.alive; y++) {
       const target = Object.values(state.companies).find((c) => c.status === 'active' && !c.playerOwned && c.countryId === state.player.countryId);
       if (target) A.protectionRacket(state, target.id);
     }
+    if (y === 14 && state.player.crimeFamilyId) {
+      const mine = playerCrimeFamily(state);
+      const rival = mine && state.crimeFamilies.find((f) => f.countryId === state.player.countryId && f.id !== mine.id && !f.disbanded);
+      if (rival) A.proposeCrimeAlliance(state, rival.id);
+    }
+    if (y === 14 && state.player.crimeFamilyId) {
+      const mine = playerCrimeFamily(state);
+      const rival = mine && state.crimeFamilies.find((f) => f.countryId === state.player.countryId && f.id !== mine.id && !f.disbanded && !mine.alliedWith.includes(f.id));
+      if (rival) A.declareCrimeWar(state, rival.id);
+    }
     if (y === 15 && state.player.crimeFamilyId) A.goStraight(state);
     if (state.player.inJailYears > 0 && y % 2 === 0) A.bribeJudge(state);
+    if (state.player.inJailYears > 0 && y % 2 === 1) A.requestParole(state);
     // --- V4: relationships ---
     if (y === 16) F.seekMentor(state);
     if (y === 17) F.networking(state);
@@ -370,7 +435,13 @@ for (let y = 0; y < 82 && state.player.alive; y++) {
       A.buyCrypto(state, 10_000);
       A.depositSavings(state, 10_000);
       A.openTermDeposit(state, 5_000, 3);
-      A.playCasino(state, 'blackjack', 1_000);
+      playTableGame(state, 'blackjack', 1_000);
+      playTableGame(state, 'poker', 500);
+      spinSlotMachine(state, 'lucky_sevens', 100);
+      if (state.player.money + state.player.savingsBalance >= 2_000_000) spinSlotMachine(state, 'diamond_royale', 5_000);
+      spinRoulette(state, { kind: 'red' }, 200);
+      spinRoulette(state, { kind: 'straight', number: 17 }, 50);
+      playCoinFlip(state, 'heads', 100);
       if (state.player.money > 300_000) A.foundCharityFoundation(state, 'Smoke Test Foundation');
       A.writeMemoir(state, 'Smoke: A Life');
     }
@@ -384,6 +455,80 @@ for (let y = 0; y < 82 && state.player.alive; y++) {
       if (home.leaderId === 'player') A.bidToHostGlobalGames(state);
     }
     if (y === 50 && state.player.age >= 60 && !state.player.retired) A.retire(state);
+    // --- V12: the Studio (product design & commerce) ---
+    if (y === 24 && state.player.companies.length) {
+      const co = state.companies[state.player.companies[0]];
+      if (co) co.cash = Math.max(co.cash, 2_000_000); // fund the pipeline for the exercise
+      const created = P.createProduct(state, state.player.companies[0], 'smartphone', 'Smoke Phone');
+      if (created.ok && created.productId) {
+        const pid = created.productId;
+        P.generateConcept(state, pid, 'minimalist eco-friendly smartphone');
+        P.researchProductTech(state, 'green_materials');
+        P.setProductMaterials(state, pid, 'aluminum', 'glass');
+        P.updateProductForm(state, pid, { slimness: 0.8, finish: 'metallic' });
+        P.setProductPackaging(state, pid, 'eco');
+        // --- V13: per-part customization, colorways, components, research, warranty ---
+        P.applyColorway(state, pid, 'midnight');
+        P.setPartOverride(state, pid, 'camera', { color: '#e8b84a', materialId: 'titanium' });
+        P.setPartOverride(state, pid, 'buttons', { finish: 'gloss' });
+        P.setPartOverride(state, pid, 'screen', { color: '#8ab4ff' });
+        P.setPartOverride(state, pid, 'logo', { color: '#ffffff' });
+        P.clearPartOverride(state, pid, 'logo');
+        P.setComponentTier(state, pid, 'chip', 'premium');
+        P.setComponentTier(state, pid, 'battery', 'budget');
+        P.setComponentTier(state, pid, 'battery', 'premium');
+        P.setComponentTier(state, pid, 'display_panel', 'premium');
+        P.runFocusGroup(state, pid, 'early_adopters');
+        P.runFocusGroup(state, pid, 'value');
+        P.runFocusGroup(state, pid, 'luxury_buyers');
+        P.runFocusGroup(state, pid, 'eco');
+        P.runFocusGroup(state, pid, 'families');
+        P.setTargetSegment(state, pid, 'early_adopters');
+        P.setWarranty(state, pid, 2);
+        // --- V13: player-engineered components ---
+        const eng = P.engineerPart(state, state.player.companies[0], 'battery', 'Bat62', 300_000);
+        if (eng.ok && eng.productId) {
+          const battId = eng.productId;
+          P.revisePart(state, battId, 75_000);
+          P.setPartForSale(state, battId, true);
+          P.setComponentTier(state, pid, 'battery', battId);
+        }
+        P.buildPrototype(state, pid);
+        P.runProductTests(state, pid);
+        P.refineDesign(state, pid);
+        P.fileProductPatent(state, pid);
+        P.setProductPrice(state, pid, 750);
+        P.setProductMarketing(state, pid, 100_000);
+        P.setProductManufacturing(state, pid, 'regional');
+        P.startProduction(state, pid);
+        P.holdLaunchEvent(state, pid, 'convention_keynote');
+      }
+    }
+    if (y === 30) {
+      const launched = Object.values(state.products).find((pr) => pr.stage === 'launched');
+      if (launched) P.upgradeGeneration(state, launched.id);
+      P.setStorefront(state, { theme: 'noir' });
+    }
+    // --- V13: a second product in a new category + recall handling ---
+    if (y === 32 && state.player.companies.length) {
+      const co = state.companies[state.player.companies[0]];
+      if (co) co.cash = Math.max(co.cash, 2_000_000);
+      const created = P.createProduct(state, state.player.companies[0], 'drone', 'Smoke Drone');
+      if (created.ok && created.productId) {
+        const pid = created.productId;
+        P.generateConcept(state, pid, 'futuristic carbon racing drone');
+        P.setPartOverride(state, pid, 'rotors', { color: '#ff6a3d' });
+        P.setComponentTier(state, pid, 'motor', 'premium');
+        P.buildPrototype(state, pid);
+        P.runProductTests(state, pid);
+        P.startProduction(state, pid);
+        P.holdLaunchEvent(state, pid, 'livestream');
+      }
+    }
+    // Any festering defect gets a recall once the company can afford it.
+    for (const pr of Object.values(state.products)) {
+      if (pr.activeDefect) P.issueRecall(state, pr.id);
+    }
     // --- V6: continue as heir when a succession offer appears ---
     if (state.pendingSuccession && state.pendingSuccession.candidates.length) {
       state = continueAsHeir(state, state.pendingSuccession.candidates[0].npcId);
@@ -413,6 +558,20 @@ console.log('  generation:', state.generation);
 console.log('  daily flavor events fired (day/week ticks):', dailyFlavorCount);
 console.log('  calendarDay at end:', state.calendarDay);
 console.log('  crime rank:', state.player.crimeRank, 'in family:', !!state.player.crimeFamilyId);
+console.log(
+  '  crime families: active',
+  state.crimeFamilies.filter((f) => !f.disbanded).length,
+  '· disbanded',
+  state.crimeFamilies.filter((f) => f.disbanded).length,
+  '· at war',
+  state.crimeFamilies.filter((f) => f.atWarWith.length > 0).length,
+  '· allied',
+  state.crimeFamilies.filter((f) => f.alliedWith.length > 0).length,
+);
+console.log(
+  '  casino: wagered', Math.round(state.player.casinoTotalWagered), '· biggest win', Math.round(state.player.casinoBiggestWin),
+  '· jackpots tracked', Object.keys(state.casinoJackpots).length, 'of', SLOT_MACHINES.length,
+);
 console.log('  mentor:', state.player.mentorId ? state.npcs[state.player.mentorId]?.name ?? 'unknown' : 'none');
 console.log('  rival:', state.player.rivalId ? state.npcs[state.player.rivalId]?.name ?? 'unknown' : 'none');
 console.log('  bonds:', state.player.bonds.length, 'forex positions:', state.player.forexPositions.length, 'life insurance:', !!state.player.lifeInsurance);
@@ -445,12 +604,25 @@ console.log('  foundation:', state.player.foundation ? `${state.player.foundatio
 console.log('  retired:', state.player.retired, 'pension:', state.player.pensionIncome);
 console.log('  memoir:', state.player.memoir?.title ?? 'none / expired');
 console.log('  CEOs hired:', Object.values(state.companies).filter((c) => c.ceoName).length, 'moonshots active:', Object.values(state.companies).filter((c) => c.moonshot).length);
+const allProducts = Object.values(state.products);
+console.log('  products designed:', allProducts.length, '· launched:', allProducts.filter((p) => p.stage === 'launched').length);
+console.log('  product units sold:', allProducts.reduce((s, p) => s + p.unitsSoldTotal, 0).toLocaleString(), '· product profit:', Math.round(allProducts.reduce((s, p) => s + p.profitTotal, 0)).toLocaleString());
+console.log('  product tech unlocked:', state.productTech.join(', ') || 'none', '· storefront theme:', state.storefront.theme);
+const allParts = Object.values(state.customParts ?? {});
+console.log('  custom parts engineered:', allParts.length, '· units sold:', allParts.reduce((s, p) => s + p.unitsSoldTotal, 0).toLocaleString(), '· revenue:', Math.round(allParts.reduce((s, p) => s + p.revenueTotal, 0)).toLocaleString());
+console.log('  properties:', state.player.properties.map((pr) => `${pr.kind} cond=${Math.round(pr.condition)} eff=${Math.round(pr.energyEfficiency)} maint=${pr.maintenanceLevel} val=$${Math.round(pr.value).toLocaleString()}`).join(' | ') || 'none');
+console.log('  education:', state.player.education.map((e) => `${e.degree}/${e.field}`).join(', ') || 'none', '· management skill (graduation bonus):', Math.round(state.player.skills[SK.management] ?? 0));
+console.log('  stress:', Math.round(state.player.stress), '· burnout until:', state.player.burnoutUntilYear ?? 'n/a', '· investigation heat:', Math.round(state.player.investigationHeat), '· years served this sentence:', state.player.yearsServedThisSentence);
+const jvActive = Object.values(state.companies).filter((c) => c.jointVenturePartnerId).length;
+console.log('  joint ventures active:', jvActive, '· total lawsuits across all companies:', Object.values(state.companies).reduce((s, c) => s + c.lawsuits, 0));
 console.log('  errors:', errors);
 
 // Invariant checks
 const bad: string[] = [];
 if (Number.isNaN(nw)) bad.push('net worth is NaN');
 if (Number.isNaN(state.player.money)) bad.push('money is NaN');
+if (Number.isNaN(state.player.stress) || state.player.stress < 0 || state.player.stress > 100) bad.push(`stress out of range: ${state.player.stress}`);
+if (Number.isNaN(state.player.investigationHeat) || state.player.investigationHeat < 0 || state.player.investigationHeat > 100) bad.push(`investigationHeat out of range: ${state.player.investigationHeat}`);
 if (Number.isNaN(state.calendarDay) || state.calendarDay < 0 || state.calendarDay > 364) bad.push(`calendarDay out of range: ${state.calendarDay}`);
 for (const c of state.countries) {
   if (Number.isNaN(c.economy.gdp)) bad.push(`${c.name} gdp NaN`);
@@ -458,6 +630,11 @@ for (const c of state.countries) {
 }
 for (const c of Object.values(state.companies)) {
   if (Number.isNaN(c.revenue) || Number.isNaN(c.sharePrice)) bad.push(`company ${c.name} NaN`);
+}
+for (const pr of state.player.properties) {
+  if (Number.isNaN(pr.value) || Number.isNaN(pr.condition) || Number.isNaN(pr.energyEfficiency)) bad.push(`property ${pr.name} NaN`);
+  if (pr.condition < 0 || pr.condition > 100) bad.push(`property ${pr.name} condition out of range: ${pr.condition}`);
+  if (pr.energyEfficiency < 0 || pr.energyEfficiency > 100) bad.push(`property ${pr.name} efficiency out of range: ${pr.energyEfficiency}`);
 }
 if (bad.length) {
   console.error('\nINVARIANT FAILURES:', bad.slice(0, 10));

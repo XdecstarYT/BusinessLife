@@ -8,6 +8,7 @@ import { clamp, clamp100 } from './types';
 import { EVENT_TEMPLATES } from '../data/events';
 import { INDUSTRY_BY_ID } from '../data/industries';
 import { companyValuation } from './business';
+import { titleForRank } from '../data/careers';
 import type { RNG } from './rng';
 
 function conditionsMet(t: EventTemplate, state: GameState): boolean {
@@ -62,6 +63,8 @@ function conditionsMet(t: EventTemplate, state: GameState): boolean {
   if (c.hasMentor !== undefined && (p.mentorId !== null) !== c.hasMentor) return false;
   if (c.hasRival !== undefined && (p.rivalId !== null) !== c.hasRival) return false;
   if (c.hasProperty !== undefined && (p.properties.length > 0) !== c.hasProperty) return false;
+  if (c.minFollowers !== undefined && p.socialFollowers < c.minFollowers) return false;
+  if (c.cancelled !== undefined && (p.cancelledUntilYear !== null && p.cancelledUntilYear >= state.year) !== c.cancelled) return false;
   return true;
 }
 
@@ -176,7 +179,7 @@ export function applyEffects(state: GameState, fx: EffectSpec, event: FiredEvent
     logs.push(`You were sentenced to ${fx.jailYears} year${fx.jailYears > 1 ? 's' : ''} in prison.`);
   }
   if (fx.loseJob && p.job) {
-    logs.push(`You left your job as ${p.job.title}.`);
+    logs.push(`You left your job as ${titleForRank(p.job.title, p.job.rank)}.`);
     p.job = null;
   }
   if (fx.campaignMomentum && p.campaign) {
@@ -187,6 +190,8 @@ export function applyEffects(state: GameState, fx: EffectSpec, event: FiredEvent
     const country = state.countries.find((k) => k.id === p.countryId)!;
     country.approvalOfGovernment = clamp100(country.approvalOfGovernment + fx.approvalOfGovernment);
   }
+  if (fx.socialFollowersPct) p.socialFollowers = Math.max(0, Math.round(p.socialFollowers * (1 + fx.socialFollowersPct)));
+  if (fx.cancelledYears) p.cancelledUntilYear = state.year + fx.cancelledYears;
   const co = event?.subjectCompanyId ? state.companies[event.subjectCompanyId] : null;
   if (co) {
     if (fx.companyCash) co.cash += fx.companyCash;

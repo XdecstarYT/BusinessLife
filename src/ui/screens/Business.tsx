@@ -11,6 +11,7 @@ import {
   CULTURE_INFO,
   diversifySupplyChain,
   fileTrademark,
+  filePatentLawsuit,
   fireCEO,
   fireExecutive,
   franchiseCompany,
@@ -27,6 +28,7 @@ import {
   protectionRacket,
   proactiveRecall,
   proposeBoardResolution,
+  proposeJointVenture,
   qualityAudit,
   raceForInnovation,
   renameCompany,
@@ -44,6 +46,7 @@ import {
   spyOnCompany,
   startCompany,
   startMoonshot,
+  startPriceWar,
   takeCompanyPublic,
   toggleCompanyInsurance,
   upgradeHQ,
@@ -74,6 +77,7 @@ export function Business() {
   const [selected, setSelected] = useState<string | null>(null);
   const [view, setView] = useState<'mine' | 'rivals'>('mine');
   const [takeoverTarget, setTakeoverTarget] = useState<string | null>(null);
+  const [jvTarget, setJvTarget] = useState<{ mineId: string; partnerId: string } | null>(null);
   if (!state) return null;
   const p = state.player;
   const companies = p.companies.map((id) => state.companies[id]).filter((c): c is Company => !!c && c.status === 'active');
@@ -98,18 +102,36 @@ export function Business() {
           </p>
           {rivals.map((c) => {
             const ind = INDUSTRY_BY_ID[c.industryId];
+            const myRival = companies.find((mine) => mine.industryId === c.industryId);
             return (
               <Card key={c.id} className="p-4">
                 <div className="flex justify-between items-start mb-2">
                   <div className="min-w-0 pr-2">
                     <div className="font-bold truncate" title={c.name}>{c.name}</div>
-                    <div className="text-xs text-slate-500 dark:text-slate-400 truncate">{ind?.name} · cap {money(marketCap(c))}</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                      {ind?.name} · cap {money(marketCap(c))} · price {c.priceLevel < 0.9 ? 'discount' : c.priceLevel > 1.1 ? 'premium' : 'mid-market'} · {Math.round(c.marketShare * 100)}% share
+                    </div>
                   </div>
                   {c.isPublic ? <Badge tone="brand">Public</Badge> : <Badge>Private</Badge>}
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <Button size="sm" variant="soft" onClick={() => run(spyOnCompany, c.id)}>🕵️ Espionage</Button>
                   <Button size="sm" disabled={!c.isPublic} onClick={() => setTakeoverTarget(c.id)}>🏴 Takeover</Button>
+                  {myRival && (
+                    <Button size="sm" variant="soft" className="col-span-2" onClick={() => run(startPriceWar, myRival.id, c.id)}>
+                      ⚔️ Price War (with {myRival.name})
+                    </Button>
+                  )}
+                  {myRival && myRival.patents > 0 && (
+                    <Button size="sm" variant="soft" className="col-span-2" onClick={() => run(filePatentLawsuit, myRival.id, c.id)}>
+                      ⚖️ Sue for Patent Infringement (with {myRival.name})
+                    </Button>
+                  )}
+                  {myRival && !myRival.jointVenturePartnerId && (
+                    <Button size="sm" variant="soft" className="col-span-2" onClick={() => setJvTarget({ mineId: myRival.id, partnerId: c.id })}>
+                      🤝 Propose Joint Venture (with {myRival.name})
+                    </Button>
+                  )}
                 </div>
                 {!c.isPublic && c.revenue <= 3_000_000 && (
                   <Button size="sm" variant="soft" className="w-full mt-2" onClick={() => run(investInStartup, c.id, 50_000)}>
@@ -133,6 +155,7 @@ export function Business() {
       <FoundModal open={founding} onClose={() => setFounding(false)} />
       {selected && <ManageModal companyId={selected} onClose={() => setSelected(null)} />}
       {takeoverTarget && <TakeoverModal companyId={takeoverTarget} onClose={() => setTakeoverTarget(null)} />}
+      {jvTarget && <JointVentureModal mineId={jvTarget.mineId} partnerId={jvTarget.partnerId} onClose={() => setJvTarget(null)} />}
     </div>
   );
 }
@@ -247,21 +270,28 @@ function FoundModal({ open, onClose }: { open: boolean; onClose: () => void }) {
           </PillRow>
           <div className="mt-3 space-y-2 max-h-[50vh] overflow-y-auto">
             {list.length === 0 && <p className="text-center text-slate-400 py-6">No affordable industries in this sector.</p>}
-            {list.map((i) => (
-              <button
-                key={i.id}
-                onClick={() => pick(i.id)}
-                className="w-full text-left p-3 rounded-2xl bg-slate-100 dark:bg-ink-800 hover:bg-slate-200 dark:hover:bg-ink-700"
-              >
-                <div className="flex justify-between gap-2">
-                  <span className="font-semibold truncate min-w-0" title={i.name}>{i.name}</span>
-                  <span className="text-sm font-bold text-brand-500 shrink-0">{money(i.startupCost)}</span>
-                </div>
-                <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                  {i.sector} · margin {pct(i.baseMargin, 0)} · {i.tags.slice(0, 3).join(', ')}
-                </div>
-              </button>
-            ))}
+            {list.map((i) => {
+              const era = state.industryEraMultiplier[i.id] ?? 1;
+              return (
+                <button
+                  key={i.id}
+                  onClick={() => pick(i.id)}
+                  className="w-full text-left p-3 rounded-2xl bg-slate-100 dark:bg-ink-800 hover:bg-slate-200 dark:hover:bg-ink-700"
+                >
+                  <div className="flex justify-between gap-2">
+                    <span className="font-semibold truncate min-w-0" title={i.name}>
+                      {i.name}
+                      {era > 1.12 && <span title="Rising industry — a growing share of the world's economy"> 📈</span>}
+                      {era < 0.9 && <span title="Declining industry — a shrinking share of the world's economy"> 📉</span>}
+                    </span>
+                    <span className="text-sm font-bold text-brand-500 shrink-0">{money(i.startupCost)}</span>
+                  </div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                    {i.sector} · margin {pct(i.baseMargin, 0)} · {i.tags.slice(0, 3).join(', ')}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </>
       ) : (
@@ -537,8 +567,12 @@ function ManageModal({ companyId, onClose }: { companyId: string; onClose: () =>
         <Button size="sm" variant="soft" className={c.isPublic ? '' : 'col-span-2'} onClick={() => run(spinOffCompany, c.id)}>
           ✂️ Spin Off Division
         </Button>
-        <Button size="sm" variant="soft" onClick={() => run(bidOnGovernmentContract, c.id)}>🏛️ Bid on Gov Contract</Button>
-        <Button size="sm" variant="soft" onClick={() => run(applyForGrant, c.id)}>📝 Apply for Grant</Button>
+        <Button size="sm" variant="soft" disabled={c.lastGovContractBidYear === state.year} onClick={() => run(bidOnGovernmentContract, c.id)}>
+          🏛️ {c.lastGovContractBidYear === state.year ? 'Bid Placed This Year' : 'Bid on Gov Contract'}
+        </Button>
+        <Button size="sm" variant="soft" disabled={c.lastGrantYear === state.year} onClick={() => run(applyForGrant, c.id)}>
+          📝 {c.lastGrantYear === state.year ? 'Applied This Year' : 'Apply for Grant'}
+        </Button>
       </div>
 
       {c.isPublic && (
@@ -636,6 +670,45 @@ function TakeoverModal({ companyId, onClose }: { companyId: string; onClose: () 
         }}
       >
         Launch Bid for {money(offer)}
+      </Button>
+    </Modal>
+  );
+}
+
+function JointVentureModal({ mineId, partnerId, onClose }: { mineId: string; partnerId: string; onClose: () => void }) {
+  const { state, run } = useGame();
+  const mine = state?.companies[mineId];
+  const partner = state?.companies[partnerId];
+  const [investment, setInvestment] = useState(50_000);
+  if (!state || !mine || !partner) return null;
+
+  return (
+    <Modal open onClose={onClose} title={`Joint Venture with ${partner.name}`}>
+      <p className="text-xs text-slate-400 mb-4">
+        Pool capital with {partner.name} for 3 years: a modest ongoing brand/quality boost while it runs, then a
+        one-time payout weighted by both companies' real strength — a strong partner is a genuinely better bet, but
+        it can still come back a loss.
+      </p>
+      <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Investment: {moneyFull(investment)}</label>
+      <input
+        type="range"
+        min={50_000}
+        max={Math.max(50_000, Math.round(mine.cash))}
+        step={5_000}
+        value={investment}
+        onChange={(e) => setInvestment(Number(e.target.value))}
+        className="w-full mt-1 mb-4"
+      />
+      <Button
+        className="w-full"
+        size="lg"
+        disabled={investment > mine.cash}
+        onClick={() => {
+          const r = run(proposeJointVenture, mineId, partnerId, investment);
+          if (r.ok) onClose();
+        }}
+      >
+        Commit {money(investment)}
       </Button>
     </Modal>
   );

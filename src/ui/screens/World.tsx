@@ -21,6 +21,7 @@ import {
   fundThinkTank,
   fundIntelligenceAgency,
   fundNationalCyberDefense,
+  investInMilitaryReadiness,
   fundUniversityResearch,
   gatherIntelligence,
   hireAdvisor,
@@ -54,6 +55,10 @@ const WORLD_EVENT_INFO: Record<WorldEvent['type'], { emoji: string; label: strin
   oil_crisis: { emoji: '🛢️', label: 'Global Oil Crisis', desc: 'Energy prices are spiking; inflation is running hot and confidence is shaken worldwide.', tone: 'bad' },
   banking_collapse: { emoji: '🏦', label: 'Banking Collapse', desc: 'A credit crunch is rattling markets and confidence everywhere; rates are climbing.', tone: 'bad' },
   ai_disruption: { emoji: '🤖', label: 'AI Disruption', desc: 'Automation is reshaping labor markets; unemployment is up even as business confidence rises.', tone: 'bad' },
+  semiconductor_shortage: { emoji: '💾', label: 'Semiconductor Shortage', desc: 'A global chip shortage is squeezing tech, auto and industrial manufacturers; unrest is up as goods sit unfinished.', tone: 'bad' },
+  food_crisis: { emoji: '🌾', label: 'Global Food Crisis', desc: 'Grain and agricultural supply chains are strained; food prices are up and unrest is rising, especially in poorer nations.', tone: 'bad' },
+  shipping_disruption: { emoji: '🚢', label: 'Shipping Disruption', desc: 'Major shipping lanes are blocked or backed up; logistics-heavy industries are stalled and inflation is climbing.', tone: 'bad' },
+  currency_crash: { emoji: '💱', label: 'Currency Crash', desc: 'The exchange rate is in free fall; imports are expensive but exporters are getting a real boost.', tone: 'bad' },
 };
 
 function WorldEventBanner({ event }: { event: WorldEvent }) {
@@ -179,6 +184,7 @@ function CountryModal({ country, onClose }: { country: Country; onClose: () => v
         <Row label="GDP" value={money(country.economy.gdp * 1e9)} />
         <Row label="Growth" value={signedPct(country.economy.gdpGrowth)} />
         <Row label="Military" value={`${Math.round(country.militaryPower)}/100`} />
+        <Row label="Readiness" value={`${Math.round(country.militaryReadiness)}/100`} />
       </div>
       <div className="space-y-3 mb-4">
         <StatBar label="Stability" value={country.stability} />
@@ -214,7 +220,7 @@ function CountryModal({ country, onClose }: { country: Country; onClose: () => v
             <span className="font-bold">Diplomacy</span>
             <Badge tone={relation > 20 ? 'good' : relation < -20 ? 'bad' : 'neutral'}>Relations {Math.round(relation)}</Badge>
           </div>
-          {atWar && <Badge tone="bad">⚔️ At War</Badge>}
+          {atWar && <Badge tone="bad">⚔️ At War · Exhaustion {Math.round(home.warExhaustion)}</Badge>}
           {sanctioned && <Badge tone="warn">🚫 Sanctioned</Badge>}
           {!isLeader ? (
             <p className="text-xs text-slate-400 mt-2">Become head of state of {home.name} to conduct foreign policy.</p>
@@ -384,10 +390,16 @@ function GovernmentTools({ country }: { country: Country }) {
       <div className="font-bold mb-2 text-sm">Treasury & National Security</div>
       <Card className="p-3 mb-4 space-y-3">
         <StatBar label="Cyber defense" value={country.cyberDefense} />
-        <div className="text-[11px] text-slate-500 dark:text-slate-400">Debt-to-GDP: {Math.round(country.economy.govDebtToGdp * 100)}% · Budget balance: {signedPct(country.economy.budgetBalance)}</div>
+        <StatBar label="Military readiness" value={country.militaryReadiness} />
+        {country.atWarWith.length > 0 && <StatBar label="War exhaustion" value={country.warExhaustion} />}
+        <div className="text-[11px] text-slate-500 dark:text-slate-400">
+          Debt-to-GDP: {Math.round(country.economy.govDebtToGdp * 100)}% · Budget balance: {signedPct(country.economy.budgetBalance)}
+          {country.warCasualtiesTotal > 0 && ` · War casualties (all-time): ${Math.round(country.warCasualtiesTotal).toLocaleString()}`}
+        </div>
         <div className="grid grid-cols-2 gap-2">
           <Button size="sm" variant="soft" onClick={() => run(issueGovernmentBonds, 5)}>🏦 Issue Bonds (5% GDP)</Button>
           <Button size="sm" variant="soft" onClick={() => run(fundNationalCyberDefense, 100_000)}>🖥️ Fund Cyber Defense ($100k)</Button>
+          <Button size="sm" variant="soft" className="col-span-2" onClick={() => run(investInMilitaryReadiness, 100_000)}>🪖 Fund Military Readiness ($100k)</Button>
         </div>
       </Card>
 

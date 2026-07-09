@@ -4,17 +4,24 @@
  * and eligibility so the UI can surface clean errors. RNG-consuming actions
  * advance the persisted stream so outcomes stay deterministic on replay.
  */
-import type { Advisor, AdvisorSpecialty, CabinetPortfolio, Company, Executive, ExecutiveRole, GameState, Gender, InfrastructureKind, ManifestoPromise, OfficeKind, PropertyAsset, TaxRates } from './types';
+import type { Advisor, AdvisorSpecialty, CabinetPortfolio, Company, Coworker, Executive, ExecutiveRole, GameState, Gender, InfrastructureKind, ManifestoPromise, MaintenanceLevel, OfficeKind, PropertyAsset, TaxRates, WorkStyle } from './types';
 import { CABINET_PORTFOLIOS, clamp, clamp100 } from './types';
 import { RNG } from './rng';
 import { INDUSTRY_BY_ID, INDUSTRIES } from '../data/industries';
 import { LAW_BY_ID } from '../data/laws';
 import { SK } from '../data/skills';
 import { makeCompanyName, makePartyName, makePersonName } from '../data/names';
+import {
+  CAREER_LADDER, COWORKER_PERSONALITIES, COWORKER_PERSONALITY_BY_ID,
+  FREELANCE_GIG_BY_ID, FREELANCE_GIGS, rankIndex, titleForRank, WORK_STYLE_BY_ID,
+} from '../data/careers';
 import { createCompany, nextCompanyId, companyValuation } from './business';
 import { doIPO, marketCap } from './market';
 import { OFFICE_SPEC_BY_KIND, campaignWinChance, eligibleFor, estimateLawVote } from './politics';
 import { log, logHistory } from './engine';
+import { playerCrimeFamily } from './crime';
+import { pushMemory } from './npcMind';
+import { POST_STYLE_BY_ID, POST_STYLES } from '../data/socialMedia';
 
 export interface ActionResult {
   ok: boolean;
@@ -31,48 +38,86 @@ function commit(state: GameState, rng: RNG): void {
   state.rngState = rng.state;
 }
 
+/** Per-year rate limiting for repeatable actions with no other natural cost/cooldown
+ * (lifestyle activities, freelance gigs, networking) — without this, a `run()` call can be
+ * dispatched an unlimited number of times in one sitting to farm stats/skills/money for free. */
+function onCooldown(state: GameState, key: string): boolean {
+  return state.player.actionCooldowns[key] === state.year;
+}
+function setCooldown(state: GameState, key: string): void {
+  state.player.actionCooldowns[key] = state.year;
+}
+
 // ---------------------------------------------------------------------------
 // Education & careers
 // ---------------------------------------------------------------------------
 
 export const DEGREES = [
-  { degree: 'Certificate', field: 'Trade', years: 1, cost: 8_000, smarts: 2 },
-  { degree: "Bachelor's", field: 'Business', years: 3, cost: 25_000, smarts: 6 },
-  { degree: "Bachelor's", field: 'Economics', years: 3, cost: 25_000, smarts: 6 },
-  { degree: "Bachelor's", field: 'Law', years: 4, cost: 40_000, smarts: 7 },
-  { degree: "Bachelor's", field: 'Engineering', years: 4, cost: 35_000, smarts: 7 },
-  { degree: "Bachelor's", field: 'Computer Science', years: 3, cost: 30_000, smarts: 7 },
-  { degree: "Bachelor's", field: 'Political Science', years: 3, cost: 24_000, smarts: 6 },
-  { degree: "Bachelor's", field: 'Medicine', years: 6, cost: 70_000, smarts: 9 },
-  { degree: 'MBA', field: 'Business Administration', years: 2, cost: 90_000, smarts: 5 },
-  { degree: 'Doctorate', field: 'Research', years: 4, cost: 20_000, smarts: 8 },
-  { degree: 'Vocational Certificate', field: 'Culinary Arts', years: 1, cost: 12_000, smarts: 2 },
-  { degree: 'Executive MBA', field: 'International Business', years: 2, cost: 140_000, smarts: 6 },
-  { degree: 'PhD', field: 'Artificial Intelligence', years: 5, cost: 60_000, smarts: 10 },
-  { degree: "Juris Doctor", field: 'Advanced Law', years: 3, cost: 85_000, smarts: 8 },
-  { degree: 'Diploma', field: 'Foreign Languages', years: 1, cost: 10_000, smarts: 3 },
-  { degree: "Bachelor's", field: 'Marketing', years: 3, cost: 22_000, smarts: 6 },
-  { degree: "Bachelor's", field: 'Psychology', years: 3, cost: 23_000, smarts: 6 },
-  { degree: "Bachelor's", field: 'Environmental Science', years: 4, cost: 32_000, smarts: 7 },
-  { degree: 'Master\'s', field: 'Finance', years: 2, cost: 55_000, smarts: 6 },
-  { degree: 'Master\'s', field: 'Public Policy', years: 2, cost: 45_000, smarts: 6 },
-  { degree: 'Master\'s', field: 'Data Science', years: 2, cost: 50_000, smarts: 7 },
-  { degree: 'Vocational Certificate', field: 'Aviation', years: 2, cost: 45_000, smarts: 4 },
-  { degree: 'Vocational Certificate', field: 'Electrical Trades', years: 2, cost: 18_000, smarts: 3 },
-  { degree: 'PhD', field: 'Biotechnology', years: 5, cost: 65_000, smarts: 10 },
-  { degree: 'Doctorate', field: 'Public Health', years: 5, cost: 55_000, smarts: 9 },
+  { degree: 'Certificate', field: 'Trade', years: 1, cost: 8_000, smarts: 2, skillId: SK.construction },
+  { degree: "Bachelor's", field: 'Business', years: 3, cost: 25_000, smarts: 6, skillId: SK.management },
+  { degree: "Bachelor's", field: 'Economics', years: 3, cost: 25_000, smarts: 6, skillId: SK.economics },
+  { degree: "Bachelor's", field: 'Law', years: 4, cost: 40_000, smarts: 7, skillId: SK.law },
+  { degree: "Bachelor's", field: 'Engineering', years: 4, cost: 35_000, smarts: 7, skillId: SK.engineering },
+  { degree: "Bachelor's", field: 'Computer Science', years: 3, cost: 30_000, smarts: 7, skillId: SK.programming },
+  { degree: "Bachelor's", field: 'Political Science', years: 3, cost: 24_000, smarts: 6, skillId: SK.policy },
+  { degree: "Bachelor's", field: 'Medicine', years: 6, cost: 70_000, smarts: 9, skillId: SK.medicine },
+  { degree: 'MBA', field: 'Business Administration', years: 2, cost: 90_000, smarts: 5, skillId: SK.management },
+  { degree: 'Doctorate', field: 'Research', years: 4, cost: 20_000, smarts: 8, skillId: SK.research },
+  { degree: 'Vocational Certificate', field: 'Culinary Arts', years: 1, cost: 12_000, smarts: 2, skillId: SK.cooking },
+  { degree: 'Executive MBA', field: 'International Business', years: 2, cost: 140_000, smarts: 6, skillId: SK.diplomacy },
+  { degree: 'PhD', field: 'Artificial Intelligence', years: 5, cost: 60_000, smarts: 10, skillId: SK.ai },
+  { degree: "Juris Doctor", field: 'Advanced Law', years: 3, cost: 85_000, smarts: 8, skillId: SK.law },
+  { degree: 'Diploma', field: 'Foreign Languages', years: 1, cost: 10_000, smarts: 3, skillId: SK.foreignLanguages },
+  { degree: "Bachelor's", field: 'Marketing', years: 3, cost: 22_000, smarts: 6, skillId: SK.marketing },
+  { degree: "Bachelor's", field: 'Psychology', years: 3, cost: 23_000, smarts: 6, skillId: SK.persuasion },
+  { degree: "Bachelor's", field: 'Environmental Science', years: 4, cost: 32_000, smarts: 7, skillId: SK.research },
+  { degree: 'Master\'s', field: 'Finance', years: 2, cost: 55_000, smarts: 6, skillId: SK.investing },
+  { degree: 'Master\'s', field: 'Public Policy', years: 2, cost: 45_000, smarts: 6, skillId: SK.policy },
+  { degree: 'Master\'s', field: 'Data Science', years: 2, cost: 50_000, smarts: 7, skillId: SK.ai },
+  { degree: 'Vocational Certificate', field: 'Aviation', years: 2, cost: 45_000, smarts: 4, skillId: SK.aerospace },
+  { degree: 'Vocational Certificate', field: 'Electrical Trades', years: 2, cost: 18_000, smarts: 3, skillId: SK.construction },
+  { degree: 'PhD', field: 'Biotechnology', years: 5, cost: 65_000, smarts: 10, skillId: SK.biotech },
+  { degree: 'Doctorate', field: 'Public Health', years: 5, cost: 55_000, smarts: 9, skillId: SK.medicine },
 ];
 
+/** Enrolling rolls for a merit scholarship (smarts-driven) that cuts tuition for the whole
+ * programme — a real, one-time-per-enrollment break, not guaranteed. */
 export function enroll(state: GameState, index: number): ActionResult {
   const p = state.player;
   const d = DEGREES[index];
   if (!d) return { ok: false, message: 'Unknown programme.' };
   if (p.studying) return { ok: false, message: 'You are already studying.' };
   if (p.inJailYears > 0) return { ok: false, message: 'Not while incarcerated.' };
-  p.studying = { degree: d.degree, field: d.field, yearsLeft: d.years, costPerYear: Math.round(d.cost / d.years) };
+  const rng = withRng(state);
+  const scholarshipChance = clamp(0.1 + Math.max(0, p.smarts - 60) * 0.01, 0.05, 0.6);
+  const scholarship = rng.chance(scholarshipChance);
+  const costPerYear = Math.round((d.cost / d.years) * (scholarship ? rng.range(0.5, 0.75) : 1));
+  commit(state, rng);
+  p.studying = { degree: d.degree, field: d.field, skillId: d.skillId, yearsLeft: d.years, totalYears: d.years, costPerYear };
   p.smarts = clamp100(p.smarts + d.smarts);
-  log(state, `Enrolled in a ${d.degree} in ${d.field}.`, 'info');
-  return { ok: true, message: `Enrolled. ${d.years} years at $${Math.round(d.cost / d.years).toLocaleString()}/yr.` };
+  log(state, `Enrolled in a ${d.degree} in ${d.field}.${scholarship ? ' Awarded a merit scholarship.' : ''}`, 'info');
+  return {
+    ok: true,
+    message: scholarship
+      ? `Enrolled with a scholarship! ${d.years} years at $${costPerYear.toLocaleString()}/yr.`
+      : `Enrolled. ${d.years} years at $${costPerYear.toLocaleString()}/yr.`,
+  };
+}
+
+/** Withdraw early — the further along you are, the more it costs your reputation and happiness;
+ * no tuition refund. Real consequence for a real choice, not a free undo. */
+export function dropOutOfSchool(state: GameState): ActionResult {
+  const p = state.player;
+  if (!p.studying) return { ok: false, message: 'You are not enrolled in anything.' };
+  const progress = 1 - p.studying.yearsLeft / p.studying.totalYears;
+  const happinessHit = Math.round(4 + progress * 10);
+  const reputationHit = Math.round(2 + progress * 6);
+  const { degree, field } = p.studying;
+  p.happiness = clamp100(p.happiness - happinessHit);
+  p.reputation = clamp100(p.reputation - reputationHit);
+  p.studying = null;
+  log(state, `Dropped out of the ${degree} in ${field}.`, 'bad');
+  return { ok: true, message: `Withdrew from your studies. Happiness -${happinessHit}, reputation -${reputationHit}.` };
 }
 
 /** Job openings generated from home-country industries, scaled by the player. */
@@ -101,30 +146,272 @@ export function jobOpenings(state: GameState): { title: string; industryId: stri
   return out;
 }
 
-export function takeJob(state: GameState, opening: { title: string; industryId: string; salary: number; requiredSmarts: number; track: string }): ActionResult {
+function makeCoworker(state: GameState, rng: RNG, role: 'manager' | 'peer', tag: string): Coworker {
+  return {
+    id: `cw_${state.year}_${tag}`,
+    name: makePersonName(rng, rng.chance(0.5) ? 'male' : 'female'),
+    role,
+    personality: rng.pick(COWORKER_PERSONALITIES).id,
+    rapport: Math.round(rng.range(role === 'manager' ? 40 : 35, role === 'manager' ? 60 : 65)),
+    memory: [],
+  };
+}
+
+/** A real hiring process: reference/background check, an interview score from your
+ * skills/charisma/reputation, and an optional salary negotiation with real upside and
+ * a small risk of blowing up the offer. Replaces a flat always-succeeds "Apply". */
+export function takeJob(state: GameState, opening: { title: string; industryId: string; salary: number; requiredSmarts: number; track: string }, negotiate = false): ActionResult {
   const p = state.player;
   if (p.inJailYears > 0) return { ok: false, message: 'Not while incarcerated.' };
   if (p.smarts < opening.requiredSmarts) return { ok: false, message: `Requires ${opening.requiredSmarts}+ smarts.` };
+  const rng = withRng(state);
   const ind = INDUSTRY_BY_ID[opening.industryId];
+  const skillLvl = ind ? (p.skills[ind.skillId] ?? 0) : 0;
+
+  // Reference/background check: a firing in the last few years dents your odds.
+  const yearsSinceFired = p.lastFiredYear === null ? 99 : state.year - p.lastFiredYear;
+  const referencePenalty = yearsSinceFired < 3 ? (3 - yearsSinceFired) * 0.1 : 0;
+
+  const interviewScore = clamp100(
+    30 + (p.smarts - 30) * 0.3 + skillLvl * 0.25 + (p.charisma - 30) * 0.15 + (p.reputation - 30) * 0.1 + rng.range(-12, 12),
+  );
+  const passChance = clamp(0.4 + interviewScore / 160 - referencePenalty, 0.05, 0.92);
+  if (!rng.chance(passChance)) {
+    commit(state, rng);
+    const reason = referencePenalty > 0.15
+      ? 'A reference check flagged concerns from your last role.'
+      : rng.pick(['They went with another candidate.', "They passed after the behavioral round — not quite the fit they needed.", 'Strong field this round; no offer.']);
+    log(state, `Interview for ${opening.title} didn't land: ${reason}`, 'bad');
+    return { ok: false, message: reason };
+  }
+
+  let salary = opening.salary;
+  if (negotiate) {
+    const negChance = clamp(0.3 + (p.charisma - 30) * 0.01 + skillLvl * 0.003, 0.1, 0.85);
+    if (rng.chance(negChance)) {
+      const bump = rng.range(0.05, 0.18);
+      salary = Math.round(salary * (1 + bump));
+    } else if (rng.chance(0.15)) {
+      commit(state, rng);
+      log(state, `${opening.title} offer rescinded after a hard negotiating push.`, 'bad');
+      return { ok: false, message: 'You pushed too hard in negotiations and the offer was pulled.' };
+    }
+  }
+
+  const employerName = makeCompanyName(rng, ind?.sector ?? 'default');
+  const coworkers = [makeCoworker(state, rng, 'manager', 'm')];
+  const peerCount = rng.chance(0.5) ? 2 : 1;
+  for (let i = 0; i < peerCount; i++) coworkers.push(makeCoworker(state, rng, 'peer', `p${i}`));
+
   p.job = {
     title: opening.title,
     industryId: opening.industryId,
     employerId: null,
-    employerName: makeCompanyName(new RNG(state.rngState), ind?.sector ?? 'default'),
-    salary: opening.salary,
+    employerName,
+    salary,
     performance: 55,
     yearsInRole: 0,
+    yearsAtCompany: 0,
     track: opening.track as 'corporate' | 'public' | 'media' | 'crime' | 'none',
+    rank: 'junior',
+    stress: 20,
+    reliability: 70,
+    workStyle: 'standard',
+    coworkers,
   };
-  log(state, `Started a new job: ${opening.title} at ${p.job.employerName} ($${opening.salary.toLocaleString()}/yr).`, 'good');
-  return { ok: true, message: `Hired as ${opening.title}.` };
+  p.unemployedYears = 0;
+  commit(state, rng);
+  log(state, `Started a new job: ${titleForRank(opening.title, 'junior')} at ${employerName} ($${salary.toLocaleString()}/yr).`, 'good');
+  return { ok: true, message: `Hired as ${titleForRank(opening.title, 'junior')}${negotiate && salary !== opening.salary ? ` — negotiated up to $${salary.toLocaleString()}` : ''}.` };
 }
 
 export function quitJob(state: GameState): ActionResult {
   if (!state.player.job) return { ok: false, message: 'You have no job.' };
-  log(state, `You quit your job as ${state.player.job.title}.`, 'info');
+  log(state, `You quit your job as ${titleForRank(state.player.job.title, state.player.job.rank)}.`, 'info');
   state.player.job = null;
   return { ok: true, message: 'You quit your job.' };
+}
+
+/** Player-initiated push up the career ladder — separate from (and better odds
+ * than) the small passive promotion chance rolled each year. */
+export function applyForPromotion(state: GameState): ActionResult {
+  const p = state.player;
+  if (!p.job) return { ok: false, message: 'You need a job first.' };
+  const idx = rankIndex(p.job.rank);
+  if (idx >= CAREER_LADDER.length - 1) return { ok: false, message: 'Already at the top of the ladder.' };
+  const current = CAREER_LADDER[idx];
+  const next = CAREER_LADDER[idx + 1];
+  if (p.job.yearsInRole < current.minYearsToPromote) {
+    return { ok: false, message: `Needs ${current.minYearsToPromote}+ year(s) in your current rank first.` };
+  }
+  if (p.job.performance < current.minPerformanceToPromote) {
+    return { ok: false, message: `Performance needs to be ${current.minPerformanceToPromote}+ (currently ${Math.round(p.job.performance)}).` };
+  }
+  const rng = withRng(state);
+  const manager = p.job.coworkers.find((c) => c.role === 'manager');
+  const managerBonus = manager ? (manager.rapport - 50) * 0.006 : 0;
+  const chance = clamp(0.4 + (p.job.performance - current.minPerformanceToPromote) * 0.01 + managerBonus, 0.1, 0.9);
+  const success = rng.chance(chance);
+  commit(state, rng);
+  if (!success) {
+    p.job.stress = clamp100(p.job.stress + 5);
+    log(state, `Passed over for promotion to ${titleForRank(p.job.title, next.id)}.`, 'bad');
+    return { ok: false, message: 'Passed over this time — try again once your case is stronger.' };
+  }
+  p.job.rank = next.id;
+  p.job.yearsInRole = 0;
+  p.job.salary = Math.round(p.job.salary * (next.salaryMult / current.salaryMult));
+  p.reputation = clamp100(p.reputation + 3);
+  if (next.id === 'executive' && !state.achievements.includes('corner_office')) state.achievements.push('corner_office');
+  log(state, `Promoted! You are now ${titleForRank(p.job.title, next.id)} earning $${p.job.salary.toLocaleString()}.`, 'good');
+  return { ok: true, message: `Promoted to ${titleForRank(p.job.title, next.id)}.` };
+}
+
+export function networkWithCoworker(state: GameState, coworkerId: string): ActionResult {
+  const p = state.player;
+  if (!p.job) return { ok: false, message: 'You have no job.' };
+  const cw = p.job.coworkers.find((c) => c.id === coworkerId);
+  if (!cw) return { ok: false, message: 'Coworker not found.' };
+  if (onCooldown(state, `network_cw_${coworkerId}`)) return { ok: false, message: `Already caught up with ${cw.name} this year — try again next year.` };
+  setCooldown(state, `network_cw_${coworkerId}`);
+  const rng = withRng(state);
+  const personality = COWORKER_PERSONALITY_BY_ID[cw.personality];
+  const gain = rng.range(4, 10) * personality.rapportGainMult;
+  cw.rapport = clamp100(cw.rapport + gain);
+  p.happiness = clamp100(p.happiness + 1);
+  pushMemory(cw, `Made an effort to connect, ${state.year}.`);
+  commit(state, rng);
+  return { ok: true, message: `Rapport with ${cw.name} is now ${Math.round(cw.rapport)}.` };
+}
+
+/** Reporting a genuinely toxic/political coworker is more likely to be upheld; crying
+ * wolf on a friendly one risks your own standing and their rapport with you. */
+export function reportToHR(state: GameState, coworkerId: string): ActionResult {
+  const p = state.player;
+  if (!p.job) return { ok: false, message: 'You have no job.' };
+  const cw = p.job.coworkers.find((c) => c.id === coworkerId);
+  if (!cw) return { ok: false, message: 'Coworker not found.' };
+  const rng = withRng(state);
+  const justified = cw.personality === 'toxic' || cw.personality === 'political';
+  const upheld = rng.chance(justified ? 0.65 : 0.25);
+  if (upheld) {
+    const wasManager = cw.role === 'manager';
+    p.job.coworkers = p.job.coworkers.filter((c) => c.id !== coworkerId);
+    if (wasManager) p.job.coworkers.push(makeCoworker(state, rng, 'manager', `m${state.year}`));
+    p.job.stress = clamp100(p.job.stress - 15);
+    commit(state, rng);
+    log(state, `HR upheld your complaint about ${cw.name}.`, 'good');
+    return { ok: true, message: `HR upheld it — ${cw.name} was moved out${wasManager ? ' and a new manager was assigned' : ''}.` };
+  }
+  p.job.performance = clamp100(p.job.performance - 5);
+  p.job.stress = clamp100(p.job.stress + 8);
+  cw.rapport = clamp100(cw.rapport - 20);
+  pushMemory(cw, `Was reported to HR by ${p.name} over an unfounded complaint, ${state.year}.`);
+  commit(state, rng);
+  log(state, `HR found no wrongdoing in your complaint about ${cw.name}.`, 'bad');
+  return { ok: false, message: `HR found no wrongdoing — it's awkward with ${cw.name} now.` };
+}
+
+export function setWorkStyle(state: GameState, style: WorkStyle): ActionResult {
+  const p = state.player;
+  if (!p.job) return { ok: false, message: 'You have no job.' };
+  const oldMult = WORK_STYLE_BY_ID[p.job.workStyle].salaryMult;
+  const newMult = WORK_STYLE_BY_ID[style].salaryMult;
+  p.job.salary = Math.round((p.job.salary / oldMult) * newMult);
+  p.job.workStyle = style;
+  return { ok: true, message: `Now working ${WORK_STYLE_BY_ID[style].label.toLowerCase()}.` };
+}
+
+// ---------------------------------------------------------------------------
+// Freelance & gig economy — independent of any formal employer
+// ---------------------------------------------------------------------------
+
+export function freelanceGigListings() {
+  return FREELANCE_GIGS;
+}
+
+export function takeFreelanceGig(state: GameState, gigId: string): ActionResult {
+  const p = state.player;
+  const gig = FREELANCE_GIG_BY_ID[gigId];
+  if (!gig) return { ok: false, message: 'Unknown gig.' };
+  if (p.inJailYears > 0) return { ok: false, message: 'Not while incarcerated.' };
+  if (onCooldown(state, `gig_${gigId}`)) return { ok: false, message: 'Already took that gig this year — try again next year.' };
+  setCooldown(state, `gig_${gigId}`);
+  const rng = withRng(state);
+  const skillLvl = gig.skillId ? (p.skills[gig.skillId] ?? 0) : 30;
+  const successChance = clamp(0.5 + skillLvl / 250 + (p.freelanceReputation - 30) / 200, 0.15, 0.95);
+  const success = rng.chance(successChance);
+  if (success) {
+    const pay = Math.round(gig.basePay * rng.range(0.85, 1.3) * (1 + p.freelanceReputation / 200));
+    p.money += pay;
+    p.freelanceReputation = clamp100(p.freelanceReputation + rng.range(1, 4));
+    p.freelanceGigsCompleted++;
+    if (gig.skillId) p.skills[gig.skillId] = clamp100((p.skills[gig.skillId] ?? 0) + rng.range(1, 3));
+    commit(state, rng);
+    if (p.freelanceGigsCompleted === 1 && !state.achievements.includes('first_gig')) state.achievements.push('first_gig');
+    if (p.freelanceGigsCompleted >= 50 && !state.achievements.includes('gig_economy_star')) state.achievements.push('gig_economy_star');
+    log(state, `Freelance: ${gig.label} paid $${pay.toLocaleString()}.`, 'money');
+    return { ok: true, message: `Earned $${pay.toLocaleString()} from ${gig.label}.` };
+  }
+  p.freelanceReputation = clamp100(p.freelanceReputation - rng.range(2, 6));
+  commit(state, rng);
+  log(state, `Freelance gig fell through: ${gig.label}.`, 'bad');
+  return { ok: false, message: `The ${gig.label.toLowerCase()} gig fell through — a bad review hurt your freelance standing.` };
+}
+
+// ---------------------------------------------------------------------------
+// Social media
+// ---------------------------------------------------------------------------
+
+export function socialMediaPostStyles() {
+  return POST_STYLES;
+}
+
+/** Post something. Reach and backlash risk both scale with the chosen style, your
+ * socialMedia skill, and how much you already have to lose — the highest-reach styles
+ * are also the ones most likely to blow up. Rate-limited to once a year so it can't be
+ * spammed for free rolls, mirroring the fix applied to the gov-contract/grant exploit. */
+export function postOnSocialMedia(state: GameState, styleId: string): ActionResult {
+  const p = state.player;
+  if (p.cancelledUntilYear !== null && p.cancelledUntilYear >= state.year) {
+    return { ok: false, message: `You're still in the middle of a backlash — lay low until ${p.cancelledUntilYear + 1}.` };
+  }
+  if (p.lastSocialPostYear === state.year) return { ok: false, message: 'Already posted this year — give it time to breathe.' };
+  const style = POST_STYLE_BY_ID[styleId];
+  if (!style) return { ok: false, message: 'Unknown post style.' };
+  const rng = withRng(state);
+  const skillLvl = p.skills[SK.socialMedia] ?? 0;
+  const audienceReach = Math.log10(p.socialFollowers + 100) / 2;
+  const viralityChance = clamp(style.viralityBase + skillLvl * 0.003 + (p.charisma - 50) * 0.002 + audienceReach * 0.05, 0.03, 0.75);
+  const backlashChance = clamp(style.backlashRisk - skillLvl * 0.0025 + (p.reputation < 40 ? 0.05 : 0), 0.01, 0.6);
+  p.lastSocialPostYear = state.year;
+
+  const roll = rng.next();
+  if (roll < backlashChance) {
+    const hit = rng.range(6, 18) * style.reputationSwing;
+    p.reputation = clamp100(p.reputation - hit);
+    p.popularity = clamp100(p.popularity - hit * 0.7);
+    p.socialFollowers = Math.max(0, Math.round(p.socialFollowers * (1 - rng.range(0.1, 0.35))));
+    p.cancelledUntilYear = state.year + rng.int(1, 3);
+    commit(state, rng);
+    log(state, `🔥 Your ${style.label.toLowerCase()} post blew up in the worst way — you're facing a real backlash.`, 'bad');
+    return { ok: false, message: `Backlash! Reputation and popularity took a hit, and you're "cancelled" until ${p.cancelledUntilYear}.` };
+  }
+  if (roll < backlashChance + viralityChance) {
+    const gain = Math.round(rng.range(500, 5000) * (1 + p.socialFollowers / 20_000));
+    p.socialFollowers += gain;
+    const boost = rng.range(2, 6) * style.reputationSwing;
+    p.reputation = clamp100(p.reputation + boost * 0.5);
+    p.popularity = clamp100(p.popularity + boost * 0.6);
+    p.skills[SK.socialMedia] = clamp100((p.skills[SK.socialMedia] ?? 0) + 1);
+    commit(state, rng);
+    log(state, `🚀 Your ${style.label.toLowerCase()} post went viral! Followers: ${p.socialFollowers.toLocaleString()}.`, 'good');
+    if (p.socialFollowers > 100_000 && !state.achievements.includes('viral_star')) state.achievements.push('viral_star');
+    return { ok: true, message: `It went viral! +${gain.toLocaleString()} followers.` };
+  }
+  p.socialFollowers += Math.round(rng.range(5, 60));
+  commit(state, rng);
+  return { ok: true, message: 'Modest engagement — nothing viral this time.' };
 }
 
 // ---------------------------------------------------------------------------
@@ -244,7 +531,6 @@ export function spyOnCompany(state: GameState, targetCompanyId: string): ActionR
   const skill = (p.skills[SK.hacking] ?? 0) * 0.6 + (p.skills[SK.streetSmarts] ?? 0) * 0.4;
   const chance = clamp(0.35 + skill * 0.005 - target.cyberDefense * 0.003, 0.05, 0.85);
   const success = rng.chance(chance);
-  commit(state, rng);
   if (success) {
     const beneficiaries = p.companies
       .map((id) => state.companies[id])
@@ -256,6 +542,7 @@ export function spyOnCompany(state: GameState, targetCompanyId: string): ActionR
     target.brand = clamp100(target.brand - 5);
     target.quality = clamp100(target.quality - 3);
     p.notoriety = clamp100(p.notoriety + 4);
+    commit(state, rng);
     log(state, `🕵️ Corporate espionage against ${target.name} paid off.`, 'business');
     return {
       ok: true,
@@ -269,8 +556,109 @@ export function spyOnCompany(state: GameState, targetCompanyId: string): ActionR
   const founder = target.founderId !== 'player' ? state.npcs[target.founderId] : null;
   if (founder) founder.opinionOfPlayer = clamp(founder.opinionOfPlayer - 40, -100, 100);
   if (rng.chance(0.3)) p.criminalRecord++;
+  commit(state, rng);
   log(state, `🚨 Your corporate espionage attempt against ${target.name} was exposed.`, 'bad');
   return { ok: false, message: `Caught red-handed spying on ${target.name}.` };
+}
+
+/** Deliberately undercut a specific named rival's price to grab share — a real, targeted
+ * price war rather than the passive drift `npcManageCompany` gives NPC companies, with a
+ * real chance the rival fights back by cutting their own price in retaliation. */
+export function startPriceWar(state: GameState, companyId: string, targetCompanyId: string): ActionResult {
+  const p = state.player;
+  const mine = state.companies[companyId];
+  const target = state.companies[targetCompanyId];
+  if (!mine || !mine.playerOwned || mine.status !== 'active') return { ok: false, message: 'Not your company.' };
+  if (!target || target.status !== 'active' || target.playerOwned) return { ok: false, message: 'Invalid target.' };
+  if (target.industryId !== mine.industryId || target.countryId !== mine.countryId) {
+    return { ok: false, message: `${target.name} isn't a direct competitor.` };
+  }
+  if (onCooldown(state, `price_war_${companyId}_${targetCompanyId}`)) return { ok: false, message: 'Already undercut them this year.' };
+  const cost = Math.round(30_000 + mine.revenue * 0.01);
+  if (cost > p.money) return { ok: false, message: `An ad blitz to publicize the discount costs $${cost.toLocaleString()}.` };
+  const rng = withRng(state);
+  p.money -= cost;
+  setCooldown(state, `price_war_${companyId}_${targetCompanyId}`);
+  mine.priceLevel = clamp(mine.priceLevel - 0.12, 0.7, 1.5);
+  const edge = (mine.brand + mine.quality - target.brand - target.quality) / 200; // -1..1
+  const shareShift = Math.max(0.005, 0.02 + edge * 0.02);
+  mine.marketShare = Math.min(1, mine.marketShare + shareShift);
+  target.marketShare = Math.max(0, target.marketShare - shareShift);
+  target.customerSatisfaction = clamp100(target.customerSatisfaction - 4);
+  const retaliates = rng.chance(0.4 + Math.max(0, -edge) * 0.3);
+  if (retaliates) {
+    target.priceLevel = clamp(target.priceLevel - rng.range(0.05, 0.15), 0.7, 1.5);
+    logHistory(state, `${target.name} slashed prices in retaliation against ${mine.name}'s price war.`);
+  }
+  commit(state, rng);
+  log(state, `Undercut ${target.name} on price with ${mine.name}.`, 'business');
+  return {
+    ok: true,
+    message: retaliates
+      ? `Price war launched — you grabbed some share, but ${target.name} cut prices right back.`
+      : `Price war launched — ${target.name} held their price and lost ground.`,
+  };
+}
+
+/** Sue a named competitor for patent infringement — turns the existing (until now purely
+ * passive) patents counter into a real, actionable weapon: win and they pay a real settlement,
+ * lose and you eat the legal costs plus a brand hit for a suit that didn't stick. */
+export function filePatentLawsuit(state: GameState, companyId: string, targetCompanyId: string): ActionResult {
+  const mine = state.companies[companyId];
+  const target = state.companies[targetCompanyId];
+  if (!mine || !mine.playerOwned || mine.status !== 'active') return { ok: false, message: 'Not your company.' };
+  if (!target || target.status !== 'active' || target.playerOwned) return { ok: false, message: 'Invalid target.' };
+  if (target.industryId !== mine.industryId) return { ok: false, message: `${target.name} isn't a direct competitor.` };
+  if (mine.patents === 0) return { ok: false, message: 'File a patent of your own first — nothing to sue over yet.' };
+  if (onCooldown(state, `patent_suit_${companyId}_${targetCompanyId}`)) return { ok: false, message: 'Already litigating against them this year.' };
+  const cost = Math.max(20_000, mine.revenue * 0.01);
+  if (cost > mine.cash) return { ok: false, message: `Legal fees cost $${Math.round(cost).toLocaleString()}.` };
+  const rng = withRng(state);
+  mine.cash -= cost;
+  setCooldown(state, `patent_suit_${companyId}_${targetCompanyId}`);
+  // Win chance: your patent strength helps; a bigger, more R&D-sophisticated defendant can better
+  // argue independent invention or prior art.
+  const sizeRatio = Math.log10(Math.max(1, target.revenue) / Math.max(1, mine.revenue));
+  const chance = clamp(0.35 + mine.patents * 0.05 - target.rdPct * 1.5 - sizeRatio * 0.08, 0.1, 0.8);
+  const win = rng.chance(chance);
+  target.lawsuits++;
+  if (win) {
+    const settlement = Math.min(target.cash * 0.4, target.revenue * rng.range(0.03, 0.08));
+    target.cash -= settlement;
+    mine.cash += settlement;
+    target.brand = clamp100(target.brand - rng.range(4, 10));
+    commit(state, rng);
+    log(state, `${mine.name} won a patent-infringement suit against ${target.name}.`, 'business');
+    return { ok: true, message: `Won! ${target.name} pays a $${Math.round(settlement).toLocaleString()} settlement.` };
+  }
+  mine.cash -= cost * rng.range(0.5, 1.2);
+  mine.brand = clamp100(mine.brand - rng.range(2, 6));
+  commit(state, rng);
+  log(state, `${mine.name} lost a patent-infringement suit against ${target.name}.`, 'bad');
+  return { ok: false, message: `Lost the case — ${target.name} successfully defended itself, plus extra legal costs.` };
+}
+
+/** Pool capital with a named partner company for a multi-year joint venture — distinct from a
+ * full merger (ownership stays independent): a modest ongoing synergy boost while it runs, then
+ * a one-time payout (which can be a real loss) weighted by both companies' actual strength. */
+export function proposeJointVenture(state: GameState, companyId: string, partnerCompanyId: string, investment: number): ActionResult {
+  const mine = state.companies[companyId];
+  const partner = state.companies[partnerCompanyId];
+  if (!mine || !mine.playerOwned || mine.status !== 'active') return { ok: false, message: 'Not your company.' };
+  if (!partner || partner.status !== 'active' || partner.playerOwned || partner.countryId !== mine.countryId) {
+    return { ok: false, message: 'Invalid partner.' };
+  }
+  if (mine.jointVenturePartnerId) return { ok: false, message: 'Already committed to a joint venture.' };
+  const minInvestment = 50_000;
+  if (investment < minInvestment) return { ok: false, message: `Needs at least $${minInvestment.toLocaleString()}.` };
+  if (investment > mine.cash) return { ok: false, message: 'Not enough company cash.' };
+  mine.cash -= investment;
+  mine.jointVenturePartnerId = partner.id;
+  mine.jointVentureYearsLeft = 3;
+  mine.jointVentureInvestment = investment;
+  mine.brand = clamp100(mine.brand + 3);
+  log(state, `${mine.name} launched a joint venture with ${partner.name}.`, 'business');
+  return { ok: true, message: `Joint venture formed with ${partner.name}. Committed $${investment.toLocaleString()} for 3 years.` };
 }
 
 /** Attempt to acquire an NPC-owned public company by outbidding the market. */
@@ -311,7 +699,20 @@ export function attemptHostileTakeover(state: GameState, targetCompanyId: string
 // Property
 // ---------------------------------------------------------------------------
 
-export function propertyListings(state: GameState): Omit<PropertyAsset, 'id' | 'purchasePrice' | 'mortgage' | 'insured'>[] {
+// Each kind offers one or more price tiers — a distinct listing name and a price multiplier —
+// rather than a new PropertyAsset.kind per tier, so the rest of the codebase (decay rates,
+// icons, 3D massing) only ever has to switch on the original 7 kinds.
+const PROPERTY_TIERS: Record<PropertyAsset['kind'], { label: string; mult: number }[]> = {
+  apartment: [{ label: 'Apartment', mult: 1 }, { label: 'Luxury Apartment', mult: 2.1 }],
+  house: [{ label: 'House', mult: 1 }, { label: 'Luxury House', mult: 2.6 }],
+  mansion: [{ label: 'Mansion', mult: 1 }, { label: 'Grand Estate', mult: 2.4 }, { label: "Billionaire's Compound", mult: 5.5 }],
+  commercial: [{ label: 'Commercial Property', mult: 1 }, { label: 'Flagship Tower', mult: 2.8 }],
+  land: [{ label: 'Land', mult: 1 }],
+  island: [{ label: 'Private Island', mult: 1 }, { label: 'Private Island Estate', mult: 3.2 }],
+  penthouse: [{ label: 'Penthouse', mult: 1 }, { label: 'Sky Penthouse', mult: 2.5 }],
+};
+
+export function propertyListings(state: GameState): Omit<PropertyAsset, 'id' | 'purchasePrice' | 'mortgage' | 'insured' | 'yearBuilt' | 'condition' | 'energyEfficiency' | 'maintenanceLevel' | 'lastRenovatedYear'>[] {
   const p = state.player;
   const home = state.countries.find((c) => c.id === p.countryId)!;
   const rng = new RNG(state.seed ^ (state.year * 40503));
@@ -319,19 +720,31 @@ export function propertyListings(state: GameState): Omit<PropertyAsset, 'id' | '
   const basePrices: Record<PropertyAsset['kind'], number> = {
     apartment: 220_000, house: 480_000, mansion: 2_800_000, commercial: 3_500_000, land: 900_000, island: 45_000_000, penthouse: 6_500_000,
   };
-  return kinds.map((kind) => {
-    const city = rng.pick(home.cities);
-    const value = Math.round(basePrices[kind] * city.costOfLiving * (home.economy.housingIndex / 100) * rng.range(0.85, 1.2));
-    const rentalYield = kind === 'land' ? 0 : kind === 'commercial' ? rng.range(0.06, 0.09) : kind === 'penthouse' ? rng.range(0.04, 0.07) : rng.range(0.03, 0.06);
-    return { name: `${kind[0].toUpperCase()}${kind.slice(1)} in ${city.name}`, kind, cityId: city.id, value, rentalYield, baseRentalYield: rentalYield };
-  });
+  const listings: Omit<PropertyAsset, 'id' | 'purchasePrice' | 'mortgage' | 'insured' | 'yearBuilt' | 'condition' | 'energyEfficiency' | 'maintenanceLevel' | 'lastRenovatedYear'>[] = [];
+  for (const kind of kinds) {
+    for (const tier of PROPERTY_TIERS[kind]) {
+      const city = rng.pick(home.cities);
+      const value = Math.round(basePrices[kind] * tier.mult * city.costOfLiving * (home.economy.housingIndex / 100) * rng.range(0.85, 1.2));
+      const rentalYield = kind === 'land' ? 0 : kind === 'commercial' ? rng.range(0.06, 0.09) : kind === 'penthouse' ? rng.range(0.04, 0.07) : rng.range(0.03, 0.06);
+      listings.push({ name: `${tier.label} in ${city.name}`, kind, cityId: city.id, value, rentalYield, baseRentalYield: rentalYield });
+    }
+  }
+  return listings;
 }
 
-export function buyProperty(state: GameState, listing: Omit<PropertyAsset, 'id' | 'purchasePrice' | 'mortgage' | 'insured'>, useMortgage: boolean): ActionResult {
+export function buyProperty(state: GameState, listing: Omit<PropertyAsset, 'id' | 'purchasePrice' | 'mortgage' | 'insured' | 'yearBuilt' | 'condition' | 'energyEfficiency' | 'maintenanceLevel' | 'lastRenovatedYear'>, useMortgage: boolean): ActionResult {
   const p = state.player;
   const deposit = useMortgage ? listing.value * 0.2 : listing.value;
   if (deposit > p.money) return { ok: false, message: useMortgage ? 'Cannot afford the 20% deposit.' : 'Cannot afford it outright.' };
+  const rng = withRng(state);
   p.money -= deposit;
+  // Undeveloped land has no structure to age or maintain; built properties get a
+  // believable construction age, with condition/efficiency drawn down accordingly.
+  const isLand = listing.kind === 'land';
+  const age = isLand ? 0 : Math.round(rng.range(0, 45));
+  const yearBuilt = state.year - age;
+  const condition = isLand ? 100 : clamp100(92 - age * 0.7 + rng.range(-8, 8));
+  const energyEfficiency = isLand ? 100 : clamp100(95 - age * 0.9 + rng.range(-8, 8));
   p.properties.push({
     id: `prop_${state.year}_${p.properties.length}`,
     name: listing.name,
@@ -343,7 +756,13 @@ export function buyProperty(state: GameState, listing: Omit<PropertyAsset, 'id' 
     baseRentalYield: listing.baseRentalYield,
     mortgage: useMortgage ? listing.value * 0.8 : 0,
     insured: false,
+    yearBuilt,
+    condition,
+    energyEfficiency,
+    maintenanceLevel: 'standard',
+    lastRenovatedYear: null,
   });
+  commit(state, rng);
   log(state, `🏠 Bought ${listing.name} for $${listing.value.toLocaleString()}${useMortgage ? ' (mortgaged)' : ''}.`, 'money');
   return { ok: true, message: `Purchased ${listing.name}.` };
 }
@@ -363,16 +782,37 @@ export function renovateProperty(state: GameState, propertyId: string): ActionRe
   const p = state.player;
   const prop = p.properties.find((x) => x.id === propertyId);
   if (!prop) return { ok: false, message: 'Property not found.' };
-  const cost = Math.round(prop.value * 0.08);
+  if (prop.kind === 'land') return { ok: false, message: 'Undeveloped land has nothing to renovate.' };
+  // Gate on condition, not just cash: a property fresh off a renovation has nothing left to
+  // restore, which closes the same-turn spam loop (renovate → value jumps 10-15% → renovate
+  // again for free money) since renovation always resets condition comfortably above this bar.
+  if (prop.condition >= 88) return { ok: false, message: `${prop.name} is already in excellent condition — nothing to renovate yet.` };
+  // Neglected properties need deeper (costlier) work to bring back up to code.
+  const neglectSurcharge = Math.max(0, 70 - prop.condition) * 0.0015;
+  const cost = Math.round(prop.value * (0.08 + neglectSurcharge));
   if (cost > p.money) return { ok: false, message: `Renovation costs $${cost.toLocaleString()}.` };
   const rng = withRng(state);
   p.money -= cost;
   const bump = rng.range(0.1, 0.15);
   prop.value = Math.round(prop.value * (1 + bump));
   if (prop.rentalYield > 0) prop.baseRentalYield = Math.min(0.12, prop.baseRentalYield * 1.1);
+  const wasCondemned = prop.condition < 20;
+  prop.condition = clamp100(94 + rng.range(-2, 2));
+  prop.energyEfficiency = clamp100(prop.energyEfficiency + 20);
+  prop.lastRenovatedYear = state.year;
   commit(state, rng);
-  log(state, `Renovated ${prop.name}, boosting its value by ${Math.round(bump * 100)}%.`, 'money');
+  if (wasCondemned && !state.achievements.includes('condemned_no_more')) state.achievements.push('condemned_no_more');
+  log(state, `Renovated ${prop.name}, boosting its value by ${Math.round(bump * 100)}% and restoring it to like-new condition.`, 'money');
   return { ok: true, message: `${prop.name} renovated.` };
+}
+
+export function setMaintenanceLevel(state: GameState, propertyId: string, level: MaintenanceLevel): ActionResult {
+  const p = state.player;
+  const prop = p.properties.find((x) => x.id === propertyId);
+  if (!prop) return { ok: false, message: 'Property not found.' };
+  if (prop.kind === 'land') return { ok: false, message: 'Undeveloped land needs no maintenance.' };
+  prop.maintenanceLevel = level;
+  return { ok: true, message: `${prop.name}: ${level} maintenance.` };
 }
 
 export function toggleRentalStatus(state: GameState, propertyId: string): ActionResult {
@@ -656,13 +1096,17 @@ export function buybackShares(state: GameState, companyId: string, amount: numbe
   const c = state.companies[companyId];
   if (!c || !c.playerOwned || !c.isPublic || c.status !== 'active') return { ok: false, message: 'Only public companies you control can buy back shares.' };
   if (amount <= 0 || amount > c.cash) return { ok: false, message: `Needs $${Math.round(amount).toLocaleString()} in company cash.` };
-  const cap = Math.max(1, marketCap(c));
   const sharesRetired = amount / c.sharePrice;
   if (sharesRetired >= c.sharesOutstanding * 0.5) return { ok: false, message: 'Cannot retire more than half of shares outstanding at once.' };
   c.cash -= amount;
   c.sharesOutstanding -= sharesRetired;
+  // Retiring shares at the current price is value-neutral by construction: the founder's stake
+  // % rises (the same math a real buyback uses — fewer shares split the same equity), but the
+  // company is now worth exactly `amount` less in cash, so the founder's dollar-value stake is
+  // unchanged. There is deliberately no share-price bump here — an earlier version added one on
+  // top of the dilution math, which let a single deterministic call mint real founder value out
+  // of the company's own cash (fixed; see git history for the exploit this closed).
   c.playerSharePct = clamp(c.playerSharePct * (c.sharesOutstanding + sharesRetired) / c.sharesOutstanding, 0, 1);
-  c.sharePrice = c.sharePrice * (1 + clamp(amount / cap, 0, 0.3) * 0.5);
   log(state, `${c.name} bought back $${Math.round(amount).toLocaleString()} of its own shares.`, 'business');
   return { ok: true, message: `Retired ${Math.round(sharesRetired).toLocaleString()} shares.` };
 }
@@ -810,6 +1254,12 @@ export function holdInvestorConference(state: GameState, companyId: string): Act
   const p = state.player;
   const c = state.companies[companyId];
   if (!c || !c.playerOwned || !c.isPublic || c.status !== 'active') return { ok: false, message: 'Only public companies you control hold investor conferences.' };
+  // Free to attempt with no other natural cost, so — like other actions in this category
+  // (see onCooldown's doc comment) — it needs a rate limit or it's a free, compounding
+  // share-price farm when spammed in one sitting.
+  const cdKey = `investor_conference_${c.id}`;
+  if (onCooldown(state, cdKey)) return { ok: false, message: 'Analysts need time between conferences — once a year per company.' };
+  setCooldown(state, cdKey);
   const rng = withRng(state);
   const skill = (p.skills[SK.negotiation] ?? 0) + (p.skills[SK.publicSpeaking] ?? 0);
   const fundamentals = clamp((c.profit / Math.max(1, c.revenue)) * 2, -0.3, 0.3);
@@ -881,16 +1331,17 @@ export function seekCelebrityEndorsement(state: GameState): ActionResult {
   p.money -= cost;
   const chance = clamp(0.5 + (p.reputation - 50) * 0.004 + celeb.opinionOfPlayer * 0.002, 0.15, 0.9);
   const success = rng.chance(chance);
-  commit(state, rng);
   if (success) {
     const gain = rng.range(4, 9);
     p.campaign.momentum = clamp(p.campaign.momentum + gain, -50, 50);
     p.popularity = clamp100(p.popularity + 2);
     if (!state.achievements.includes('celebrity_backed')) state.achievements.push('celebrity_backed');
+    commit(state, rng);
     log(state, `⭐ ${celeb.name} publicly endorsed your campaign.`, 'politics');
     return { ok: true, message: `${celeb.name} endorsed you! Momentum +${gain.toFixed(0)}.` };
   }
   p.campaign.momentum = clamp(p.campaign.momentum - 3, -50, 50);
+  commit(state, rng);
   log(state, `${celeb.name} declined to endorse you — and said so publicly.`, 'bad');
   return { ok: false, message: `${celeb.name} publicly turned you down.` };
 }
@@ -1010,6 +1461,7 @@ export function launchCampaign(state: GameState, officeKind: OfficeKind, warChes
 export function campaignAction(state: GameState, kind: 'ads' | 'rally' | 'doorknock' | 'fundraise' | 'consultant' | 'polling' | 'debate'): ActionResult {
   const p = state.player;
   if (!p.campaign) return { ok: false, message: 'No active campaign.' };
+  if (onCooldown(state, `campaign_${kind}`)) return { ok: false, message: 'Already did that this year — try again next year.' };
   const rng = withRng(state);
   const boost = p.campaign.consultantHired ? 1.25 : 1;
   let msg = '';
@@ -1068,14 +1520,17 @@ export function campaignAction(state: GameState, kind: 'ads' | 'rally' | 'doorkn
       if (success) {
         p.campaign.momentum = clamp(p.campaign.momentum + swing, -50, 50);
         if (!state.achievements.includes('debate_winner')) state.achievements.push('debate_winner');
+        setCooldown(state, `campaign_${kind}`);
         commit(state, rng);
         return { ok: true, message: `You won the debate. Momentum +${swing.toFixed(0)}.` };
       }
       p.campaign.momentum = clamp(p.campaign.momentum - swing * 0.6, -50, 50);
+      setCooldown(state, `campaign_${kind}`);
       commit(state, rng);
       return { ok: false, message: `Your opponent won the exchange. Momentum -${(swing * 0.6).toFixed(0)}.` };
     }
   }
+  setCooldown(state, `campaign_${kind}`);
   commit(state, rng);
   return { ok: true, message: msg };
 }
@@ -1088,17 +1543,18 @@ export function holdPressConference(state: GameState): ActionResult {
   const skill = (p.skills[SK.debate] ?? 0) * 0.5 + (p.skills['media_public_relations'] ?? 0) * 0.5;
   const chance = clamp(0.5 + skill * 0.004 + (p.charisma - 50) * 0.003, 0.15, 0.9);
   const success = rng.chance(chance);
-  commit(state, rng);
   if (success) {
     const gain = rng.range(2, 5);
     p.popularity = clamp100(p.popularity + gain);
     if (p.campaign) p.campaign.momentum = clamp(p.campaign.momentum + gain, -50, 50);
+    commit(state, rng);
     log(state, '🎤 Your press conference landed well with the media.', 'politics');
     return { ok: true, message: 'Press conference was a hit.' };
   }
   const loss = rng.range(1, 4);
   p.popularity = clamp100(p.popularity - loss);
   if (p.campaign) p.campaign.momentum = clamp(p.campaign.momentum - loss, -50, 50);
+  commit(state, rng);
   log(state, '📰 A reporter caught you off guard at your press conference.', 'bad');
   return { ok: false, message: 'The press conference went sideways.' };
 }
@@ -1211,6 +1667,53 @@ export function negotiateCoalition(state: GameState, partnerPartyId: string): Ac
   if (!state.achievements.includes('coalition_builder')) state.achievements.push('coalition_builder');
   log(state, `🤝 Formed a governing coalition with the ${partner.name}.`, 'politics');
   return { ok: true, message: `Coalition formed with the ${partner.name}.` };
+}
+
+/** Force a formal no-confidence motion against the sitting leader in a parliamentary system —
+ * distinct from the automatic legislative risk that can oust the player when THEY hold power
+ * (see tickPlayerLife). Needs real seat weight and political capital; a big enough bloc can walk
+ * straight into power if the motion succeeds, otherwise a caretaker NPC steps in. */
+export function callNoConfidenceVote(state: GameState): ActionResult {
+  const p = state.player;
+  const home = state.countries.find((c) => c.id === p.countryId)!;
+  if (home.system !== 'parliamentary') return { ok: false, message: 'Only meaningful in a parliamentary system.' };
+  if (home.leaderId === 'player') return { ok: false, message: 'You already lead the government.' };
+  if (!home.leaderId) return { ok: false, message: 'No sitting leader to challenge.' };
+  if (!p.partyId) return { ok: false, message: 'Join or found a party first.' };
+  const myParty = home.parties.find((x) => x.id === p.partyId);
+  if (!myParty) return { ok: false, message: 'Party not found.' };
+  if (onCooldown(state, 'no_confidence_vote')) return { ok: false, message: 'Already called for a vote this year.' };
+  if (p.politicalCapital < 25) return { ok: false, message: 'Needs at least 25 political capital.' };
+  const seatShare = myParty.seats / Math.max(1, home.totalSeats);
+  if (seatShare < 0.15) return { ok: false, message: 'Your party holds too few seats to force a vote.' };
+  const rng = withRng(state);
+  p.politicalCapital = clamp(p.politicalCapital - 25, 0, 100);
+  setCooldown(state, 'no_confidence_vote');
+  const chance = clamp(seatShare * 0.6 + (60 - home.approvalOfGovernment) * 0.006 + (home.unrest - 40) * 0.003, 0.05, 0.75);
+  const success = rng.chance(chance);
+  if (!success) {
+    p.popularity = clamp100(p.popularity - 4);
+    commit(state, rng);
+    log(state, 'Your no-confidence motion failed to gather enough support.', 'bad');
+    return { ok: false, message: 'The motion failed. The government survives — for now.' };
+  }
+  const oustedLeaderId = home.leaderId;
+  const takesPower = seatShare >= 0.35;
+  if (takesPower) {
+    home.leaderId = 'player';
+    myParty.leaderId = 'player';
+    p.politicalCapital = clamp(p.politicalCapital + 15, 0, 100);
+    log(state, '🏛️ No-confidence vote succeeds — you take power as the new head of government.', 'politics');
+  } else {
+    const successor = Object.values(state.npcs).find((n) => n.alive && n.countryId === home.id && n.role === 'politician' && n.id !== oustedLeaderId);
+    home.leaderId = successor?.id ?? null;
+    log(state, "🏛️ No-confidence vote succeeds — the government falls, though your party doesn't hold enough seats to take over.", 'politics');
+  }
+  home.approvalOfGovernment = clamp100(home.approvalOfGovernment - 10);
+  home.electionInYears = Math.min(home.electionInYears, 1);
+  if (!state.achievements.includes('kingmaker')) state.achievements.push('kingmaker');
+  commit(state, rng);
+  return { ok: true, message: takesPower ? 'The government has fallen — you take power!' : 'The government has fallen. A caretaker leader steps in.' };
 }
 
 // ---------------------------------------------------------------------------
@@ -1408,6 +1911,20 @@ export function fundNationalCyberDefense(state: GameState, amount: number): Acti
   home.cyberDefense = clamp100(home.cyberDefense + amount / 25_000);
   log(state, `Invested $${amount.toLocaleString()} in national cyber defense.`, 'politics');
   return { ok: true, message: `National cyber defense now ${Math.round(home.cyberDefense)}.` };
+}
+
+/** Direct investment in military readiness — training, logistics, and supply, distinct from
+ * the raw militaryPower score. This is what actually determines war performance, casualty rates
+ * and how quickly exhaustion builds if the country ends up fighting. */
+export function investInMilitaryReadiness(state: GameState, amount: number): ActionResult {
+  const { home, error } = requireLeadership(state);
+  if (error) return error;
+  if (amount <= 0 || amount > state.player.money) return { ok: false, message: 'Invalid funding amount.' };
+  state.player.money -= amount;
+  home.militaryReadiness = clamp100(home.militaryReadiness + amount / 30_000);
+  home.militaryPower = clamp100(home.militaryPower + amount / 80_000);
+  log(state, `Invested $${amount.toLocaleString()} in military readiness.`, 'politics');
+  return { ok: true, message: `Military readiness now ${Math.round(home.militaryReadiness)}.` };
 }
 
 const ADVISOR_COST = 50_000;
@@ -1674,21 +2191,24 @@ export function bidOnGovernmentContract(state: GameState, companyId: string): Ac
   const p = state.player;
   const c = state.companies[companyId];
   if (!c || !c.playerOwned || c.status !== 'active') return { ok: false, message: 'Not your company.' };
+  if (c.lastGovContractBidYear === state.year) return { ok: false, message: 'Already bid on a government contract this year — try again next year.' };
   const home = state.countries.find((k) => k.id === c.countryId)!;
-  const bidCost = Math.max(5_000, c.revenue * 0.01);
+  const bidCost = Math.max(8_000, c.revenue * 0.01);
   if (bidCost > c.cash) return { ok: false, message: `Needs $${Math.round(bidCost).toLocaleString()} in company cash to prepare a bid.` };
   const rng = withRng(state);
   c.cash -= bidCost;
+  c.lastGovContractBidYear = state.year;
   const chance = clamp(0.2 + (c.brand / 100) * 0.2 + (p.politicalCapital / 100) * 0.2 + (home.corruption / 100) * (p.notoriety > 20 ? 0.15 : -0.05), 0.05, 0.85);
   const won = rng.chance(chance);
-  commit(state, rng);
   if (won) {
-    const value = Math.max(50_000, c.revenue * rng.range(0.15, 0.4));
+    const value = Math.max(20_000, c.revenue * rng.range(0.15, 0.4));
     c.cash += value;
     c.brand = clamp100(c.brand + 3);
+    commit(state, rng);
     log(state, `🏛️ ${c.name} won a government contract worth $${Math.round(value).toLocaleString()}.`, 'business');
     return { ok: true, message: `Won the contract: $${Math.round(value).toLocaleString()}.` };
   }
+  commit(state, rng);
   log(state, `${c.name}'s bid for a government contract was passed over.`, 'bad');
   return { ok: false, message: 'The contract went to another bidder.' };
 }
@@ -1696,14 +2216,19 @@ export function bidOnGovernmentContract(state: GameState, companyId: string): Ac
 export function applyForGrant(state: GameState, companyId: string): ActionResult {
   const c = state.companies[companyId];
   if (!c || !c.playerOwned || c.status !== 'active') return { ok: false, message: 'Not your company.' };
+  if (c.lastGrantYear === state.year) return { ok: false, message: 'Already applied for a grant this year — try again next year.' };
   const home = state.countries.find((k) => k.id === c.countryId)!;
   if (home.economy.budgetBalance < -0.08) return { ok: false, message: `${home.name}'s budget is too strained to fund grants right now.` };
+  const applicationCost = Math.max(3_000, c.revenue * 0.003);
+  if (applicationCost > c.cash) return { ok: false, message: `Needs $${Math.round(applicationCost).toLocaleString()} in company cash to prepare the application.` };
   const rng = withRng(state);
+  c.cash -= applicationCost;
+  c.lastGrantYear = state.year;
   const chance = clamp(0.25 + c.rdPct * 2, 0.1, 0.8);
   const approved = rng.chance(chance);
   commit(state, rng);
   if (approved) {
-    const amount = Math.max(20_000, c.revenue * 0.05);
+    const amount = Math.max(15_000, c.revenue * 0.05);
     c.cash += amount;
     c.quality = clamp100(c.quality + 3);
     log(state, `${c.name} was awarded a government R&D grant of $${Math.round(amount).toLocaleString()}.`, 'business');
@@ -1881,7 +2406,10 @@ export function holdCabinetMeeting(state: GameState): ActionResult {
   const rng = withRng(state);
   const [portfolio, npcId] = rng.pick(appointed);
   const minister = state.npcs[npcId];
-  if (!minister || !minister.alive) return { ok: false, message: 'That minister is no longer available.' };
+  if (!minister || !minister.alive) {
+    commit(state, rng);
+    return { ok: false, message: 'That minister is no longer available.' };
+  }
   const theme = PORTFOLIO_THEMES[portfolio as CabinetPortfolio];
   const chance = clamp(0.35 + (minister.competence - 50) * 0.005 + (state.player.politicalCapital - 50) * 0.002, 0.15, 0.85);
   const agreed = rng.chance(chance);
@@ -1979,30 +2507,40 @@ export function joinCrimeFamily(state: GameState): ActionResult {
   const p = state.player;
   if (p.crimeFamilyId) return { ok: false, message: 'You are already in the family.' };
   if (p.inJailYears > 0) return { ok: false, message: 'Not while incarcerated.' };
+  const candidates = state.crimeFamilies.filter((f) => f.countryId === p.countryId && !f.disbanded);
+  if (!candidates.length) return { ok: false, message: 'No organized crime family operates here right now.' };
   const rng = withRng(state);
-  const candidates = Object.values(state.npcs).filter((n) => n.alive && n.countryId === p.countryId && n.role === 'criminal');
-  const boss = candidates.length ? rng.pick(candidates) : null;
-  p.crimeFamilyId = boss?.id ?? 'unknown_boss';
+  const family = rng.pick(candidates);
+  const boss = state.npcs[family.bossId];
+  p.crimeFamilyId = family.bossId;
   p.crimeRank = 1;
+  p.turfControl = Math.min(p.turfControl, family.turf);
   p.notoriety = clamp100(p.notoriety + 10);
   p.karma = clamp100(p.karma - 10);
   commit(state, rng);
-  log(state, `🕶️ You were initiated into ${boss?.name ?? 'a criminal organization'}'s family as an Associate.`, 'bad');
-  return { ok: true, message: `Welcome to the family, Associate.` };
+  log(state, `🕶️ You were initiated into ${family.name} as an Associate.`, 'bad');
+  return { ok: true, message: `Welcome to ${family.name}, Associate${boss ? ` — ${boss.name} runs the show` : ''}.` };
 }
 
 export function heist(state: GameState): ActionResult {
   const p = state.player;
   if (!p.crimeFamilyId) return { ok: false, message: 'You need to be in the family first.' };
   if (p.inJailYears > 0) return { ok: false, message: 'Not while incarcerated.' };
+  // A real score takes planning — no cooldown here meant a maxed-skill player could farm it
+  // repeatedly in one sitting for near-guaranteed money at 85% success and no cash cost.
+  if (onCooldown(state, 'heist')) return { ok: false, message: 'Your crew needs time to plan the next job — once a year.' };
+  setCooldown(state, 'heist');
   const rng = withRng(state);
   const skill = (p.skills[SK.streetSmarts] ?? 0) * 0.6 + (p.skills[SK.evasion] ?? 0) * 0.4;
   const chance = clamp(0.4 + skill * 0.004 + p.crimeRank * 0.03, 0.1, 0.85);
   const success = rng.chance(chance);
+  const family = playerCrimeFamily(state);
   if (success) {
     const take = rng.range(20_000, 60_000) * p.crimeRank * (1 + p.turfControl / 200);
     p.dirtyMoney += take;
     p.notoriety = clamp100(p.notoriety + 5);
+    p.investigationHeat = clamp100(p.investigationHeat + 12);
+    if (family) family.heat = clamp100(family.heat + 4);
     if (p.crimeRank < 5 && rng.chance(0.25)) {
       p.crimeRank++;
       if (p.crimeRank === 5 && !state.achievements.includes('crime_boss')) state.achievements.push('crime_boss');
@@ -2029,6 +2567,10 @@ export function protectionRacket(state: GameState, targetCompanyId: string): Act
   if (!p.crimeFamilyId) return { ok: false, message: 'You need to be in the family first.' };
   const target = state.companies[targetCompanyId];
   if (!target || target.status !== 'active' || target.playerOwned) return { ok: false, message: 'Invalid target.' };
+  // No cash cost to the player, so without a cooldown every active company in the world could
+  // be shaken down in a single sitting for free money — cap it to once a year, same as heist.
+  if (onCooldown(state, 'protection_racket')) return { ok: false, message: 'Word travels fast — wait until next year to run another shakedown.' };
+  setCooldown(state, 'protection_racket');
   const rng = withRng(state);
   const take = Math.min(target.cash, target.revenue * 0.05 * p.crimeRank);
   if (take < 1000) return { ok: false, message: 'That business has nothing worth taking.' };
@@ -2037,12 +2579,14 @@ export function protectionRacket(state: GameState, targetCompanyId: string): Act
     target.cash -= take;
     p.dirtyMoney += take * (1 + p.turfControl / 200);
     p.notoriety = clamp100(p.notoriety + 3);
+    p.investigationHeat = clamp100(p.investigationHeat + 8);
     commit(state, rng);
     log(state, `Shook down ${target.name} for $${Math.round(take).toLocaleString()}.`, 'bad');
     return { ok: true, message: `Collected $${Math.round(take).toLocaleString()}.` };
   }
   p.reputation = clamp100(p.reputation - 5);
   p.notoriety = clamp100(p.notoriety + 6);
+  p.investigationHeat = clamp100(p.investigationHeat + 20);
   commit(state, rng);
   log(state, `${target.name} refused to pay and reported you.`, 'bad');
   return { ok: false, message: 'They refused and reported you.' };
@@ -2088,6 +2632,36 @@ export function attemptPrisonEscape(state: GameState): ActionResult {
   return { ok: false, message: 'Escape failed. +2 years.' };
 }
 
+/** Request early release once you've served at least a year of the current sentence — real
+ * behavior-based leniency, not a guaranteed out. Odds favor a clean record, low notoriety,
+ * good karma, and time already served; a denial can be appealed again next year. */
+export function requestParole(state: GameState): ActionResult {
+  const p = state.player;
+  if (p.inJailYears <= 0) return { ok: false, message: 'You are not in prison.' };
+  if (p.yearsServedThisSentence < 1) return { ok: false, message: 'You need to serve at least a year before requesting parole.' };
+  if (onCooldown(state, 'parole_request')) return { ok: false, message: 'The board already heard your case this year — try again next year.' };
+  setCooldown(state, 'parole_request');
+  const rng = withRng(state);
+  const chance = clamp(
+    0.25 + (60 - p.criminalRecord * 8) * 0.005 + (p.karma - 50) * 0.003 - p.notoriety * 0.003 + p.yearsServedThisSentence * 0.05,
+    0.05,
+    0.85,
+  );
+  const granted = rng.chance(chance);
+  commit(state, rng);
+  if (granted) {
+    const timeLeft = p.inJailYears;
+    p.inJailYears = 0;
+    p.yearsServedThisSentence = 0;
+    p.happiness = clamp100(p.happiness + 10);
+    log(state, `You were granted parole, ${timeLeft} year(s) early.`, 'good');
+    if (!state.achievements.includes('early_release')) state.achievements.push('early_release');
+    return { ok: true, message: `Parole granted! Released ${timeLeft} year(s) early.` };
+  }
+  log(state, 'The parole board denied your request.', 'bad');
+  return { ok: false, message: 'Parole denied. You can appeal again next year.' };
+}
+
 export function goStraight(state: GameState): ActionResult {
   const p = state.player;
   if (!p.crimeFamilyId) return { ok: false, message: 'You are not in the family.' };
@@ -2119,10 +2693,12 @@ export function launderMoney(state: GameState, companyId: string, amount: number
     c.lawsuits++;
     p.notoriety = clamp100(p.notoriety + 15);
     p.criminalRecord++;
+    p.investigationHeat = clamp100(p.investigationHeat + 18);
     log(state, `🚨 A laundering operation through ${c.name} was flagged by regulators.`, 'bad');
     return { ok: false, message: `The operation was flagged. Dirty money lost, and ${c.name} faces scrutiny.` };
   }
   p.money += clean;
+  p.investigationHeat = clamp100(p.investigationHeat + 6);
   log(state, `Laundered $${Math.round(amount).toLocaleString()} through ${c.name} (${Math.round(cut * 100)}% cut).`, 'bad');
   return { ok: true, message: `Cleaned $${Math.round(clean).toLocaleString()}.` };
 }
@@ -2132,24 +2708,85 @@ export function contestTerritory(state: GameState): ActionResult {
   if (!p.crimeFamilyId) return { ok: false, message: 'You need to be in the family first.' };
   if (p.inJailYears > 0) return { ok: false, message: 'Not while incarcerated.' };
   if (p.turfControl >= 100) return { ok: false, message: 'You already control all the turf worth having.' };
+  const family = playerCrimeFamily(state);
+  const rival = family
+    ? state.crimeFamilies.filter((f) => f.countryId === p.countryId && f.id !== family.id && !f.disbanded && !family.alliedWith.includes(f.id))
+      .sort((a, b) => a.strength - b.strength)[0]
+    : null;
+  if (!rival) return { ok: false, message: 'No rival family left to push against here.' };
   const rng = withRng(state);
   const skill = (p.skills[SK.streetSmarts] ?? 0) * 0.6 + (p.skills[SK.bribery] ?? 0) * 0.4;
-  const chance = clamp(0.35 + skill * 0.004 + p.crimeRank * 0.05, 0.15, 0.85);
+  const chance = clamp(0.35 + skill * 0.004 + p.crimeRank * 0.05 + ((family!.strength - rival.strength) / 200), 0.15, 0.85);
   const success = rng.chance(chance);
   if (success) {
     const gain = rng.range(8, 18);
     p.turfControl = clamp100(p.turfControl + gain);
+    family!.turf = clamp100(family!.turf + gain * 0.5);
+    rival.turf = clamp100(rival.turf - gain * 0.5);
+    family!.heat = clamp100(family!.heat + 6);
     p.notoriety = clamp100(p.notoriety + 4);
+    p.investigationHeat = clamp100(p.investigationHeat + 7);
     commit(state, rng);
-    log(state, `Your family expanded its turf. Territory control now ${Math.round(p.turfControl)}.`, 'bad');
-    return { ok: true, message: `Turf control +${gain.toFixed(0)}.` };
+    log(state, `Your family pushed ${rival.name} off some turf. Territory control now ${Math.round(p.turfControl)}.`, 'bad');
+    return { ok: true, message: `Turf control +${gain.toFixed(0)} at ${rival.name}'s expense.` };
   }
   const loss = rng.range(5, 12);
   p.turfControl = clamp100(p.turfControl - loss);
+  family!.turf = clamp100(family!.turf - loss * 0.5);
+  rival.turf = clamp100(rival.turf + loss * 0.5);
   p.health = clamp100(p.health - rng.range(5, 15));
+  p.investigationHeat = clamp100(p.investigationHeat + 10);
   commit(state, rng);
-  log(state, `A rival crew pushed back hard on your turf grab.`, 'bad');
-  return { ok: false, message: 'The turf war went badly. You took losses.' };
+  log(state, `${rival.name} pushed back hard on your turf grab.`, 'bad');
+  return { ok: false, message: `The turf war with ${rival.name} went badly. You took losses.` };
+}
+
+/** Ally the player's family with another named family in the same country — mutual, and reduces
+ * the chance either side ends up dragged into the other's future turf wars. */
+export function proposeCrimeAlliance(state: GameState, targetFamilyId: string): ActionResult {
+  const p = state.player;
+  const family = playerCrimeFamily(state);
+  if (!family) return { ok: false, message: 'You need to be in the family first.' };
+  const target = state.crimeFamilies.find((f) => f.id === targetFamilyId && f.countryId === p.countryId && !f.disbanded);
+  if (!target || target.id === family.id) return { ok: false, message: 'Invalid family.' };
+  if (family.alliedWith.includes(target.id)) return { ok: false, message: 'Already allied with them.' };
+  if (family.atWarWith.includes(target.id)) return { ok: false, message: 'At war with them — make peace first.' };
+  if (onCooldown(state, `crime_alliance_${targetFamilyId}`)) return { ok: false, message: 'Already reached out to them this year.' };
+  const rng = withRng(state);
+  setCooldown(state, `crime_alliance_${targetFamilyId}`);
+  const chance = clamp(0.3 + p.crimeRank * 0.08 + (p.skills[SK.bribery] ?? 0) * 0.003, 0.1, 0.75);
+  const accepted = rng.chance(chance);
+  if (accepted) {
+    family.alliedWith.push(target.id);
+    target.alliedWith.push(family.id);
+    commit(state, rng);
+    log(state, `🤝 ${family.name} formed an alliance with ${target.name}.`, 'bad');
+    return { ok: true, message: `${target.name} agrees to an alliance.` };
+  }
+  commit(state, rng);
+  return { ok: false, message: `${target.name} isn't interested — for now.` };
+}
+
+/** Declare a real turf war on a named rival family — distinct from contestTerritory's automatic
+ * skirmish against whoever's weakest; this deliberately opens hostilities that then play out over
+ * the following years' ticks in tickCrimeFamilies, win or lose. */
+export function declareCrimeWar(state: GameState, targetFamilyId: string): ActionResult {
+  const p = state.player;
+  const family = playerCrimeFamily(state);
+  if (!family) return { ok: false, message: 'You need to be in the family first.' };
+  if (p.inJailYears > 0) return { ok: false, message: 'Not while incarcerated.' };
+  const target = state.crimeFamilies.find((f) => f.id === targetFamilyId && f.countryId === p.countryId && !f.disbanded);
+  if (!target || target.id === family.id) return { ok: false, message: 'Invalid target.' };
+  if (family.alliedWith.includes(target.id)) return { ok: false, message: "Can't attack an ally." };
+  if (family.atWarWith.includes(target.id)) return { ok: false, message: 'Already at war with them.' };
+  const rng = withRng(state);
+  family.atWarWith.push(target.id);
+  target.atWarWith.push(family.id);
+  family.heat = clamp100(family.heat + 10);
+  p.investigationHeat = clamp100(p.investigationHeat + 8);
+  commit(state, rng);
+  log(state, `⚔️ ${family.name} declares war on ${target.name}.`, 'bad');
+  return { ok: true, message: `War declared on ${target.name}. It'll play out over the coming years.` };
 }
 
 export function enterWitnessProtection(state: GameState): ActionResult {
@@ -2189,6 +2826,7 @@ export type ActivityKind =
 
 export function doActivity(state: GameState, kind: ActivityKind): ActionResult {
   const p = state.player;
+  if (onCooldown(state, `activity_${kind}`)) return { ok: false, message: 'You already did that this year — try again next year.' };
   const rng = withRng(state);
   let msg = '';
   switch (kind) {
@@ -2198,6 +2836,7 @@ export function doActivity(state: GameState, kind: ActivityKind): ActionResult {
       p.money -= cost;
       p.happiness = clamp100(p.happiness + 10);
       p.health = clamp100(p.health + 3);
+      p.stress = clamp100(p.stress - 12);
       msg = 'You took a rejuvenating vacation.';
       break;
     }
@@ -2239,6 +2878,7 @@ export function doActivity(state: GameState, kind: ActivityKind): ActionResult {
       p.happiness = clamp100(p.happiness + 4);
       p.health = clamp100(p.health + 2);
       p.smarts = clamp100(p.smarts + 1);
+      p.stress = clamp100(p.stress - 8);
       msg = 'A calmer, sharper mind.';
       break;
     }
@@ -2256,6 +2896,7 @@ export function doActivity(state: GameState, kind: ActivityKind): ActionResult {
       p.money -= cost;
       p.happiness = clamp100(p.happiness + 8);
       p.health = clamp100(p.health + 3);
+      p.stress = clamp100(p.stress - 22);
       msg = 'A year of therapy left you feeling lighter and clearer-headed.';
       break;
     }
@@ -2342,6 +2983,7 @@ export function doActivity(state: GameState, kind: ActivityKind): ActionResult {
       p.money -= cost;
       p.happiness = clamp100(p.happiness + 6);
       p.health = clamp100(p.health + 3);
+      p.stress = clamp100(p.stress - 10);
       msg = 'A relaxing spa day recharged you.';
       break;
     }
@@ -2384,6 +3026,7 @@ export function doActivity(state: GameState, kind: ActivityKind): ActionResult {
       p.happiness = clamp100(p.happiness + 4);
       p.health = clamp100(p.health + 4);
       p.skills[SK.fitness] = clamp100((p.skills[SK.fitness] ?? 0) + 4);
+      p.stress = clamp100(p.stress - 7);
       msg = 'A calming yoga session left you centered.';
       break;
     }
@@ -2566,6 +3209,7 @@ export function doActivity(state: GameState, kind: ActivityKind): ActionResult {
       p.money -= cost;
       p.happiness = clamp100(p.happiness + 6);
       p.smarts = clamp100(p.smarts + 2);
+      p.stress = clamp100(p.stress - 9);
       msg = 'A clarifying session on where your life is headed.';
       break;
     }
@@ -2576,6 +3220,7 @@ export function doActivity(state: GameState, kind: ActivityKind): ActionResult {
       p.happiness = clamp100(p.happiness + 8);
       p.health = clamp100(p.health + 4);
       p.karma = clamp100(p.karma + 3);
+      p.stress = clamp100(p.stress - 16);
       msg = 'A quiet retreat left you grounded and clear-headed.';
       break;
     }
@@ -2628,6 +3273,7 @@ export function doActivity(state: GameState, kind: ActivityKind): ActionResult {
       break;
     }
   }
+  setCooldown(state, `activity_${kind}`);
   commit(state, rng);
   return { ok: true, message: msg };
 }
@@ -2867,42 +3513,6 @@ export function retire(state: GameState): ActionResult {
   if (!state.achievements.includes('retired')) state.achievements.push('retired');
   log(state, `🌅 You formally retired. Pension: $${p.pensionIncome.toLocaleString()}/yr.`, 'milestone');
   return { ok: true, message: `Retired with a $${p.pensionIncome.toLocaleString()}/yr pension.` };
-}
-
-export type CasinoGame = 'blackjack' | 'roulette' | 'slots';
-
-export function playCasino(state: GameState, game: CasinoGame, stake: number): ActionResult {
-  const p = state.player;
-  if (stake <= 0 || stake > p.money) return { ok: false, message: 'Invalid stake.' };
-  const rng = withRng(state);
-  p.money -= stake;
-  const pokerEdge = (p.skills[SK.poker] ?? 0) / 100;
-  let winChance: number;
-  let payoutMult: number;
-  if (game === 'blackjack') {
-    winChance = clamp(0.46 + pokerEdge * 0.08, 0.3, 0.56);
-    payoutMult = 2;
-  } else if (game === 'roulette') {
-    winChance = 0.47;
-    payoutMult = 2;
-  } else {
-    winChance = 0.12;
-    payoutMult = 8;
-  }
-  const won = rng.chance(winChance);
-  commit(state, rng);
-  p.skills[SK.poker] = clamp100((p.skills[SK.poker] ?? 0) + 1);
-  if (won) {
-    const winnings = Math.round(stake * payoutMult);
-    p.money += winnings;
-    p.happiness = clamp100(p.happiness + 3);
-    if (winnings - stake >= 50_000 && !state.achievements.includes('high_roller')) state.achievements.push('high_roller');
-    log(state, `🎰 Won $${(winnings - stake).toLocaleString()} at the casino (${game}).`, 'money');
-    return { ok: true, message: `You won $${(winnings - stake).toLocaleString()}!` };
-  }
-  p.happiness = clamp100(p.happiness - 2);
-  log(state, `🎰 Lost $${stake.toLocaleString()} at the casino (${game}).`, 'bad');
-  return { ok: true, message: `The house took your $${stake.toLocaleString()}.` };
 }
 
 export function writeMemoir(state: GameState, title: string): ActionResult {

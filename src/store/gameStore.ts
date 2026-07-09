@@ -27,13 +27,16 @@ export type Screen =
   | 'life'
   | 'career'
   | 'business'
+  | 'studio'
   | 'market'
   | 'assets'
   | 'politics'
   | 'world'
+  | 'explore'
   | 'news'
   | 'stats'
-  | 'family';
+  | 'family'
+  | 'casino';
 
 interface Toast {
   id: number;
@@ -117,7 +120,8 @@ export const useGame = create<GameStoreState>((set, get) => ({
   load: async (id) => {
     const state = await loadGame(id);
     if (state) {
-      set({ state, screen: 'life', eventQueue: state.pendingEvents ?? [], activeEvent: null, eventResult: null });
+      const queue = state.pendingEvents ?? [];
+      set({ state, screen: 'life', eventQueue: queue.slice(1), activeEvent: queue[0] ?? null, eventResult: null });
     } else {
       get().toast('Save not found.', 'err');
     }
@@ -144,7 +148,8 @@ export const useGame = create<GameStoreState>((set, get) => ({
   importFrom: (json) => {
     try {
       const state = importSave(json);
-      set({ state, screen: 'life', eventQueue: state.pendingEvents ?? [] });
+      const queue = state.pendingEvents ?? [];
+      set({ state, screen: 'life', eventQueue: queue.slice(1), activeEvent: queue[0] ?? null, eventResult: null });
       get().toast('Save imported.');
     } catch {
       get().toast('Invalid save file.', 'err');
@@ -226,17 +231,28 @@ export const useGame = create<GameStoreState>((set, get) => ({
     const summary = result.text ? `${choice.label} — ${result.text}` : choice.label;
     s.lifeLog.push({ year: s.year, age: s.player.age, text: summary, kind: 'info' });
     for (const l of result.logs) s.lifeLog.push({ year: s.year, age: s.player.age, text: l, kind: 'info' });
+    // This event is now resolved — keep the persisted queue in sync with what's actually
+    // left, otherwise an autosave taken mid-queue would replay already-resolved events
+    // (and their effects) on reload, or soft-lock the game if it never gets read back
+    // into `activeEvent` (see load()/importFrom()).
+    s.pendingEvents = get().eventQueue;
     set({ state: { ...s }, eventResult: result, activeEvent: null });
     void saveGame(AUTOSAVE_ID, s, true);
   },
 
   dismissEventResult: () => {
+    const s = get().state;
     const queue = get().eventQueue;
+    const nextActive = queue[0] ?? null;
+    const nextQueue = queue.slice(1);
+    if (s) s.pendingEvents = nextActive ? [nextActive, ...nextQueue] : nextQueue;
     set({
+      state: s ? { ...s } : null,
       eventResult: null,
-      activeEvent: queue[0] ?? null,
-      eventQueue: queue.slice(1),
+      activeEvent: nextActive,
+      eventQueue: nextQueue,
     });
+    if (s) void saveGame(AUTOSAVE_ID, s, true);
   },
 
   toggleDark: () => set({ darkMode: !get().darkMode }),

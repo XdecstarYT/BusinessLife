@@ -9,6 +9,7 @@ import { clamp, clamp100 } from './types';
 import { LAW_BY_ID } from '../data/laws';
 import { SK } from '../data/skills';
 import type { RNG } from './rng';
+import { randomMindTraits } from './npcMind';
 
 export interface OfficeSpec {
   kind: OfficeKind;
@@ -231,6 +232,16 @@ export function tickPolitics(state: GameState, country: Country, rng: RNG): stri
   const headlines: string[] = [];
   const e = country.economy;
   const playerIsLeader = country.leaderId === 'player';
+
+  if (country.militaryReadiness === undefined) { // backfill for saves from before V18 military depth
+    country.militaryReadiness = country.militaryPower * 0.7;
+    country.warExhaustion = 0;
+    country.warCasualtiesTotal = 0;
+  }
+  // Military readiness drifts toward what the Defense budget share can sustain — chronically
+  // under-funding it (below the ~16.7% even-split baseline) lets it decay; over-funding slowly
+  // builds it. Distinct from the raw militaryPower score, which cabinet meetings/laws move directly.
+  country.militaryReadiness = clamp100(country.militaryReadiness + (country.budgetAllocations.Defense - 16.7) * 0.06 + rng.range(-0.5, 0.5));
 
   // Government approval follows the economy and stability.
   const drift =
@@ -481,26 +492,42 @@ export function tickPolitics(state: GameState, country: Country, rng: RNG): stri
     }
     if (country.atWarWith.includes(other.id)) {
       // A war strategy chosen via declareWar() differentiates the yearly toll and peace odds.
+      // Readiness now matters: a country fighting under-prepared racks up exhaustion and
+      // casualties faster than one that invested in its military beforehand.
       const strategy = country.warStrategies[other.id];
-      let peaceChance = 0.35;
+      const readinessGap = other.militaryReadiness - country.militaryReadiness; // positive = country is outmatched
+      let peaceChance = 0.3;
+      let casualtyRate = 0.00015;
       if (strategy === 'blockade') {
         other.economy.businessConfidence = clamp100(other.economy.businessConfidence - 3);
         other.economy.gdpGrowth -= 0.01;
-        peaceChance = 0.22;
+        peaceChance = 0.2;
+        casualtyRate = 0.00008;
       } else if (strategy === 'invasion') {
         country.stability = clamp100(country.stability - 2);
         other.stability = clamp100(other.stability - 4);
-        peaceChance = 0.45;
+        peaceChance = 0.4;
+        casualtyRate = 0.00025;
       }
+      country.warExhaustion = clamp100(country.warExhaustion + 4 + Math.max(0, readinessGap) * 0.08);
+      peaceChance = clamp(peaceChance + country.warExhaustion * 0.006 + Math.max(0, readinessGap) * 0.004, 0.05, 0.9);
+      country.approvalOfGovernment = clamp100(country.approvalOfGovernment - country.warExhaustion * 0.02);
+      const casualties = Math.round(country.population * casualtyRate * (1 + Math.max(0, readinessGap) / 100));
+      country.population = Math.max(1000, country.population - casualties);
+      country.warCasualtiesTotal += casualties;
       if (rng.chance(peaceChance)) {
         country.atWarWith = country.atWarWith.filter((x) => x !== other.id);
         other.atWarWith = other.atWarWith.filter((x) => x !== country.id);
         delete country.warStrategies[other.id];
         country.relations[other.id] = -40;
         other.relations[country.id] = -40;
-        headlines.push(`🕊️ Peace: ${country.name} and ${other.name} sign an armistice`);
+        country.infrastructure = clamp100(country.infrastructure - 4); // reconstruction toll
+        headlines.push(`🕊️ Peace: ${country.name} and ${other.name} sign an armistice after ${Math.round(country.warExhaustion / 6)} years of grinding war`);
       }
     }
+  }
+  if (country.atWarWith.length === 0) {
+    country.warExhaustion = clamp100(country.warExhaustion - 6); // recovers once at peace with everyone
   }
 
   // Coups in unstable autocracies/low-stability states.
@@ -526,6 +553,7 @@ export function tickNPCs(state: GameState, rng: RNG): string[] {
   const headlines: string[] = [];
   for (const npc of Object.values(state.npcs)) {
     if (!npc.alive) continue;
+    if (npc.mood === undefined) Object.assign(npc, randomMindTraits(rng)); // backfill for saves from before V17 NPC minds
     npc.age++;
     const deathChance = npc.age > 90 ? 0.25 : npc.age > 80 ? 0.09 : npc.age > 70 ? 0.035 : npc.age > 60 ? 0.012 : 0.004;
     if (rng.chance(deathChance)) {
@@ -547,10 +575,20 @@ export function tickNPCs(state: GameState, rng: RNG): string[] {
       }
       continue;
     }
+    const wealthDelta = rng.range(-0.08, 0.12);
     npc.popularity = clamp100(npc.popularity + rng.range(-4, 4));
-    npc.wealth = Math.max(0, npc.wealth * (1 + rng.range(-0.08, 0.12)));
+    npc.wealth = Math.max(0, npc.wealth * (1 + wealthDelta));
     // Opinions decay toward neutral
     npc.opinionOfPlayer = Math.round(npc.opinionOfPlayer * 0.92);
+
+    // Dynamic mind state: cheap mean-reverting random walks, once a year, for every NPC.
+    // A wealth drop this year raises financial pressure; a rise eases it.
+    npc.financialPressure = clamp100(npc.financialPressure - wealthDelta * 60 + rng.range(-3, 3) - (npc.financialPressure - 25) * 0.06);
+    npc.stress = clamp100(npc.stress + npc.financialPressure * 0.02 + rng.range(-4, 4) - (npc.stress - 35) * 0.08);
+    npc.fatigue = clamp100(npc.fatigue + rng.range(-5, 5) - (npc.fatigue - 30) * 0.1);
+    npc.mood = clamp100(npc.mood + rng.range(-5, 5) - npc.stress * 0.03 - (npc.mood - 55) * 0.05);
+    npc.careerSatisfaction = clamp100(npc.careerSatisfaction + rng.range(-4, 4) + (npc.competence - 50) * 0.01 - (npc.careerSatisfaction - 55) * 0.05);
+    npc.relationshipTension = clamp100(npc.relationshipTension - (npc.relationshipTension - 10) * 0.1);
   }
   return headlines;
 }

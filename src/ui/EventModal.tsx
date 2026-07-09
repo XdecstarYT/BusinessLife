@@ -15,7 +15,7 @@ const EFFECT_LABEL: { key: keyof EffectSpec; label: string; good: (v: number) =>
 ];
 
 export function EventModal() {
-  const { activeEvent, eventResult, chooseEvent, dismissEventResult } = useGame();
+  const { activeEvent, eventQueue, eventResult, chooseEvent, dismissEventResult } = useGame();
 
   if (eventResult) {
     return (
@@ -39,6 +39,11 @@ export function EventModal() {
   return (
     <Overlay>
       <div className="text-3xl text-center mb-3">⚡</div>
+      {eventQueue.length > 0 && (
+        <div className="text-center text-xs font-semibold text-brand-500 mb-2">
+          {eventQueue.length} more event{eventQueue.length > 1 ? 's' : ''} waiting after this one
+        </div>
+      )}
       <p className="text-center text-base font-semibold text-slate-800 dark:text-slate-100 mb-5 leading-relaxed">{activeEvent.text}</p>
       <div className="space-y-2">
         {activeEvent.choices.map((choice, i) => (

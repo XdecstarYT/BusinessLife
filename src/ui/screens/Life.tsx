@@ -6,7 +6,9 @@
  */
 import { useState, type ReactNode } from 'react';
 import { useGame, type Screen } from '../../store/gameStore';
-import { attemptPrisonEscape, bribeJudge, contestTerritory, CRIME_RANK_TITLES, doActivity, donateToFoundation, enterWitnessProtection, foundCharityFoundation, goStraight, heist, issuePublicApology, joinCrimeFamily, playCasino, retire, writeMemoir } from '../../sim/actions';
+import { attemptPrisonEscape, bribeJudge, contestTerritory, CRIME_RANK_TITLES, declareCrimeWar, doActivity, donateToFoundation, enterWitnessProtection, foundCharityFoundation, goStraight, heist, issuePublicApology, joinCrimeFamily, postOnSocialMedia, proposeCrimeAlliance, requestParole, retire, socialMediaPostStyles, writeMemoir } from '../../sim/actions';
+import { playerCrimeFamily } from '../../sim/crime';
+import { titleForRank } from '../../data/careers';
 import { netWorth } from '../../sim/engine';
 import { Badge, Button, Card, CircleTile, Pill, PillRow, SectionHeader, StatBar } from '../components';
 import { money } from '../format';
@@ -74,7 +76,7 @@ export function Life() {
               <div className="text-xs font-bold uppercase tracking-widest opacity-80">Net Worth</div>
               <div className="text-3xl font-black leading-tight">{money(nw, home.currencySymbol)}</div>
               <div className="text-sm opacity-90 mt-1">
-                {p.office ? `${p.office.title} of ${p.office.regionName}` : p.job ? p.job.title : 'Independent'}
+                {p.office ? `${p.office.title} of ${p.office.regionName}` : p.job ? titleForRank(p.job.title, p.job.rank) : 'Independent'}
               </div>
             </div>
             <div className="w-14 h-14 rounded-2xl bg-white/15 flex items-center justify-center">
@@ -114,6 +116,7 @@ export function Life() {
           <StatBar label="Health" value={p.health} icon={<IconHeart className="w-3.5 h-3.5" />} />
           <StatBar label="Happiness" value={p.happiness} icon={<IconSpark className="w-3.5 h-3.5" />} />
           <StatBar label="Smarts" value={p.smarts} icon={<IconBrain className="w-3.5 h-3.5" />} />
+          <StatBar label={`Stress${p.burnoutUntilYear !== null && state.year <= p.burnoutUntilYear ? ' — burned out' : ''}`} value={p.stress} />
         </Card>
         <Card className="p-4 space-y-3">
           <StatBar label="Reputation" value={p.reputation} />
@@ -136,6 +139,7 @@ export function Life() {
         {p.turfControl > 0 && <Badge tone="bad">Turf {Math.round(p.turfControl)}</Badge>}
         {p.dirtyMoney > 0 && <Badge tone="warn">Dirty {money(p.dirtyMoney)}</Badge>}
         {p.inWitnessProtection && <Badge tone="good">🛡️ Protected</Badge>}
+        {p.investigationHeat > 40 && <Badge tone="warn">🕵️ Heat {Math.round(p.investigationHeat)}</Badge>}
       </PillRow>
 
       {p.inJailYears > 0 && (
@@ -144,9 +148,15 @@ export function Life() {
             <span className="font-extrabold">🔒 In Prison</span>
             <Badge tone="bad">{p.inJailYears} yr{p.inJailYears > 1 ? 's' : ''} left</Badge>
           </div>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
+            Served {p.yearsServedThisSentence} yr{p.yearsServedThisSentence === 1 ? '' : 's'} of this sentence.
+          </p>
           <div className="grid grid-cols-2 gap-2">
             <Button size="sm" variant="soft" onClick={() => run(bribeJudge)}>💵 Bribe Judge</Button>
             <Button size="sm" variant="danger" onClick={() => run(attemptPrisonEscape)}>🏃 Attempt Escape</Button>
+            <Button size="sm" variant="soft" className="col-span-2" disabled={p.yearsServedThisSentence < 1} onClick={() => run(requestParole)}>
+              ⚖️ Request Parole
+            </Button>
           </div>
         </Card>
       )}
@@ -165,6 +175,32 @@ export function Life() {
           />
         ))}
       </div>
+
+      {/* Social media */}
+      <SectionHeader title="Social Media" />
+      <Card className="p-4 mb-4">
+        <div className="flex items-center justify-between mb-1">
+          <div className="font-bold text-sm">👥 {p.socialFollowers.toLocaleString()} followers</div>
+          {p.cancelledUntilYear !== null && p.cancelledUntilYear >= state.year && (
+            <Badge tone="bad">🔥 Cancelled until {p.cancelledUntilYear}</Badge>
+          )}
+        </div>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+          {p.cancelledUntilYear !== null && p.cancelledUntilYear >= state.year
+            ? "You're in the middle of a backlash — posting is off the table until it passes."
+            : 'Post once a year. Bigger reach means bigger risk of it blowing up.'}
+        </p>
+        <PillRow>
+          {socialMediaPostStyles().map((s) => (
+            <Pill
+              key={s.id}
+              label={`${s.icon} ${s.label}`}
+              disabled={p.lastSocialPostYear === state.year || (p.cancelledUntilYear !== null && p.cancelledUntilYear >= state.year)}
+              onClick={() => run(postOnSocialMedia, s.id)}
+            />
+          ))}
+        </PillRow>
+      </Card>
 
       {/* Lifestyle quick actions */}
       <SectionHeader title="Lifestyle" />
@@ -248,14 +284,52 @@ export function Life() {
           </>
         )}
       </PillRow>
+      {(() => {
+        const myFamily = playerCrimeFamily(state);
+        const families = state.crimeFamilies.filter((f) => f.countryId === p.countryId && !f.disbanded);
+        if (families.length === 0) return null;
+        return (
+          <div className="mt-2 space-y-2">
+            <p className="text-xs text-slate-400 px-1">
+              The real crime families operating in your country — they war, ally, and get crushed by the law on their own, whether or not you're in one.
+            </p>
+            {families.map((f) => {
+              const isMine = myFamily?.id === f.id;
+              const atWar = myFamily ? myFamily.atWarWith.includes(f.id) : false;
+              const allied = myFamily ? myFamily.alliedWith.includes(f.id) : false;
+              const boss = state.npcs[f.bossId];
+              return (
+                <Card key={f.id} className="p-4">
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="min-w-0 pr-2">
+                      <div className="font-bold truncate" title={f.name}>{f.name}</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                        Boss: {boss?.name ?? 'Unknown'} · strength {Math.round(f.strength)} · turf {Math.round(f.turf)}% · heat {Math.round(f.heat)}
+                      </div>
+                    </div>
+                    {isMine ? <Badge tone="brand">Your Family</Badge> : atWar ? <Badge tone="bad">At War</Badge> : allied ? <Badge tone="good">Allied</Badge> : null}
+                  </div>
+                  {myFamily && !isMine && !atWar && !allied && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <Pill label="🤝 Propose Alliance" onClick={() => run(proposeCrimeAlliance, f.id)} />
+                      <Pill label="⚔️ Declare War" onClick={() => run(declareCrimeWar, f.id)} />
+                    </div>
+                  )}
+                </Card>
+              );
+            })}
+          </div>
+        );
+      })()}
 
       <SectionHeader title="Casino" />
-      <PillRow>
-        <Pill label="🃏 Blackjack ($1k)" onClick={() => run(playCasino, 'blackjack', 1_000)} />
-        <Pill label="🎡 Roulette ($1k)" onClick={() => run(playCasino, 'roulette', 1_000)} />
-        <Pill label="🎰 Slots ($500)" onClick={() => run(playCasino, 'slots', 500)} />
-        <Pill label="🃏 Blackjack ($25k)" onClick={() => run(playCasino, 'blackjack', 25_000)} />
-      </PillRow>
+      <Card className="p-4 flex items-center justify-between cursor-pointer active:scale-[0.99] transition-transform" onClick={() => setScreen('casino')}>
+        <div>
+          <div className="font-bold">🎰 Visit the Casino</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400">Named slot machines with real jackpots, blackjack, roulette, high-stakes poker.</div>
+        </div>
+        <IconArrowRight className="w-5 h-5 text-slate-400 shrink-0" />
+      </Card>
 
       <SectionHeader title="Legacy" />
       <Card className="p-4 mb-4 space-y-3">

@@ -36,6 +36,8 @@ export interface Holding {
   costBasis: number; // average price paid per share
 }
 
+export type MaintenanceLevel = 'minimal' | 'standard' | 'premium';
+
 export interface PropertyAsset {
   id: string;
   name: string;
@@ -47,6 +49,11 @@ export interface PropertyAsset {
   baseRentalYield: number; // remembered yield so toggling rental status is reversible
   mortgage: number; // outstanding principal
   insured: boolean;
+  yearBuilt: number; // construction year — undeveloped land uses the purchase year
+  condition: number; // 0..100, decays with age and neglect, restored by renovation
+  energyEfficiency: number; // 0..100, ages slowly, boosted by renovation
+  maintenanceLevel: MaintenanceLevel; // player-chosen upkeep spend; trades cost for condition
+  lastRenovatedYear: number | null;
 }
 
 export type LuxuryAssetKind = 'private_jet' | 'yacht' | 'island' | 'sports_team' | 'racehorse' | 'artwork';
@@ -159,6 +166,22 @@ export interface Office {
 export const MANIFESTO_PROMISES = ['tax_cuts', 'healthcare', 'education', 'jobs', 'crime_reduction', 'infrastructure'] as const;
 export type ManifestoPromise = (typeof MANIFESTO_PROMISES)[number];
 
+export const CAREER_RANKS = ['intern', 'junior', 'mid', 'senior', 'manager', 'executive'] as const;
+export type CareerRank = (typeof CAREER_RANKS)[number];
+
+export type CoworkerPersonality = 'friendly' | 'competitive' | 'toxic' | 'mentoring' | 'political';
+
+export interface Coworker {
+  id: string;
+  name: string;
+  role: 'manager' | 'peer';
+  personality: CoworkerPersonality;
+  rapport: number; // 0..100
+  memory: string[]; // notable interactions with the player (network, HR reports, incidents)
+}
+
+export type WorkStyle = 'standard' | 'overtime' | 'flexible';
+
 export interface PlayerJob {
   title: string;
   industryId: string;
@@ -166,8 +189,14 @@ export interface PlayerJob {
   employerName: string;
   salary: number;
   performance: number; // 0..100
-  yearsInRole: number;
+  yearsInRole: number; // years since the last promotion/rank change
+  yearsAtCompany: number; // total tenure, survives promotions
   track: 'none' | 'corporate' | 'public' | 'media' | 'crime';
+  rank: CareerRank;
+  stress: number; // 0..100, driven by work style and toxic coworkers; hurts health/performance
+  reliability: number; // 0..100, punctuality/attendance proxy; drifts with stress and health
+  workStyle: WorkStyle;
+  coworkers: Coworker[]; // a manager plus one or two peers
 }
 
 export interface Player {
@@ -192,10 +221,16 @@ export interface Player {
   money: number;
   criminalRecord: number; // number of convictions
   inJailYears: number;
+  yearsServedThisSentence: number; // counts up while jailed, resets to 0 on release; gates parole eligibility
 
   skills: Record<string, number>; // skillId -> 0..100
   education: EducationRecord[];
-  studying: { degree: string; field: string; yearsLeft: number; costPerYear: number } | null;
+  studying: { degree: string; field: string; skillId: string; yearsLeft: number; totalYears: number; costPerYear: number } | null;
+
+  // V19: mental health & investigation heat
+  stress: number; // 0..100, general life stress — distinct from PlayerJob.stress, fed by it plus money/relationship/unemployment pressure
+  burnoutUntilYear: number | null; // sustained high stress triggers this; dents performance/happiness/skill-gain until it passes
+  investigationHeat: number; // 0..100, law-enforcement attention built up by a life of crime; can trigger a real arrest independent of any single action's own risk roll
 
   job: PlayerJob | null;
   companies: string[]; // ids of companies the player founded/owns
@@ -240,7 +275,15 @@ export interface Player {
   foundation: CharityFoundation | null; // personal charitable foundation, once founded
   retired: boolean; // formally retired from employment
   pensionIncome: number; // yearly pension once retired, based on career at retirement
+  lastFiredYear: number | null; // reference damage window — dents interview odds and offers for a few years
+  freelanceReputation: number; // 0..100, gig-economy standing independent of any employer
+  freelanceGigsCompleted: number;
+  unemployedYears: number; // consecutive years without a job or company; drives skill decay and safety-net support
   memoir: Memoir | null; // published autobiography paying royalties for a few years
+  socialFollowers: number; // social-media audience size
+  cancelledUntilYear: number | null; // a viral backlash is actively depressing reputation/popularity until this year
+  lastSocialPostYear: number | null; // cooldown so posting can't be spammed for free rolls
+  actionCooldowns: Record<string, number>; // arbitrary key -> year last used; guards repeatable actions (lifestyle activities, freelance gigs, networking, campaign actions) against being spammed for free stat/money farming within the same year
   campaign: null | {
     officeKind: OfficeKind;
     regionName: string;
@@ -251,6 +294,8 @@ export interface Player {
     promises: ManifestoPromise[]; // manifesto pledges made at launch, tracked for fulfillment in office
   };
   lastElectionResult: ElectionResult | null; // transient: set on resolution, cleared once the UI shows it
+  casinoTotalWagered: number; // lifetime stake across all casino games, for the Stats screen
+  casinoBiggestWin: number; // single largest payout ever collected (any casino game, including a jackpot)
 }
 
 export interface ElectionResult {
@@ -296,6 +341,24 @@ export interface NPC {
   goal: string;
   memory: string[]; // notable interactions with the player
   parentId?: string; // NPC id of the parent, for tracking grandchildren lineage
+
+  // V17: stable personality dials (0..100), distinct from the career/politics-facing
+  // competence/charisma/ambition/riskTolerance/integrity above — these drive relationship
+  // and social-decision math instead of career/investing behaviour.
+  empathy: number;
+  aggression: number;
+  socialConfidence: number;
+  discipline: number;
+  loyalty: number;
+  curiosity: number;
+
+  // V17: dynamic day-to-day state (0..100), drifts a little every year in tickNPCs.
+  mood: number;
+  stress: number;
+  fatigue: number;
+  financialPressure: number;
+  relationshipTension: number; // specifically about their relationship with the player
+  careerSatisfaction: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -426,6 +489,14 @@ export interface Country {
   cyberDefense: number; // 0..100, national cyber defense strength; dampens cyberattack severity
   oppositionLeaderId: string | null; // NPC id; reactively critiques the player's government and adapts
   globalGamesYear: number | null; // year this nation hosts the Global Games, if a bid was won
+
+  // V18: military depth — militaryPower above is a raw/latent capability score; readiness is
+  // the trained/supplied/battle-ready sliver of it that actually determines war performance.
+  militaryReadiness: number; // 0..100, drifts toward the Defense budget share; decays if under-funded
+  warExhaustion: number; // 0..100, builds while at war (faster under an invasion strategy), decays at peace; dampens approval and pushes both sides toward peace
+  warCasualtiesTotal: number; // cumulative population lost to war across this playthrough (flavor + real population drag)
+
+  lastNoConfidenceYear: number | null; // gates automatic legislative no-confidence risk to at most one attempt per year
 }
 
 export const CABINET_PORTFOLIOS = ['Finance', 'Foreign Affairs', 'Defense', 'Health', 'Education', 'Justice'] as const;
@@ -555,6 +626,16 @@ export interface Company {
   ceoName: string | null; // hired professional CEO running day-to-day (chairman mode)
   ceoSkill: number; // 0..100
   ceoSalary: number; // yearly, paid from company cash
+  lastGovContractBidYear: number | null; // gates one bid per company per year
+  lastGrantYear: number | null; // gates one grant application per company per year
+
+  // Joint venture: a multi-year capital-pooling deal with a named partner company, distinct from
+  // a full merger (tickMergers) — both sides keep independent ownership, gain a modest ongoing
+  // synergy boost while it runs, and the investment resolves into a one-time payout (which can be
+  // a loss) when the term ends.
+  jointVenturePartnerId: string | null;
+  jointVentureYearsLeft: number;
+  jointVentureInvestment: number;
 
   status: CompanyStatus;
   history: CompanyHistoryPoint[];
@@ -563,6 +644,149 @@ export interface Company {
 export interface Moonshot {
   yearsLeft: number;
   invested: number; // total committed; burned over the project's life
+}
+
+// ---------------------------------------------------------------------------
+// Product Design & Commerce (the Studio)
+// ---------------------------------------------------------------------------
+
+export type ProductCategory =
+  | 'smartphone' | 'laptop' | 'tablet' | 'wearable' | 'gaming' | 'audio'
+  | 'appliance' | 'smart_home' | 'furniture' | 'fashion' | 'shoes' | 'jewelry'
+  | 'cosmetics' | 'automotive' | 'food_beverage' | 'medical' | 'industrial'
+  | 'toys' | 'sports' | 'luxury'
+  | 'drone' | 'camera' | 'tv' | 'bicycle' | 'eyewear' | 'instrument' | 'kitchenware' | 'powertool';
+
+export type ProductMaterialId =
+  | 'aluminum' | 'titanium' | 'steel' | 'carbon_fiber' | 'glass' | 'leather'
+  | 'plastic' | 'ceramic' | 'wood' | 'marble' | 'fabric' | 'gold' | 'chrome'
+  | 'copper' | 'eco_composite' | 'recycled';
+
+export type ProductStage = 'concept' | 'prototype' | 'testing' | 'production' | 'launched' | 'retired';
+export type PublishState = 'draft' | 'internal' | 'portfolio' | 'marketplace' | 'public';
+export type ManufacturingStrategy = 'handmade' | 'boutique' | 'regional' | 'overseas' | 'automated' | 'sustainable' | 'luxury_craft' | 'mass';
+export type PackagingStyle = 'minimal' | 'premium' | 'eco' | 'playful' | 'industrial';
+export type ProductFinish = 'matte' | 'gloss' | 'metallic' | 'brushed';
+export type StudioLighting = 'studio' | 'sunset' | 'showroom' | 'noir';
+export type LaunchVenue = 'livestream' | 'rooftop_party' | 'convention_keynote' | 'flagship_theater';
+export type SalesChannel = 'storefront' | 'online' | 'retail' | 'boutique';
+
+/** Per-part customization: overrides the body/accent defaults for one named piece of the model. */
+export interface PartOverride {
+  color: string | null;
+  materialId: ProductMaterialId | null;
+  finish: ProductFinish | null;
+}
+
+/** Component sourcing tiers — every slot of a product's bill of materials is chosen per tier. */
+export type ComponentTier = 'budget' | 'standard' | 'premium';
+
+/** Customer segments for market research and demand targeting. */
+export type CustomerSegment = 'value' | 'early_adopters' | 'luxury_buyers' | 'eco' | 'families';
+
+/** An active quality defect discovered in the field; resolve it with a recall or risk trust. */
+export interface ProductDefect {
+  name: string;
+  severity: number; // 1..3
+  year: number;
+}
+
+/** A player-engineered component (e.g. the "Bat62" battery): installable in your
+ * products in place of a sourcing tier, and sellable on the global component market. */
+export interface CustomPart {
+  id: string;
+  companyId: string; // owning company — engineering costs and sales revenue flow here
+  name: string;
+  componentId: string; // which component slot type it fits ('battery', 'chip', …)
+  version: number; // revision count; revisions raise the grade
+  grade: number; // 0..100 engineering grade — drives every stat below
+  quality: number; // quality bonus contributed to products using it
+  defectMod: number; // defect-rate delta
+  costMult: number; // unit-cost multiplier vs a standard sourced part
+  luxury: number; // perceived-premium bonus
+  forSale: boolean; // listed on the global component market
+  unitsSoldTotal: number;
+  revenueTotal: number;
+  yearDesigned: number;
+}
+
+/** Parametric 3D form: drives the procedural product mesh in the Studio viewport. */
+export interface ProductForm {
+  size: number; // 0.6..1.8 overall scale
+  slimness: number; // 0..1 thinner/sleeker
+  curvature: number; // 0..1 soft/rounded vs sharp
+  accent: number; // 0..1 how prominent accent details are
+  bodyColor: string; // hex
+  accentColor: string; // hex
+  finish: ProductFinish;
+  lighting: StudioLighting; // preferred preview lighting preset
+}
+
+export interface ProductTestScores {
+  appearance: number; innovation: number; comfort: number; reliability: number;
+  performance: number; easeOfUse: number; sustainability: number; buildQuality: number; value: number;
+}
+
+export interface ProductReview {
+  year: number;
+  stars: number; // 1..5
+  text: string;
+}
+
+export interface ProductSalesPoint {
+  year: number;
+  units: number;
+  revenue: number;
+  profit: number;
+}
+
+export interface Product {
+  id: string;
+  companyId: string; // owning (player) company; profits flow into it
+  name: string;
+  tagline: string;
+  category: ProductCategory;
+  generation: number; // 1..n; upgraded generations supersede their predecessor
+  predecessorId: string | null;
+  stage: ProductStage;
+  publishState: PublishState;
+  materials: [ProductMaterialId, ProductMaterialId]; // primary body + accent
+  form: ProductForm;
+  partOverrides: Record<string, PartOverride>; // per-part color/material/finish, keyed by part id
+  components: Record<string, string>; // per slot: a ComponentTier, or a CustomPart id
+  targetSegment: CustomerSegment | null; // demand focus after market research
+  segmentInsights: Partial<Record<CustomerSegment, number>>; // fit scores revealed by focus groups
+  warrantyYears: number; // 0..3 — costs per unit, lifts trust and rating
+  trust: number; // 0..100 consumer trust; scales demand
+  activeDefect: ProductDefect | null;
+  recalls: number;
+  features: string[]; // granted by unlocked product tech
+  packaging: PackagingStyle;
+  manufacturing: ManufacturingStrategy;
+  price: number;
+  patented: boolean;
+  testScores: ProductTestScores | null;
+  iterations: number; // refinement passes
+  designQuality: number; // 0..100, grows with refinement and R&D
+  hype: number; // 0..100 launch buzz, decays yearly
+  brandPower: number; // 0..100 product-brand strength
+  yearDesigned: number;
+  yearLaunched: number | null;
+  unitsSoldTotal: number;
+  revenueTotal: number;
+  profitTotal: number;
+  rating: number; // 0..5 running customer rating
+  reviews: ProductReview[];
+  returnRate: number; // 0..1
+  marketingBudget: number; // per-year spend from company cash
+  channels: SalesChannel[];
+  salesHistory: ProductSalesPoint[];
+}
+
+export interface Storefront {
+  name: string;
+  theme: 'aurora' | 'noir' | 'porcelain' | 'terra';
+  featuredProductId: string | null;
 }
 
 export type ExecutiveRole = 'cfo' | 'coo' | 'cmo';
@@ -647,6 +871,8 @@ export interface EffectSpec {
   campaignMomentum?: number;
   approvalOfGovernment?: number;
   achievement?: string; // unlocks this achievement id if not already held
+  socialFollowersPct?: number; // fraction change to social-media follower count
+  cancelledYears?: number; // sets/extends a social-media backlash window this many years out
 }
 
 export interface EventOutcome {
@@ -687,10 +913,12 @@ export interface EventConditions {
   hasChildren?: boolean;
   hasProperty?: boolean;
   businessPublic?: boolean; // has an active company that is publicly listed
-  duringWorldEvent?: 'pandemic' | 'trade_war' | 'tech_boom';
+  duringWorldEvent?: WorldEventType;
   inCrimeFamily?: boolean;
   hasMentor?: boolean;
   hasRival?: boolean;
+  minFollowers?: number;
+  cancelled?: boolean; // is currently in the middle of a social-media backlash
 }
 
 export interface EventTemplate {
@@ -783,8 +1011,12 @@ export interface GameOverInfo {
   legacyScore: number; // 0..100, a rough composite of wealth, dynasty, office and achievements
 }
 
+export type WorldEventType =
+  | 'pandemic' | 'trade_war' | 'tech_boom' | 'oil_crisis' | 'banking_collapse' | 'ai_disruption'
+  | 'semiconductor_shortage' | 'food_crisis' | 'shipping_disruption' | 'currency_crash';
+
 export interface WorldEvent {
-  type: 'pandemic' | 'trade_war' | 'tech_boom' | 'oil_crisis' | 'banking_collapse' | 'ai_disruption';
+  type: WorldEventType;
   yearsLeft: number;
   severity: number; // 0..1
 }
@@ -820,6 +1052,38 @@ export interface GameState {
   worldHistory: WorldHistoryEntry[]; // sparse chronicle of major world-level milestones, spans generations
   cryptoPrice: number; // the world's single cryptocurrency, priced in the home currency
   cryptoHistory: number[]; // recent yearly closes for charting
+  products: Record<string, Product>; // the Studio: player-designed products
+  productTech: string[]; // unlocked product R&D node ids
+  storefront: Storefront; // the player's customizable product storefront
+  componentShortage: { componentId: string; yearsLeft: number } | null; // global supply-chain squeeze
+  customParts: Record<string, CustomPart>; // player-engineered components
+
+  // V17: generational world evolution
+  culturalProgressivism: number; // 0..100, drifts slowly across decades; nudged by tech/AI-era world events
+  shockHistory: Partial<Record<WorldEventType, number>>; // world-event type -> years since it last ended (undefined = never happened)
+  industryEraMultiplier: Record<string, number>; // sparse industryId -> growth multiplier from secular rise/decline over decades
+
+  // Crime Syndicate Engine: real, named organized-crime families competing with each other in
+  // every country, not just an abstract "rival crew" backdrop to the player's own crimeRank —
+  // see sim/crime.ts. The player's own family (if any) is one of these, found by bossId.
+  crimeFamilies: CrimeFamily[];
+
+  // Casino: sparse machineId -> current progressive jackpot pool. World-persistent (not reset per
+  // player action) so the pot really does grow between spins and pays out big when it finally hits.
+  casinoJackpots: Record<string, number>;
+}
+
+export interface CrimeFamily {
+  id: string;
+  name: string;
+  countryId: string;
+  bossId: string; // NPC id, role: 'criminal'
+  strength: number; // 0..100, combat/economic power — drives turf-war and crackdown outcomes
+  turf: number; // 0..100, share of the country's criminal territory this family controls
+  heat: number; // 0..100, law-enforcement attention specifically on this family
+  alliedWith: string[]; // other CrimeFamily ids, mutual non-aggression + turf-war backup
+  atWarWith: string[]; // other CrimeFamily ids, actively fighting for turf
+  disbanded: boolean; // true once taken down by a crackdown or wiped out in a war
 }
 
 export interface SuccessionCandidate {

@@ -4,13 +4,14 @@
  * player's own life (job, study, office, campaign, assets) → events → news.
  * Pure function of (state, rng): UI-free and worker-friendly.
  */
-import type { Country, GameState, LifeLogEntry, Player } from './types';
+import type { Country, GameState, LifeLogEntry, MaintenanceLevel, Player, PropertyAsset } from './types';
 import { clamp, clamp100 } from './types';
 import { RNG } from './rng';
 import { tickCommodities, tickEconomy } from './economy';
-import { npcManageCompany, tickCompany, tickMergers, tickCorporateSabotage, companyValuation } from './business';
+import { npcManageCompany, tickCompany, tickMergers, tickCorporateSabotage, tickIndustryEra, companyValuation } from './business';
 import { tickStock, portfolioValue, checkLimitOrders, tickMargin } from './market';
 import { campaignWinChance, electionRegionalBreakdown, OFFICE_SPEC_BY_KIND, promiseFulfillment, promiseMetricValue, tickNPCs, tickPolitics } from './politics';
+import { tickCrimeFamilies } from './crime';
 import { fireEvents } from './events';
 import { generateNews } from './news';
 import { INDUSTRY_BY_ID } from '../data/industries';
@@ -18,9 +19,21 @@ import { distributeEstate, dynastyScore, tickFamily } from './family';
 import { tickWorldEvents } from './worldEvents';
 import { tryFireDailyEvent } from './dailyEvents';
 import { tickLifestyleAssets } from './lifestyle';
+import { tickProducts } from './products';
 import { SK } from '../data/skills';
+import { CAREER_LADDER, COWORKER_PERSONALITIES, COWORKER_PERSONALITY_BY_ID, rankIndex, titleForRank, WORK_STYLE_BY_ID, WORKPLACE_EVENTS } from '../data/careers';
+import { makePersonName } from '../data/names';
 
 const SPECIAL_BIRTHDAYS = new Set([18, 21, 25, 30, 40, 50, 60, 65, 70, 75, 80, 90, 100]);
+
+// Building realism: upkeep spend trades cost for condition; neglected, uninsured
+// buildings risk a costly structural incident, and low condition dents both
+// rental income and resale value.
+const MAINTENANCE_COST_RATE: Record<MaintenanceLevel, number> = { minimal: 0.002, standard: 0.006, premium: 0.014 };
+const MAINTENANCE_DECAY_MULT: Record<MaintenanceLevel, number> = { minimal: 1.7, standard: 1.0, premium: 0.3 };
+const BASE_DECAY_BY_KIND: Record<PropertyAsset['kind'], number> = {
+  apartment: 1.1, house: 1.0, mansion: 1.3, commercial: 1.5, land: 0, island: 1.2, penthouse: 1.0,
+};
 
 export function log(state: GameState, text: string, kind: LifeLogEntry['kind'] = 'info'): void {
   state.lifeLog.push({ year: state.year, age: state.player.age, text, kind });
@@ -242,31 +255,80 @@ function tickCEOs(state: GameState, rng: RNG): void {
   }
 }
 
-function tickPlayerLife(state: GameState, rng: RNG): void {
+/** Returns headlines for real, notable-to-the-outside-world moments this tick
+ * (arrest, release, burnout) so `generateNews` can react to the player's actual
+ * life instead of only macro events. */
+function tickPlayerLife(state: GameState, rng: RNG): string[] {
   const p = state.player;
   const home = state.countries.find((c) => c.id === p.countryId)!;
   const city = home.cities.find((c) => c.id === p.cityId) ?? home.cities[0];
   const e = home.economy;
+  const headlines: string[] = [];
+
+  if (p.socialFollowers === undefined) { // backfill for saves from before V17 social/info layer
+    p.socialFollowers = 0;
+    p.cancelledUntilYear = null;
+    p.lastSocialPostYear = null;
+  }
+  if (p.actionCooldowns === undefined) p.actionCooldowns = {}; // backfill for saves from before the exploit-fix cooldown system
+  if (p.stress === undefined) { // backfill for saves from before V19 mental health & crime depth
+    p.stress = 25;
+    p.burnoutUntilYear = null;
+    p.investigationHeat = 0;
+    p.yearsServedThisSentence = 0;
+  }
 
   // --- Jail ---------------------------------------------------------------
   if (p.inJailYears > 0) {
     p.inJailYears--;
+    p.yearsServedThisSentence++;
     p.happiness = clamp100(p.happiness - 6);
     p.reputation = clamp100(p.reputation - 2);
     if (p.inJailYears === 0) {
       log(state, 'You were released from prison.', 'milestone');
       if (!state.achievements.includes('jailbird')) state.achievements.push('jailbird');
+      p.yearsServedThisSentence = 0;
+      headlines.push(`${p.name} released after serving out a prison sentence`);
     }
-    return; // No job/study/campaign progression inside.
+    return headlines; // No job/study/campaign progression inside.
+  }
+
+  // --- Investigation heat: a life of crime draws real law-enforcement attention over time,
+  // independent of any single crime action's own risk roll. Staying clean lets it cool off.
+  if (p.investigationHeat > 0) {
+    p.investigationHeat = clamp100(p.investigationHeat - (p.crimeFamilyId || p.dirtyMoney > 0 ? 3 : 12));
+  }
+  if (p.investigationHeat > 55 && rng.chance((p.investigationHeat - 50) * 0.01)) {
+    const sentence = Math.max(1, Math.round(rng.range(1, 4) * (1 + p.criminalRecord * 0.15)));
+    p.criminalRecord++;
+    p.inJailYears += sentence;
+    p.investigationHeat = 20;
+    p.job = null;
+    p.campaign = null;
+    if (p.office) {
+      log(state, `You were removed from office as ${p.office.title}.`, 'bad');
+      p.office = null;
+    }
+    p.reputation = clamp100(p.reputation - 20);
+    log(state, `🚨 Investigators finally caught up with you — convicted and sentenced to ${sentence} year(s).`, 'bad');
+    headlines.push(`${p.name} convicted, sentenced to ${sentence} year${sentence === 1 ? '' : 's'} after a long-running investigation`);
   }
 
   // --- Study --------------------------------------------------------------
   if (p.studying) {
+    if (p.studying.skillId === undefined) { // backfill for saves from before V19 education depth
+      p.studying.skillId = SK.research;
+      p.studying.totalYears = p.studying.yearsLeft;
+    }
     p.money -= p.studying.costPerYear;
     p.studying.yearsLeft--;
     p.smarts = clamp100(p.smarts + 2);
     if (p.studying.yearsLeft <= 0) {
       p.education.push({ degree: p.studying.degree, field: p.studying.field, yearCompleted: state.year });
+      // The field you actually studied translates into a real, sizeable skill bump on
+      // graduation — not just generic smarts (a Finance degree makes you better at investing).
+      const skillGain = 12 + p.studying.totalYears * 2;
+      p.skills[p.studying.skillId] = clamp100((p.skills[p.studying.skillId] ?? 0) + skillGain);
       log(state, `You graduated with a ${p.studying.degree} in ${p.studying.field}.`, 'milestone');
       p.reputation = clamp100(p.reputation + 4);
       p.studying = null;
@@ -279,28 +341,111 @@ function tickPlayerLife(state: GameState, rng: RNG): void {
     const tax = gross * e.taxRates.income * 0.7; // effective rate below top marginal
     p.money += gross - tax;
     p.job.yearsInRole++;
+    p.job.yearsAtCompany++;
     const skillLvl = p.skills[INDUSTRY_BY_ID[p.job.industryId]?.skillId ?? ''] ?? 0;
-    p.job.performance = clamp100(p.job.performance + (p.smarts - 50) * 0.06 + skillLvl * 0.03 + rng.range(-6, 6));
-    // Raises & promotions
+    p.job.performance = clamp100(p.job.performance + (p.smarts - 50) * 0.06 + skillLvl * 0.03 - Math.max(0, p.job.stress - 40) * 0.04 + rng.range(-6, 6));
+
+    // Coworkers: rapport drifts, toxic/political personalities add ambient stress and
+    // occasionally cause a real incident that dents performance.
+    for (const cw of p.job.coworkers) {
+      if (cw.memory === undefined) cw.memory = []; // backfill for saves from before V17 NPC minds
+      const pers = COWORKER_PERSONALITY_BY_ID[cw.personality];
+      cw.rapport = clamp100(cw.rapport + rng.range(-2, 2));
+      p.job.stress = clamp100(p.job.stress + pers.stressPerYear);
+    }
+    const incident = p.job.coworkers.find((cw) => rng.chance(COWORKER_PERSONALITY_BY_ID[cw.personality].toxicityRisk));
+    if (incident) {
+      p.job.stress = clamp100(p.job.stress + 10);
+      p.job.performance = clamp100(p.job.performance - 4);
+      log(state, `${incident.name} caused friction at work — stress is up.`, 'bad');
+    }
+
+    // Work style, stress, reliability and their spillover into health/happiness.
+    p.job.stress = clamp100(p.job.stress + WORK_STYLE_BY_ID[p.job.workStyle].stressPerYear + rng.range(-2, 2));
+    p.job.reliability = clamp100(p.job.reliability - Math.max(0, p.job.stress - 60) * 0.1 + (p.health - 50) * 0.05);
+    p.happiness = clamp100(p.happiness - Math.max(0, p.job.stress - 70) * 0.05);
+    p.health = clamp100(p.health - Math.max(0, p.job.stress - 80) * 0.03);
+
+    // Raises: always some inflation adjustment, a bigger bump when performance is strong.
     if (p.job.performance > 70 && rng.chance(0.5)) {
       const bump = rng.range(0.04, 0.15);
       p.job.salary = Math.round(p.job.salary * (1 + bump + e.inflation));
-      if (rng.chance(0.3)) {
-        p.job.title = `Senior ${p.job.title.replace(/^Senior /, '')}`;
-        log(state, `Promoted! You are now ${p.job.title} earning $${p.job.salary.toLocaleString()}.`, 'good');
-      }
     } else {
       p.job.salary = Math.round(p.job.salary * (1 + e.inflation * 0.8));
     }
-    // Layoffs in downturns
+    // A small passive promotion chance; applyForPromotion() is the reliable player-driven path.
+    const curIdx = rankIndex(p.job.rank);
+    const curRank = CAREER_LADDER[curIdx];
+    if (curIdx < CAREER_LADDER.length - 1 && p.job.performance >= curRank.minPerformanceToPromote && p.job.yearsInRole >= curRank.minYearsToPromote && rng.chance(0.12)) {
+      const next = CAREER_LADDER[curIdx + 1];
+      p.job.rank = next.id;
+      p.job.yearsInRole = 0;
+      p.job.salary = Math.round(p.job.salary * (next.salaryMult / curRank.salaryMult));
+      log(state, `Promoted! You are now ${titleForRank(p.job.title, next.id)} earning $${p.job.salary.toLocaleString()}.`, 'good');
+      if (next.id === 'executive' && !state.achievements.includes('corner_office')) state.achievements.push('corner_office');
+    }
+    // Layoffs in downturns — sets a reference-check penalty for a few years.
     if ((e.regime === 'recession' || e.regime === 'depression') && rng.chance(0.12 + Math.max(0, 40 - p.job.performance) * 0.004)) {
-      log(state, `You were laid off from your job as ${p.job.title} at ${p.job.employerName}.`, 'bad');
+      log(state, `You were laid off from your job as ${titleForRank(p.job.title, p.job.rank)} at ${p.job.employerName}.`, 'bad');
       p.job = null;
+      p.lastFiredYear = state.year;
       p.happiness = clamp100(p.happiness - 8);
     }
     // Passive skill growth from working
     const ind = p.job ? INDUSTRY_BY_ID[p.job.industryId] : null;
     if (ind) p.skills[ind.skillId] = clamp100((p.skills[ind.skillId] ?? 0) + rng.range(2, 5));
+
+    // Random workplace events — real, bespoke effects rather than pure flavor text.
+    if (p.job && rng.chance(0.18)) {
+      const evt = rng.weighted(WORKPLACE_EVENTS, (x) => x.weight);
+      switch (evt.id) {
+        case 'restructure':
+          p.job.stress = clamp100(p.job.stress + 8);
+          if (rng.chance(0.3)) p.job.coworkers = p.job.coworkers.filter((c) => c.role === 'manager' || rng.chance(0.6));
+          break;
+        case 'manager_change': {
+          p.job.coworkers = p.job.coworkers.filter((c) => c.role !== 'manager');
+          p.job.coworkers.push({
+            id: `cw_${state.year}_m2`,
+            name: makePersonName(rng, rng.chance(0.5) ? 'male' : 'female'),
+            role: 'manager',
+            personality: rng.pick(COWORKER_PERSONALITIES).id,
+            rapport: Math.round(rng.range(35, 55)),
+            memory: [],
+          });
+          break;
+        }
+        case 'budget_cuts':
+          p.job.salary = Math.round(p.job.salary * 0.99); // effectively freezes/claws back the year's inflation bump
+          break;
+        case 'relocation':
+          p.job.stress = clamp100(p.job.stress + 6);
+          p.happiness = clamp100(p.happiness - 3);
+          break;
+        case 'automation':
+          if (ind) p.skills[ind.skillId] = clamp100((p.skills[ind.skillId] ?? 0) - rng.range(1, 4));
+          p.job.stress = clamp100(p.job.stress + 5);
+          break;
+        case 'accident':
+          p.health = clamp100(p.health - rng.range(3, 8));
+          p.job.stress = clamp100(p.job.stress + 6);
+          break;
+        case 'scandal':
+          p.job.stress = clamp100(p.job.stress + 4);
+          p.reputation = clamp100(p.reputation - 2);
+          break;
+      }
+      if (p.job) log(state, `${evt.icon} ${evt.label} at ${p.job.employerName}: ${evt.blurb}`, 'business');
+    }
+  } else {
+    // --- Unemployment ------------------------------------------------------
+    p.unemployedYears++;
+    const benefit = Math.max(0, 6_000 - p.unemployedYears * 1_200);
+    if (benefit > 0) p.money += benefit;
+    p.happiness = clamp100(p.happiness - Math.min(10, p.unemployedYears * 1.5));
+    if (p.unemployedYears >= 2) {
+      for (const k of Object.keys(p.skills)) p.skills[k] = clamp100(p.skills[k] - 1);
+    }
   }
 
   // --- Office -------------------------------------------------------------
@@ -364,6 +509,60 @@ function tickPlayerLife(state: GameState, rng: RNG): void {
       p.money *= 0.5;
       home.system = 'presidential';
       home.totalSeats = 150;
+    }
+  }
+
+  // Parliamentary systems can formally vote out a sitting player head of state — distinct from
+  // the dictator-coup above — when approval collapses, unrest is high, and the player's own party
+  // (if any) doesn't hold a working majority to protect them. Gated to at most once per year.
+  if (
+    home.leaderId === 'player' &&
+    home.system === 'parliamentary' &&
+    home.approvalOfGovernment < 22 &&
+    home.unrest > 45 &&
+    home.lastNoConfidenceYear !== state.year &&
+    rng.chance(0.2)
+  ) {
+    home.lastNoConfidenceYear = state.year;
+    const myParty = home.parties.find((x) => x.id === p.partyId);
+    const hasMajority = myParty ? myParty.seats / Math.max(1, home.totalSeats) >= 0.5 : false;
+    if (!hasMajority) {
+      log(state, '🏛️ Parliament passes a motion of no confidence — your government has fallen.', 'bad');
+      headlines.push(`${p.name}'s government falls in a no-confidence vote`);
+      const successor = Object.values(state.npcs).find((n) => n.alive && n.countryId === home.id && n.role === 'politician');
+      home.leaderId = successor?.id ?? null;
+      p.popularity = clamp100(p.popularity - 15);
+      p.politicalCapital = clamp(p.politicalCapital - 20, 0, 100);
+      home.electionInYears = Math.min(home.electionInYears, 1);
+    }
+  }
+
+  // --- Political scandal risk ---------------------------------------------
+  // Anyone with real political standing carries scandal risk proportional to how dirty their
+  // life actually is (notoriety, convictions, laundered money, law-enforcement heat) — a retained
+  // PR agency measurably softens the blow, same as it already does for the generic reputation
+  // hits elsewhere, and a severe uncontained scandal can force a resignation outright.
+  if (p.office || home.leaderId === 'player') {
+    const riskScore = p.notoriety * 0.4 + p.criminalRecord * 8 + (p.dirtyMoney > 0 ? 15 : 0) + Math.max(0, p.investigationHeat - 30) * 0.3;
+    const lastScandalYear = p.actionCooldowns.political_scandal ?? -999;
+    if (riskScore > 20 && state.year - lastScandalYear >= 2 && rng.chance(clamp(riskScore * 0.004, 0, 0.3))) {
+      p.actionCooldowns.political_scandal = state.year;
+      const dampened = p.prAgencyHired;
+      const popularityHit = dampened ? rng.range(4, 10) : rng.range(10, 22);
+      const reputationHit = dampened ? rng.range(3, 8) : rng.range(8, 18);
+      p.popularity = clamp100(p.popularity - popularityHit);
+      p.reputation = clamp100(p.reputation - reputationHit);
+      log(state, `📰 A political scandal broke over ${p.name}'s conduct.`, 'bad');
+      headlines.push(`${p.name} engulfed in a political scandal`);
+      if (!dampened && p.office && rng.chance(0.15)) {
+        log(state, `Pressure over the scandal forced ${p.name} to resign as ${p.office.title}.`, 'bad');
+        headlines.push(`${p.name} resigns as ${p.office.title} amid scandal`);
+        if (p.office.kind === 'head_of_state' && home.leaderId === 'player') {
+          const successor = Object.values(state.npcs).find((n) => n.alive && n.countryId === home.id && n.role === 'politician');
+          home.leaderId = successor?.id ?? null;
+        }
+        p.office = null;
+      }
     }
   }
 
@@ -459,12 +658,43 @@ function tickPlayerLife(state: GameState, rng: RNG): void {
   if (p.prAgencyHired) p.money -= 10_000;
 
   for (const prop of p.properties) {
-    prop.value = Math.max(10_000, prop.value * (e.housingIndex / Math.max(1, e.history.length >= 2 ? e.history[e.history.length - 2].housingIndex : 100)));
-    if (prop.rentalYield > 0) p.money += prop.value * prop.rentalYield * 0.85; // net of costs
+    if (prop.condition === undefined) { // backfill for saves from before building realism
+      prop.yearBuilt = state.year;
+      prop.condition = 90;
+      prop.energyEfficiency = 90;
+      prop.maintenanceLevel = 'standard';
+      prop.lastRenovatedYear = null;
+    }
+    if (prop.kind !== 'land') {
+      const decay = BASE_DECAY_BY_KIND[prop.kind] * MAINTENANCE_DECAY_MULT[prop.maintenanceLevel] + rng.range(-0.3, 0.3);
+      const upkeepDrift = prop.maintenanceLevel === 'premium' && prop.condition < 88 ? 1.2 : 0;
+      prop.condition = clamp100(prop.condition - decay + upkeepDrift);
+      prop.energyEfficiency = clamp100(prop.energyEfficiency - 0.4 - Math.max(0, 50 - prop.condition) * 0.01);
+      p.money -= prop.value * MAINTENANCE_COST_RATE[prop.maintenanceLevel];
+      if (prop.insured) p.money -= prop.value * 0.004 * (1 + Math.max(0, 50 - prop.condition) * 0.01);
+    }
+
+    const condValueMult = prop.kind === 'land' ? 1 : 1 + (prop.condition - 60) * 0.0006;
+    prop.value = Math.max(10_000, prop.value * (e.housingIndex / Math.max(1, e.history.length >= 2 ? e.history[e.history.length - 2].housingIndex : 100)) * condValueMult);
+
+    if (prop.rentalYield > 0) {
+      const condMult = prop.condition < 40 ? 0.55 : prop.condition < 65 ? 0.8 : prop.condition < 85 ? 1.0 : 1.08;
+      p.money += prop.value * prop.rentalYield * 0.85 * condMult; // net of costs
+    }
     if (prop.mortgage > 0) {
       const pay = prop.mortgage * (e.interestRate + 0.02) + prop.mortgage * 0.05;
       p.money -= pay;
       prop.mortgage = Math.max(0, prop.mortgage - prop.mortgage * 0.05);
+    }
+
+    if (prop.kind !== 'land' && prop.condition < 35 && rng.chance(0.05 + (35 - prop.condition) * 0.006)) {
+      const severity = rng.range(0.15, 0.32);
+      const loss = prop.value * severity * (prop.insured ? 0.4 : 1);
+      prop.value = Math.max(5_000, prop.value - loss);
+      prop.condition = clamp100(prop.condition - rng.range(10, 20));
+      log(state, prop.insured
+        ? `⚠️ Structural failure at ${prop.name} — insurance covered most of the $${Math.round(loss).toLocaleString()} damage.`
+        : `🔥 Structural failure at ${prop.name} — uninsured, you're out $${Math.round(loss).toLocaleString()}.`, 'bad');
     }
   }
 
@@ -476,11 +706,40 @@ function tickPlayerLife(state: GameState, rng: RNG): void {
     log(state, `You fell into debt and took emergency credit of $${Math.round(need).toLocaleString()}.`, 'bad');
   }
 
+  // --- Mental health: general life stress, distinct from job-specific stress -----------
+  // Fed by job stress bleeding over, financial pressure, marital tension, and unemployment;
+  // eases with happiness and, absent pressure, drifts back toward a calm baseline.
+  const spouseTension = p.spouseId ? (state.npcs[p.spouseId]?.relationshipTension ?? 0) : 0;
+  const stressPressure =
+    (p.job ? Math.max(0, p.job.stress - 50) * 0.12 : 0) +
+    (p.money < 5_000 ? 10 : p.money < 20_000 ? 4 : p.money > 1_000_000 ? -4 : 0) +
+    spouseTension * 0.06 +
+    (!p.job && !p.retired ? Math.min(18, p.unemployedYears * 2.5) : 0) -
+    Math.max(0, p.happiness - 60) * 0.08;
+  p.stress = clamp100(p.stress + stressPressure * 0.25 + rng.range(-2, 2) - (p.stress - 25) * 0.08);
+
+  if (p.burnoutUntilYear !== null && state.year > p.burnoutUntilYear) {
+    p.burnoutUntilYear = null;
+    p.stress = clamp100(p.stress - 20);
+    log(state, 'You\'ve recovered from burnout — things feel manageable again.', 'good');
+  } else if (p.burnoutUntilYear === null && p.stress > 80 && rng.chance(0.25)) {
+    p.burnoutUntilYear = state.year + rng.int(1, 3);
+    log(state, '🔥 Burnout hit hard this year — you\'re running on empty.', 'bad');
+    if (!state.achievements.includes('burned_out')) state.achievements.push('burned_out');
+    headlines.push(`Associates say ${p.name} is visibly burning out under the pressure`);
+  }
+  const burnedOut = p.burnoutUntilYear !== null && state.year <= p.burnoutUntilYear;
+  if (burnedOut) {
+    p.happiness = clamp100(p.happiness - 5);
+    p.health = clamp100(p.health - 3);
+    if (p.job) p.job.performance = clamp100(p.job.performance - 8);
+  }
+
   // --- Body & mind -----------------------------------------------------------
   const ageDecay = p.age > 70 ? 3.5 : p.age > 55 ? 2 : p.age > 40 ? 1 : 0.4;
-  p.health = clamp100(p.health - ageDecay + (p.happiness - 50) * 0.02 + rng.range(-2, 2));
+  p.health = clamp100(p.health - ageDecay + (p.happiness - 50) * 0.02 - Math.max(0, p.stress - 60) * 0.03 + rng.range(-2, 2));
   const moneyComfort = p.money > 100_000 ? 1 : p.money < 2_000 ? -2 : 0;
-  p.happiness = clamp100(p.happiness + moneyComfort + (p.health - 60) * 0.03 + rng.range(-3, 3));
+  p.happiness = clamp100(p.happiness + moneyComfort + (p.health - 60) * 0.03 - Math.max(0, p.stress - 70) * 0.04 + rng.range(-3, 3));
   p.notoriety = Math.max(0, p.notoriety - 1);
 
   // --- Mortality ----------------------------------------------------------------
@@ -490,6 +749,7 @@ function tickPlayerLife(state: GameState, rng: RNG): void {
   if (rng.chance(mortality * healthMult * (1 - home.healthcare / 300) * difficultyMortalityMult)) {
     p.alive = false;
   }
+  return headlines;
 }
 
 /** A rough 0..100 composite of wealth, dynasty, office and achievements at death. */
@@ -630,6 +890,18 @@ export function continueAsHeir(state: GameState, npcId: string): GameState {
     memoir: null,
     luxuryAssets: [],
     celebrityStakes: [],
+    lastFiredYear: null,
+    freelanceReputation: 30,
+    freelanceGigsCompleted: 0,
+    unemployedYears: 0,
+    socialFollowers: 0,
+    cancelledUntilYear: null,
+    lastSocialPostYear: null,
+    actionCooldowns: {},
+    yearsServedThisSentence: 0,
+    stress: 25,
+    burnoutUntilYear: null,
+    investigationHeat: 0,
   };
   delete state.npcs[npcId];
   state.player = newPlayer;
@@ -649,6 +921,37 @@ export function continueAsHeir(state: GameState, npcId: string): GameState {
  */
 export function advanceYear(state: GameState): GameState {
   if (state.gameOver) return state;
+  if (state.culturalProgressivism === undefined) { // backfill for saves from before V17 world evolution
+    state.culturalProgressivism = 50;
+    state.shockHistory = {};
+    state.industryEraMultiplier = {};
+  }
+  if (state.crimeFamilies === undefined) { // backfill for saves from before the Crime Syndicate Engine
+    state.crimeFamilies = [];
+    // Preserve an existing player membership as one real family so it isn't silently orphaned;
+    // other countries simply start without NPC families rather than retroactively regenerating
+    // a whole world of them for a save that predates this system.
+    if (state.player.crimeFamilyId) {
+      const home = state.countries.find((c) => c.id === state.player.countryId);
+      if (home) {
+        state.crimeFamilies.push({
+          id: `crime_${home.id}_legacy`,
+          name: 'The Old Guard',
+          countryId: home.id,
+          bossId: state.player.crimeFamilyId,
+          strength: clamp(50 + state.player.turfControl * 0.3, 0, 100),
+          turf: state.player.turfControl,
+          heat: state.player.investigationHeat ?? 20,
+          alliedWith: [],
+          atWarWith: [],
+          disbanded: false,
+        });
+      }
+    }
+  }
+  if (state.casinoJackpots === undefined) state.casinoJackpots = {}; // backfill for saves from before the Casino
+  if (state.player.casinoTotalWagered === undefined) state.player.casinoTotalWagered = 0;
+  if (state.player.casinoBiggestWin === undefined) state.player.casinoBiggestWin = 0;
   const rng = new RNG(state.seed);
   rng.state = state.rngState;
   const netWorthStart = netWorth(state);
@@ -663,8 +966,18 @@ export function advanceYear(state: GameState): GameState {
 
   // 1. World economy
   tickCommodities(state, rng);
+  tickIndustryEra(state, rng);
   const worldEventHeadlines = tickWorldEvents(state, rng);
   for (const h of worldEventHeadlines) logHistory(state, h);
+
+  // Cultural progressivism drifts slowly across decades — tech-forward eras (tech booms, AI
+  // disruption) push it up; crises (banking collapses, food shortages, currency crashes) push
+  // it back down as society turns inward. New births reflect the era they're born into (family.ts).
+  const evTypeNow = state.worldEvent?.type;
+  const culturalDrift = evTypeNow === 'tech_boom' || evTypeNow === 'ai_disruption' ? rng.range(0.1, 0.5)
+    : evTypeNow === 'banking_collapse' || evTypeNow === 'food_crisis' || evTypeNow === 'currency_crash' ? rng.range(-0.5, -0.1)
+    : rng.range(-0.15, 0.15);
+  state.culturalProgressivism = clamp(state.culturalProgressivism + culturalDrift, 0, 100);
   const politicalHeadlines: string[] = [...worldEventHeadlines];
   for (const country of state.countries) {
     const res = tickEconomy(state, country, rng);
@@ -686,6 +999,7 @@ export function advanceYear(state: GameState): GameState {
     politicalHeadlines.push(...gamesHeadlines);
   }
   politicalHeadlines.push(...tickNPCs(state, rng));
+  politicalHeadlines.push(...tickCrimeFamilies(state, rng));
 
   // 3. Companies & markets
   const businessHeadlines: string[] = [];
@@ -705,6 +1019,7 @@ export function advanceYear(state: GameState): GameState {
   businessHeadlines.push(...tickMergers(state, rng));
   businessHeadlines.push(...tickCorporateSabotage(state, rng));
   businessHeadlines.push(...tickIndustryAwards(state, rng));
+  businessHeadlines.push(...tickProducts(state, rng));
   tickMoonshots(state, rng);
   tickCEOs(state, rng);
   tickCrypto(state, rng);
@@ -712,7 +1027,7 @@ export function advanceYear(state: GameState): GameState {
   for (const l of tickMargin(state)) log(state, l, 'bad');
 
   // 4. The player's own year
-  tickPlayerLife(state, rng);
+  const playerHeadlines = tickPlayerLife(state, rng);
   if (state.player.alive) tickFamily(state, rng);
   if (state.player.alive) tickChallenge(state, rng);
   if (state.player.alive) for (const h of tickLifestyleAssets(state, rng)) log(state, h, 'money');
@@ -734,7 +1049,7 @@ export function advanceYear(state: GameState): GameState {
   state.pendingEvents = p.alive ? fireEvents(state, rng) : [];
 
   // 7. News
-  const news = generateNews(state, rng, politicalHeadlines.slice(0, 6), businessHeadlines.slice(0, 4));
+  const news = generateNews(state, rng, politicalHeadlines.slice(0, 6), businessHeadlines.slice(0, 4), playerHeadlines);
   state.news.push(...news);
   if (state.news.length > 400) state.news.splice(0, state.news.length - 400);
 

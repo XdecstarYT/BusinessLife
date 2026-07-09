@@ -16,9 +16,12 @@ import { Market } from './ui/screens/Market';
 import { Assets } from './ui/screens/Assets';
 import { Politics } from './ui/screens/Politics';
 import { World } from './ui/screens/World';
+import { Explore } from './ui/screens/Explore';
 import { News } from './ui/screens/News';
 import { Stats } from './ui/screens/Stats';
 import { Family } from './ui/screens/Family';
+import { Studio } from './ui/screens/Studio';
+import { Casino } from './ui/screens/Casino';
 
 export default function App() {
   const { state, screen, darkMode } = useGame();
@@ -44,13 +47,16 @@ export default function App() {
           {screen === 'life' && <Life />}
           {screen === 'career' && <Career />}
           {screen === 'business' && <Business />}
+          {screen === 'studio' && <Studio />}
           {screen === 'market' && <Market />}
           {screen === 'assets' && <Assets />}
           {screen === 'politics' && <Politics />}
           {screen === 'world' && <World />}
+          {screen === 'explore' && <Explore />}
           {screen === 'news' && <News />}
           {screen === 'stats' && <Stats />}
           {screen === 'family' && <Family />}
+          {screen === 'casino' && <Casino />}
         </div>
       </AppShell>
       <YearRecapModal />
