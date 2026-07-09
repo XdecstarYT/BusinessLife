@@ -699,6 +699,19 @@ export function attemptHostileTakeover(state: GameState, targetCompanyId: string
 // Property
 // ---------------------------------------------------------------------------
 
+// Each kind offers one or more price tiers — a distinct listing name and a price multiplier —
+// rather than a new PropertyAsset.kind per tier, so the rest of the codebase (decay rates,
+// icons, 3D massing) only ever has to switch on the original 7 kinds.
+const PROPERTY_TIERS: Record<PropertyAsset['kind'], { label: string; mult: number }[]> = {
+  apartment: [{ label: 'Apartment', mult: 1 }, { label: 'Luxury Apartment', mult: 2.1 }],
+  house: [{ label: 'House', mult: 1 }, { label: 'Luxury House', mult: 2.6 }],
+  mansion: [{ label: 'Mansion', mult: 1 }, { label: 'Grand Estate', mult: 2.4 }, { label: "Billionaire's Compound", mult: 5.5 }],
+  commercial: [{ label: 'Commercial Property', mult: 1 }, { label: 'Flagship Tower', mult: 2.8 }],
+  land: [{ label: 'Land', mult: 1 }],
+  island: [{ label: 'Private Island', mult: 1 }, { label: 'Private Island Estate', mult: 3.2 }],
+  penthouse: [{ label: 'Penthouse', mult: 1 }, { label: 'Sky Penthouse', mult: 2.5 }],
+};
+
 export function propertyListings(state: GameState): Omit<PropertyAsset, 'id' | 'purchasePrice' | 'mortgage' | 'insured' | 'yearBuilt' | 'condition' | 'energyEfficiency' | 'maintenanceLevel' | 'lastRenovatedYear'>[] {
   const p = state.player;
   const home = state.countries.find((c) => c.id === p.countryId)!;
@@ -707,12 +720,16 @@ export function propertyListings(state: GameState): Omit<PropertyAsset, 'id' | '
   const basePrices: Record<PropertyAsset['kind'], number> = {
     apartment: 220_000, house: 480_000, mansion: 2_800_000, commercial: 3_500_000, land: 900_000, island: 45_000_000, penthouse: 6_500_000,
   };
-  return kinds.map((kind) => {
-    const city = rng.pick(home.cities);
-    const value = Math.round(basePrices[kind] * city.costOfLiving * (home.economy.housingIndex / 100) * rng.range(0.85, 1.2));
-    const rentalYield = kind === 'land' ? 0 : kind === 'commercial' ? rng.range(0.06, 0.09) : kind === 'penthouse' ? rng.range(0.04, 0.07) : rng.range(0.03, 0.06);
-    return { name: `${kind[0].toUpperCase()}${kind.slice(1)} in ${city.name}`, kind, cityId: city.id, value, rentalYield, baseRentalYield: rentalYield };
-  });
+  const listings: Omit<PropertyAsset, 'id' | 'purchasePrice' | 'mortgage' | 'insured' | 'yearBuilt' | 'condition' | 'energyEfficiency' | 'maintenanceLevel' | 'lastRenovatedYear'>[] = [];
+  for (const kind of kinds) {
+    for (const tier of PROPERTY_TIERS[kind]) {
+      const city = rng.pick(home.cities);
+      const value = Math.round(basePrices[kind] * tier.mult * city.costOfLiving * (home.economy.housingIndex / 100) * rng.range(0.85, 1.2));
+      const rentalYield = kind === 'land' ? 0 : kind === 'commercial' ? rng.range(0.06, 0.09) : kind === 'penthouse' ? rng.range(0.04, 0.07) : rng.range(0.03, 0.06);
+      listings.push({ name: `${tier.label} in ${city.name}`, kind, cityId: city.id, value, rentalYield, baseRentalYield: rentalYield });
+    }
+  }
+  return listings;
 }
 
 export function buyProperty(state: GameState, listing: Omit<PropertyAsset, 'id' | 'purchasePrice' | 'mortgage' | 'insured' | 'yearBuilt' | 'condition' | 'energyEfficiency' | 'maintenanceLevel' | 'lastRenovatedYear'>, useMortgage: boolean): ActionResult {
@@ -765,6 +782,11 @@ export function renovateProperty(state: GameState, propertyId: string): ActionRe
   const p = state.player;
   const prop = p.properties.find((x) => x.id === propertyId);
   if (!prop) return { ok: false, message: 'Property not found.' };
+  if (prop.kind === 'land') return { ok: false, message: 'Undeveloped land has nothing to renovate.' };
+  // Gate on condition, not just cash: a property fresh off a renovation has nothing left to
+  // restore, which closes the same-turn spam loop (renovate → value jumps 10-15% → renovate
+  // again for free money) since renovation always resets condition comfortably above this bar.
+  if (prop.condition >= 88) return { ok: false, message: `${prop.name} is already in excellent condition — nothing to renovate yet.` };
   // Neglected properties need deeper (costlier) work to bring back up to code.
   const neglectSurcharge = Math.max(0, 70 - prop.condition) * 0.0015;
   const cost = Math.round(prop.value * (0.08 + neglectSurcharge));
@@ -775,7 +797,7 @@ export function renovateProperty(state: GameState, propertyId: string): ActionRe
   prop.value = Math.round(prop.value * (1 + bump));
   if (prop.rentalYield > 0) prop.baseRentalYield = Math.min(0.12, prop.baseRentalYield * 1.1);
   const wasCondemned = prop.condition < 20;
-  prop.condition = clamp100(92 + rng.range(-3, 3));
+  prop.condition = clamp100(94 + rng.range(-2, 2));
   prop.energyEfficiency = clamp100(prop.energyEfficiency + 20);
   prop.lastRenovatedYear = state.year;
   commit(state, rng);
@@ -1228,6 +1250,12 @@ export function holdInvestorConference(state: GameState, companyId: string): Act
   const p = state.player;
   const c = state.companies[companyId];
   if (!c || !c.playerOwned || !c.isPublic || c.status !== 'active') return { ok: false, message: 'Only public companies you control hold investor conferences.' };
+  // Free to attempt with no other natural cost, so — like other actions in this category
+  // (see onCooldown's doc comment) — it needs a rate limit or it's a free, compounding
+  // share-price farm when spammed in one sitting.
+  const cdKey = `investor_conference_${c.id}`;
+  if (onCooldown(state, cdKey)) return { ok: false, message: 'Analysts need time between conferences — once a year per company.' };
+  setCooldown(state, cdKey);
   const rng = withRng(state);
   const skill = (p.skills[SK.negotiation] ?? 0) + (p.skills[SK.publicSpeaking] ?? 0);
   const fundamentals = clamp((c.profit / Math.max(1, c.revenue)) * 2, -0.3, 0.3);
@@ -2494,6 +2522,10 @@ export function heist(state: GameState): ActionResult {
   const p = state.player;
   if (!p.crimeFamilyId) return { ok: false, message: 'You need to be in the family first.' };
   if (p.inJailYears > 0) return { ok: false, message: 'Not while incarcerated.' };
+  // A real score takes planning — no cooldown here meant a maxed-skill player could farm it
+  // repeatedly in one sitting for near-guaranteed money at 85% success and no cash cost.
+  if (onCooldown(state, 'heist')) return { ok: false, message: 'Your crew needs time to plan the next job — once a year.' };
+  setCooldown(state, 'heist');
   const rng = withRng(state);
   const skill = (p.skills[SK.streetSmarts] ?? 0) * 0.6 + (p.skills[SK.evasion] ?? 0) * 0.4;
   const chance = clamp(0.4 + skill * 0.004 + p.crimeRank * 0.03, 0.1, 0.85);
@@ -2531,6 +2563,10 @@ export function protectionRacket(state: GameState, targetCompanyId: string): Act
   if (!p.crimeFamilyId) return { ok: false, message: 'You need to be in the family first.' };
   const target = state.companies[targetCompanyId];
   if (!target || target.status !== 'active' || target.playerOwned) return { ok: false, message: 'Invalid target.' };
+  // No cash cost to the player, so without a cooldown every active company in the world could
+  // be shaken down in a single sitting for free money — cap it to once a year, same as heist.
+  if (onCooldown(state, 'protection_racket')) return { ok: false, message: 'Word travels fast — wait until next year to run another shakedown.' };
+  setCooldown(state, 'protection_racket');
   const rng = withRng(state);
   const take = Math.min(target.cash, target.revenue * 0.05 * p.crimeRank);
   if (take < 1000) return { ok: false, message: 'That business has nothing worth taking.' };
@@ -3473,42 +3509,6 @@ export function retire(state: GameState): ActionResult {
   if (!state.achievements.includes('retired')) state.achievements.push('retired');
   log(state, `🌅 You formally retired. Pension: $${p.pensionIncome.toLocaleString()}/yr.`, 'milestone');
   return { ok: true, message: `Retired with a $${p.pensionIncome.toLocaleString()}/yr pension.` };
-}
-
-export type CasinoGame = 'blackjack' | 'roulette' | 'slots';
-
-export function playCasino(state: GameState, game: CasinoGame, stake: number): ActionResult {
-  const p = state.player;
-  if (stake <= 0 || stake > p.money) return { ok: false, message: 'Invalid stake.' };
-  const rng = withRng(state);
-  p.money -= stake;
-  const pokerEdge = (p.skills[SK.poker] ?? 0) / 100;
-  let winChance: number;
-  let payoutMult: number;
-  if (game === 'blackjack') {
-    winChance = clamp(0.46 + pokerEdge * 0.08, 0.3, 0.56);
-    payoutMult = 2;
-  } else if (game === 'roulette') {
-    winChance = 0.47;
-    payoutMult = 2;
-  } else {
-    winChance = 0.12;
-    payoutMult = 8;
-  }
-  const won = rng.chance(winChance);
-  commit(state, rng);
-  p.skills[SK.poker] = clamp100((p.skills[SK.poker] ?? 0) + 1);
-  if (won) {
-    const winnings = Math.round(stake * payoutMult);
-    p.money += winnings;
-    p.happiness = clamp100(p.happiness + 3);
-    if (winnings - stake >= 50_000 && !state.achievements.includes('high_roller')) state.achievements.push('high_roller');
-    log(state, `🎰 Won $${(winnings - stake).toLocaleString()} at the casino (${game}).`, 'money');
-    return { ok: true, message: `You won $${(winnings - stake).toLocaleString()}!` };
-  }
-  p.happiness = clamp100(p.happiness - 2);
-  log(state, `🎰 Lost $${stake.toLocaleString()} at the casino (${game}).`, 'bad');
-  return { ok: true, message: `The house took your $${stake.toLocaleString()}.` };
 }
 
 export function writeMemoir(state: GameState, title: string): ActionResult {

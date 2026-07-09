@@ -278,6 +278,7 @@ export function generateWorld(config: NewGameConfig): GameState {
     shockHistory: {},
     industryEraMultiplier: {},
     crimeFamilies,
+    casinoJackpots: {},
   };
 
   // Public + private NPC companies per country (more in the player's home).
@@ -377,6 +378,8 @@ export function generateWorld(config: NewGameConfig): GameState {
     advisors: [],
     campaign: null,
     lastElectionResult: null,
+    casinoTotalWagered: 0,
+    casinoBiggestWin: 0,
     hasPrenup: false,
     lobbyingFirmHired: false,
     marginDebt: 0,

@@ -97,6 +97,7 @@ const ACHIEVEMENTS: Record<string, { label: string; icon: string }> = {
   foundation_million: { label: 'Million-Dollar Giver', icon: '💝' },
   retired: { label: 'Retired', icon: '🌅' },
   high_roller: { label: 'High Roller', icon: '🎰' },
+  jackpot_winner: { label: 'Jackpot Winner', icon: '🎉' },
   bestselling_author: { label: 'Bestselling Author', icon: '📖' },
   games_host: { label: 'Global Games Host', icon: '🏟️' },
   company_of_the_year: { label: 'Company of the Year', icon: '🏆' },

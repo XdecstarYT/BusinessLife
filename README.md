@@ -352,11 +352,16 @@ only moves when you tell it to, using the three buttons on the Life hub:
 - **Markets** — trade the stock exchange of your home nation with a live scrolling ticker of top movers;
   go long or short, trade on margin, collect and optionally reinvest dividends (DRIP), and set standing
   limit orders that fire on their own.
-- **Assets** — buy property (cash or mortgage, including penthouses) for rental income and appreciation,
-  renovate it, insure it, or move in yourself; take personal loans; buy government bonds; speculate long
-  or short on foreign currencies; take out life insurance for your family; and once you're rich enough,
-  buy into the billionaire lifestyle (private jets, yachts, islands, sports teams, racehorses, art) or
-  take a royalty stake in a celebrity's brand.
+- **Assets** — buy property (cash or mortgage) for rental income and appreciation, renovate it, insure it,
+  or move in yourself; take personal loans; buy government bonds; speculate long or short on foreign
+  currencies; take out life insurance for your family; and once you're rich enough, buy into the billionaire
+  lifestyle (private jets, yachts, islands, sports teams, racehorses, art) or take a royalty stake in a
+  celebrity's brand. Every property kind (apartment through private island) now lists a standard tier plus
+  one or two genuinely more expensive luxury tiers — a Billionaire's Compound runs 5x a base mansion — and
+  any listing or owned property can be viewed as a real, condition-aware 3D massing model (procedural, not a
+  literal architectural rendering — see public/models/README.md for why). Renovation now requires the
+  property to actually need it (condition below 88), closing a same-turn spam exploit that used to make
+  repeated renovation free money.
 - **Politics** — join/found a party, run for office with a manifesto of promises tracked through your term,
   campaign (rallies, ads, debates, press conferences, celebrity endorsements, consultants, polling),
   negotiate coalitions, appoint a cabinet if you lead the country, and legislate — or call a referendum to
@@ -384,6 +389,12 @@ only moves when you tell it to, using the three buttons on the Life hub:
   or declare war on a specific named rival family, and if your family gets crushed or wiped out you lose your
   standing with it (this is a family-level strength/turf/heat state machine, not a simulation of individual
   soldiers or a literal open-world crime map).
+- **Casino** — a real 3D casino floor (see the Casino tab) with six named, distinct slot machines — each its
+  own theme, stakes and volatility, with a real progressive jackpot pool that grows every spin and resets
+  when someone finally hits it — plus blackjack, roulette and high-stakes poker tables, and a VIP room
+  (Diamond Royale) unlocked once you're liquid enough. Every game keeps a genuine house edge: skill narrows
+  it (poker skill on the table games) but can never flip it into the player's favor, the same principle a
+  real casino runs on.
 - **Lifestyle** — 20+ quick activities on the Life hub, from the gym and charity to book clubs, therapy,
   adopting a pet, art collecting, wine tasting, poker nights, blogging and learning a language.
 

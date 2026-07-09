@@ -20,6 +20,15 @@ function freshNpcId(state: GameState): string {
   return `npc_f${npcCounter++}`;
 }
 
+// Local copy of actions.ts's per-year rate-limit pattern (same `actionCooldowns` field) —
+// not imported from there to avoid adding a family.ts <-> actions.ts module dependency.
+function onCooldown(state: GameState, key: string): boolean {
+  return state.player.actionCooldowns[key] === state.year;
+}
+function setCooldown(state: GameState, key: string): void {
+  state.player.actionCooldowns[key] = state.year;
+}
+
 export interface DatingCandidate {
   npcId: string;
   name: string;
@@ -62,6 +71,10 @@ export interface FamilyActionResult {
 export function propose(state: GameState, candidate: DatingCandidate, withPrenup = false): FamilyActionResult {
   const p = state.player;
   if (p.spouseId) return { ok: false, message: 'You are already married.' };
+  // The dowry below plus a prenup's capped settlement makes marry-then-divorce profitable —
+  // without a cooldown a rich enough candidate pool (datingPool is deterministic per year) lets
+  // that cycle be repeated in the same sitting for free money. One marriage per year closes it.
+  if (onCooldown(state, 'marriage')) return { ok: false, message: 'You need more time before your next proposal.' };
   const rng = new RNG(state.seed);
   rng.state = state.rngState;
   const chance = 0.35 + (p.charisma - 50) * 0.006 + (candidate.compatibility - 50) * 0.004 + (p.money > 100_000 ? 0.05 : 0);
@@ -101,6 +114,7 @@ export function propose(state: GameState, candidate: DatingCandidate, withPrenup
   state.npcs[npc.id] = npc;
   p.spouseId = npc.id;
   p.hasPrenup = withPrenup;
+  setCooldown(state, 'marriage');
   p.relationships.push({ npcId: npc.id, kind: 'spouse', closeness: 80 });
   p.money += candidate.wealth * 0.15; // modest dowry/shared assets
   p.happiness = clamp100(p.happiness + 15);

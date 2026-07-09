@@ -21,6 +21,7 @@ import { News } from './ui/screens/News';
 import { Stats } from './ui/screens/Stats';
 import { Family } from './ui/screens/Family';
 import { Studio } from './ui/screens/Studio';
+import { Casino } from './ui/screens/Casino';
 
 export default function App() {
   const { state, screen, darkMode } = useGame();
@@ -55,6 +56,7 @@ export default function App() {
           {screen === 'news' && <News />}
           {screen === 'stats' && <Stats />}
           {screen === 'family' && <Family />}
+          {screen === 'casino' && <Casino />}
         </div>
       </AppShell>
       <YearRecapModal />

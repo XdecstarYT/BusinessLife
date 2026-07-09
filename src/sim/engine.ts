@@ -949,6 +949,9 @@ export function advanceYear(state: GameState): GameState {
       }
     }
   }
+  if (state.casinoJackpots === undefined) state.casinoJackpots = {}; // backfill for saves from before the Casino
+  if (state.player.casinoTotalWagered === undefined) state.player.casinoTotalWagered = 0;
+  if (state.player.casinoBiggestWin === undefined) state.player.casinoBiggestWin = 0;
   const rng = new RNG(state.seed);
   rng.state = state.rngState;
   const netWorthStart = netWorth(state);

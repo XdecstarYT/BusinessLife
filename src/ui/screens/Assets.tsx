@@ -1,5 +1,5 @@
 /** Assets screen: property market, owned property, loans, bonds, forex, insurance. */
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { useGame } from '../../store/gameStore';
 import {
   buyBond,
@@ -23,9 +23,14 @@ import {
   withdrawSavings,
 } from '../../sim/actions';
 import { buyLuxuryAsset, divestCelebrityStake, investInCelebrityBrand, LUXURY_CATALOG, sellLuxuryAsset } from '../../sim/lifestyle';
-import { Badge, Button, Card, Field, Pill, PillRow, SectionHeader, StatBar } from '../components';
+import { Badge, Button, Card, Field, Modal, Pill, PillRow, SectionHeader, StatBar } from '../components';
 import { money, moneyFull, pct } from '../format';
 import type { MaintenanceLevel, PropertyAsset } from '../../sim/types';
+
+const PropertyScene = lazy(() => import('../three/PropertyScene').then((m) => ({ default: m.PropertyScene })));
+const SceneFallback = <div className="w-full h-56 rounded-2xl bg-slate-100 dark:bg-ink-800 animate-pulse" />;
+
+interface Preview3D { name: string; kind: PropertyAsset['kind']; value: number; condition: number }
 
 export function Assets() {
   const { state, run } = useGame();
@@ -40,6 +45,7 @@ export function Assets() {
   const [fxAmt, setFxAmt] = useState(10_000);
   const [fxCountry, setFxCountry] = useState('');
   const [premium, setPremium] = useState(200);
+  const [preview3D, setPreview3D] = useState<Preview3D | null>(null);
   if (!state) return null;
   const p = state.player;
   const home = state.countries.find((c) => c.id === p.countryId)!;
@@ -126,6 +132,7 @@ export function Assets() {
               onToggleInsurance={() => run(togglePropertyInsurance, prop.id)}
               onRefinance={() => run(refinanceMortgage, prop.id)}
               onMaintenance={(level) => run(setMaintenanceLevel, prop.id, level)}
+              onView3D={() => setPreview3D({ name: prop.name, kind: prop.kind, value: prop.value, condition: prop.condition })}
               year={state.year}
             />
           ))}
@@ -147,6 +154,7 @@ export function Assets() {
                 <div className="font-extrabold text-brand-500 shrink-0">{money(l.value)}</div>
               </div>
               <div className="grid grid-cols-2 gap-2 mt-3">
+                <Button size="sm" variant="soft" className="col-span-2" onClick={() => setPreview3D({ name: l.name, kind: l.kind, value: l.value, condition: 90 })}>🏛️ View in 3D</Button>
                 <Button size="sm" variant="soft" onClick={() => run(buyProperty, l, false)}>Buy Cash</Button>
                 <Button size="sm" onClick={() => run(buyProperty, l, true)}>Mortgage (20%)</Button>
               </div>
@@ -355,6 +363,14 @@ export function Assets() {
             ))}
         </div>
       )}
+
+      <Modal open={!!preview3D} onClose={() => setPreview3D(null)} title={preview3D?.name}>
+        {preview3D && (
+          <Suspense fallback={SceneFallback}>
+            <PropertyScene kind={preview3D.kind} value={preview3D.value} condition={preview3D.condition} />
+          </Suspense>
+        )}
+      </Modal>
     </div>
   );
 }
@@ -373,6 +389,7 @@ function PropertyCard({
   onToggleInsurance,
   onRefinance,
   onMaintenance,
+  onView3D,
   year,
 }: {
   prop: PropertyAsset;
@@ -382,6 +399,7 @@ function PropertyCard({
   onToggleInsurance: () => void;
   onRefinance: () => void;
   onMaintenance: (level: MaintenanceLevel) => void;
+  onView3D: () => void;
   year: number;
 }) {
   const appreciation = prop.value / prop.purchasePrice - 1;
@@ -434,7 +452,12 @@ function PropertyCard({
         </div>
       )}
       <div className="grid grid-cols-2 gap-2 mt-3">
-        <Button size="sm" variant="soft" onClick={onRenovate}>🔨 Renovate</Button>
+        <Button size="sm" variant="soft" className="col-span-2" onClick={onView3D}>🏛️ View in 3D</Button>
+        {prop.kind !== 'land' && (
+          <Button size="sm" variant="soft" disabled={prop.condition >= 88} onClick={onRenovate}>
+            {prop.condition >= 88 ? '🔨 Already Pristine' : '🔨 Renovate'}
+          </Button>
+        )}
         {prop.kind !== 'land' && (
           <Button size="sm" variant="soft" onClick={onToggleRental}>{prop.rentalYield > 0 ? 'Move In' : 'Rent Out'}</Button>
         )}

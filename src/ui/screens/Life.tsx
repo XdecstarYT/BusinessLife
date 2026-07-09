@@ -6,7 +6,7 @@
  */
 import { useState, type ReactNode } from 'react';
 import { useGame, type Screen } from '../../store/gameStore';
-import { attemptPrisonEscape, bribeJudge, contestTerritory, CRIME_RANK_TITLES, declareCrimeWar, doActivity, donateToFoundation, enterWitnessProtection, foundCharityFoundation, goStraight, heist, issuePublicApology, joinCrimeFamily, playCasino, postOnSocialMedia, proposeCrimeAlliance, requestParole, retire, socialMediaPostStyles, writeMemoir } from '../../sim/actions';
+import { attemptPrisonEscape, bribeJudge, contestTerritory, CRIME_RANK_TITLES, declareCrimeWar, doActivity, donateToFoundation, enterWitnessProtection, foundCharityFoundation, goStraight, heist, issuePublicApology, joinCrimeFamily, postOnSocialMedia, proposeCrimeAlliance, requestParole, retire, socialMediaPostStyles, writeMemoir } from '../../sim/actions';
 import { playerCrimeFamily } from '../../sim/crime';
 import { titleForRank } from '../../data/careers';
 import { netWorth } from '../../sim/engine';
@@ -323,12 +323,13 @@ export function Life() {
       })()}
 
       <SectionHeader title="Casino" />
-      <PillRow>
-        <Pill label="🃏 Blackjack ($1k)" onClick={() => run(playCasino, 'blackjack', 1_000)} />
-        <Pill label="🎡 Roulette ($1k)" onClick={() => run(playCasino, 'roulette', 1_000)} />
-        <Pill label="🎰 Slots ($500)" onClick={() => run(playCasino, 'slots', 500)} />
-        <Pill label="🃏 Blackjack ($25k)" onClick={() => run(playCasino, 'blackjack', 25_000)} />
-      </PillRow>
+      <Card className="p-4 flex items-center justify-between cursor-pointer active:scale-[0.99] transition-transform" onClick={() => setScreen('casino')}>
+        <div>
+          <div className="font-bold">🎰 Visit the Casino</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400">Named slot machines with real jackpots, blackjack, roulette, high-stakes poker.</div>
+        </div>
+        <IconArrowRight className="w-5 h-5 text-slate-400 shrink-0" />
+      </Card>
 
       <SectionHeader title="Legacy" />
       <Card className="p-4 mb-4 space-y-3">

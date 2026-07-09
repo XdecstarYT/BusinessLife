@@ -294,6 +294,8 @@ export interface Player {
     promises: ManifestoPromise[]; // manifesto pledges made at launch, tracked for fulfillment in office
   };
   lastElectionResult: ElectionResult | null; // transient: set on resolution, cleared once the UI shows it
+  casinoTotalWagered: number; // lifetime stake across all casino games, for the Stats screen
+  casinoBiggestWin: number; // single largest payout ever collected (any casino game, including a jackpot)
 }
 
 export interface ElectionResult {
@@ -1065,6 +1067,10 @@ export interface GameState {
   // every country, not just an abstract "rival crew" backdrop to the player's own crimeRank —
   // see sim/crime.ts. The player's own family (if any) is one of these, found by bossId.
   crimeFamilies: CrimeFamily[];
+
+  // Casino: sparse machineId -> current progressive jackpot pool. World-persistent (not reset per
+  // player action) so the pot really does grow between spins and pays out big when it finally hits.
+  casinoJackpots: Record<string, number>;
 }
 
 export interface CrimeFamily {
