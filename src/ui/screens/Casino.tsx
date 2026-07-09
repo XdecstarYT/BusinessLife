@@ -7,7 +7,7 @@
  * CSS toggle on its wrapping div (small inline box <-> fixed full-viewport), never a second
  * mount/unmount, so entering fullscreen doesn't spin up a second WebGL context.
  */
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useGame } from '../../store/gameStore';
 import {
   playCoinFlip, playTableGame, rouletteNumberColor, spinRoulette, spinSlotMachine,
@@ -48,6 +48,49 @@ export function Casino() {
   const [rouletteNumber, setRouletteNumber] = useState(17);
   const [coinSide, setCoinSide] = useState<CoinSide>('heads');
   const [fullscreen, setFullscreen] = useState(false);
+  const [isPortrait, setIsPortrait] = useState(() => typeof window !== 'undefined' && window.matchMedia('(orientation: portrait)').matches);
+  const fsContainerRef = useRef<HTMLDivElement>(null);
+
+  // Track real device orientation so the fullscreen view can show a "rotate your device" hint on
+  // browsers that don't support (or deny) the Screen Orientation lock below — mainly iOS Safari,
+  // which never implements orientation.lock at all.
+  useEffect(() => {
+    const mq = window.matchMedia('(orientation: portrait)');
+    const onChange = () => setIsPortrait(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  // The browser's own fullscreen exit (Esc key, Android back gesture, swipe-down on iOS) doesn't
+  // go through our button — without this the UI would keep showing "Exit Fullscreen" while no
+  // longer actually fullscreen.
+  useEffect(() => {
+    const onFsChange = () => {
+      if (!document.fullscreenElement) setFullscreen(false);
+    };
+    document.addEventListener('fullscreenchange', onFsChange);
+    return () => document.removeEventListener('fullscreenchange', onFsChange);
+  }, []);
+
+  const enterFullscreen = () => {
+    setFullscreen(true);
+    const el = fsContainerRef.current;
+    // Best-effort: real Fullscreen API (hides browser chrome) + landscape lock, chained so lock
+    // only fires after fullscreen actually engages. Either step can be unsupported or denied
+    // (iOS Safari supports neither for arbitrary elements) — the CSS `fixed inset-0` box below
+    // covers the viewport regardless, so a rejection here just means no OS-level fullscreen/lock,
+    // not a broken feature; the rotate-device hint covers the "can't force landscape" case.
+    Promise.resolve(el?.requestFullscreen?.())
+      .then(() => (screen as any).orientation?.lock?.('landscape'))
+      .catch(() => {});
+  };
+
+  const exitFullscreen = () => {
+    setFullscreen(false);
+    try { (screen as any).orientation?.unlock?.(); } catch { /* unsupported — ignore */ }
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  };
+
   if (!state) return null;
   const p = state.player;
   const liquidity = p.money + p.savingsBalance;
@@ -181,20 +224,31 @@ export function Casino() {
         edge here — narrowed by skill where skill applies, never flipped — same as a real casino.
       </p>
 
-      <div className={fullscreen ? 'fixed inset-0 z-[90] bg-black flex flex-col' : 'relative w-full h-64 rounded-2xl overflow-hidden'}>
+      <div
+        ref={fsContainerRef}
+        className={fullscreen ? 'fixed inset-0 z-[90] bg-black flex flex-col' : 'relative w-full h-64 rounded-2xl overflow-hidden'}
+      >
         <div className={fullscreen ? 'flex-1 min-h-0' : 'w-full h-full'}>
           <Suspense fallback={SceneFallback}>
             <CasinoScene machines={machineViews} tables={TABLES} selectedId={selected} />
           </Suspense>
         </div>
         <button
-          onClick={() => setFullscreen((f) => !f)}
-          className="absolute top-2 right-2 bg-black/60 hover:bg-black/80 text-white text-xs font-semibold px-3 py-1.5 rounded-full backdrop-blur transition-colors"
+          onClick={() => (fullscreen ? exitFullscreen() : enterFullscreen())}
+          className="absolute top-[calc(0.5rem+env(safe-area-inset-top))] right-[calc(0.5rem+env(safe-area-inset-right))] bg-black/60 hover:bg-black/80 text-white text-xs font-semibold px-3 py-1.5 rounded-full backdrop-blur transition-colors"
         >
           {fullscreen ? '✕ Exit Fullscreen' : '⛶ Fullscreen'}
         </button>
+        {fullscreen && isPortrait && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/70 pointer-events-none px-8">
+            <div className="text-center text-white">
+              <div className="text-4xl mb-2 animate-pulse">🔄</div>
+              <div className="text-sm font-semibold">Rotate your device for the best view</div>
+            </div>
+          </div>
+        )}
         {fullscreen && betPanel && (
-          <div className="p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] bg-gradient-to-t from-black via-black/90 to-transparent">
+          <div className="max-h-[45vh] overflow-y-auto p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] bg-gradient-to-t from-black via-black/90 to-transparent">
             {betPanel}
           </div>
         )}
@@ -256,7 +310,11 @@ export function Casino() {
             ))}
           </div>
 
-          {betPanel && <div className="mt-4 sticky bottom-20">{betPanel}</div>}
+          {/* Sticky pins the panel near the bottom nav so it's always reachable while scrolling
+              the machine/table lists — but on a short landscape phone viewport that leaves almost
+              no room, and the pinned panel ends up covering the whole screen including the
+              Fullscreen button. `landscape:static` drops the pin there so it just flows inline. */}
+          {betPanel && <div className="mt-4 sticky bottom-20 landscape:static">{betPanel}</div>}
         </>
       )}
     </div>

@@ -216,7 +216,7 @@ function makeSlotCabinet(m: CasinoMachineView): THREE.Group {
   return g;
 }
 
-function makeRouletteTable(): THREE.Group {
+function makeRouletteTable(chipCount: number): THREE.Group {
   const g = new THREE.Group();
   const sideMat = new THREE.MeshStandardMaterial({ color: 0x2b1b12, roughness: 0.55 });
   const feltMat = new THREE.MeshStandardMaterial({ map: feltLayoutTexture(), roughness: 0.85 });
@@ -232,7 +232,7 @@ function makeRouletteTable(): THREE.Group {
   const ball = new THREE.Mesh(new THREE.SphereGeometry(0.035, 12, 10), new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.85, roughness: 0.08 }));
   ball.position.set(0.32, 0.85, 0);
   g.add(ball);
-  const chips = makeChipStack(CHIP_COLORS, 6);
+  const chips = makeChipStack(CHIP_COLORS, chipCount);
   chips.position.set(0.58, 0.78, 0.4);
   g.add(chips);
   g.userData.wheel = wheel;
@@ -241,7 +241,7 @@ function makeRouletteTable(): THREE.Group {
   return g;
 }
 
-function makeCardTable(color: number): THREE.Group {
+function makeCardTable(color: number, chipCount: number): THREE.Group {
   const g = new THREE.Group();
   const base = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 0.7, 6), new THREE.MeshStandardMaterial({ color: 0x2b1b12, roughness: 0.6 }));
   base.position.y = 0.35;
@@ -257,7 +257,7 @@ function makeCardTable(color: number): THREE.Group {
     card.rotation.y = dx * 0.6;
     g.add(card);
   }
-  const chips = makeChipStack(CHIP_COLORS, 5);
+  const chips = makeChipStack(CHIP_COLORS, chipCount);
   chips.position.set(-0.4, 0.75, -0.15);
   g.add(chips);
   return g;
@@ -279,7 +279,7 @@ function makeCoinStand(color: number): THREE.Group {
   return g;
 }
 
-function makeChandelier(): THREE.Group {
+function makeChandelier(withLight: boolean): THREE.Group {
   const g = new THREE.Group();
   const chainMat = new THREE.MeshStandardMaterial({ color: 0x3a3226, metalness: 0.6, roughness: 0.4 });
   const chain = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 1.1, 6), chainMat);
@@ -295,9 +295,14 @@ function makeChandelier(): THREE.Group {
     bulb.position.set(Math.cos(a) * 0.42, 4.05, Math.sin(a) * 0.42);
     g.add(bulb);
   }
-  const glow = new THREE.PointLight(0xffdca0, 1.1, 11);
-  glow.position.y = 4.1;
-  g.add(glow);
+  // The emissive bulbs above read as "lit" on their own — the actual dynamic PointLight is a real
+  // per-fragment cost multiplied across every other material in the scene, so mobile only gets it
+  // on the one chandelier that's actually kept (see CasinoScene's quality-gated instantiation).
+  if (withLight) {
+    const glow = new THREE.PointLight(0xffdca0, 1.1, 11);
+    glow.position.y = 4.1;
+    g.add(glow);
+  }
   return g;
 }
 
@@ -321,22 +326,30 @@ export function CasinoScene({ machines, tables, selectedId }: CasinoSceneProps) 
 
   useThreeScene(
     ref,
-    ({ scene, camera, addStars }) => {
+    ({ scene, camera, addStars, quality }) => {
+      // Every extra real-time light multiplies the per-fragment cost of every PBR material in
+      // range, and this room has a lot of small decorative meshes (chip stacks, reel windows,
+      // chandeliers) — phone GPUs without a shadow map to hide behind still pay full price for
+      // that, so mobile gets a meaningfully lighter room: 2 lights instead of 5, no columns, one
+      // chandelier instead of two, and fewer chips per stack.
+      const desktop = quality === 'desktop';
       scene.fog = new THREE.Fog(0x120a1a, 9, 28);
       scene.background = new THREE.Color(0x120a1a);
-      addStars(150);
-      scene.add(new THREE.AmbientLight(0x6644aa, 0.32));
+      addStars(desktop ? 150 : 60);
+      scene.add(new THREE.AmbientLight(0x6644aa, desktop ? 0.32 : 0.4));
       const warm = new THREE.PointLight(0xffb347, 1.3, 15);
       warm.position.set(0, 4, 2);
       scene.add(warm);
-      const magenta = new THREE.PointLight(0xd946ef, 0.7, 12);
-      magenta.position.set(-4, 3, -3);
-      scene.add(magenta);
-      const cyan = new THREE.PointLight(0x22d3ee, 0.6, 12);
-      cyan.position.set(4, 3, -3);
-      scene.add(cyan);
+      if (desktop) {
+        const magenta = new THREE.PointLight(0xd946ef, 0.7, 12);
+        magenta.position.set(-4, 3, -3);
+        scene.add(magenta);
+        const cyan = new THREE.PointLight(0x22d3ee, 0.6, 12);
+        cyan.position.set(4, 3, -3);
+        scene.add(cyan);
+      }
 
-      const floor = new THREE.Mesh(new THREE.CircleGeometry(9, 48), new THREE.MeshStandardMaterial({ map: carpetTexture(), roughness: 0.95 }));
+      const floor = new THREE.Mesh(new THREE.CircleGeometry(9, desktop ? 48 : 28), new THREE.MeshStandardMaterial({ map: carpetTexture(), roughness: 0.95 }));
       floor.rotation.x = -Math.PI / 2;
       scene.add(floor);
 
@@ -344,22 +357,25 @@ export function CasinoScene({ machines, tables, selectedId }: CasinoSceneProps) 
       // real room, not a fog-shrouded void — the single biggest cue that this is a place you
       // could walk into.
       const wall = new THREE.Mesh(
-        new THREE.CylinderGeometry(9, 9, 5, 48, 1, true, -Math.PI * 0.95, Math.PI * 1.9),
+        new THREE.CylinderGeometry(9, 9, 5, desktop ? 48 : 28, 1, true, -Math.PI * 0.95, Math.PI * 1.9),
         new THREE.MeshStandardMaterial({ color: 0x2a1533, roughness: 0.9, side: THREE.BackSide }),
       );
       wall.position.y = 2.5;
       scene.add(wall);
 
-      for (const x of [-6.5, 6.5]) {
-        const col = makeColumn();
-        col.position.set(x, 0, -3.5);
-        scene.add(col);
+      if (desktop) {
+        for (const x of [-6.5, 6.5]) {
+          const col = makeColumn();
+          col.position.set(x, 0, -3.5);
+          scene.add(col);
+        }
       }
-      for (const x of [-2.8, 2.8]) {
-        const chandelier = makeChandelier();
+      const chandelierPositions = desktop ? [-2.8, 2.8] : [0];
+      chandelierPositions.forEach((x, i) => {
+        const chandelier = makeChandelier(i === 0); // only the first chandelier carries a real light
         chandelier.position.set(x, 0, 0.5);
         scene.add(chandelier);
-      }
+      });
 
       // Slot machines, arced along the back wall.
       const cabinets = machines.map((m, i) => {
@@ -376,8 +392,9 @@ export function CasinoScene({ machines, tables, selectedId }: CasinoSceneProps) 
       });
 
       // Table games, front and center.
+      const chipCount = desktop ? 6 : 3;
       const tableGroups = tables.map((t, i) => {
-        const grp = t.id === 'roulette' ? makeRouletteTable() : t.id === 'heads_or_tails' ? makeCoinStand(t.color) : makeCardTable(t.color);
+        const grp = t.id === 'roulette' ? makeRouletteTable(chipCount) : t.id === 'heads_or_tails' ? makeCoinStand(t.color) : makeCardTable(t.color, chipCount);
         grp.position.set((i - (tables.length - 1) / 2) * 1.8, 0, 2.2);
         grp.userData.id = t.id;
         grp.userData.baseY = grp.position.y;

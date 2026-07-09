@@ -398,7 +398,10 @@ only moves when you tell it to, using the three buttons on the Life hub:
   red/black/odd/even/high/low outside bets, real payouts), and a fair 50/50 heads-or-tails coin toss on a
   spinning stand. Every game keeps a genuine house edge: skill narrows it (poker skill on the card tables)
   but can never flip it into the player's favor, the same principle a real casino runs on. A VIP room
-  (Diamond Royale) unlocks once you're liquid enough.
+  (Diamond Royale) unlocks once you're liquid enough. Fullscreen requests real landscape orientation on
+  browsers that support it (with a rotate-your-device hint where they don't, mainly iOS Safari), and the room
+  itself is deliberately lighter on phones — fewer real-time lights and decorative meshes — since a phone GPU
+  pays full price for every light with no shadow map to hide behind.
 - **Lifestyle** — 20+ quick activities on the Life hub, from the gym and charity to book clubs, therapy,
   adopting a pet, art collecting, wine tasting, poker nights, blogging and learning a language.
 
