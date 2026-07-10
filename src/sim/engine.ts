@@ -8,8 +8,8 @@ import type { Country, GameState, LifeLogEntry, MaintenanceLevel, Player, Proper
 import { clamp, clamp100 } from './types';
 import { RNG } from './rng';
 import { tickCommodities, tickEconomy } from './economy';
-import { npcManageCompany, tickCompany, tickMergers, tickCorporateSabotage, tickIndustryEra, companyValuation } from './business';
-import { tickStock, portfolioValue, checkLimitOrders, tickMargin } from './market';
+import { npcManageCompany, tickCompany, tickMergers, tickCorporateSabotage, tickIndustryEra, tickNpcIPOs, companyValuation } from './business';
+import { tickStock, portfolioValue, checkLimitOrders, tickMargin, tickStockLifecycle } from './market';
 import { campaignWinChance, electionRegionalBreakdown, OFFICE_SPEC_BY_KIND, promiseFulfillment, promiseMetricValue, tickNPCs, tickPolitics } from './politics';
 import { tickCrimeFamilies } from './crime';
 import { fireEvents } from './events';
@@ -1017,12 +1017,14 @@ export function advanceYear(state: GameState): GameState {
     tickStock(company, state, rng);
   }
   businessHeadlines.push(...tickMergers(state, rng));
+  businessHeadlines.push(...tickNpcIPOs(state, rng));
   businessHeadlines.push(...tickCorporateSabotage(state, rng));
   businessHeadlines.push(...tickIndustryAwards(state, rng));
   businessHeadlines.push(...tickProducts(state, rng));
   tickMoonshots(state, rng);
   tickCEOs(state, rng);
   tickCrypto(state, rng);
+  for (const l of tickStockLifecycle(state, rng)) log(state, l, 'money');
   for (const l of checkLimitOrders(state)) log(state, l, 'money');
   for (const l of tickMargin(state)) log(state, l, 'bad');
 

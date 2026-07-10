@@ -63,6 +63,7 @@ const ACHIEVEMENTS: Record<string, { label: string; icon: string }> = {
   paragon: { label: 'Paragon', icon: '😇' },
   property_baron: { label: 'Property Baron', icon: '🏘️' },
   condemned_no_more: { label: 'Condemned No More', icon: '🏚️' },
+  property_developer: { label: 'Property Developer', icon: '🏗️' },
   corner_office: { label: 'Corner Office', icon: '🏙️' },
   first_gig: { label: 'First Gig', icon: '🧰' },
   gig_economy_star: { label: 'Gig Economy Star', icon: '⭐' },

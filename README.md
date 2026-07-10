@@ -13,6 +13,17 @@ state instead of affecting anything else if you have no connection.
 
 ## Highlights
 
+- **V30 — the city is alive: every public company gets a real skyline building.** Explore's plaza now
+  renders a second, outer skyline ring beyond the ten fixed system buildings — one procedurally-built
+  tower per publicly-listed company in your home country (banded and capped so the ring stays readable
+  even with hundreds of companies in the world), tinted by sector and sized by the company's real
+  `hqTier`. IPO a company (yours or an NPC's — public companies now IPO on their own over time, not just
+  when the player triggers it) and it spends its first year behind scaffolding, a crane and a "COMING
+  SOON" sign before the real tower opens; upgrade the HQ afterward and the building updates live. The
+  plaza itself got a pass too: a three-stop day → dusk → night sky gradient and a fading starfield.
+  Alongside the city work: stock splits and NPC share buybacks in the market, a build-to-suit action that
+  turns vacant land into a house/apartment block/commercial property, and continued verification that the
+  existing spin-off, buyback and hostile-takeover systems already cover the deep-business-and-stocks ask.
 - **V29 content pass — ~400 new features, all data-driven.** 108 new industries across every one of the
   12 sectors (347 total), 70 new laws across 17 categories (185 total), 92 new daily flavor events (139
   total), 105 new yearly event templates across all ten categories (257 total), and 20 new milestone
@@ -454,8 +465,8 @@ src/
     types.ts           All game types; GameState is the single source of truth
     world.ts           World generation from country seeds + the player
     economy.ts         Macro cycle, rates, inflation, assets, commodities, demographics
-    business.ts        Company simulation, valuation, HQ tiers/culture, NPC merger consolidation
-    market.ts          Stock exchange, trading, shorting, dividends
+    business.ts        Company simulation, valuation, HQ tiers/culture, NPC merger consolidation, NPC IPOs
+    market.ts          Stock exchange, trading, shorting, dividends, splits, buybacks, IPO construction lifecycle
     politics.ts        Office ladder, elections, legislation, cabinet, coalitions, geopolitics, NPC lives,
                        budget allocation, infrastructure projects, manifesto promise tracking
     family.ts          Dating, marriage, children, succession planning (business + political), estate

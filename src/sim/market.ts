@@ -19,8 +19,10 @@ export function marketCap(c: Company): number {
   return c.isPublic ? c.sharePrice * c.sharesOutstanding : 0;
 }
 
-/** Take a private company public. Returns cash raised into the company. */
-export function doIPO(c: Company, rng: RNG): number {
+/** Take a private company public. `ipoYear` defaults to the founding year (for world-gen
+ * backstory companies whose IPO predates play, so they never render as "under construction");
+ * pass the current game year for a real player/NPC IPO that happens mid-game. */
+export function doIPO(c: Company, rng: RNG, ipoYear?: number): number {
   const value = Math.max(c.revenue * 1.5, c.profit * 14) + c.assets - c.debt;
   const hype = rng.range(0.8, 1.4);
   const priced = Math.max(1_000_000, value * hype);
@@ -30,11 +32,18 @@ export function doIPO(c: Company, rng: RNG): number {
   c.sharesOutstanding += newShares;
   c.playerSharePct = c.playerOwned ? c.playerSharePct * (c.sharesOutstanding - newShares) / c.sharesOutstanding : 0;
   c.isPublic = true;
+  c.ipoYear = ipoYear ?? c.foundedYear;
   c.sharePrice = priced / c.sharesOutstanding;
   c.cash += raise;
   c.institutionalOwnPct = rng.range(0.2, 0.5);
   c.analystExpectation = Math.max(c.profit * 1.1, c.revenue * 0.06);
   return raise;
+}
+
+/** True through the calendar year after ipoYear — the "under construction" window during
+ * which a freshly-public company's HQ building hasn't finished going up on the city map yet. */
+export function isBuildingUnderConstruction(c: Company, year: number): boolean {
+  return c.isPublic && c.ipoYear !== null && year <= c.ipoYear;
 }
 
 export function tickStock(c: Company, state: GameState, rng: RNG): void {
@@ -173,6 +182,51 @@ export function coverShort(state: GameState, companyId: string, fraction: number
   h.shares += toCover;
   p.portfolio = p.portfolio.filter((x) => x.shares !== 0);
   return { ok: true, message: `Covered ${toCover.toLocaleString()} shares.` };
+}
+
+/** Value-neutral share retirement for NPC companies (mirrors the player-facing buybackShares in
+ * actions.ts — same "no price bump" math, see that function's comment for why). Not exported:
+ * only ever called from the yearly lifecycle tick below, never directly by the player. */
+function npcBuyback(c: Company, spend: number): void {
+  if (spend <= 0 || spend > c.cash) return;
+  const sharesRetired = spend / c.sharePrice;
+  if (sharesRetired >= c.sharesOutstanding * 0.5) return;
+  c.cash -= spend;
+  c.sharesOutstanding -= sharesRetired;
+}
+
+/** Yearly stock-lifecycle pass: splits shares when the price runs too high for a healthy float
+ * (keeps per-share prices in a readable band over long playthroughs instead of drifting into the
+ * tens of thousands), and lets cash-rich mature NPC public companies occasionally retire their own
+ * stock the same way the player can via actions.ts's buybackShares. */
+export function tickStockLifecycle(state: GameState, rng: RNG): string[] {
+  const logs: string[] = [];
+  for (const c of Object.values(state.companies)) {
+    if (!c.isPublic || c.status !== 'active') continue;
+
+    if (c.sharePrice >= 400) {
+      const ratio = c.sharePrice >= 2000 ? 10 : 4;
+      c.sharePrice /= ratio;
+      c.sharesOutstanding *= ratio;
+      for (const h of state.player.portfolio) {
+        if (h.companyId !== c.id) continue;
+        h.shares *= ratio;
+        h.costBasis /= ratio;
+      }
+      for (const o of state.player.limitOrders) {
+        if (o.companyId === c.id) o.targetPrice /= ratio;
+      }
+      if (c.playerOwned || state.player.portfolio.some((h) => h.companyId === c.id)) {
+        logs.push(`${c.name} splits its stock ${ratio}-for-1.`);
+      }
+      continue;
+    }
+
+    if (!c.playerOwned && c.cash > c.revenue * 0.5 && c.profit > 0 && rng.chance(0.05)) {
+      npcBuyback(c, c.cash * rng.range(0.05, 0.15));
+    }
+  }
+  return logs;
 }
 
 /** Buy shares partly with borrowed money. Buying power = cash + 50% of current long portfolio value. */

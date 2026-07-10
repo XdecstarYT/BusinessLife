@@ -28,21 +28,23 @@ export type HubArchetype = 'tower' | 'bank' | 'capitol' | 'exchange' | 'storefro
 export type HubSeason = 'spring' | 'summer' | 'autumn' | 'winter';
 
 export interface HubBuilding {
-  id: HubBuildingId;
+  id: string; // the 10 fixed system ids, or a company id for the IPO skyline ring
   label: string;
   sublabel: string;
   archetype: HubArchetype;
   tier: 0 | 1 | 2 | 3; // drives lighting/size/extra props — reflects real sim state
   accent: string; // hex, used for glow/trim/banner color
   dormant?: boolean; // nothing built here yet — smaller, unlit, inviting rather than reactive
+  constructing?: boolean; // fresh IPO, one year from breaking ground to opening — scaffolding + crane, not a real building yet
+  kind?: 'system' | 'company'; // system buildings sit on the inner ring; companies fill the outer skyline
   quickAction?: { label: string; icon: string }; // an action offered right here, without leaving the plaza
 }
 
 interface CityHubSceneProps {
   buildings: HubBuilding[];
   season: HubSeason;
-  onEnter: (id: HubBuildingId) => void;
-  onQuickAction?: (id: HubBuildingId) => void;
+  onEnter: (id: string) => void;
+  onQuickAction?: (id: string) => void;
 }
 
 const PLAZA_RADIUS = 11;
@@ -51,6 +53,11 @@ const WALK_BOUND = 9.9;
 const ENTER_RADIUS = 2.3;
 const EXIT_RADIUS = 2.8;
 const MOVE_SPEED = 4.2;
+// Company buildings (one per IPO'd business) fill an outer skyline ring beyond the fixed system
+// ring, banded so an unbounded company count never crowds into an unreadable single circle.
+const COMPANIES_PER_BAND = 12;
+const COMPANY_BAND_GAP = 3.2;
+const COMPANY_RING_BASE = RING_RADIUS + 4.5;
 
 const SEASON_FOLIAGE: Record<HubSeason, { leaf: string; ground: string }> = {
   spring: { leaf: '#5fae5a', ground: '#3f8f52' },
@@ -449,7 +456,79 @@ function buildKiosk(group: THREE.Group, tier: number, accent: string, dormant: b
   group.add(board);
 }
 
+/** A freshly-IPO'd company's first year: scaffolding cage, safety netting, a translucent ghost
+ * of the future tower (tinted by the company's real accent color), a crane and a "COMING SOON"
+ * sign. Swapped out for the real tier-driven building the moment isBuildingUnderConstruction()
+ * (see src/sim/market.ts) turns false. */
+function buildConstructionSite(group: THREE.Group, tier: number, accent: string): void {
+  const w = 1.8, d = 1.8;
+  const h = 1.4 + tier * 0.6;
+  const slab = new THREE.Mesh(new THREE.BoxGeometry(w * 1.05, 0.1, d * 1.05), new THREE.MeshStandardMaterial({ color: 0x555a52, roughness: 0.9 }));
+  slab.position.y = 0.05;
+  group.add(slab);
+  const poleMat = new THREE.MeshStandardMaterial({ color: 0xc9a227, roughness: 0.6, metalness: 0.3 });
+  const corners: [number, number][] = [[-w / 2, -d / 2], [w / 2, -d / 2], [-w / 2, d / 2], [w / 2, d / 2]];
+  for (const [cx, cz] of corners) {
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, h, 6), poleMat);
+    pole.position.set(cx, h / 2, cz);
+    group.add(pole);
+  }
+  const braceLevels = Math.max(1, Math.round(h / 0.7));
+  for (let lvl = 1; lvl <= braceLevels; lvl++) {
+    const y = (lvl / (braceLevels + 1)) * h;
+    const braceZ1 = new THREE.Mesh(new THREE.BoxGeometry(w, 0.03, 0.03), poleMat);
+    braceZ1.position.set(0, y, -d / 2);
+    group.add(braceZ1);
+    const braceZ2 = braceZ1.clone();
+    braceZ2.position.z = d / 2;
+    group.add(braceZ2);
+    const braceX1 = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.03, d), poleMat);
+    braceX1.position.set(-w / 2, y, 0);
+    group.add(braceX1);
+    const braceX2 = braceX1.clone();
+    braceX2.position.x = w / 2;
+    group.add(braceX2);
+  }
+  const net = new THREE.Mesh(
+    new THREE.BoxGeometry(w * 1.02, h, d * 1.02),
+    new THREE.MeshStandardMaterial({ color: 0x1c8a5c, transparent: true, opacity: 0.32, side: THREE.DoubleSide, roughness: 1 }),
+  );
+  net.position.y = h / 2;
+  group.add(net);
+  const ghost = new THREE.Mesh(
+    new THREE.BoxGeometry(w * 0.7, h * 0.6, d * 0.7),
+    new THREE.MeshStandardMaterial({ color: accent, transparent: true, opacity: 0.5, roughness: 0.6 }),
+  );
+  ghost.position.y = h * 0.3;
+  group.add(ghost);
+  const craneMat = new THREE.MeshStandardMaterial({ color: 0xffb020 });
+  const mastH = h + 2;
+  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, mastH, 8), craneMat);
+  mast.position.set(w * 0.9, mastH / 2, 0);
+  group.add(mast);
+  const jib = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.06, 0.06), craneMat);
+  jib.position.set(w * 0.9 + 0.7, mastH, 0);
+  group.add(jib);
+  const counterJib = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.06, 0.06), craneMat);
+  counterJib.position.set(w * 0.9 - 0.32, mastH, 0);
+  group.add(counterJib);
+  const hookCable = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.9, 4), new THREE.MeshStandardMaterial({ color: 0x333333 }));
+  hookCable.position.set(w * 0.9 + 1.1, mastH - 0.45, 0);
+  group.add(hookCable);
+  const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 8), new THREE.MeshBasicMaterial({ color: 0xff3b30 }));
+  beacon.position.set(w * 0.9, mastH + 0.15, 0);
+  beacon.userData.blink = true;
+  group.add(beacon);
+  const sign = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.1, 0.35),
+    new THREE.MeshStandardMaterial({ map: signTexture('COMING SOON'), emissive: 0xffffff, emissiveMap: signTexture('COMING SOON'), emissiveIntensity: 0.7 }),
+  );
+  sign.position.set(0, 0.5, d / 2 + 0.15);
+  group.add(sign);
+}
+
 function buildBuilding(group: THREE.Group, b: HubBuilding, foliage: string): void {
+  if (b.constructing) { buildConstructionSite(group, b.tier, b.accent); return; }
   switch (b.archetype) {
     case 'tower': buildTower(group, b.tier, b.accent, !!b.dormant); return;
     case 'bank': buildBank(group, b.tier, b.accent); return;
@@ -531,8 +610,8 @@ function makePedestrian(shirtColor: number, pantsColor = 0x2b3140): THREE.Group 
 export function CityHubScene({ buildings, season, onEnter, onQuickAction }: CityHubSceneProps) {
   const ref = useRef<HTMLDivElement>(null);
   const inputRef = useRef({ x: 0, z: 0 });
-  const nearbyRef = useRef<HubBuildingId | null>(null);
-  const [nearby, setNearby] = useState<HubBuildingId | null>(null);
+  const nearbyRef = useRef<string | null>(null);
+  const [nearby, setNearby] = useState<string | null>(null);
   const [joyKnob, setJoyKnob] = useState<{ x: number; y: number } | null>(null);
   const joyBaseRef = useRef<HTMLDivElement>(null);
   const joyPointerId = useRef<number | null>(null);
@@ -610,7 +689,17 @@ export function CityHubScene({ buildings, season, onEnter, onQuickAction }: City
     ref,
     ({ scene, camera, makeLabel, quality }) => {
       const castsShadows = quality === 'desktop';
-      scene.fog = new THREE.Fog(0x0b1220, 14, 40);
+
+      // System buildings keep their original fixed inner ring; company buildings (one per IPO'd
+      // business) fill an outer skyline ring banded so the plaza grows gracefully instead of
+      // packing an unbounded company count into one crowded circle.
+      const systemBuildings = buildings.filter((b) => b.kind !== 'company');
+      const companyBuildings = buildings.filter((b) => b.kind === 'company');
+      const bandCount = companyBuildings.length ? Math.floor((companyBuildings.length - 1) / COMPANIES_PER_BAND) + 1 : 0;
+      const dynamicPlazaRadius = bandCount > 0 ? COMPANY_RING_BASE + (bandCount - 1) * COMPANY_BAND_GAP + 3 : PLAZA_RADIUS;
+      const dynamicWalkBound = Math.max(WALK_BOUND, dynamicPlazaRadius - 1.1);
+
+      scene.fog = new THREE.Fog(0x0b1220, 14, Math.max(40, dynamicPlazaRadius * 3));
       scene.background = new THREE.Color(0x0b1220);
 
       const hemi = new THREE.HemisphereLight(0x99b3d9, 0x2a2f22, 0.6);
@@ -620,10 +709,10 @@ export function CityHubScene({ buildings, season, onEnter, onQuickAction }: City
       if (castsShadows) {
         sun.castShadow = true;
         sun.shadow.mapSize.set(1024, 1024);
-        sun.shadow.camera.left = -PLAZA_RADIUS - 2;
-        sun.shadow.camera.right = PLAZA_RADIUS + 2;
-        sun.shadow.camera.top = PLAZA_RADIUS + 2;
-        sun.shadow.camera.bottom = -PLAZA_RADIUS - 2;
+        sun.shadow.camera.left = -dynamicPlazaRadius - 2;
+        sun.shadow.camera.right = dynamicPlazaRadius + 2;
+        sun.shadow.camera.top = dynamicPlazaRadius + 2;
+        sun.shadow.camera.bottom = -dynamicPlazaRadius - 2;
         sun.shadow.camera.near = 1;
         sun.shadow.camera.far = 30;
         sun.shadow.bias = -0.0015;
@@ -633,18 +722,31 @@ export function CityHubScene({ buildings, season, onEnter, onQuickAction }: City
       scene.add(fill);
 
       const ground = new THREE.Mesh(
-        new THREE.CircleGeometry(PLAZA_RADIUS, 48),
+        new THREE.CircleGeometry(dynamicPlazaRadius, 48),
         new THREE.MeshStandardMaterial({ map: plazaGroundTexture(), roughness: 0.95 }),
       );
       ground.rotation.x = -Math.PI / 2;
       ground.receiveShadow = castsShadows;
       scene.add(ground);
 
-      // Buildings, ring around the plaza, each with a floating name label.
-      const buildingMeshes: { id: HubBuildingId; group: THREE.Group; pos: { x: number; z: number } }[] = [];
-      buildings.forEach((b, i) => {
-        const angle = (i / buildings.length) * Math.PI * 2;
-        const x = Math.cos(angle) * RING_RADIUS, z = Math.sin(angle) * RING_RADIUS;
+      // Buildings: system ring + company skyline ring, each with a floating name label.
+      const buildingMeshes: { id: string; group: THREE.Group; pos: { x: number; z: number } }[] = [];
+      let companyIndex = 0;
+      buildings.forEach((b) => {
+        let x: number, z: number;
+        if (b.kind === 'company') {
+          const i = companyIndex++;
+          const band = Math.floor(i / COMPANIES_PER_BAND);
+          const idxInBand = i % COMPANIES_PER_BAND;
+          const countInBand = Math.min(COMPANIES_PER_BAND, companyBuildings.length - band * COMPANIES_PER_BAND);
+          const angle = (idxInBand / countInBand) * Math.PI * 2 + band * 0.35;
+          const radius = COMPANY_RING_BASE + band * COMPANY_BAND_GAP;
+          x = Math.cos(angle) * radius; z = Math.sin(angle) * radius;
+        } else {
+          const i = systemBuildings.indexOf(b);
+          const angle = (i / systemBuildings.length) * Math.PI * 2;
+          x = Math.cos(angle) * RING_RADIUS; z = Math.sin(angle) * RING_RADIUS;
+        }
         const group = new THREE.Group();
         buildBuilding(group, b, foliage.leaf);
         if (castsShadows) {
@@ -655,8 +757,9 @@ export function CityHubScene({ buildings, season, onEnter, onQuickAction }: City
         group.position.set(x, 0, z);
         group.lookAt(0, 0, 0);
         scene.add(group);
+        const labelY = b.constructing ? 2.4 + b.tier * 0.4 : b.kind === 'company' ? 3.6 + b.tier * 0.9 : 3.6;
         const label = makeLabel(b.label, 0.5);
-        label.position.set(x, 3.6, z);
+        label.position.set(x, labelY, z);
         scene.add(label);
         buildingMeshes.push({ id: b.id, group, pos: { x, z } });
 
@@ -664,7 +767,7 @@ export function CityHubScene({ buildings, season, onEnter, onQuickAction }: City
         // into public/models/, the HQ tower swaps to it automatically. Nothing ships there
         // today, so loadModel resolves null and the procedural tower above stays exactly as
         // built — this is a fallback path, not a placeholder that needs removing later.
-        if (b.archetype === 'tower') {
+        if (b.archetype === 'tower' && !b.constructing) {
           loadModel('/models/office_tower.glb').then((model) => {
             if (!model) return;
             while (group.children.length) group.remove(group.children[0]);
@@ -731,8 +834,30 @@ export function CityHubScene({ buildings, season, onEnter, onQuickAction }: City
       if (castsShadows) { playerBody.castShadow = true; nose.castShadow = true; }
       scene.add(player);
 
+      // Night starfield: fades in as the sun sets, scaled to the plaza so it always sits
+      // comfortably outside the skyline ring regardless of how many companies are listed.
+      const starCount = 260;
+      const starPositions = new Float32Array(starCount * 3);
+      for (let i = 0; i < starCount; i++) {
+        const r = dynamicPlazaRadius * 1.7 + Math.random() * dynamicPlazaRadius * 0.9;
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos(2 * Math.random() - 1) * 0.55;
+        starPositions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+        starPositions[i * 3 + 1] = Math.abs(r * Math.cos(phi)) * 0.7 + 5;
+        starPositions[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
+      }
+      const starGeo = new THREE.BufferGeometry();
+      starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+      const starMat = new THREE.PointsMaterial({ color: 0xdfe8ff, size: 0.14, sizeAttenuation: true, transparent: true, opacity: 0, fog: false });
+      scene.add(new THREE.Points(starGeo, starMat));
+
       camera.position.set(0, 5.2, 8);
       camera.lookAt(0, 1, 0);
+
+      const skyDay = new THREE.Color(0x8fc4e8);
+      const skyDusk = new THREE.Color(0xe08a4f);
+      const skyNight = new THREE.Color(0x050914);
+      const skyScratch = new THREE.Color();
 
       let heading = 0;
       let lastT = 0;
@@ -751,9 +876,9 @@ export function CityHubScene({ buildings, season, onEnter, onQuickAction }: City
           player.position.x += nx * MOVE_SPEED * dt * Math.min(mag, 1);
           player.position.z += nz * MOVE_SPEED * dt * Math.min(mag, 1);
           const dist = Math.hypot(player.position.x, player.position.z);
-          if (dist > WALK_BOUND) {
-            player.position.x = (player.position.x / dist) * WALK_BOUND;
-            player.position.z = (player.position.z / dist) * WALK_BOUND;
+          if (dist > dynamicWalkBound) {
+            player.position.x = (player.position.x / dist) * dynamicWalkBound;
+            player.position.z = (player.position.z / dist) * dynamicWalkBound;
           }
           const targetHeading = Math.atan2(nx, nz);
           let diff = targetHeading - heading;
@@ -764,7 +889,7 @@ export function CityHubScene({ buildings, season, onEnter, onQuickAction }: City
         }
 
         // --- proximity / enter prompt ---
-        let closest: HubBuildingId | null = null;
+        let closest: string | null = null;
         let closestDist = Infinity;
         for (const bm of buildingMeshes) {
           const d = Math.hypot(player.position.x - bm.pos.x, player.position.z - bm.pos.z);
@@ -790,18 +915,24 @@ export function CityHubScene({ buildings, season, onEnter, onQuickAction }: City
         const isNight = sunY < 0.08;
         sun.intensity = Math.max(0.08, sunY) * 1.3;
         hemi.intensity = 0.25 + Math.max(0, sunY) * 0.45;
-        const skyDay = new THREE.Color(0x8fc4e8), skyNight = new THREE.Color(0x050914);
-        const skyT = Math.max(0, Math.min(1, (sunY + 0.25) / 1.1));
-        const sky = skyDay.clone().lerp(skyNight, 1 - skyT);
-        (scene.fog as THREE.Fog).color = sky;
-        (scene.background as THREE.Color).copy(sky);
+        // Three-stop sky (day → dusk → night) instead of a flat two-color lerp: sunset briefly
+        // reads as a real amber horizon instead of blue fading straight to black.
+        if (sunY >= 0.05) {
+          skyScratch.copy(skyDay).lerp(skyDusk, THREE.MathUtils.clamp(1 - (sunY - 0.05) / 0.55, 0, 1));
+        } else {
+          skyScratch.copy(skyDusk).lerp(skyNight, THREE.MathUtils.clamp(1 - (sunY + 0.3) / 0.35, 0, 1));
+        }
+        (scene.fog as THREE.Fog).color = skyScratch;
+        (scene.background as THREE.Color).copy(skyScratch);
         for (const bulb of lamps) (bulb.material as THREE.MeshStandardMaterial).emissiveIntensity = isNight ? 1.4 : 0.15;
+        starMat.opacity = THREE.MathUtils.clamp(1 - Math.max(0, sunY) * 3.5, 0, 0.85);
 
         // --- ambient traffic & pedestrians ---
+        const roadRadius = dynamicPlazaRadius - 1.3;
         for (const car of cars) {
           car.userData.angle += car.userData.speed * dt;
           const a = car.userData.angle;
-          car.position.set(Math.cos(a) * 9.7, 0.05, Math.sin(a) * 9.7);
+          car.position.set(Math.cos(a) * roadRadius, 0.05, Math.sin(a) * roadRadius);
           car.rotation.y = -a + Math.PI / 2;
         }
         for (const ped of peds) {
@@ -823,7 +954,7 @@ export function CityHubScene({ buildings, season, onEnter, onQuickAction }: City
         }
       };
     },
-    [buildings.map((b) => `${b.id}:${b.tier}:${b.accent}:${b.dormant}`).join(','), season],
+    [buildings.map((b) => `${b.id}:${b.tier}:${b.accent}:${b.dormant}:${b.constructing}:${b.kind}`).join(','), season],
     { controls: 'none' },
   );
 

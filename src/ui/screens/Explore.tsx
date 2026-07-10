@@ -1,20 +1,26 @@
 /**
  * Explore: a walkable 3D plaza layered over the real simulation — the
  * primary way to reach every major system, not a side visualization. Ten
- * buildings are computed fresh from live GameState every render, so what
- * you see always matches what's true: a bankrupt company's HQ is dark and
- * boarded, Parliament only flies a flag if you hold office, the Exchange
- * glows with the real market trend. Walking up to a building opens the
- * real screen for that system, and some offer a quick action — a
- * promotion push at the office, a moment of meditation at the park — right
- * there in the plaza.
+ * fixed system buildings plus a skyline ring of every public company (see
+ * MAX_COMPANY_BUILDINGS) are computed fresh from live GameState every
+ * render, so what you see always matches what's true: a bankrupt company's
+ * HQ is dark and boarded, Parliament only flies a flag if you hold office,
+ * the Exchange glows with the real market trend, and a company that just
+ * IPO'd sits behind scaffolding for a year before its real tier-driven
+ * tower opens (see isBuildingUnderConstruction in sim/market.ts). Walking
+ * up to a building opens the real screen for that system, and some offer a
+ * quick action — a promotion push at the office, a moment of meditation at
+ * the park — right there in the plaza.
  */
 import { lazy, Suspense } from 'react';
 import { useGame, type Screen } from '../../store/gameStore';
 import { netWorth } from '../../sim/engine';
 import { playerProducts } from '../../sim/products';
 import { applyForPromotion, doActivity } from '../../sim/actions';
+import { isBuildingUnderConstruction, marketCap } from '../../sim/market';
+import { INDUSTRY_BY_ID } from '../../data/industries';
 import { SectionHeader } from '../components';
+import { money } from '../format';
 import type { HubBuilding, HubBuildingId, HubSeason } from '../three/CityHubScene';
 
 const CityHubScene = lazy(() => import('../three/CityHubScene').then((m) => ({ default: m.CityHubScene })));
@@ -51,6 +57,18 @@ function seasonFromDay(calendarDay: number): HubSeason {
 function clampTier(n: number): 0 | 1 | 2 | 3 {
   return Math.max(0, Math.min(3, Math.round(n))) as 0 | 1 | 2 | 3;
 }
+
+// Every public company gets a building on the skyline ring, tinted by its sector so the city
+// reads as a real mixed-industry downtown rather than a wall of identical gray towers.
+const SECTOR_ACCENT: Record<string, string> = {
+  Retail: '#f59e0b', Food: '#ef4444', Technology: '#38bdf8', Finance: '#d8b24a',
+  Energy: '#22c55e', Industrial: '#94a3b8', Property: '#a78bfa', Transport: '#0ea5e9',
+  Media: '#f472b6', Health: '#34d399', Services: '#facc15', Emerging: '#c084fc',
+};
+// The skyline ring can't render every NPC company in the world (there are hundreds) without
+// becoming an unreadable, unusably slow wall of towers — cap it to the biggest, most relevant
+// ones by market cap, which also happens to be the set a player actually cares about walking past.
+const MAX_COMPANY_BUILDINGS = 24;
 
 export function Explore() {
   const { state, setScreen, run, toast } = useGame();
@@ -147,13 +165,46 @@ export function Explore() {
     accent: '#f59e0b', quickAction: latestNews ? { icon: '📰', label: 'Skim the headlines' } : undefined,
   };
 
-  const buildings = [hq, bank, parliament, exchange, studio, homeBuilding, careerOffice, park, docks, newsstand];
+  const systemBuildings = [hq, bank, parliament, exchange, studio, homeBuilding, careerOffice, park, docks, newsstand];
+
+  // --- Skyline: one building per publicly-listed company, freshest IPOs still scaffolded ---
+  const publicCompanies = Object.values(state.companies)
+    .filter((c) => c.isPublic && c.status === 'active' && c.countryId === p.countryId)
+    .sort((a, b) => marketCap(b) - marketCap(a))
+    .slice(0, MAX_COMPANY_BUILDINGS);
+  const companyBuildings: HubBuilding[] = publicCompanies.map((c) => {
+    const ind = INDUSTRY_BY_ID[c.industryId];
+    const constructing = isBuildingUnderConstruction(c, state.year);
+    return {
+      id: c.id,
+      label: c.name,
+      sublabel: constructing ? 'Breaking ground — opens next year' : `${ind?.sector ?? 'Public'} · cap ${money(marketCap(c))}`,
+      archetype: 'tower',
+      tier: clampTier(c.hqTier),
+      accent: c.playerOwned ? '#e8b84a' : (SECTOR_ACCENT[ind?.sector ?? ''] ?? '#8b5cf6'),
+      constructing,
+      kind: 'company',
+    };
+  });
+
+  const buildings = [...systemBuildings, ...companyBuildings];
   const season = seasonFromDay(state.calendarDay);
 
-  const handleQuickAction = (id: HubBuildingId) => {
+  const handleQuickAction = (id: string) => {
     if (id === 'office') { run(applyForPromotion); return; }
     if (id === 'park') { run(doActivity, 'meditate'); return; }
     if (id === 'newsstand' && latestNews) { toast(`📰 ${latestNews.outlet}: "${latestNews.headline}"`); return; }
+  };
+
+  const handleEnter = (id: string) => {
+    if (id in HUB_SCREEN) { setScreen(HUB_SCREEN[id as HubBuildingId]); return; }
+    const company = state.companies[id];
+    if (!company) return;
+    if (isBuildingUnderConstruction(company, state.year)) {
+      toast(`🏗️ ${company.name}'s new headquarters is still under construction — check back next year.`);
+      return;
+    }
+    setScreen(company.playerOwned ? 'business' : 'market');
   };
 
   return (
@@ -161,12 +212,13 @@ export function Explore() {
       <SectionHeader title="🧭 Explore" />
       <p className="text-xs text-slate-500 dark:text-slate-400 mb-3 px-1">
         Walk your city block. Every building reflects your real empire — approach one and step inside, or use the quick action on offer.
+        {publicCompanies.length > 0 && ` The skyline beyond the plaza is every public company in ${home.name}, ${publicCompanies.length} strong.`}
       </p>
       <Suspense fallback={SceneFallback}>
-        <CityHubScene buildings={buildings} season={season} onEnter={(id) => setScreen(HUB_SCREEN[id])} onQuickAction={handleQuickAction} />
+        <CityHubScene buildings={buildings} season={season} onEnter={handleEnter} onQuickAction={handleQuickAction} />
       </Suspense>
       <div className="grid grid-cols-3 gap-2 mt-3">
-        {buildings.map((b) => (
+        {systemBuildings.map((b) => (
           <div key={b.id} className="rounded-xl bg-slate-100 dark:bg-ink-800 p-2 text-center">
             <div className="text-[10px] font-bold truncate" style={{ color: b.accent }}>{b.label}</div>
             <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">{b.sublabel}</div>

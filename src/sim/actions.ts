@@ -497,7 +497,7 @@ export function takeCompanyPublic(state: GameState, companyId: string): ActionRe
   if (c.isPublic) return { ok: false, message: 'Already public.' };
   if (c.revenue < 5_000_000) return { ok: false, message: 'Company needs $5m+ revenue to IPO.' };
   const rng = withRng(state);
-  const raised = doIPO(c, rng);
+  const raised = doIPO(c, rng, state.year);
   if (!state.achievements.includes('ipo_ceo')) state.achievements.push('ipo_ceo');
   commit(state, rng);
   log(state, `📈 ${c.name} went public, raising $${Math.round(raised).toLocaleString()}. You retain ${Math.round(c.playerSharePct * 100)}%.`, 'business');
@@ -804,6 +804,42 @@ export function renovateProperty(state: GameState, propertyId: string): ActionRe
   if (wasCondemned && !state.achievements.includes('condemned_no_more')) state.achievements.push('condemned_no_more');
   log(state, `Renovated ${prop.name}, boosting its value by ${Math.round(bump * 100)}% and restoring it to like-new condition.`, 'money');
   return { ok: true, message: `${prop.name} renovated.` };
+}
+
+const DEVELOPMENT_KINDS: { kind: PropertyAsset['kind']; label: string; costMult: number; rentalYield: [number, number] }[] = [
+  { kind: 'house', label: 'a house', costMult: 0.9, rentalYield: [0.03, 0.06] },
+  { kind: 'apartment', label: 'an apartment block', costMult: 1.4, rentalYield: [0.05, 0.08] },
+  { kind: 'commercial', label: 'a commercial building', costMult: 2.2, rentalYield: [0.07, 0.1] },
+];
+
+/** Build on a vacant land parcel, converting it into an income-producing structure. Development
+ * cost scales off the land's own value (a premium lot costs more to build on), so this is a real
+ * capital commitment rather than a free value-up — distinct from renovateProperty, which only
+ * restores an already-built property's condition. */
+export function developProperty(state: GameState, propertyId: string, developKind: PropertyAsset['kind']): ActionResult {
+  const p = state.player;
+  const prop = p.properties.find((x) => x.id === propertyId);
+  if (!prop) return { ok: false, message: 'Property not found.' };
+  if (prop.kind !== 'land') return { ok: false, message: 'Only vacant land can be developed.' };
+  const spec = DEVELOPMENT_KINDS.find((d) => d.kind === developKind);
+  if (!spec) return { ok: false, message: 'Not a valid development type.' };
+  const cost = Math.round(prop.value * spec.costMult);
+  if (cost > p.money) return { ok: false, message: `Developing ${spec.label} costs $${cost.toLocaleString()}.` };
+  const rng = withRng(state);
+  p.money -= cost;
+  prop.kind = developKind;
+  prop.value += cost;
+  prop.purchasePrice += cost;
+  prop.yearBuilt = state.year;
+  prop.condition = 95;
+  prop.energyEfficiency = 90;
+  const yieldPct = rng.range(spec.rentalYield[0], spec.rentalYield[1]);
+  prop.baseRentalYield = yieldPct;
+  prop.rentalYield = 0;
+  commit(state, rng);
+  if (!state.achievements.includes('property_developer')) state.achievements.push('property_developer');
+  log(state, `🏗️ Broke ground on ${prop.name}, developing it into ${spec.label} for $${cost.toLocaleString()}.`, 'money');
+  return { ok: true, message: `${prop.name} developed into ${spec.label}.` };
 }
 
 export function setMaintenanceLevel(state: GameState, propertyId: string, level: MaintenanceLevel): ActionResult {

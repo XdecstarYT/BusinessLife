@@ -8,6 +8,7 @@ import type { Company, Country, GameState, Industry } from './types';
 import { clamp, clamp01, clamp100 } from './types';
 import { aggregateLawEffects, lawIndustryModifier } from './economy';
 import { INDUSTRY_BY_ID } from '../data/industries';
+import { doIPO } from './market';
 import type { RNG } from './rng';
 
 let companyCounter = 0;
@@ -64,6 +65,7 @@ export function createCompany(opts: FoundCompanyOptions, rng: RNG): Company {
     marketingPct: 0.05,
     rdPct: industry.techIntensity * 0.06,
     isPublic: false,
+    ipoYear: null,
     sharesOutstanding: 1_000_000 * Math.max(1, Math.round(scale)),
     sharePrice: 0,
     dividendPayoutPct: 0,
@@ -454,6 +456,21 @@ export function tickMergers(state: GameState, rng: RNG): string[] {
     acquirer.brand = clamp100(acquirer.brand + 3);
     target.status = 'acquired';
     headlines.push(`${acquirer.name} acquires rival ${target.name} in a market consolidation.`);
+  }
+  return headlines;
+}
+
+/** Strong private NPC companies occasionally go public on their own, keeping the stock market —
+ * and the city skyline (see CityHubScene's IPO construction lifecycle) — growing over time even
+ * when the player never triggers an IPO themselves. */
+export function tickNpcIPOs(state: GameState, rng: RNG): string[] {
+  const headlines: string[] = [];
+  for (const c of Object.values(state.companies)) {
+    if (c.status !== 'active' || c.playerOwned || c.isPublic) continue;
+    if (c.revenue < 8_000_000 || c.profit <= 0) continue;
+    if (!rng.chance(0.04)) continue;
+    const raised = doIPO(c, rng, state.year);
+    headlines.push(`${c.name} goes public, raising $${Math.round(raised).toLocaleString()} on the exchange.`);
   }
   return headlines;
 }

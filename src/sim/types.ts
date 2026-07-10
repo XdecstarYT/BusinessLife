@@ -596,6 +596,7 @@ export interface Company {
   rdPct: number; // fraction of revenue spent on R&D
 
   isPublic: boolean;
+  ipoYear: number | null; // year doIPO() ran; building is "under construction" through the following year
   sharesOutstanding: number;
   sharePrice: number;
   dividendPayoutPct: number; // fraction of profit paid out

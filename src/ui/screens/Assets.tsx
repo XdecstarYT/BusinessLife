@@ -8,6 +8,7 @@ import {
   cancelLifeInsurance,
   closeForexPosition,
   depositSavings,
+  developProperty,
   openForexPosition,
   openTermDeposit,
   propertyListings,
@@ -128,6 +129,7 @@ export function Assets() {
               prop={prop}
               onSell={() => run(sellProperty, prop.id)}
               onRenovate={() => run(renovateProperty, prop.id)}
+              onDevelop={(kind) => run(developProperty, prop.id, kind)}
               onToggleRental={() => run(toggleRentalStatus, prop.id)}
               onToggleInsurance={() => run(togglePropertyInsurance, prop.id)}
               onRefinance={() => run(refinanceMortgage, prop.id)}
@@ -381,10 +383,17 @@ const MAINTENANCE_LEVELS: { id: MaintenanceLevel; label: string }[] = [
   { id: 'premium', label: 'Premium' },
 ];
 
+const DEVELOP_OPTIONS: { kind: PropertyAsset['kind']; label: string; mult: number }[] = [
+  { kind: 'house', label: '🏡 House', mult: 0.9 },
+  { kind: 'apartment', label: '🏢 Apartments', mult: 1.4 },
+  { kind: 'commercial', label: '🏬 Commercial', mult: 2.2 },
+];
+
 function PropertyCard({
   prop,
   onSell,
   onRenovate,
+  onDevelop,
   onToggleRental,
   onToggleInsurance,
   onRefinance,
@@ -395,6 +404,7 @@ function PropertyCard({
   prop: PropertyAsset;
   onSell: () => void;
   onRenovate: () => void;
+  onDevelop: (kind: PropertyAsset['kind']) => void;
   onToggleRental: () => void;
   onToggleInsurance: () => void;
   onRefinance: () => void;
@@ -449,6 +459,19 @@ function PropertyCard({
               <Pill key={m.id} label={m.label} active={prop.maintenanceLevel === m.id} onClick={() => onMaintenance(m.id)} />
             ))}
           </PillRow>
+        </div>
+      )}
+      {isLand && (
+        <div className="mt-3">
+          <div className="text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Develop this land</div>
+          <div className="grid grid-cols-3 gap-2">
+            {DEVELOP_OPTIONS.map((d) => (
+              <Button key={d.kind} size="sm" variant="soft" onClick={() => onDevelop(d.kind)}>
+                {d.label}
+              </Button>
+            ))}
+          </div>
+          <p className="text-[11px] text-slate-400 mt-1">Build cost ≈ {Math.round(DEVELOP_OPTIONS[0].mult * 100)}–{Math.round(DEVELOP_OPTIONS[2].mult * 100)}% of land value.</p>
         </div>
       )}
       <div className="grid grid-cols-2 gap-2 mt-3">
