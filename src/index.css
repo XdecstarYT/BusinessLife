@@ -21,6 +21,12 @@
   --color-ink-800: #16223a;
   --color-ink-700: #223252;
   --color-ink-600: #33456b;
+  /* Layered elevation: ambient wash + tight contact shadow reads as depth,
+     not the single flat drop-shadow of a default card. */
+  --shadow-lift: 0 1px 2px rgb(15 23 42 / 0.04), 0 4px 16px -4px rgb(15 23 42 / 0.08);
+  --shadow-lift-lg: 0 2px 4px rgb(15 23 42 / 0.05), 0 12px 32px -8px rgb(15 23 42 / 0.14);
+  --shadow-glow-brand: 0 4px 20px -4px rgb(51 125 255 / 0.45);
+  --shadow-glow-danger: 0 4px 20px -4px rgb(244 63 94 / 0.4);
 }
 
 :root {
@@ -41,6 +47,22 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   overscroll-behavior-y: none;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+}
+
+/* Money, ages, years, prices — every number in the game lines up instead of
+   jittering as digits change width. */
+body {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Ambient background: a faint brand-tinted radial glow at the top of the page
+   so surfaces sit in an atmosphere rather than on a flat fill. */
+.app-bg {
+  background-image: radial-gradient(60rem 24rem at 50% -8rem, rgb(51 125 255 / 0.06), transparent 70%);
+}
+.dark .app-bg {
+  background-image: radial-gradient(60rem 24rem at 50% -8rem, rgb(51 125 255 / 0.12), transparent 70%);
 }
 
 /* Thin, theme-aware scrollbars */
@@ -81,6 +103,11 @@ input[type='range']::-webkit-slider-thumb {
   background: var(--color-brand-500);
   cursor: pointer;
   border: 2px solid #fff2;
+  box-shadow: 0 1px 6px rgb(51 125 255 / 0.4);
+  transition: transform 0.15s ease;
+}
+input[type='range']::-webkit-slider-thumb:active {
+  transform: scale(1.2);
 }
 input[type='range']::-moz-range-thumb {
   width: 18px;
@@ -89,6 +116,7 @@ input[type='range']::-moz-range-thumb {
   background: var(--color-brand-500);
   cursor: pointer;
   border: none;
+  box-shadow: 0 1px 6px rgb(51 125 255 / 0.4);
 }
 
 @keyframes floatIn {
@@ -105,10 +133,75 @@ input[type='range']::-moz-range-thumb {
   animation: floatIn 0.25s ease-out;
 }
 
+/* Screen-level entrance: content drifts up with a slight overshoot-free ease.
+   Applied by AppShell to the <main> keyed by screen, so every navigation
+   feels like a transition, not a repaint. */
+@keyframes screenIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.anim-screen {
+  animation: screenIn 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Modal sheet: springs up from the bottom edge with a gentle settle. */
+@keyframes sheetIn {
+  0% {
+    opacity: 0;
+    transform: translateY(48px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.anim-sheet {
+  animation: sheetIn 0.34s cubic-bezier(0.32, 1.25, 0.5, 1);
+}
+
+/* Backdrop fade so the dim layer never pops in. */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.anim-fade {
+  animation: fadeIn 0.25s ease-out;
+}
+
+/* Stat-bar fills catch a moving sheen once when they first render. */
+@keyframes shimmer {
+  from {
+    background-position: -200% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* Respect users who ask for less motion. */
+@media (prefers-reduced-motion: reduce) {
+  .anim-in,
+  .anim-screen,
+  .anim-sheet,
+  .anim-fade {
+    animation: none;
+  }
 }

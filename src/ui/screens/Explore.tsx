@@ -24,7 +24,7 @@ import { money } from '../format';
 import type { HubBuilding, HubBuildingId, HubSeason } from '../three/CityHubScene';
 
 const CityHubScene = lazy(() => import('../three/CityHubScene').then((m) => ({ default: m.CityHubScene })));
-const SceneFallback = <div className="w-full h-[420px] rounded-2xl bg-slate-100 dark:bg-ink-800 animate-pulse" />;
+const SceneFallback = <div className="w-full h-[480px] rounded-2xl bg-slate-100 dark:bg-ink-800 animate-pulse" />;
 
 const HUB_SCREEN: Record<HubBuildingId, Screen> = {
   hq: 'business',
@@ -68,7 +68,7 @@ const SECTOR_ACCENT: Record<string, string> = {
 // The skyline ring can't render every NPC company in the world (there are hundreds) without
 // becoming an unreadable, unusably slow wall of towers — cap it to the biggest, most relevant
 // ones by market cap, which also happens to be the set a player actually cares about walking past.
-const MAX_COMPANY_BUILDINGS = 24;
+const MAX_COMPANY_BUILDINGS = 32;
 
 export function Explore() {
   const { state, setScreen, run, toast } = useGame();

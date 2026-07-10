@@ -13,6 +13,18 @@ state instead of affecting anything else if you have no connection.
 
 ## Highlights
 
+- **V31 — design-system overhaul + a bigger, livelier city.** The whole UI moved to a layered
+  design language in one pass by overhauling the shared primitives every screen is built from:
+  two-level ambient/contact elevation on cards with hover lift, gradient primary/danger buttons with
+  glow shadows and press-scale feedback, spring bottom-sheet modals with grab handles and close
+  buttons, one-shot sheen sweeps on stat bars, accent-tick section headers, a glass top bar and
+  bottom nav with a springy floating active-tab indicator, per-screen entrance transitions, tabular
+  numerals everywhere, and `prefers-reduced-motion` support. The 3D city grew ~27% in radius (with a
+  faster walk speed to match) and got a realism pass: articulated pedestrians with counter-phase
+  arm/leg walk cycles, construction cranes that slowly slew over their sites with a swinging load,
+  car headlights that flare after dark, drifting clouds, circling birds with flapping wings, zebra
+  crossings at the compass points, a tree green-belt between the plaza and the skyline, and a second
+  lamp ring — plus the skyline cap raised to 32 public companies.
 - **V30 — the city is alive: every public company gets a real skyline building.** Explore's plaza now
   renders a second, outer skyline ring beyond the ten fixed system buildings — one procedurally-built
   tower per publicly-listed company in your home country (banded and capped so the ring stays readable

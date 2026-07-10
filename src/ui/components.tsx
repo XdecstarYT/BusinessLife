@@ -12,7 +12,11 @@ export function Card({ children, className = '', onClick }: { children: ReactNod
   return (
     <div
       onClick={onClick}
-      className={`rounded-3xl bg-white dark:bg-ink-850 border border-slate-100 dark:border-ink-800 shadow-sm ${onClick ? 'cursor-pointer active:scale-[0.99] transition-transform' : ''} ${className}`}
+      className={`rounded-3xl bg-white dark:bg-ink-850 border border-slate-100 dark:border-ink-800 [box-shadow:var(--shadow-lift)] ${
+        onClick
+          ? 'cursor-pointer transition-[transform,box-shadow] duration-200 hover:[box-shadow:var(--shadow-lift-lg)] hover:-translate-y-px active:scale-[0.985] active:translate-y-0'
+          : ''
+      } ${className}`}
     >
       {children}
     </div>
@@ -34,13 +38,13 @@ export function Pill({
   tone?: 'neutral' | 'brand';
 }) {
   const activeCls = tone === 'brand'
-    ? 'bg-brand-500 text-white border-brand-500'
-    : 'bg-slate-900 text-white border-slate-900 dark:bg-white dark:text-ink-900 dark:border-white';
+    ? 'bg-brand-500 text-white border-brand-500 [box-shadow:var(--shadow-glow-brand)]'
+    : 'bg-slate-900 text-white border-slate-900 dark:bg-white dark:text-ink-900 dark:border-white shadow-md';
   return (
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`shrink-0 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+      className={`shrink-0 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-semibold transition-[background-color,box-shadow,transform] duration-200 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed ${
         active ? activeCls : 'bg-slate-100 text-slate-700 border-transparent dark:bg-ink-800 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-ink-700'
       }`}
     >
@@ -57,7 +61,10 @@ export function PillRow({ children }: { children: ReactNode }) {
 export function SectionHeader({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
   return (
     <div className="flex items-center justify-between mb-3 mt-6 px-1">
-      <h2 className="text-xl font-extrabold tracking-tight text-slate-900 dark:text-white">{title}</h2>
+      <h2 className="flex items-center gap-2.5 text-xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+        <span aria-hidden className="w-1 h-5 rounded-full bg-gradient-to-b from-brand-400 to-brand-600 shrink-0" />
+        {title}
+      </h2>
       {(action || onAction) && (
         <button onClick={onAction} className="flex items-center gap-1 text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-brand-500">
           {action} <IconChevron className="w-4 h-4" />
@@ -97,7 +104,9 @@ export function CircleTile({
   return (
     <button onClick={onClick} className="flex flex-col items-center gap-2 group w-full">
       <div className="relative">
-        <div className={`w-16 h-16 rounded-full bg-gradient-to-br ${grad} flex items-center justify-center text-white shadow-md group-active:scale-95 transition-transform`}>
+        <div
+          className={`w-16 h-16 rounded-full bg-gradient-to-br ${grad} flex items-center justify-center text-white shadow-lg ring-2 ring-white/40 dark:ring-white/10 group-active:scale-90 group-hover:scale-105 transition-transform duration-200 [transition-timing-function:cubic-bezier(0.34,1.56,0.64,1)]`}
+        >
           {icon}
         </div>
         {badge !== undefined && badge !== '' && (
@@ -120,8 +129,21 @@ export function StatBar({ label, value, icon, suffix }: { label: string; value: 
         <span className="flex items-center gap-1 font-medium text-slate-500 dark:text-slate-400">{icon}{label}</span>
         <span className="font-bold text-slate-700 dark:text-slate-200">{Math.round(value)}{suffix ?? ''}</span>
       </div>
-      <div className="h-2 rounded-full bg-slate-100 dark:bg-ink-800 overflow-hidden">
-        <div className={`h-full rounded-full ${statBarColor(v)} transition-all duration-500`} style={{ width: `${v}%` }} />
+      <div className="h-2 rounded-full bg-slate-100 dark:bg-ink-800 overflow-hidden shadow-inner">
+        <div
+          className={`relative h-full rounded-full ${statBarColor(v)} transition-all duration-700 [transition-timing-function:cubic-bezier(0.22,1,0.36,1)]`}
+          style={{ width: `${v}%` }}
+        >
+          {/* one-shot sheen sweep so a freshly-rendered bar reads as "live" */}
+          <div
+            className="absolute inset-0 rounded-full opacity-60"
+            style={{
+              backgroundImage: 'linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.5) 50%, transparent 60%)',
+              backgroundSize: '200% 100%',
+              animation: 'shimmer 1.4s ease-out 1',
+            }}
+          />
+        </div>
       </div>
     </div>
   );
@@ -144,17 +166,19 @@ export function Button({
   size?: 'sm' | 'md' | 'lg';
 }) {
   const variants = {
-    primary: 'bg-brand-500 text-white hover:bg-brand-600 shadow-sm',
-    soft: 'bg-slate-100 text-slate-800 dark:bg-ink-800 dark:text-slate-100 hover:bg-slate-200 dark:hover:bg-ink-700',
+    primary:
+      'bg-gradient-to-b from-brand-400 to-brand-600 text-white hover:from-brand-500 hover:to-brand-700 [box-shadow:var(--shadow-glow-brand),inset_0_1px_0_rgb(255_255_255/0.25)]',
+    soft: 'bg-slate-100 text-slate-800 dark:bg-ink-800 dark:text-slate-100 hover:bg-slate-200 dark:hover:bg-ink-700 shadow-sm',
     ghost: 'bg-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-ink-800',
-    danger: 'bg-rose-500 text-white hover:bg-rose-600',
+    danger:
+      'bg-gradient-to-b from-rose-400 to-rose-600 text-white hover:from-rose-500 hover:to-rose-700 [box-shadow:var(--shadow-glow-danger),inset_0_1px_0_rgb(255_255_255/0.25)]',
   };
   const sizes = { sm: 'px-3 py-1.5 text-sm', md: 'px-4 py-2.5 text-sm', lg: 'px-5 py-3 text-base' };
   return (
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`rounded-2xl font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${variants[variant]} ${sizes[size]} ${className}`}
+      className={`rounded-2xl font-semibold transition-[background-color,box-shadow,transform,opacity] duration-200 active:scale-[0.96] disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 ${variants[variant]} ${sizes[size]} ${className}`}
     >
       {children}
     </button>
@@ -286,7 +310,7 @@ export function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       {...props}
-      className={`w-full rounded-2xl bg-slate-100 dark:bg-ink-800 border border-transparent focus:border-brand-400 outline-none px-4 py-3 text-slate-900 dark:text-white placeholder:text-slate-400 ${props.className ?? ''}`}
+      className={`w-full rounded-2xl bg-slate-100 dark:bg-ink-800 border border-transparent focus:border-brand-400 focus:ring-4 focus:ring-brand-500/15 focus:bg-white dark:focus:bg-ink-850 outline-none px-4 py-3 text-slate-900 dark:text-white placeholder:text-slate-400 transition-[border-color,box-shadow,background-color] ${props.className ?? ''}`}
     />
   );
 }
@@ -297,11 +321,24 @@ export function Modal({ open, onClose, children, title }: { open: boolean; onClo
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full sm:max-w-lg max-h-[90vh] overflow-y-auto bg-white dark:bg-ink-850 rounded-t-3xl sm:rounded-3xl shadow-2xl anim-in border border-slate-100 dark:border-ink-800">
+      <div className="absolute inset-0 bg-black/55 backdrop-blur-sm anim-fade" onClick={onClose} />
+      <div className="relative w-full sm:max-w-lg max-h-[90vh] overflow-y-auto bg-white dark:bg-ink-850 rounded-t-3xl sm:rounded-3xl shadow-2xl anim-sheet border border-slate-100 dark:border-ink-800">
+        {/* bottom-sheet grab handle (mobile affordance) */}
+        <div className="sm:hidden pt-2.5 flex justify-center">
+          <div className="w-10 h-1 rounded-full bg-slate-300 dark:bg-ink-600" />
+        </div>
         {title && (
-          <div className="sticky top-0 bg-white/90 dark:bg-ink-850/90 backdrop-blur px-5 py-4 border-b border-slate-100 dark:border-ink-800">
-            <h3 className="text-lg font-extrabold text-slate-900 dark:text-white">{title}</h3>
+          <div className="sticky top-0 z-10 bg-white/90 dark:bg-ink-850/90 backdrop-blur px-5 py-4 border-b border-slate-100 dark:border-ink-800 flex items-center justify-between gap-3">
+            <h3 className="text-lg font-extrabold text-slate-900 dark:text-white truncate">{title}</h3>
+            {onClose && (
+              <button
+                onClick={onClose}
+                aria-label="Close"
+                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-ink-800 text-slate-500 dark:text-slate-400 flex items-center justify-center text-sm font-bold hover:bg-slate-200 dark:hover:bg-ink-700 active:scale-90 transition-[background-color,transform] shrink-0"
+              >
+                ✕
+              </button>
+            )}
           </div>
         )}
         <div className="p-5">{children}</div>

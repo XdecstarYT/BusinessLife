@@ -47,12 +47,12 @@ interface CityHubSceneProps {
   onQuickAction?: (id: string) => void;
 }
 
-const PLAZA_RADIUS = 11;
-const RING_RADIUS = 8;
-const WALK_BOUND = 9.9;
+const PLAZA_RADIUS = 14;
+const RING_RADIUS = 10;
+const WALK_BOUND = 12.9;
 const ENTER_RADIUS = 2.3;
 const EXIT_RADIUS = 2.8;
-const MOVE_SPEED = 4.2;
+const MOVE_SPEED = 5;
 // Company buildings (one per IPO'd business) fill an outer skyline ring beyond the fixed system
 // ring, banded so an unbounded company count never crowds into an unreadable single circle.
 const COMPANIES_PER_BAND = 12;
@@ -506,15 +506,27 @@ function buildConstructionSite(group: THREE.Group, tier: number, accent: string)
   const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, mastH, 8), craneMat);
   mast.position.set(w * 0.9, mastH / 2, 0);
   group.add(mast);
+  // Jib assembly hangs off its own pivot at the mast top so the animation loop
+  // can slowly slew it back and forth like a crane actually working the site.
+  const slew = new THREE.Group();
+  slew.position.set(w * 0.9, mastH, 0);
+  slew.userData.craneSlew = Math.random() * Math.PI * 2; // phase offset per site
   const jib = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.06, 0.06), craneMat);
-  jib.position.set(w * 0.9 + 0.7, mastH, 0);
-  group.add(jib);
+  jib.position.set(0.7, 0, 0);
+  slew.add(jib);
   const counterJib = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.06, 0.06), craneMat);
-  counterJib.position.set(w * 0.9 - 0.32, mastH, 0);
-  group.add(counterJib);
+  counterJib.position.set(-0.32, 0, 0);
+  slew.add(counterJib);
+  const counterweight = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.14, 0.12), new THREE.MeshStandardMaterial({ color: 0x555a63 }));
+  counterweight.position.set(-0.5, -0.06, 0);
+  slew.add(counterweight);
   const hookCable = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.9, 4), new THREE.MeshStandardMaterial({ color: 0x333333 }));
-  hookCable.position.set(w * 0.9 + 1.1, mastH - 0.45, 0);
-  group.add(hookCable);
+  hookCable.position.set(1.1, -0.45, 0);
+  slew.add(hookCable);
+  const hookLoad = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.12, 0.16), new THREE.MeshStandardMaterial({ color: 0x8a6a45, roughness: 0.9 }));
+  hookLoad.position.set(1.1, -0.95, 0);
+  slew.add(hookLoad);
+  group.add(slew);
   const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 8), new THREE.MeshBasicMaterial({ color: 0xff3b30 }));
   beacon.position.set(w * 0.9, mastH + 0.15, 0);
   beacon.userData.blink = true;
@@ -576,32 +588,84 @@ function makeCar(color: number): THREE.Group {
     taillight.position.set(-0.22, 0.1, dz);
     g.add(taillight);
   }
+  // Exposed so the day/night loop can flare the headlights after dark.
+  g.userData.headMat = headlightMat;
+  g.userData.tailMat = taillightMat;
   return g;
 }
 
+/** Articulated pedestrian: legs and arms hang from pivot groups at the hip and
+ * shoulder, so the animation loop can swing them through a real counter-phase
+ * walk cycle (left arm forward with right leg) instead of sliding a static
+ * capsule around the plaza. Pivots are exposed via userData.limbs. */
 function makePedestrian(shirtColor: number, pantsColor = 0x2b3140): THREE.Group {
   const g = new THREE.Group();
-  const legs = new THREE.Mesh(new THREE.CapsuleGeometry(0.075, 0.2, 4, 8), new THREE.MeshStandardMaterial({ color: pantsColor, roughness: 0.75 }));
-  legs.position.y = 0.16;
-  g.add(legs);
-  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.078, 0.16, 4, 8), new THREE.MeshStandardMaterial({ color: shirtColor, roughness: 0.6 }));
-  torso.position.y = 0.4;
+  const pantsMat = new THREE.MeshStandardMaterial({ color: pantsColor, roughness: 0.75 });
+  const shirtMat = new THREE.MeshStandardMaterial({ color: shirtColor, roughness: 0.6 });
+
+  const limbs: Record<string, THREE.Group> = {};
+  const makeLimb = (name: string, x: number, y: number, radius: number, length: number, mat: THREE.Material) => {
+    const pivot = new THREE.Group();
+    pivot.position.set(x, y, 0);
+    const limb = new THREE.Mesh(new THREE.CapsuleGeometry(radius, length, 4, 6), mat);
+    limb.position.y = -(length / 2 + radius * 0.5);
+    pivot.add(limb);
+    g.add(pivot);
+    limbs[name] = pivot;
+  };
+  makeLimb('legL', -0.045, 0.3, 0.033, 0.2, pantsMat);
+  makeLimb('legR', 0.045, 0.3, 0.033, 0.2, pantsMat);
+  makeLimb('armL', -0.115, 0.5, 0.026, 0.17, shirtMat);
+  makeLimb('armR', 0.115, 0.5, 0.026, 0.17, shirtMat);
+  g.userData.limbs = limbs;
+
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.078, 0.16, 4, 8), shirtMat);
+  torso.position.y = 0.42;
   g.add(torso);
-  const armMat = new THREE.MeshStandardMaterial({ color: shirtColor, roughness: 0.6 });
-  for (const dx of [-0.11, 0.11]) {
-    const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.028, 0.18, 4, 6), armMat);
-    arm.position.set(dx, 0.37, 0);
-    g.add(arm);
-  }
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.072, 14, 12), new THREE.MeshStandardMaterial({ color: 0xe8c9a0, roughness: 0.65 }));
-  head.position.y = 0.56;
+  head.position.y = 0.62;
   g.add(head);
   const hair = new THREE.Mesh(
     new THREE.SphereGeometry(0.075, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.55),
     new THREE.MeshStandardMaterial({ color: 0x2a2018, roughness: 0.85 }),
   );
-  hair.position.y = 0.59;
+  hair.position.y = 0.65;
   g.add(hair);
+  return g;
+}
+
+/** A soft drifting cloud: a few squashed icosahedron lumps sharing one material. */
+function makeCloud(): THREE.Group {
+  const g = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, roughness: 1, fog: false });
+  const lumps = 3 + Math.floor(Math.random() * 2);
+  for (let i = 0; i < lumps; i++) {
+    const r = 0.8 + Math.random() * 0.9;
+    const lump = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), mat);
+    lump.scale.y = 0.45;
+    lump.position.set(i * 1.1 - lumps * 0.5, Math.random() * 0.3, Math.random() * 0.8 - 0.4);
+    g.add(lump);
+  }
+  return g;
+}
+
+/** A tiny bird: dot of a body with two flapping wing planes (pivot in userData). */
+function makeBird(): THREE.Group {
+  const g = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({ color: 0x22262e, roughness: 0.9 });
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), mat);
+  body.scale.z = 1.6;
+  g.add(body);
+  const wings: THREE.Group[] = [];
+  for (const side of [-1, 1] as const) {
+    const pivot = new THREE.Group();
+    const wing = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.09), new THREE.MeshStandardMaterial({ color: 0x2c313a, side: THREE.DoubleSide, roughness: 0.9 }));
+    wing.position.x = side * 0.12;
+    pivot.add(wing);
+    g.add(pivot);
+    wings.push(pivot);
+  }
+  g.userData.wings = wings;
   return g;
 }
 
@@ -776,20 +840,72 @@ export function CityHubScene({ buildings, season, onEnter, onQuickAction }: City
         }
       });
 
-      // Plaza props: lamp posts, a fountain, a couple of trees.
+      // Plaza props: lamp posts (two rings on the bigger plaza), a fountain, trees.
       const lamps: THREE.Mesh[] = [];
+      const lampRings: [number, number][] = [[6, 4.2], [8, RING_RADIUS + 2.4]];
+      for (const [count, radius] of lampRings) {
+        for (let i = 0; i < count; i++) {
+          const a = (i / count) * Math.PI * 2 + Math.PI / count;
+          const lamp = new THREE.Group();
+          const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 1.4, 8), new THREE.MeshStandardMaterial({ color: 0x1c2027 }));
+          pole.position.y = 0.7;
+          lamp.add(pole);
+          const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.08, 10, 10), new THREE.MeshStandardMaterial({ color: 0xfff2c8, emissive: 0xfff2c8, emissiveIntensity: 0.2 }));
+          bulb.position.y = 1.42;
+          lamp.add(bulb);
+          lamp.position.set(Math.cos(a) * radius, 0, Math.sin(a) * radius);
+          lamps.push(bulb);
+          scene.add(lamp);
+        }
+      }
+
+      // Zebra crossings over the ring road at the four compass points.
+      const roadRadius = dynamicPlazaRadius - 1.3;
+      const stripeMat = new THREE.MeshStandardMaterial({ color: 0xe8e8e2, roughness: 0.85 });
+      const stripeGeo = new THREE.PlaneGeometry(0.18, 1.5);
       for (let i = 0; i < 4; i++) {
-        const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
-        const lamp = new THREE.Group();
-        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 1.4, 8), new THREE.MeshStandardMaterial({ color: 0x1c2027 }));
-        pole.position.y = 0.7;
-        lamp.add(pole);
-        const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.08, 10, 10), new THREE.MeshStandardMaterial({ color: 0xfff2c8, emissive: 0xfff2c8, emissiveIntensity: 0.2 }));
-        bulb.position.y = 1.42;
-        lamp.add(bulb);
-        lamp.position.set(Math.cos(a) * 3.4, 0, Math.sin(a) * 3.4);
-        lamps.push(bulb);
-        scene.add(lamp);
+        const a = (i / 4) * Math.PI * 2;
+        const crossing = new THREE.Group();
+        for (let s = -2; s <= 2; s++) {
+          const stripe = new THREE.Mesh(stripeGeo, stripeMat);
+          stripe.rotation.x = -Math.PI / 2;
+          stripe.position.set(s * 0.34, 0.012, 0);
+          crossing.add(stripe);
+        }
+        crossing.position.set(Math.cos(a) * roadRadius, 0, Math.sin(a) * roadRadius);
+        crossing.lookAt(0, 0, 0);
+        scene.add(crossing);
+      }
+
+      // A green belt of trees between the system ring and the company skyline,
+      // skipping gaps near the compass crossings so paths stay readable.
+      const beltRadius = RING_RADIUS + 3;
+      for (let i = 0; i < 14; i++) {
+        const a = (i / 14) * Math.PI * 2 + 0.22;
+        if (Math.abs(Math.sin(a * 2)) < 0.25) continue; // leave the crossing sightlines open
+        const tree = makeTree(foliage.leaf, 0.9 + (i % 3) * 0.25);
+        tree.position.set(Math.cos(a) * beltRadius, 0, Math.sin(a) * beltRadius);
+        scene.add(tree);
+      }
+
+      // Drifting clouds and circling birds — sky-level life for the bigger map.
+      const clouds: THREE.Group[] = [];
+      for (let i = 0; i < 5; i++) {
+        const cloud = makeCloud();
+        cloud.position.set((Math.random() - 0.5) * dynamicPlazaRadius * 2, 12 + Math.random() * 4, (Math.random() - 0.5) * dynamicPlazaRadius * 2);
+        cloud.userData.speed = 0.25 + Math.random() * 0.2;
+        clouds.push(cloud);
+        scene.add(cloud);
+      }
+      const birds: THREE.Group[] = [];
+      for (let i = 0; i < 4; i++) {
+        const bird = makeBird();
+        bird.userData.angle = (i / 4) * Math.PI * 2;
+        bird.userData.radius = 5 + i * 1.6;
+        bird.userData.height = 7.5 + (i % 2) * 1.5;
+        bird.userData.speed = 0.5 + i * 0.08;
+        birds.push(bird);
+        scene.add(bird);
       }
       const fountainBase = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.2, 0.3, 24), new THREE.MeshStandardMaterial({ color: 0xcfd3d8, roughness: 0.4 }));
       fountainBase.position.y = 0.15;
@@ -803,21 +919,21 @@ export function CityHubScene({ buildings, season, onEnter, onQuickAction }: City
       spray.position.y = 0.75;
       scene.add(spray);
 
-      // Ambient traffic: a few cars looping the outer road.
-      const cars = [0xd4442a, 0x3a6fd8, 0xe8e2d6].map((c, i) => {
+      // Ambient traffic: more cars for the longer ring road.
+      const cars = [0xd4442a, 0x3a6fd8, 0xe8e2d6, 0x2b8a5c, 0x8a5cb8].map((c, i) => {
         const car = makeCar(c);
-        car.userData.angle = (i / 3) * Math.PI * 2;
-        car.userData.speed = 0.18 + i * 0.03;
+        car.userData.angle = (i / 5) * Math.PI * 2;
+        car.userData.speed = 0.16 + i * 0.025;
         scene.add(car);
         return car;
       });
 
-      // Ambient pedestrians: a few looping a small circle in the plaza.
-      const peds = [0x8b5cf6, 0xf59e0b, 0x10b981, 0xef4444].map((c, i) => {
+      // Ambient pedestrians: plaza strollers plus a couple walking the green belt.
+      const peds = [0x8b5cf6, 0xf59e0b, 0x10b981, 0xef4444, 0x38bdf8, 0xf472b6].map((c, i) => {
         const ped = makePedestrian(c);
-        ped.userData.angle = (i / 4) * Math.PI * 2;
-        ped.userData.speed = 0.28 + i * 0.05;
-        ped.userData.radius = 2.6 + (i % 2) * 0.8;
+        ped.userData.angle = (i / 6) * Math.PI * 2;
+        ped.userData.speed = i >= 4 ? 0.16 : 0.28 + i * 0.05;
+        ped.userData.radius = i >= 4 ? beltRadius - 0.8 : 2.6 + (i % 2) * 0.8;
         scene.add(ped);
         return ped;
       });
@@ -928,28 +1044,55 @@ export function CityHubScene({ buildings, season, onEnter, onQuickAction }: City
         starMat.opacity = THREE.MathUtils.clamp(1 - Math.max(0, sunY) * 3.5, 0, 0.85);
 
         // --- ambient traffic & pedestrians ---
-        const roadRadius = dynamicPlazaRadius - 1.3;
         for (const car of cars) {
           car.userData.angle += car.userData.speed * dt;
           const a = car.userData.angle;
           car.position.set(Math.cos(a) * roadRadius, 0.05, Math.sin(a) * roadRadius);
           car.rotation.y = -a + Math.PI / 2;
+          // headlights flare after dark, taillights glow a touch hotter too
+          (car.userData.headMat as THREE.MeshStandardMaterial).emissiveIntensity = isNight ? 2.4 : 0.4;
+          (car.userData.tailMat as THREE.MeshStandardMaterial).emissiveIntensity = isNight ? 1.6 : 0.6;
         }
         for (const ped of peds) {
           ped.userData.angle += ped.userData.speed * dt;
           const a = ped.userData.angle;
           const r = ped.userData.radius;
-          ped.position.set(Math.cos(a) * r, 0, Math.sin(a) * r);
+          ped.position.set(Math.cos(a) * r, Math.abs(Math.sin(t * 5.5 + a * 7)) * 0.02, Math.sin(a) * r);
           ped.rotation.y = -a + Math.PI / 2;
-          ped.position.y = Math.abs(Math.sin(t * 6 + a)) * 0.03;
+          // counter-phase limb swing: left arm forward with right leg, scaled by stride speed
+          const stride = t * 5.5 + a * 7;
+          const swing = Math.sin(stride) * 0.55;
+          const limbs = ped.userData.limbs as Record<string, THREE.Group>;
+          limbs.legL.rotation.x = swing;
+          limbs.legR.rotation.x = -swing;
+          limbs.armL.rotation.x = -swing * 0.7;
+          limbs.armR.rotation.x = swing * 0.7;
         }
 
-        // --- building flourishes: spinning exchange ring, blinking crane beacon, waving flag ---
+        // --- sky life: drifting clouds, circling birds with flapping wings ---
+        for (const cloud of clouds) {
+          cloud.position.x += cloud.userData.speed * dt;
+          if (cloud.position.x > dynamicPlazaRadius * 1.6) cloud.position.x = -dynamicPlazaRadius * 1.6;
+        }
+        for (const bird of birds) {
+          bird.userData.angle += bird.userData.speed * dt;
+          const a = bird.userData.angle;
+          bird.position.set(Math.cos(a) * bird.userData.radius, bird.userData.height + Math.sin(t * 1.5 + a) * 0.4, Math.sin(a) * bird.userData.radius);
+          bird.rotation.y = -a;
+          const wings = bird.userData.wings as THREE.Group[];
+          const flap = Math.sin(t * 9 + a * 4) * 0.6;
+          wings[0].rotation.z = flap;
+          wings[1].rotation.z = -flap;
+        }
+
+        // --- building flourishes: spinning exchange ring, blinking beacons, waving flags,
+        //     construction cranes slowly slewing over their sites ---
         for (const bm of buildingMeshes) {
           bm.group.traverse((obj) => {
             if (obj.userData.spin) obj.rotation.z += 0.01;
             if (obj.userData.blink) (obj as THREE.Mesh).visible = Math.sin(t * 4) > 0;
             if (obj.userData.flag) obj.rotation.y = Math.sin(t * 3) * 0.3;
+            if (obj.userData.craneSlew !== undefined) obj.rotation.y = Math.sin(t * 0.22 + obj.userData.craneSlew) * 1.1;
           });
         }
       };
@@ -962,7 +1105,7 @@ export function CityHubScene({ buildings, season, onEnter, onQuickAction }: City
 
   return (
     <div
-      className="relative w-full h-[420px] rounded-2xl overflow-hidden bg-slate-950 select-none"
+      className="relative w-full h-[480px] rounded-2xl overflow-hidden bg-slate-950 select-none"
       style={{ touchAction: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' }}
     >
       <div ref={ref} className="absolute inset-0" />
