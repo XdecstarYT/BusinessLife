@@ -13,6 +13,15 @@ state instead of affecting anything else if you have no connection.
 
 ## Highlights
 
+- **V32 — the BitLife look.** The app chrome now mirrors the BitLife layout it was always inspired
+  by: a flat signature-green header banner (identity left, bank balance right), a persistent
+  😊❤️🧠😎 Happiness/Health/Smarts/Charisma stat strip pinned above the tab bar, and a five-slot
+  bottom bar whose center is the big raised circular **+AGE** button that advances the year from
+  anywhere (Job · Assets · AGE · Relations · Activities, with the Activities sheet holding every
+  other screen two taps away). The Life screen was rebuilt as the classic chronological life-log
+  feed — plain text entries grouped under bold "Age N" headers, newest chapter first — with
+  day/week time controls in a compact age ribbon. The whole brand palette swapped from blue to
+  BitLife green in one token change.
 - **V31 — design-system overhaul + a bigger, livelier city.** The whole UI moved to a layered
   design language in one pass by overhauling the shared primitives every screen is built from:
   two-level ambient/contact elevation on cards with hover lift, gradient primary/danger buttons with

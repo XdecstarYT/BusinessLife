@@ -1,28 +1,26 @@
 /**
- * Life hub — the home screen. Featured "advance year" card, player stat bars,
- * a grid of circular icon tiles that navigate the game (mirroring the
- * reference's "Featured brands" grid), quick lifestyle chips, and the life
- * log feed. This is the screen the reference image most directly informs.
+ * Life hub — the home screen, BitLife-style: an age ribbon with day-level
+ * time controls, then the life log as the hero — chronological text entries
+ * grouped under bold "Age N" headers, newest chapter first. The year itself
+ * advances from the big AGE button in the app shell's tab bar. Below the
+ * feed: the manage grid, social media, lifestyle chips, underworld, legacy.
  */
 import { useState, type ReactNode } from 'react';
 import { useGame, type Screen } from '../../store/gameStore';
 import { attemptPrisonEscape, bribeJudge, contestTerritory, CRIME_RANK_TITLES, declareCrimeWar, doActivity, donateToFoundation, enterWitnessProtection, foundCharityFoundation, goStraight, heist, issuePublicApology, joinCrimeFamily, postOnSocialMedia, proposeCrimeAlliance, requestParole, retire, socialMediaPostStyles, writeMemoir } from '../../sim/actions';
 import { playerCrimeFamily } from '../../sim/crime';
-import { titleForRank } from '../../data/careers';
 import { netWorth } from '../../sim/engine';
 import { Badge, Button, Card, CircleTile, Pill, PillRow, SectionHeader, StatBar } from '../components';
 import { money } from '../format';
 import {
   IconArrowRight,
   IconAssets,
-  IconBrain,
   IconBusiness,
   IconCareer,
   IconHeart,
   IconMarket,
   IconNews,
   IconPolitics,
-  IconSpark,
   IconStats,
   IconWorld,
 } from '../icons';
@@ -39,25 +37,34 @@ const HUB: { screen: Screen; label: string; Icon: (p: { className?: string }) =>
   { screen: 'stats', label: 'Stats', Icon: IconStats },
 ];
 
-const LOG_TONE: Record<string, string> = {
-  good: 'border-l-emerald-500',
-  bad: 'border-l-rose-500',
-  money: 'border-l-amber-500',
-  politics: 'border-l-violet-500',
-  business: 'border-l-brand-500',
-  milestone: 'border-l-fuchsia-500',
-  info: 'border-l-slate-300 dark:border-l-ink-700',
+const LOG_DOT: Record<string, string> = {
+  good: 'bg-emerald-500',
+  bad: 'bg-rose-500',
+  money: 'bg-amber-500',
+  politics: 'bg-violet-500',
+  business: 'bg-brand-500',
+  milestone: 'bg-fuchsia-500',
+  info: 'bg-slate-300 dark:bg-ink-600',
 };
 
 export function Life() {
-  const { state, setScreen, nextYear, nextDay, nextWeek, run, eventQueue, activeEvent } = useGame();
+  const { state, setScreen, nextDay, nextWeek, run, eventQueue, activeEvent } = useGame();
   const [showMoreActivities, setShowMoreActivities] = useState(false);
   if (!state) return null;
   const p = state.player;
   const home = state.countries.find((c) => c.id === p.countryId)!;
   const nw = netWorth(state);
   const pendingCount = eventQueue.length + (activeEvent ? 1 : 0);
-  const recentLog = [...state.lifeLog].slice(-14).reverse();
+
+  // BitLife-style feed: entries grouped under bold "Age N" headers, newest age
+  // first so the latest chapter of your life is always at the top.
+  const logGroups: { age: number; year: number; entries: typeof state.lifeLog }[] = [];
+  for (const e of state.lifeLog.slice(-70)) {
+    const last = logGroups[logGroups.length - 1];
+    if (last && last.age === e.age) last.entries.push(e);
+    else logGroups.push({ age: e.age, year: e.year, entries: [e] });
+  }
+  logGroups.reverse();
 
   const badgeFor = (s: Screen): string | number | undefined => {
     if (s === 'business') return p.companies.filter((id) => state.companies[id]?.status === 'active').length || undefined;
@@ -68,62 +75,60 @@ export function Life() {
 
   return (
     <div className="space-y-1">
-      {/* Featured hero: advance year */}
-      <Card className="overflow-hidden mt-2">
-        <div className="bg-gradient-to-br from-brand-600 via-brand-500 to-violet-500 p-5 text-white">
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="text-xs font-bold uppercase tracking-widest opacity-80">Net Worth</div>
-              <div className="text-3xl font-black leading-tight">{money(nw, home.currencySymbol)}</div>
-              <div className="text-sm opacity-90 mt-1">
-                {p.office ? `${p.office.title} of ${p.office.regionName}` : p.job ? titleForRank(p.job.title, p.job.rank) : 'Independent'}
-              </div>
-            </div>
-            <div className="w-14 h-14 rounded-2xl bg-white/15 flex items-center justify-center">
-              <IconSpark className="w-8 h-8" />
-            </div>
+      {/* Age ribbon — day progress plus the sub-year time controls */}
+      <Card className="mt-2 p-3 flex items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="font-extrabold leading-tight">Age {p.age} — {state.year}</div>
+          <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
+            Day {state.calendarDay + 1} of 365 · net worth {money(nw, home.currencySymbol)}
           </div>
-          <div className="flex items-center justify-between text-xs opacity-80 mt-4 mb-1">
-            <span>Day {state.calendarDay + 1} of 365</span>
-            <span>{Math.round(((state.calendarDay + 1) / 365) * 100)}% through {state.year}</span>
+          <div className="h-1 mt-1.5 rounded-full bg-slate-100 dark:bg-ink-800 overflow-hidden">
+            <div className="h-full bg-brand-500 rounded-full transition-all" style={{ width: `${((state.calendarDay + 1) / 365) * 100}%` }} />
           </div>
-          <div className="h-1.5 rounded-full bg-white/20 overflow-hidden mb-3">
-            <div className="h-full bg-white rounded-full transition-all" style={{ width: `${((state.calendarDay + 1) / 365) * 100}%` }} />
-          </div>
-          {pendingCount > 0 ? (
-            <Button disabled className="w-full bg-white/60! text-brand-700! font-extrabold" size="lg">
-              Resolve {pendingCount} event{pendingCount > 1 ? 's' : ''} first
-            </Button>
-          ) : (
-            <div className="grid grid-cols-3 gap-2">
-              <Button onClick={nextDay} className="bg-white/15! text-white! hover:bg-white/25! font-bold">
-                +1 Day
-              </Button>
-              <Button onClick={nextWeek} className="bg-white/15! text-white! hover:bg-white/25! font-bold">
-                +1 Week
-              </Button>
-              <Button onClick={nextYear} className="bg-white! text-brand-700! hover:bg-white/90! font-extrabold">
-                Year {state.year + 1} →
-              </Button>
-            </div>
-          )}
+        </div>
+        <div className="flex gap-1.5 shrink-0">
+          <Button size="sm" variant="soft" disabled={pendingCount > 0} onClick={nextDay}>+1 Day</Button>
+          <Button size="sm" variant="soft" disabled={pendingCount > 0} onClick={nextWeek}>+1 Wk</Button>
         </div>
       </Card>
 
-      {/* Vital stats */}
-      <div className="grid grid-cols-2 gap-3 mt-4">
-        <Card className="p-4 space-y-3">
-          <StatBar label="Health" value={p.health} icon={<IconHeart className="w-3.5 h-3.5" />} />
-          <StatBar label="Happiness" value={p.happiness} icon={<IconSpark className="w-3.5 h-3.5" />} />
-          <StatBar label="Smarts" value={p.smarts} icon={<IconBrain className="w-3.5 h-3.5" />} />
-          <StatBar label={`Stress${p.burnoutUntilYear !== null && state.year <= p.burnoutUntilYear ? ' — burned out' : ''}`} value={p.stress} />
+      {pendingCount > 0 && (
+        <Card className="p-3 mt-2 border-2 border-amber-400 text-sm font-semibold text-amber-600 dark:text-amber-400">
+          ⏳ {pendingCount} event{pendingCount > 1 ? 's' : ''} to resolve before time can move on.
         </Card>
-        <Card className="p-4 space-y-3">
-          <StatBar label="Reputation" value={p.reputation} />
-          <StatBar label="Popularity" value={p.popularity} />
-          <StatBar label="Influence" value={p.influence} />
-        </Card>
-      </div>
+      )}
+
+      {/* The life log — the BitLife-style heart of the screen */}
+      <Card className="mt-3 divide-y divide-slate-100 dark:divide-ink-800 overflow-hidden">
+        {logGroups.length === 0 && (
+          <div className="p-6 text-center text-sm text-slate-500 dark:text-slate-400">
+            Your story starts now. Hit the AGE button below.
+          </div>
+        )}
+        {logGroups.map((g, gi) => (
+          <div key={`${g.age}-${gi}`} className="px-4 py-3">
+            <div className="flex items-baseline gap-2 mb-1.5">
+              <span className="text-sm font-black text-brand-600 dark:text-brand-400">Age {g.age}</span>
+              <span className="text-[11px] font-semibold text-slate-400">{g.year}</span>
+            </div>
+            <div className="space-y-1.5">
+              {g.entries.map((entry, i) => (
+                <div key={i} className="flex gap-2 items-start">
+                  <span className={`mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${LOG_DOT[entry.kind] ?? LOG_DOT.info}`} />
+                  <p className="text-sm text-slate-700 dark:text-slate-200 leading-snug">{entry.text}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </Card>
+
+      {/* Standing in society — the stats the bottom strip doesn't cover */}
+      <Card className="p-4 mt-3 grid grid-cols-3 gap-3">
+        <StatBar label="Reputation" value={p.reputation} />
+        <StatBar label="Popularity" value={p.popularity} />
+        <StatBar label={`Stress${p.burnoutUntilYear !== null && state.year <= p.burnoutUntilYear ? ' 🔥' : ''}`} value={p.stress} />
+      </Card>
 
       {/* Status chips */}
       <PillRow>
@@ -374,22 +379,6 @@ export function Life() {
         </>
       )}
 
-      {/* Life log */}
-      <SectionHeader title="Life Log" action="News" onAction={() => setScreen('news')} />
-      <div className="space-y-2">
-        {recentLog.map((entry, i) => (
-          <div
-            key={i}
-            className={`bg-white dark:bg-ink-850 border border-slate-100 dark:border-ink-800 border-l-4 ${LOG_TONE[entry.kind] ?? LOG_TONE.info} rounded-xl px-4 py-2.5`}
-          >
-            <div className="flex items-center gap-2 mb-0.5">
-              <span className="text-[11px] font-bold text-slate-400">AGE {entry.age}</span>
-              {entry.kind === 'milestone' && <IconArrowRight className="w-3 h-3 text-fuchsia-500" />}
-            </div>
-            <p className="text-sm text-slate-700 dark:text-slate-200 leading-snug">{entry.text}</p>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }

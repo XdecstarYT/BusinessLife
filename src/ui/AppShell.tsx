@@ -1,12 +1,15 @@
 /**
- * App chrome: a sticky top bar (identity, cash, year, theme toggle) and a
- * bottom tab bar in the style of the reference. The bar covers the four most
- * frequent sections plus a "More" tab that opens a sheet listing every
- * remaining screen — so every screen is reachable in at most two taps from
- * anywhere in the app, not just from the Life hub grid.
+ * App chrome, styled after BitLife: a flat signature-green header banner
+ * (identity left, bank balance right), a persistent four-stat strip —
+ * Happiness / Health / Smarts / Charisma — pinned above the tab bar, and a
+ * five-slot bottom bar whose center is the big raised circular AGE button
+ * that advances the year from anywhere. "Job / Assets / Relations" cover the
+ * classic tabs; "Activities" opens a sheet listing every other screen, so
+ * everything stays reachable in at most two taps.
  */
 import { useState, type ReactNode } from 'react';
 import { useGame, type Screen } from '../store/gameStore';
+import { titleForRank } from '../data/careers';
 import { money } from './format';
 import {
   IconAssets,
@@ -29,66 +32,91 @@ import {
 } from './icons';
 import { Modal } from './components';
 
-const TABS: { screen: Screen; label: string; Icon: (p: { className?: string }) => ReactNode }[] = [
+const SIDE_TABS: { screen: Screen; label: string; Icon: (p: { className?: string }) => ReactNode }[] = [
+  { screen: 'career', label: 'Job', Icon: IconCareer },
+  { screen: 'assets', label: 'Assets', Icon: IconAssets },
+  { screen: 'family', label: 'Relations', Icon: IconHeart },
+];
+
+const ACTIVITY_SCREENS: { screen: Screen; label: string; Icon: (p: { className?: string }) => ReactNode }[] = [
   { screen: 'life', label: 'Life', Icon: IconLife },
   { screen: 'explore', label: 'City', Icon: IconExplore },
   { screen: 'business', label: 'Business', Icon: IconBusiness },
   { screen: 'market', label: 'Markets', Icon: IconMarket },
   { screen: 'politics', label: 'Politics', Icon: IconPolitics },
-];
-
-const MORE_SCREENS: { screen: Screen; label: string; Icon: (p: { className?: string }) => ReactNode }[] = [
   { screen: 'studio', label: 'Studio', Icon: IconSpark },
-  { screen: 'career', label: 'Career', Icon: IconCareer },
-  { screen: 'assets', label: 'Assets', Icon: IconAssets },
-  { screen: 'family', label: 'Family', Icon: IconHeart },
   { screen: 'casino', label: 'Casino', Icon: IconCasino },
   { screen: 'world', label: 'World', Icon: IconWorld },
   { screen: 'news', label: 'News', Icon: IconNews },
   { screen: 'stats', label: 'Stats', Icon: IconStats },
-  { screen: 'leaderboard', label: 'Leaderboard', Icon: IconTrophy },
+  { screen: 'leaderboard', label: 'Ranks', Icon: IconTrophy },
 ];
 
+/** BitLife-style stat meter: emoji, label, thin bar, percent readout. */
+function MeterBar({ emoji, label, value }: { emoji: string; label: string; value: number }) {
+  const v = Math.max(0, Math.min(100, value));
+  const fill = v < 25 ? 'bg-rose-500' : v < 50 ? 'bg-amber-400' : 'bg-brand-500';
+  return (
+    <div className="flex items-center gap-1.5 min-w-0">
+      <span className="text-sm leading-none shrink-0">{emoji}</span>
+      <div className="min-w-0 flex-1">
+        <div className="flex justify-between text-[9px] font-bold text-slate-500 dark:text-slate-400 leading-tight">
+          <span className="truncate">{label}</span>
+          <span>{Math.round(v)}%</span>
+        </div>
+        <div className="h-1.5 rounded-full bg-slate-200 dark:bg-ink-700 overflow-hidden">
+          <div className={`h-full rounded-full ${fill} transition-all duration-500`} style={{ width: `${v}%` }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
-  const { state, screen, setScreen, darkMode, toggleDark, toMenu } = useGame();
-  const [moreOpen, setMoreOpen] = useState(false);
+  const { state, screen, setScreen, nextYear, darkMode, toggleDark, toMenu } = useGame();
+  const [activitiesOpen, setActivitiesOpen] = useState(false);
   if (!state) return <>{children}</>;
   const p = state.player;
   const home = state.countries.find((c) => c.id === p.countryId)!;
-  const inMore = MORE_SCREENS.some((m) => m.screen === screen);
+  const inActivities = ACTIVITY_SCREENS.some((m) => m.screen === screen);
+  const occupation = p.office
+    ? `${p.office.title} of ${p.office.regionName}`
+    : p.job
+      ? titleForRank(p.job.title, p.job.rank)
+      : p.retired
+        ? 'Retired'
+        : 'Unemployed';
 
   return (
     <div className="min-h-full flex flex-col bg-slate-50 dark:bg-ink-900 text-slate-900 dark:text-white app-bg">
-      {/* Top bar */}
-      <header className="sticky top-0 z-30 bg-slate-50/85 dark:bg-ink-900/80 backdrop-blur-xl border-b border-slate-200/60 dark:border-ink-800/80 shadow-[0_1px_12px_rgb(15_23_42/0.04)] pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
-        <div className="max-w-2xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 py-3 flex items-center gap-3">
-          <button onClick={toMenu} className="flex items-center gap-2.5 min-w-0 group">
-            <div className="p-[2px] rounded-full bg-gradient-to-br from-brand-400 via-violet-500 to-fuchsia-500 shrink-0 group-active:scale-95 transition-transform">
-              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-brand-500 to-violet-600 flex items-center justify-center text-white font-black border-2 border-slate-50 dark:border-ink-900">
-                {p.name.charAt(0).toUpperCase()}
-              </div>
+      {/* Top banner — flat BitLife green */}
+      <header className="sticky top-0 z-30 bg-gradient-to-b from-brand-500 to-brand-600 text-white shadow-md pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
+        <div className="max-w-2xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 py-2.5 flex items-center gap-3">
+          <button onClick={() => setScreen('life')} className="flex items-center gap-2.5 min-w-0 group text-left">
+            <div className="w-10 h-10 rounded-full bg-white text-brand-600 flex items-center justify-center font-black text-lg shrink-0 shadow group-active:scale-95 transition-transform">
+              {p.name.charAt(0).toUpperCase()}
             </div>
-            <div className="min-w-0 text-left">
-              <div className="font-bold text-sm truncate leading-tight flex items-center gap-1" title={p.name}>
+            <div className="min-w-0">
+              <div className="font-extrabold text-sm truncate leading-tight flex items-center gap-1" title={p.name}>
                 {state.achievements.includes('born_royal') && <span title="Born Royal">👑</span>}
                 {p.name}
               </div>
-              <div className="text-xs text-slate-500 dark:text-slate-400 leading-tight truncate">
-                Age {p.age} · {home.flag} {home.name}
+              <div className="text-[11px] text-white/85 leading-tight truncate">
+                {occupation} · Age {p.age} · {home.flag}
               </div>
             </div>
           </button>
           <div className="ml-auto flex items-center gap-2 shrink-0">
             <div className="text-right">
-              <div className="font-extrabold text-emerald-500 leading-tight whitespace-nowrap">{money(p.money, home.currencySymbol)}</div>
-              <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight whitespace-nowrap">Year {state.year}</div>
+              <div className="font-black leading-tight whitespace-nowrap drop-shadow-sm">{money(p.money, home.currencySymbol)}</div>
+              <div className="text-[10px] text-white/85 leading-tight whitespace-nowrap">Bank Balance · {state.year}</div>
             </div>
             <button
               onClick={toggleDark}
-              className="w-9 h-9 rounded-full bg-slate-100 dark:bg-ink-800 flex items-center justify-center text-slate-600 dark:text-slate-300 shrink-0"
+              className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white shrink-0 transition-colors"
               aria-label="Toggle theme"
             >
-              {darkMode ? <IconSun className="w-5 h-5" /> : <IconMoon className="w-5 h-5" />}
+              {darkMode ? <IconSun className="w-4 h-4" /> : <IconMoon className="w-4 h-4" />}
             </button>
           </div>
         </div>
@@ -97,61 +125,55 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* Content — keyed by screen so each navigation replays the entrance animation */}
       <main
         key={screen}
-        className="anim-screen flex-1 max-w-2xl lg:max-w-3xl xl:max-w-4xl w-full mx-auto px-4 pb-28 pt-2 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]"
+        className="anim-screen flex-1 max-w-2xl lg:max-w-3xl xl:max-w-4xl w-full mx-auto px-4 pb-40 pt-2 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]"
       >
         {children}
       </main>
 
-      {/* Bottom tab bar */}
-      <nav className="fixed bottom-0 inset-x-0 z-30 bg-white/85 dark:bg-ink-850/85 backdrop-blur-xl border-t border-slate-200/60 dark:border-ink-800/80 shadow-[0_-4px_20px_rgb(15_23_42/0.06)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
-        <div className="max-w-2xl lg:max-w-3xl xl:max-w-4xl mx-auto px-2 flex justify-around">
-          {TABS.map(({ screen: s, label, Icon }) => {
-            const active = screen === s;
-            return (
-              <button
-                key={s}
-                onClick={() => setScreen(s)}
-                className={`relative flex flex-col items-center gap-0.5 py-2.5 px-0.5 flex-1 min-w-0 transition-colors duration-200 ${
-                  active ? 'text-brand-500' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'
-                }`}
-              >
-                {/* floating active indicator: a soft pill glow behind the icon */}
-                <span
-                  aria-hidden
-                  className={`absolute top-1.5 w-11 h-7 rounded-full bg-brand-500/12 dark:bg-brand-400/15 transition-[opacity,transform] duration-300 [transition-timing-function:cubic-bezier(0.34,1.56,0.64,1)] ${
-                    active ? 'opacity-100 scale-100' : 'opacity-0 scale-50'
-                  }`}
-                />
-                <Icon className={`relative w-6 h-6 shrink-0 transition-transform duration-200 ${active ? '-translate-y-px' : ''}`} />
-                <span className="relative text-[10px] sm:text-[11px] font-semibold w-full text-center leading-tight">{label}</span>
-              </button>
-            );
-          })}
-          <button
-            onClick={() => setMoreOpen(true)}
-            className={`relative flex flex-col items-center gap-0.5 py-2.5 px-0.5 flex-1 min-w-0 transition-colors duration-200 ${
-              inMore ? 'text-brand-500' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'
-            }`}
-          >
-            <span
-              aria-hidden
-              className={`absolute top-1.5 w-11 h-7 rounded-full bg-brand-500/12 dark:bg-brand-400/15 transition-[opacity,transform] duration-300 ${
-                inMore ? 'opacity-100 scale-100' : 'opacity-0 scale-50'
-              }`}
-            />
-            <IconMenu className="relative w-6 h-6 shrink-0" />
-            <span className="relative text-[10px] sm:text-[11px] font-semibold w-full text-center leading-tight">More</span>
-          </button>
+      {/* Persistent BitLife stat strip + tab bar */}
+      <nav className="fixed bottom-0 inset-x-0 z-30 bg-white/95 dark:bg-ink-850/95 backdrop-blur-xl border-t border-slate-200/70 dark:border-ink-800 shadow-[0_-4px_20px_rgb(15_23_42/0.08)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
+        <button
+          onClick={() => setScreen('stats')}
+          className="w-full max-w-2xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 pt-2 pb-1.5 grid grid-cols-4 gap-3 border-b border-slate-100 dark:border-ink-800"
+          aria-label="Open full stats"
+        >
+          <MeterBar emoji="😊" label="Happiness" value={p.happiness} />
+          <MeterBar emoji="❤️" label="Health" value={p.health} />
+          <MeterBar emoji="🧠" label="Smarts" value={p.smarts} />
+          <MeterBar emoji="😎" label="Charisma" value={p.charisma} />
+        </button>
+        <div className="max-w-2xl lg:max-w-3xl xl:max-w-4xl mx-auto px-2 flex items-end justify-around">
+          {SIDE_TABS.slice(0, 2).map(({ screen: s, label, Icon }) => (
+            <TabButton key={s} active={screen === s} label={label} Icon={Icon} onClick={() => setScreen(s)} />
+          ))}
+          {/* The signature center AGE button — raised above the bar */}
+          <div className="relative flex-1 min-w-0 flex justify-center">
+            <button
+              onClick={nextYear}
+              aria-label="Age up one year"
+              className="relative -top-5 w-16 h-16 rounded-full bg-gradient-to-b from-brand-400 to-brand-600 text-white flex flex-col items-center justify-center border-4 border-white dark:border-ink-850 [box-shadow:var(--shadow-glow-brand)] active:scale-90 transition-transform duration-150"
+            >
+              <span className="text-2xl font-black leading-none">+</span>
+              <span className="text-[10px] font-extrabold tracking-widest leading-none">AGE</span>
+            </button>
+          </div>
+          <TabButton
+            active={screen === 'family'}
+            label="Relations"
+            Icon={IconHeart}
+            onClick={() => setScreen('family')}
+          />
+          <TabButton active={inActivities} label="Activities" Icon={IconMenu} onClick={() => setActivitiesOpen(true)} />
         </div>
       </nav>
 
-      {/* "More" sheet: every remaining screen, reachable from anywhere */}
-      <Modal open={moreOpen} onClose={() => setMoreOpen(false)} title="More">
+      {/* Activities sheet: every other screen, BitLife-style list-of-things-to-do */}
+      <Modal open={activitiesOpen} onClose={() => setActivitiesOpen(false)} title="Activities">
         <div className="grid grid-cols-3 gap-4">
-          {MORE_SCREENS.map(({ screen: s, label, Icon }) => (
+          {ACTIVITY_SCREENS.map(({ screen: s, label, Icon }) => (
             <button
               key={s}
-              onClick={() => { setScreen(s); setMoreOpen(false); }}
+              onClick={() => { setScreen(s); setActivitiesOpen(false); }}
               className="flex flex-col items-center gap-2 group"
             >
               <div
@@ -167,7 +189,43 @@ export function AppShell({ children }: { children: ReactNode }) {
             </button>
           ))}
         </div>
+        <button
+          onClick={() => { setActivitiesOpen(false); toMenu(); }}
+          className="mt-5 w-full rounded-2xl bg-slate-100 dark:bg-ink-800 px-4 py-3 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-ink-700 transition-colors"
+        >
+          ⏏️ Save & Main Menu
+        </button>
       </Modal>
     </div>
+  );
+}
+
+function TabButton({
+  active,
+  label,
+  Icon,
+  onClick,
+}: {
+  active: boolean;
+  label: string;
+  Icon: (p: { className?: string }) => ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`relative flex flex-col items-center gap-0.5 py-2 px-0.5 flex-1 min-w-0 transition-colors duration-200 ${
+        active ? 'text-brand-600 dark:text-brand-400' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'
+      }`}
+    >
+      <span
+        aria-hidden
+        className={`absolute top-1 w-11 h-7 rounded-full bg-brand-500/12 dark:bg-brand-400/15 transition-[opacity,transform] duration-300 [transition-timing-function:cubic-bezier(0.34,1.56,0.64,1)] ${
+          active ? 'opacity-100 scale-100' : 'opacity-0 scale-50'
+        }`}
+      />
+      <Icon className="relative w-6 h-6 shrink-0" />
+      <span className="relative text-[10px] sm:text-[11px] font-bold w-full text-center leading-tight">{label}</span>
+    </button>
   );
 }
