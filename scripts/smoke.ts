@@ -25,6 +25,20 @@ import { SK } from '../src/data/skills';
   console.log('Scenario/difficulty check: regime =', home.economy.regime, '· difficulty =', boomWorld.difficulty, '· starting money >= 50000:', boomWorld.player.money >= 50_000);
 }
 
+// --- Leaderboard "born into royalty" perk: starting stats/money should be far above normal, and
+// the achievement + a flavor life-log entry should be present.
+{
+  const normalWorld = generateWorld({ playerName: 'Commoner Test', gender: 'male', seedText: 'royal-check-normal' });
+  const royalWorld = generateWorld({ playerName: 'Royal Test', gender: 'male', seedText: 'royal-check-royal', bornRoyal: true });
+  console.log(
+    'Royalty check: normal money =', Math.round(normalWorld.player.money),
+    '· royal money =', Math.round(royalWorld.player.money),
+    '· royal reputation =', royalWorld.player.reputation,
+    '· achievement present =', royalWorld.achievements.includes('born_royal'),
+    '· royal money > normal:', royalWorld.player.money > normalWorld.player.money,
+  );
+}
+
 /** Resolve any pending yearly choice events by auto-picking the first choice. */
 function resolvePending() {
   for (const ev of state.pendingEvents) {

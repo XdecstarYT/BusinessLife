@@ -7,6 +7,7 @@ import { Badge, Button, Card, LineChart, Modal, SectionHeader, StatBar, TextInpu
 import { money } from '../format';
 
 const ACHIEVEMENTS: Record<string, { label: string; icon: string }> = {
+  born_royal: { label: 'Born Royal', icon: '👑' },
   millionaire: { label: 'Millionaire', icon: '💰' },
   deca_millionaire: { label: 'Deca-Millionaire', icon: '💎' },
   billionaire: { label: 'Billionaire', icon: '🤑' },

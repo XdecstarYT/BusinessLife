@@ -8,7 +8,7 @@
 import { useEffect, useState } from 'react';
 import { useGame } from '../../store/gameStore';
 import { netWorth } from '../../sim/engine';
-import { fetchTopLegacy, fetchTopNetWorth, submitNetWorth, type LegacyEntry, type NetWorthEntry } from '../../net/leaderboard';
+import { checkRoyaltyFromTop, fetchTopLegacy, fetchTopNetWorth, submitNetWorth, type LegacyEntry, type NetWorthEntry } from '../../net/leaderboard';
 import { Badge, Button, Card, SectionHeader } from '../components';
 import { money } from '../format';
 import { IconTrophy } from '../icons';
@@ -31,7 +31,15 @@ export function Leaderboard() {
     setNetWorthRows(null);
     setLegacyRows(null);
     Promise.all([fetchTopNetWorth(), fetchTopLegacy()])
-      .then(([nw, lg]) => { setNetWorthRows(nw); setLegacyRows(lg); })
+      .then(([nw, lg]) => {
+        setNetWorthRows(nw);
+        setLegacyRows(lg);
+        // A fresh #1 finish banks a "born into royalty" perk for the next new life (spent on
+        // the Menu's new-game screen) — checked here so it fires from a normal board view, not
+        // just right after submitting.
+        if (checkRoyaltyFromTop('networth', nw[0])) toast("👑 You're #1 in Net Worth! Your next life can be born into royalty.", 'ok');
+        if (checkRoyaltyFromTop('legacy', lg[0])) toast("👑 You're #1 in Legacy Score! Your next life can be born into royalty.", 'ok');
+      })
       .catch(() => setLoadError(true));
   };
 

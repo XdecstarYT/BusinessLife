@@ -67,7 +67,10 @@ export function AppShell({ children }: { children: ReactNode }) {
               {p.name.charAt(0).toUpperCase()}
             </div>
             <div className="min-w-0 text-left">
-              <div className="font-bold text-sm truncate leading-tight" title={p.name}>{p.name}</div>
+              <div className="font-bold text-sm truncate leading-tight flex items-center gap-1" title={p.name}>
+                {state.achievements.includes('born_royal') && <span title="Born Royal">👑</span>}
+                {p.name}
+              </div>
               <div className="text-xs text-slate-500 dark:text-slate-400 leading-tight truncate">
                 Age {p.age} · {home.flag} {home.name}
               </div>

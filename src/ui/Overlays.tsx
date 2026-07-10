@@ -1,7 +1,7 @@
 /** Toasts and the game-over screen. */
 import { useState } from 'react';
 import { useGame } from '../store/gameStore';
-import { submitLegacyScore } from '../net/leaderboard';
+import { checkRoyaltyFromTop, fetchTopLegacy, submitLegacyScore } from '../net/leaderboard';
 import { Button } from './components';
 
 export function Toasts() {
@@ -33,9 +33,21 @@ export function GameOver() {
     setSubmitState('submitting');
     const result = await submitLegacyScore(state.player.name, go.legacyScore, go.finalAge, state.year, home?.name ?? null);
     setSubmitState('done');
-    if (result === 'submitted') toast('🏆 New personal best posted to the Legacy leaderboard.', 'ok');
-    else if (result === 'not_a_new_best') toast("Not a new best for this device — leaderboard wasn't updated.", 'ok');
-    else toast('Could not reach the leaderboard — check your connection.', 'err');
+    if (result === 'submitted') {
+      toast('🏆 New personal best posted to the Legacy leaderboard.', 'ok');
+      // Check for a fresh #1 right away, while we know the network is reachable, rather than
+      // waiting for the player to open the Leaderboard screen on their own.
+      try {
+        const top = await fetchTopLegacy(1);
+        if (checkRoyaltyFromTop('legacy', top[0])) {
+          toast("👑 You're #1 worldwide! Your next life can be born into royalty.", 'ok');
+        }
+      } catch { /* best-effort — the Leaderboard screen will catch it on next visit */ }
+    } else if (result === 'not_a_new_best') {
+      toast("Not a new best for this device — leaderboard wasn't updated.", 'ok');
+    } else {
+      toast('Could not reach the leaderboard — check your connection.', 'err');
+    }
   };
 
   return (

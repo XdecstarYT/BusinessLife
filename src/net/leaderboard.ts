@@ -36,6 +36,48 @@ export function getDeviceId(): string {
   return id;
 }
 
+// ---------------------------------------------------------------------------
+// Royalty: a #1 finish on either board banks a one-life "born into royalty"
+// perk, offered as an opt-in on the next new-game screen (see ui/screens/Menu.tsx)
+// and spent by sim/world.ts's generateWorld when bornRoyal is set. Banked, not
+// live — once you've been seen at #1 the perk is yours to use whenever you next
+// start a life, even if you've since been knocked off the top spot; this avoids
+// a perk that quietly vanishes between checking the board and clicking "New Life."
+// ---------------------------------------------------------------------------
+
+export type RoyaltySource = 'networth' | 'legacy';
+const ROYALTY_KEY = 'bl_royalty_sources';
+
+function readRoyaltySources(): RoyaltySource[] {
+  try {
+    const raw: unknown = JSON.parse(localStorage.getItem(ROYALTY_KEY) ?? '[]');
+    return Array.isArray(raw) ? raw.filter((s): s is RoyaltySource => s === 'networth' || s === 'legacy') : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Checks the top row of an already-fetched leaderboard slice against this device, banking
+ * royalty eligibility if it's currently #1. Returns true only the first time it's earned, so
+ * callers can toast once instead of on every repeat check. */
+export function checkRoyaltyFromTop(source: RoyaltySource, topRow: { device_id: string } | undefined): boolean {
+  if (!topRow || topRow.device_id !== getDeviceId()) return false;
+  const sources = readRoyaltySources();
+  if (sources.includes(source)) return false;
+  sources.push(source);
+  localStorage.setItem(ROYALTY_KEY, JSON.stringify(sources));
+  return true;
+}
+
+export function getRoyaltySources(): RoyaltySource[] {
+  return readRoyaltySources();
+}
+
+/** Spends the banked perk(s) — call once a new life actually applies it. */
+export function consumeRoyalty(): void {
+  localStorage.removeItem(ROYALTY_KEY);
+}
+
 export interface NetWorthEntry {
   device_id: string;
   player_name: string;

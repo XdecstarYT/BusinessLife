@@ -6,6 +6,7 @@ import { Button, Card, Field, Pill, TextInput } from '../components';
 import { money } from '../format';
 import type { Difficulty, Gender } from '../../sim/types';
 import type { Scenario } from '../../sim/world';
+import { consumeRoyalty, getRoyaltySources } from '../../net/leaderboard';
 import { IconBusiness, IconSpark, IconTrophy } from '../icons';
 
 const SCENARIOS: { id: Scenario; label: string; blurb: string }[] = [
@@ -30,7 +31,9 @@ export function Menu() {
   const [scenario, setScenario] = useState<Scenario>('modern');
   const [difficulty, setDifficulty] = useState<Difficulty>('standard');
   const [useLegacyBonus, setUseLegacyBonus] = useState(false);
+  const [useRoyalty, setUseRoyalty] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const royaltySources = getRoyaltySources();
 
   useEffect(() => {
     void refreshSaves();
@@ -42,6 +45,7 @@ export function Menu() {
   const legacyBonusAmount = bestLegacyScore * 10_000;
 
   const start = () => {
+    const spendRoyalty = useRoyalty && royaltySources.length > 0;
     newGame({
       playerName: name.trim() || 'Alex Morgan',
       gender,
@@ -49,7 +53,9 @@ export function Menu() {
       scenario,
       difficulty,
       legacyBonus: useLegacyBonus ? legacyBonusAmount : 0,
+      bornRoyal: spendRoyalty,
     });
+    if (spendRoyalty) consumeRoyalty();
   };
 
   const onImport = (file: File) => {
@@ -191,6 +197,17 @@ export function Menu() {
                   <label className="flex items-center gap-2 text-sm">
                     <input type="checkbox" checked={useLegacyBonus} onChange={(e) => setUseLegacyBonus(e.target.checked)} />
                     Start with a {money(legacyBonusAmount)} bonus from your best Legacy Score ({bestLegacyScore})
+                  </label>
+                </Field>
+              )}
+              {royaltySources.length > 0 && (
+                <Field label="Royal Bloodline">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={useRoyalty} onChange={(e) => setUseRoyalty(e.target.checked)} />
+                    👑 You hit #1 on the {royaltySources.includes('networth') && royaltySources.includes('legacy')
+                      ? 'Net Worth and Legacy Score'
+                      : royaltySources.includes('networth') ? 'Net Worth' : 'Legacy Score'} leaderboard — spend it to be
+                    born into royalty this life (a fortune, elite tutors, and standing before you've done a thing).
                   </label>
                 </Field>
               )}

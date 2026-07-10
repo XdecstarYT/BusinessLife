@@ -89,6 +89,7 @@ export interface NewGameConfig {
   scenario?: Scenario;
   difficulty?: Difficulty;
   legacyBonus?: number; // starting money bonus carried over from a previous life's Legacy Score
+  bornRoyal?: boolean; // spends a banked #1-leaderboard perk (see net/leaderboard.ts) on a royal start
 }
 
 export function generateWorld(config: NewGameConfig): GameState {
@@ -331,6 +332,13 @@ export function generateWorld(config: NewGameConfig): GameState {
   // A few random aptitudes
   for (let i = 0; i < 6; i++) skills[rng.pick(SKILLS).id] = rng.int(5, 25);
 
+  // A #1 leaderboard finish banks a one-life "born into royalty" perk (see net/leaderboard.ts) —
+  // spent here as real starting advantages, not just a cosmetic label: inherited wealth, an
+  // elite upbringing's head start on smarts/charisma, and standing existing reputation/
+  // popularity/influence systems don't otherwise grant an 18-year-old.
+  const royal = !!config.bornRoyal;
+  const royalTreasury = royal ? rng.int(3_000_000, 12_000_000) : 0;
+
   const player: Player = {
     name: config.playerName,
     gender: config.gender,
@@ -340,14 +348,14 @@ export function generateWorld(config: NewGameConfig): GameState {
     cityId: homeCity.id,
     health: rng.int(75, 95),
     happiness: rng.int(60, 85),
-    smarts: rng.int(40, 85),
-    charisma: rng.int(35, 80),
-    reputation: 5,
-    popularity: 0,
-    influence: 0,
+    smarts: royal ? rng.int(60, 95) : rng.int(40, 85),
+    charisma: royal ? rng.int(55, 92) : rng.int(35, 80),
+    reputation: royal ? rng.int(55, 80) : 5,
+    popularity: royal ? rng.int(30, 55) : 0,
+    influence: royal ? rng.int(20, 45) : 0,
     karma: 50,
     notoriety: 0,
-    money: rng.int(500, 5_000) + Math.max(0, config.legacyBonus ?? 0),
+    money: rng.int(500, 5_000) + Math.max(0, config.legacyBonus ?? 0) + royalTreasury,
     criminalRecord: 0,
     inJailYears: 0,
     skills,
@@ -422,6 +430,15 @@ export function generateWorld(config: NewGameConfig): GameState {
 
   state.player = player;
   state.rngState = rng.state;
+  if (royal) {
+    state.achievements.push('born_royal');
+    state.lifeLog.push({
+      year: startYear,
+      age: 18,
+      text: `Born into the royal family of ${home.name} — a childhood of private tutors, palace connections and inherited wealth (${homeCity.name} still refers to your family by title).`,
+      kind: 'milestone',
+    });
+  }
   state.lifeLog.push({
     year: startYear,
     age: 18,

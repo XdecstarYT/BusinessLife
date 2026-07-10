@@ -421,7 +421,12 @@ only moves when you tell it to, using the three buttons on the Life hub:
   spamming new ones; this is an honest honor-system board with no server authority over the client-side
   sim, not a certified ranking. Every leaderboard call is timeout-bounded and fails soft: no connection
   (or the board being genuinely empty) just shows a clear, distinct state and a Retry button — it never
-  touches the rest of the offline game.
+  touches the rest of the offline game. **Reach #1 on either board and you bank a "Royal Bloodline" perk**
+  for your next life — a real starting advantage on the new-game screen, not just a title: several million
+  in inherited wealth, an elite upbringing's boost to smarts and charisma, and starting reputation,
+  popularity and influence an 18-year-old couldn't otherwise have. The perk is banked the moment you're
+  seen at #1 (checked on the Leaderboard screen and right after a Legacy submission) and stays available
+  until you actually spend it starting a new life, so a later drop in rank doesn't take it away.
 
 Life ends when you do — from old age, illness, or misfortune — with a Legacy Score summarizing your wealth,
 dynasty, office and achievements. If a spouse, child, or grandchild survives you, choose to continue playing
