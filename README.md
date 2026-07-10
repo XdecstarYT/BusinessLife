@@ -389,19 +389,26 @@ only moves when you tell it to, using the three buttons on the Life hub:
   or declare war on a specific named rival family, and if your family gets crushed or wiped out you lose your
   standing with it (this is a family-level strength/turf/heat state machine, not a simulation of individual
   soldiers or a literal open-world crime map).
-- **Casino** — a real 3D casino floor (see the Casino tab, expandable to fullscreen for an immersive view — an
-  enclosed room with a patterned carpet, flanking columns, two hanging chandeliers, and a fully playable bet
-  panel even while fullscreen) with six named, distinct slot machines — each its own theme, stakes and
-  volatility, a reel-window symbol strip and coin tray, and a real progressive jackpot pool that grows every
-  spin and resets when someone finally hits it — plus blackjack, high-stakes poker with chip stacks on the
-  felt, a genuine European roulette wheel (37 pockets, a numbered felt betting layout, straight-number or
-  red/black/odd/even/high/low outside bets, real payouts), and a fair 50/50 heads-or-tails coin toss on a
-  spinning stand. Every game keeps a genuine house edge: skill narrows it (poker skill on the card tables)
-  but can never flip it into the player's favor, the same principle a real casino runs on. A VIP room
-  (Diamond Royale) unlocks once you're liquid enough. Fullscreen requests real landscape orientation on
-  browsers that support it (with a rotate-your-device hint where they don't, mainly iOS Safari), and the room
-  itself is deliberately lighter on phones — fewer real-time lights and decorative meshes — since a phone GPU
-  pays full price for every light with no shadow map to hide behind.
+- **Casino — a real walkable 3D floor, not an orbit-camera diorama** — walk your own avatar around an
+  enclosed room (patterned carpet, flanking columns, two hanging chandeliers) with WASD/arrow keys or a
+  virtual joystick, exactly the same walking-camera system as the Explore city hub. Walk up to any of six
+  named, distinct slot machines (each its own theme, stakes, volatility, a reel-window symbol strip and
+  coin tray, and a real progressive jackpot pool that grows every spin and resets when someone finally hits
+  it), blackjack, high-stakes poker, a fair 50/50 heads-or-tails coin toss, or the sports book kiosk, and a
+  "▶ Play" prompt surfaces automatically — the bet panel then opens as a fixed overlay inside the same
+  scene box (never pushed into page scroll), pausing movement while it's open. **Roulette is genuine 3D
+  betting**: the wheel and ball spin down and land on the real winning number from the actual spin result
+  (37 pockets, straight-number or red/black/odd/even/high/low outside bets, real payouts), and a bright chip
+  marker shows exactly where your current bet sits on the felt. **New: a Sports Book** — a fresh weekly
+  slate of 5 matches across football, basketball, soccer and boxing, each team with a real win probability
+  and moneyline odds priced with a genuine ~7% vig shaved off both sides (not a coin flip dressed up — the
+  book keeps its edge on the bet either way). Every game keeps a genuine house edge: skill narrows it (poker
+  skill on the card tables) but can never flip it into the player's favor, the same principle a real casino
+  runs on. A VIP room (Diamond Royale) unlocks once you're liquid enough. Fullscreen requests real landscape
+  orientation on browsers that support it (with a rotate-your-device hint where they don't, mainly iOS
+  Safari), filling the viewport with the same walkable scene and overlay UI; the room itself is deliberately
+  lighter on phones — fewer real-time lights and decorative meshes — since a phone GPU pays full price for
+  every light with no shadow map to hide behind.
 - **Lifestyle** — 20+ quick activities on the Life hub, from the gym and charity to book clubs, therapy,
   adopting a pet, art collecting, wine tasting, poker nights, blogging and learning a language.
 
