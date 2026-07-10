@@ -1335,7 +1335,7 @@ ev({
   ],
 });
 ev({
-  id: 'career_side_hustle', category: 'career', weight: 4,
+  id: 'career_friend_side_hustle', category: 'career', weight: 4,
   text: 'A friend suggests you start a side hustle in your spare time.',
   choices: [
     { label: 'Give it a shot', outcomes: [
@@ -1673,7 +1673,7 @@ ev({
   ],
 });
 ev({
-  id: 'media_podcast_invite', category: 'media', weight: 4, conditions: { minReputation: 45 },
+  id: 'media_longform_podcast_invite', category: 'media', weight: 4, conditions: { minReputation: 45 },
   text: 'A popular podcast wants to have you on for a long-form interview.',
   choices: [
     { label: 'Go on and be candid', skillCheck: { skillId: SK.publicSpeaking, bonusPerLevel: 0.005 }, outcomes: [
@@ -1699,5 +1699,990 @@ ev({
     { label: 'Push through it', effects: { health: -5, happiness: -3 } },
   ],
 });
+
+// ---------------------------------------------------------------------------
+// V29 CONTENT BATCH — 110 new templates across all ten categories
+// ---------------------------------------------------------------------------
+
+// --- LIFE ---
+ev({
+  id: 'life_garage_sale', category: 'life', weight: 4,
+  text: 'Your closet is overflowing. A neighborhood garage sale is coming up.',
+  choices: [
+    { label: 'Sell off the clutter', effects: { money: 300, happiness: 2 } },
+    { label: 'Donate it all instead', effects: { karma: 3, happiness: 1 } },
+    { label: 'Leave it for another year', effects: {} },
+  ],
+});
+ev({
+  id: 'life_road_trip_offer', category: 'life', weight: 4,
+  text: 'Friends are planning a spontaneous road trip. Entry costs {amount} in gas and lodging.',
+  amount: { min: 400, max: 1200 },
+  choices: [
+    { label: 'Go for it', effects: { moneyAmountMult: -1, happiness: 6 } },
+    { label: 'Stay home and save', effects: {} },
+  ],
+});
+ev({
+  id: 'life_new_hobby_expensive', category: 'life', weight: 3,
+  text: 'A friend got you hooked on an expensive new hobby — gear runs {amount}.',
+  amount: { min: 500, max: 3000 },
+  choices: [
+    { label: 'Dive in headfirst', effects: { moneyAmountMult: -1, happiness: 5, skillXp: [SK.golf, 10] } },
+    { label: 'Try it cheaply first', effects: { happiness: 2, money: -100 } },
+    { label: 'Pass', effects: {} },
+  ],
+});
+ev({
+  id: 'life_home_declutter', category: 'life', weight: 4,
+  text: 'A weekend of ruthless decluttering left your home feeling brand new.',
+  choices: [
+    { label: 'Enjoy the calm', effects: { happiness: 3, health: 1 } },
+  ],
+});
+ev({
+  id: 'life_bank_scam_call', category: 'life', weight: 4,
+  text: 'You got a convincing call claiming to be from your bank about "suspicious activity."',
+  choices: [
+    { label: 'Hang up and call the bank directly', skillCheck: { skillId: SK.economics, bonusPerLevel: 0.005 }, outcomes: [
+      { chance: 0.9, text: 'Good instinct — it was a scam.', effects: { happiness: 1 } },
+      { chance: 0.1, text: 'You second-guessed yourself and gave up a code before hanging up.', effects: { money: -800, happiness: -4 } },
+    ] },
+    { label: 'Give them the verification code', outcomes: [
+      { chance: 0.85, text: 'It was indeed a scam. Costly lesson.', effects: { money: -1500, happiness: -5 } },
+      { chance: 0.15, text: 'Somehow it was legitimate.', effects: {} },
+    ] },
+  ],
+});
+ev({
+  id: 'life_reunion_invite', category: 'life', weight: 4, conditions: { minAge: 28 },
+  text: 'A high school reunion invitation arrived. Attending costs {amount}.',
+  amount: { min: 100, max: 400 },
+  choices: [
+    { label: 'Go and reconnect', effects: { moneyAmountMult: -1, happiness: 4, charisma: 1 } },
+    { label: 'Skip it', effects: {} },
+  ],
+});
+ev({
+  id: 'life_minimalism_kick', category: 'life', weight: 3,
+  text: 'You went through a minimalism phase and sold most of what you own.',
+  choices: [
+    { label: 'Lean into it', effects: { money: 600, happiness: 2 } },
+    { label: 'Regret it halfway through', effects: { money: 200, happiness: -1 } },
+  ],
+});
+ev({
+  id: 'life_language_immersion', category: 'life', weight: 3,
+  text: 'A language immersion weekend is being offered in {city} for {amount}.',
+  amount: { min: 300, max: 900 },
+  choices: [
+    { label: 'Sign up', effects: { moneyAmountMult: -1, skillXp: [SK.foreignLanguages, 15], smarts: 1 } },
+    { label: 'Skip it', effects: {} },
+  ],
+});
+ev({
+  id: 'life_home_garden', category: 'life', weight: 4,
+  text: 'You started a small backyard garden.',
+  choices: [
+    { label: 'Tend it diligently', effects: { happiness: 3, health: 1, money: -100 } },
+    { label: 'Let it go wild', effects: { happiness: 1 } },
+  ],
+});
+ev({
+  id: 'life_estate_sale_find', category: 'life', weight: 3,
+  text: 'You stumbled on an estate sale with a genuinely interesting find.',
+  choices: [
+    { label: 'Buy it on a hunch', effects: { money: -300, happiness: 2 } },
+    { label: 'Walk away', effects: {} },
+  ],
+});
+ev({
+  id: 'life_volunteer_abroad', category: 'life', weight: 3, conditions: { minMoney: 3000 },
+  text: 'A volunteer program abroad is recruiting. It costs {amount} to join for a month.',
+  amount: { min: 1500, max: 4000 },
+  choices: [
+    { label: 'Go volunteer', effects: { moneyAmountMult: -1, karma: 6, happiness: 5, reputation: 2 } },
+    { label: 'Donate money instead', effects: { money: -300, karma: 3 } },
+    { label: 'Not this year', effects: {} },
+  ],
+});
+
+// --- CAREER ---
+ev({
+  id: 'career_mentor_offer', category: 'career', weight: 4, conditions: { employed: true },
+  text: 'A senior colleague offered to mentor you informally.',
+  choices: [
+    { label: 'Accept gladly', effects: { jobPerformance: 4, smarts: 1 } },
+    { label: 'Politely decline — too busy', effects: {} },
+  ],
+});
+ev({
+  id: 'career_harsh_manager', category: 'career', weight: 4, conditions: { employed: true },
+  text: 'Your boss has been unusually harsh and demanding lately.',
+  choices: [
+    { label: 'Push back diplomatically', skillCheck: { skillId: SK.negotiation, bonusPerLevel: 0.005 }, outcomes: [
+      { chance: 0.5, text: 'They backed off and things improved.', effects: { happiness: 3, jobPerformance: 1 } },
+      { chance: 0.5, text: 'They got defensive and things got tenser.', effects: { happiness: -3, jobPerformance: -2 } },
+    ] },
+    { label: 'Grin and bear it', effects: { happiness: -3, health: -2 } },
+    { label: 'Start looking elsewhere', effects: { happiness: 1 } },
+  ],
+});
+ev({
+  id: 'career_industry_conference', category: 'career', weight: 4, conditions: { employed: true },
+  text: 'Your company is sending a few people to an industry conference. Attendance costs {amount} out of pocket for extras.',
+  amount: { min: 200, max: 800 },
+  choices: [
+    { label: 'Go and network hard', effects: { moneyAmountMult: -1, jobPerformance: 3, charisma: 1 } },
+    { label: 'Skip the extras', effects: {} },
+  ],
+});
+ev({
+  id: 'career_credit_stolen', category: 'career', weight: 3, conditions: { employed: true },
+  text: 'A coworker presented your idea as their own in a meeting.',
+  choices: [
+    { label: 'Call it out directly', skillCheck: { skillId: SK.publicSpeaking, bonusPerLevel: 0.004 }, outcomes: [
+      { chance: 0.55, text: 'You reclaimed credit and earned respect.', effects: { reputation: 2, jobPerformance: 2 } },
+      { chance: 0.45, text: 'It came across as petty office politics.', effects: { happiness: -2, jobPerformance: -1 } },
+    ] },
+    { label: 'Let it go this time', effects: { happiness: -2 } },
+  ],
+});
+ev({
+  id: 'career_cross_training', category: 'career', weight: 4, conditions: { employed: true },
+  text: 'Your employer offered free cross-training in a new skill area.',
+  choices: [
+    { label: 'Take the training', effects: { skillXp: [SK.management, 12], jobPerformance: 2 } },
+    { label: 'Stick to your lane', effects: {} },
+  ],
+});
+ev({
+  id: 'career_relocation_offer', category: 'career', weight: 3, conditions: { employed: true },
+  text: 'Your company offered to relocate you to a bigger office for a promotion track.',
+  choices: [
+    { label: 'Accept the move', effects: { jobPerformance: 5, happiness: -2, money: -2000 } },
+    { label: 'Stay put', effects: {} },
+  ],
+});
+ev({
+  id: 'career_office_politics_alliance', category: 'career', weight: 3, conditions: { employed: true },
+  text: 'A coworker is quietly building a faction and wants you on their side.',
+  choices: [
+    { label: 'Join them', effects: { jobPerformance: 2, karma: -1 } },
+    { label: 'Stay neutral', effects: {} },
+    { label: 'Report it to management', effects: { jobPerformance: -1, karma: 1 } },
+  ],
+});
+ev({
+  id: 'career_side_hustle_temptation', category: 'career', weight: 4, conditions: { employed: true },
+  text: 'A friend wants you to moonlight on a side project in your off hours.',
+  choices: [
+    { label: 'Do it for the extra cash', effects: { money: 1200, health: -3, happiness: -1 } },
+    { label: 'Focus on your day job', effects: {} },
+  ],
+});
+ev({
+  id: 'career_bad_performance_review', category: 'career', weight: 3, conditions: { employed: true },
+  text: 'Your performance review came back weaker than expected.',
+  choices: [
+    { label: 'Ask for specific feedback and improve', effects: { jobPerformance: 3, happiness: -1 } },
+    { label: 'Brush it off', effects: { jobPerformance: -2 } },
+  ],
+});
+ev({
+  id: 'career_headhunter_call', category: 'career', weight: 4, conditions: { employed: true, minReputation: 20 },
+  text: 'A headhunter called with a tempting pitch about "a role you should hear about."',
+  choices: [
+    { label: 'Take the call', effects: { happiness: 1, reputation: 1 } },
+    { label: 'Ignore it — loyal to your current job', effects: { jobPerformance: 1 } },
+  ],
+});
+ev({
+  id: 'career_office_move', category: 'career', weight: 3, conditions: { employed: true },
+  text: 'Your company is moving offices to a much longer commute for you.',
+  choices: [
+    { label: 'Adjust and push through', effects: { happiness: -3, health: -1 } },
+    { label: 'Negotiate remote days', skillCheck: { skillId: SK.negotiation, bonusPerLevel: 0.005 }, outcomes: [
+      { chance: 0.5, text: 'They agreed to two remote days a week.', effects: { happiness: 3 } },
+      { chance: 0.5, text: 'They said no, company policy.', effects: { happiness: -2 } },
+    ] },
+  ],
+});
+
+// --- BUSINESS ---
+ev({
+  id: 'biz_landlord_dispute', category: 'business', weight: 4, conditions: { hasBusiness: true },
+  text: 'Your landlord wants to raise commercial rent sharply at renewal.',
+  choices: [
+    { label: 'Negotiate hard', skillCheck: { skillId: SK.negotiation, bonusPerLevel: 0.005 }, outcomes: [
+      { chance: 0.55, text: 'You got a more reasonable rate.', effects: { companyCash: -20000 } },
+      { chance: 0.45, text: 'They held firm.', effects: { companyCash: -60000 } },
+    ] },
+    { label: 'Pay it and move on', effects: { companyCash: -60000 } },
+    { label: 'Start looking for a new location', effects: { companyMorale: -3 } },
+  ],
+});
+ev({
+  id: 'biz_rival_poaching_attempt', category: 'business', weight: 4, conditions: { hasBusiness: true },
+  text: 'A rival company is trying to poach one of your best employees.',
+  choices: [
+    { label: 'Counter-offer to keep them', effects: { companyCash: -25000, companyMorale: 3 } },
+    { label: 'Let them go', effects: { companyQuality: -3 } },
+  ],
+});
+ev({
+  id: 'biz_supplier_cost_increase', category: 'business', weight: 5, conditions: { hasBusiness: true },
+  text: 'A key supplier is raising prices due to rising costs.',
+  choices: [
+    { label: 'Absorb the cost', effects: { companyCash: -30000 } },
+    { label: 'Pass it to customers', effects: { companyBrand: -3, companyCash: 10000 } },
+    { label: 'Find a new supplier', skillCheck: { skillId: SK.operations, bonusPerLevel: 0.005 }, outcomes: [
+      { chance: 0.5, text: 'You found a solid replacement.', effects: { companyCash: -5000 } },
+      { chance: 0.5, text: 'The switch caused disruption.', effects: { companyQuality: -4, companyCash: -15000 } },
+    ] },
+  ],
+});
+ev({
+  id: 'biz_social_viral_moment', category: 'business', weight: 3, conditions: { hasBusiness: true },
+  text: 'Your business unexpectedly went viral on social media overnight.',
+  choices: [
+    { label: 'Lean into the moment', effects: { companyBrand: 8, companyCash: 20000 } },
+    { label: 'Stay quiet and let it pass', effects: { companyBrand: 2 } },
+  ],
+});
+ev({
+  id: 'biz_equipment_breakdown', category: 'business', weight: 4, conditions: { hasBusiness: true },
+  text: 'Critical equipment broke down, halting part of your operations.',
+  choices: [
+    { label: 'Rush repair', effects: { companyCash: -25000 } },
+    { label: 'Limp along and delay', effects: { companyQuality: -5, companyCash: -10000 } },
+  ],
+});
+ev({
+  id: 'biz_board_disagreement', category: 'business', weight: 3, conditions: { hasBusiness: true, businessPublic: true },
+  text: 'The board is split on your strategic direction.',
+  choices: [
+    { label: 'Push your vision through', skillCheck: { skillId: SK.strategy, bonusPerLevel: 0.005 }, outcomes: [
+      { chance: 0.55, text: 'You won them over.', effects: { reputation: 2, companyCash: 15000 } },
+      { chance: 0.45, text: 'It created lasting friction.', effects: { reputation: -2 } },
+    ] },
+    { label: 'Compromise on a middle path', effects: { companyCash: 5000 } },
+  ],
+});
+ev({
+  id: 'biz_customer_lawsuit_threat', category: 'business', weight: 3, conditions: { hasBusiness: true },
+  text: 'An unhappy customer is threatening legal action over a product issue.',
+  choices: [
+    { label: 'Settle quietly', effects: { companyCash: -15000 } },
+    { label: 'Fight it', skillCheck: { skillId: SK.law, bonusPerLevel: 0.005 }, outcomes: [
+      { chance: 0.5, text: 'The claim was dismissed.', effects: {} },
+      { chance: 0.5, text: 'You lost and paid heavily.', effects: { companyCash: -80000, companyBrand: -4 } },
+    ] },
+  ],
+});
+ev({
+  id: 'biz_industry_award_nomination', category: 'business', weight: 3, conditions: { hasBusiness: true, minReputation: 30 },
+  text: 'Your company was nominated for an industry award.',
+  choices: [
+    { label: 'Campaign for votes', effects: { companyCash: -5000, companyBrand: 4 } },
+    { label: 'Let the nomination speak for itself', effects: { companyBrand: 1 } },
+  ],
+});
+ev({
+  id: 'biz_data_breach', category: 'business', weight: 3, conditions: { hasBusiness: true },
+  text: 'Your company suffered a minor data breach.',
+  choices: [
+    { label: 'Disclose transparently and fix it', effects: { companyCash: -20000, companyBrand: -2, reputation: 1 } },
+    { label: 'Quietly patch and stay quiet', outcomes: [
+      { chance: 0.6, text: 'It never came out.', effects: { companyCash: -5000 } },
+      { chance: 0.4, text: 'It leaked anyway, and the cover-up made it worse.', effects: { companyBrand: -10, reputation: -4 } },
+    ] },
+  ],
+});
+ev({
+  id: 'biz_office_culture_survey', category: 'business', weight: 4, conditions: { hasBusiness: true },
+  text: 'An anonymous employee survey revealed some real dissatisfaction.',
+  choices: [
+    { label: 'Act on the feedback', effects: { companyCash: -15000, companyMorale: 6 } },
+    { label: 'File it away', effects: { companyMorale: -3 } },
+  ],
+});
+ev({
+  id: 'biz_export_opportunity', category: 'business', weight: 3, conditions: { hasBusiness: true },
+  text: 'A distributor overseas wants to carry your product.',
+  choices: [
+    { label: 'Sign the export deal', effects: { companyCash: 40000, companyBrand: 3 } },
+    { label: 'Not ready to scale internationally', effects: {} },
+  ],
+});
+
+// --- MARKET ---
+ev({
+  id: 'market_hyped_ipo_listing', category: 'market', weight: 4, conditions: { minMoney: 5000 },
+  text: 'A hyped new IPO is about to list, and everyone is talking about it.',
+  choices: [
+    { label: 'Buy in on day one', outcomes: [
+      { chance: 0.4, text: 'It popped hard on debut.', effects: { money: 4000 } },
+      { chance: 0.6, text: 'It fizzled after the hype faded.', effects: { money: -2500 } },
+    ] },
+    { label: 'Wait and watch', effects: {} },
+  ],
+});
+ev({
+  id: 'market_analyst_downgrade_note', category: 'market', weight: 4, conditions: { hasStocks: true },
+  text: 'A major analyst downgraded a stock you hold.',
+  choices: [
+    { label: 'Sell before it drops further', effects: { money: -1000 } },
+    { label: 'Hold your position', outcomes: [
+      { chance: 0.5, text: 'The stock recovered.', effects: { money: 1500 } },
+      { chance: 0.5, text: 'The downgrade proved right.', effects: { money: -2000 } },
+    ] },
+  ],
+});
+ev({
+  id: 'market_dividend_surprise', category: 'market', weight: 4, conditions: { hasStocks: true },
+  text: 'A company you hold announced a surprise special dividend.',
+  choices: [
+    { label: 'Take the payout', effects: { money: 1800, happiness: 2 } },
+  ],
+});
+ev({
+  id: 'market_insider_tip_offer', category: 'market', weight: 3, conditions: { hasStocks: true },
+  text: 'An acquaintance hints they have inside information on an upcoming merger.',
+  choices: [
+    { label: 'Trade on it', outcomes: [
+      { chance: 0.35, text: 'You made a killing before anyone noticed.', effects: { money: 15000, notoriety: 3 } },
+      { chance: 0.65, text: 'Regulators noticed the unusual trading pattern.', effects: { money: -20000, criminalRecord: 1, reputation: -8 } },
+    ] },
+    { label: 'Refuse — not worth the risk', effects: { karma: 1 } },
+  ],
+});
+ev({
+  id: 'market_etf_rebalance', category: 'market', weight: 4, conditions: { hasStocks: true },
+  text: 'Your broker suggests rebalancing your portfolio into index funds for stability.',
+  choices: [
+    { label: 'Rebalance', effects: { skillXp: [SK.investing, 8], money: -200 } },
+    { label: 'Stay concentrated in individual picks', effects: {} },
+  ],
+});
+ev({
+  id: 'market_short_squeeze', category: 'market', weight: 3, conditions: { hasStocks: true, minMoney: 10000 },
+  text: 'A heavily shorted stock is being talked about as a potential short squeeze.',
+  choices: [
+    { label: 'Pile in for the ride', outcomes: [
+      { chance: 0.3, text: 'The squeeze happened. Huge gains.', effects: { money: 12000, happiness: 4 } },
+      { chance: 0.7, text: 'It fizzled and you lost money.', effects: { money: -6000, happiness: -3 } },
+    ] },
+    { label: 'Stay away from the meme trade', effects: {} },
+  ],
+});
+ev({
+  id: 'market_bond_ladder_pitch', category: 'market', weight: 3, conditions: { minMoney: 20000 },
+  text: 'A financial advisor pitched you on building a bond ladder for steady income.',
+  choices: [
+    { label: 'Set it up', effects: { skillXp: [SK.investing, 6], money: -500 } },
+    { label: 'Not interested right now', effects: {} },
+  ],
+});
+ev({
+  id: 'market_currency_swing', category: 'market', weight: 3,
+  text: 'A sudden currency swing affected the value of your foreign holdings.',
+  choices: [
+    { label: 'Ride it out', outcomes: [
+      { chance: 0.5, text: 'It swung back in your favor.', effects: { money: 1200 } },
+      { chance: 0.5, text: 'It kept moving against you.', effects: { money: -1200 } },
+    ] },
+  ],
+});
+ev({
+  id: 'market_activist_investor_letter', category: 'market', weight: 3, conditions: { hasBusiness: true, businessPublic: true },
+  text: 'An activist investor sent a public letter demanding changes at your company.',
+  choices: [
+    { label: 'Engage and negotiate', skillCheck: { skillId: SK.negotiation, bonusPerLevel: 0.005 }, outcomes: [
+      { chance: 0.5, text: 'You reached an amicable settlement.', effects: { companyCash: -10000, reputation: 1 } },
+      { chance: 0.5, text: 'It turned into a public fight.', effects: { companyBrand: -6, reputation: -2 } },
+    ] },
+    { label: 'Ignore the letter', effects: { companyBrand: -3 } },
+  ],
+});
+ev({
+  id: 'market_options_expiry_win', category: 'market', weight: 3, conditions: { hasStocks: true, minMoney: 5000 },
+  text: 'You considered a risky options play ahead of earnings.',
+  choices: [
+    { label: 'Take the bet', outcomes: [
+      { chance: 0.4, text: 'It paid off big.', effects: { money: 6000 } },
+      { chance: 0.6, text: 'The options expired worthless.', effects: { money: -3000 } },
+    ] },
+    { label: 'Stick to your normal strategy', effects: {} },
+  ],
+});
+ev({
+  id: 'market_index_milestone', category: 'market', weight: 3,
+  text: 'The national stock index hit a record high, dominating the headlines.',
+  choices: [
+    { label: 'Feel good about your holdings', effects: { happiness: 1 } },
+    { label: 'Worry it means a correction is coming', effects: { happiness: -1 } },
+  ],
+  conditions: { hasStocks: true },
+});
+
+// --- POLITICS ---
+ev({
+  id: 'pol_town_hall_heckler', category: 'politics', weight: 4, conditions: { campaigning: true },
+  text: 'A heckler disrupted your town hall event with pointed questions.',
+  choices: [
+    { label: 'Engage them directly', skillCheck: { skillId: SK.debate, bonusPerLevel: 0.006 }, outcomes: [
+      { chance: 0.55, text: 'You handled it with poise and won the room.', effects: { campaignMomentum: 4, popularity: 2 } },
+      { chance: 0.45, text: 'It got tense and awkward on camera.', effects: { campaignMomentum: -3 } },
+    ] },
+    { label: 'Have security remove them', effects: { campaignMomentum: -1, popularity: -1 } },
+  ],
+});
+ev({
+  id: 'pol_endorsement_offer', category: 'politics', weight: 4, conditions: { campaigning: true },
+  text: 'A prominent local business association wants to endorse your campaign.',
+  choices: [
+    { label: 'Accept the endorsement', effects: { campaignMomentum: 3, popularity: 1 } },
+    { label: 'Decline to avoid the optics', effects: { reputation: 1 } },
+  ],
+});
+ev({
+  id: 'pol_leaked_memo', category: 'politics', weight: 3, conditions: { inOffice: 'any' },
+  text: 'An internal policy memo leaked to the press before you were ready to announce it.',
+  choices: [
+    { label: 'Get ahead of the story', skillCheck: { skillId: SK.spin, bonusPerLevel: 0.005 }, outcomes: [
+      { chance: 0.55, text: 'You controlled the narrative.', effects: { popularity: 2 } },
+      { chance: 0.45, text: 'The story ran wild before you could respond.', effects: { popularity: -4 } },
+    ] },
+    { label: 'Say nothing and let it blow over', effects: { popularity: -1 } },
+  ],
+});
+ev({
+  id: 'pol_constituent_casework', category: 'politics', weight: 4, conditions: { inOffice: 'any' },
+  text: 'A constituent came to you with a genuinely difficult personal problem needing your help.',
+  choices: [
+    { label: 'Personally intervene', effects: { popularity: 2, karma: 2, politicalCapital: -1 } },
+    { label: 'Refer them to your staff', effects: {} },
+  ],
+});
+ev({
+  id: 'pol_rival_scandal_opportunity', category: 'politics', weight: 3, conditions: { inParty: true, notInOffice: true },
+  text: 'You learned of a genuine scandal involving a political rival.',
+  choices: [
+    { label: 'Leak it to the press', outcomes: [
+      { chance: 0.6, text: 'It landed and damaged your rival badly.', effects: { popularity: 3, karma: -2 } },
+      { chance: 0.4, text: 'It was traced back to you.', effects: { reputation: -6, karma: -3 } },
+    ] },
+    { label: 'Take the high road', effects: { karma: 2 } },
+  ],
+});
+ev({
+  id: 'pol_budget_negotiation', category: 'politics', weight: 3, conditions: { inOffice: 'any' },
+  text: 'Tense budget negotiations with the opposition are dragging on.',
+  choices: [
+    { label: 'Compromise to get a deal done', skillCheck: { skillId: SK.coalition, bonusPerLevel: 0.005 }, outcomes: [
+      { chance: 0.6, text: 'A workable deal was reached.', effects: { popularity: 1, politicalCapital: 2 } },
+      { chance: 0.4, text: 'Talks collapsed and voters blamed everyone.', effects: { popularity: -3 } },
+    ] },
+    { label: 'Hold the line on principle', effects: { politicalCapital: -2, popularity: 1 } },
+  ],
+});
+ev({
+  id: 'pol_grassroots_volunteers', category: 'politics', weight: 4, conditions: { campaigning: true },
+  text: 'A wave of enthusiastic grassroots volunteers showed up wanting to help your campaign.',
+  choices: [
+    { label: 'Put them to work canvassing', effects: { campaignMomentum: 4 } },
+    { label: 'Keep the operation lean', effects: {} },
+  ],
+});
+ev({
+  id: 'pol_foreign_delegation_visit', category: 'politics', weight: 3, conditions: { inOffice: 'any' },
+  text: 'A foreign delegation requested a courtesy visit while touring the country.',
+  choices: [
+    { label: 'Host them warmly', effects: { influence: 2, popularity: 1 } },
+    { label: 'Keep it brief and formal', effects: {} },
+  ],
+});
+ev({
+  id: 'pol_ballot_initiative', category: 'politics', weight: 3,
+  text: 'A citizen-led ballot initiative on a hot-button issue is gathering signatures.',
+  choices: [
+    { label: 'Publicly support it', effects: { popularity: 1 } },
+    { label: 'Publicly oppose it', effects: { popularity: -1 } },
+    { label: 'Stay neutral', effects: {} },
+  ],
+});
+ev({
+  id: 'pol_staff_defection', category: 'politics', weight: 3, conditions: { inOffice: 'any' },
+  text: 'A trusted senior staffer resigned abruptly to join a rival\'s team.',
+  choices: [
+    { label: 'Let them go gracefully', effects: { reputation: 1 } },
+    { label: 'Publicly criticize their loyalty', effects: { popularity: -2, karma: -1 } },
+  ],
+});
+ev({
+  id: 'pol_infrastructure_ribbon_cutting', category: 'politics', weight: 4, conditions: { inOffice: 'any' },
+  text: 'A long-promised infrastructure project finally finished, and there\'s a ribbon-cutting ceremony.',
+  choices: [
+    { label: 'Make it a big media event', effects: { popularity: 3 } },
+    { label: 'Keep it low-key', effects: { popularity: 1 } },
+  ],
+});
+
+// --- CRIME ---
+ev({
+  id: 'crime_stolen_identity', category: 'crime', weight: 3,
+  text: 'Someone used your identity to open a fraudulent line of credit.',
+  choices: [
+    { label: 'Dispute it immediately', effects: { money: -300, happiness: -2 } },
+    { label: 'Deal with it later', outcomes: [
+      { chance: 0.5, text: 'It resolved itself eventually.', effects: { money: -500 } },
+      { chance: 0.5, text: 'The debt collectors got aggressive.', effects: { money: -2000, happiness: -4 } },
+    ] },
+  ],
+});
+ev({
+  id: 'crime_witness_approach', category: 'crime', weight: 3,
+  text: 'You witnessed a crime and someone involved is pressuring you to stay quiet.',
+  choices: [
+    { label: 'Report it anyway', effects: { karma: 3, notoriety: 1 } },
+    { label: 'Stay silent', effects: { karma: -2, money: 1000 } },
+  ],
+});
+ev({
+  id: 'crime_pickpocketed', category: 'crime', weight: 4,
+  text: 'You got pickpocketed in a crowded market.',
+  choices: [
+    { label: 'Chase them down', outcomes: [
+      { chance: 0.4, text: 'You caught them and got your things back.', effects: { happiness: 1 } },
+      { chance: 0.6, text: 'They got away, and you got hurt trying.', effects: { health: -3, money: -200 } },
+    ] },
+    { label: 'Let it go', effects: { money: -200, happiness: -2 } },
+  ],
+});
+ev({
+  id: 'crime_bribery_offer', category: 'crime', weight: 3, conditions: { hasBusiness: true },
+  text: 'A local official hinted that a "processing fee" would speed up your permits.',
+  choices: [
+    { label: 'Pay the bribe', outcomes: [
+      { chance: 0.75, text: 'The permits sailed through.', effects: { companyCash: -8000, money: -3000, karma: -3 } },
+      { chance: 0.25, text: 'It was a sting operation.', effects: { criminalRecord: 1, reputation: -8, jailYears: 1 } },
+    ] },
+    { label: 'Refuse and wait it out', effects: { karma: 2, companyCash: -2000 } },
+  ],
+});
+ev({
+  id: 'crime_neighborhood_watch', category: 'crime', weight: 4,
+  text: 'Your neighborhood is starting a watch program after a string of break-ins.',
+  choices: [
+    { label: 'Join and volunteer', effects: { karma: 2, happiness: 1, skillXp: [SK.streetSmarts, 5] } },
+    { label: 'Skip it', effects: {} },
+  ],
+});
+ev({
+  id: 'crime_counterfeit_goods', category: 'crime', weight: 3,
+  text: 'You were offered a "great deal" on designer goods that are obviously counterfeit.',
+  choices: [
+    { label: 'Buy them anyway', effects: { money: -200, notoriety: 1, happiness: 1 } },
+    { label: 'Refuse', effects: {} },
+  ],
+});
+ev({
+  id: 'crime_hacked_account', category: 'crime', weight: 3,
+  text: 'One of your online accounts was compromised in a breach.',
+  choices: [
+    { label: 'Lock it down immediately', skillCheck: { skillId: SK.hacking, bonusPerLevel: 0.004 }, outcomes: [
+      { chance: 0.7, text: 'You secured everything in time.', effects: {} },
+      { chance: 0.3, text: 'Some damage was already done.', effects: { money: -1500, happiness: -2 } },
+    ] },
+    { label: 'Deal with it whenever', effects: { money: -1500, happiness: -2 } },
+  ],
+});
+ev({
+  id: 'crime_underground_poker', category: 'crime', weight: 3, conditions: { minMoney: 5000 },
+  text: 'You were invited to a high-stakes, off-the-books poker game.',
+  choices: [
+    { label: 'Play', skillCheck: { skillId: SK.poker, bonusPerLevel: 0.006 }, outcomes: [
+      { chance: 0.5, text: 'You cleaned up.', effects: { money: 8000, notoriety: 1 } },
+      { chance: 0.5, text: 'You got cleaned out.', effects: { money: -6000 } },
+    ] },
+    { label: 'Decline', effects: {} },
+  ],
+});
+ev({
+  id: 'crime_extortion_threat', category: 'crime', weight: 3, conditions: { hasBusiness: true, minMoney: 20000 },
+  text: 'Someone is threatening to spread damaging rumors about your business unless you pay up.',
+  choices: [
+    { label: 'Pay to make it go away', effects: { money: -8000, karma: -1 } },
+    { label: 'Go to the police', outcomes: [
+      { chance: 0.6, text: 'They caught the extortionist.', effects: { reputation: 2 } },
+      { chance: 0.4, text: 'They followed through and spread the rumors anyway.', effects: { reputation: -6, companyBrand: -4 } },
+    ] },
+  ],
+});
+ev({
+  id: 'crime_fake_charity', category: 'crime', weight: 3,
+  text: 'A door-to-door "charity collector" seemed off, but was persistent.',
+  choices: [
+    { label: 'Donate anyway', effects: { money: -100 } },
+    { label: 'Report them to local authorities', effects: { karma: 1 } },
+  ],
+});
+ev({
+  id: 'crime_stolen_vehicle', category: 'crime', weight: 3, conditions: { minMoney: 10000 },
+  text: 'Your car was stolen from outside your home.',
+  choices: [
+    { label: 'File an insurance claim', effects: { money: -1000, happiness: -3 } },
+    { label: 'Track it down yourself', skillCheck: { skillId: SK.streetSmarts, bonusPerLevel: 0.006 }, outcomes: [
+      { chance: 0.4, text: 'You actually found it, abandoned nearby.', effects: { happiness: 2 } },
+      { chance: 0.6, text: 'It was long gone.', effects: { money: -5000, happiness: -4 } },
+    ] },
+  ],
+});
+
+// --- WORLD ---
+ev({
+  id: 'world_heatwave', category: 'world', weight: 4,
+  text: 'A brutal heatwave is straining the power grid across {country}.',
+  choices: [
+    { label: 'Stay informed and prepared', effects: { health: -1 } },
+    { label: 'Ignore it', effects: { health: -2 } },
+  ],
+});
+ev({
+  id: 'world_tech_leap', category: 'world', weight: 3,
+  text: 'A breakthrough in a foreign lab promises to reshape an entire industry.',
+  choices: [
+    { label: 'Study the implications', effects: { smarts: 1 } },
+    { label: 'Not your concern', effects: {} },
+  ],
+});
+ev({
+  id: 'world_royal_visit', category: 'world', weight: 3,
+  text: 'A foreign head of state is visiting {country} and public events are being held.',
+  choices: [
+    { label: 'Attend a public event', effects: { happiness: 1, influence: 1 } },
+    { label: 'Skip it', effects: {} },
+  ],
+});
+ev({
+  id: 'world_labor_strike', category: 'world', weight: 4,
+  text: 'A nationwide transit strike is disrupting daily life across {country}.',
+  choices: [
+    { label: 'Work around it', effects: { happiness: -1 } },
+    { label: 'Support the strikers publicly', effects: { karma: 1, reputation: 1 } },
+  ],
+});
+ev({
+  id: 'world_cultural_festival', category: 'world', weight: 4,
+  text: 'A major cultural festival is happening in {city} this year.',
+  choices: [
+    { label: 'Attend and enjoy it', effects: { happiness: 3, money: -80 } },
+    { label: 'Stay home', effects: {} },
+  ],
+});
+ev({
+  id: 'world_debt_downgrade', category: 'world', weight: 3,
+  text: '{country}\'s credit rating was downgraded by a major agency.',
+  choices: [
+    { label: 'Watch your investments closely', effects: { smarts: 1 } },
+    { label: 'Nothing to do about it', effects: {} },
+  ],
+});
+ev({
+  id: 'world_border_dispute', category: 'world', weight: 3,
+  text: 'A minor border dispute between neighboring nations is making headlines.',
+  choices: [
+    { label: 'Follow the news closely', effects: {} },
+    { label: 'Tune it out', effects: {} },
+  ],
+});
+ev({
+  id: 'world_science_prize', category: 'world', weight: 3,
+  text: 'A researcher from {country} just won a major international science prize.',
+  choices: [
+    { label: 'Feel a swell of national pride', effects: { happiness: 1 } },
+  ],
+});
+ev({
+  id: 'world_refugee_crisis', category: 'world', weight: 3,
+  text: 'A humanitarian crisis abroad has sent a wave of refugees toward {country}.',
+  choices: [
+    { label: 'Donate to relief efforts', effects: { money: -200, karma: 3 } },
+    { label: 'Focus on your own life', effects: {} },
+  ],
+});
+ev({
+  id: 'world_tourism_boom', category: 'world', weight: 4,
+  text: 'Tourism to {country} is booming this year, filling hotels and streets.',
+  choices: [
+    { label: 'Enjoy the vibrant atmosphere', effects: { happiness: 1 } },
+    { label: 'Find it overwhelming', effects: { happiness: -1 } },
+  ],
+});
+ev({
+  id: 'world_undersea_cable_cut', category: 'world', weight: 2,
+  text: 'A key undersea internet cable was damaged, slowing connectivity across the region.',
+  choices: [
+    { label: 'Adapt to slower service', effects: { happiness: -1 } },
+  ],
+});
+
+// --- MEDIA ---
+ev({
+  id: 'media_documentary_pitch', category: 'media', weight: 3, conditions: { minReputation: 40 },
+  text: 'A documentary crew wants to feature your life story.',
+  choices: [
+    { label: 'Cooperate fully', effects: { reputation: 3, popularity: 2, happiness: -1 } },
+    { label: 'Decline — keep your privacy', effects: {} },
+  ],
+});
+ev({
+  id: 'media_hit_piece', category: 'media', weight: 3, conditions: { minReputation: 20 },
+  text: 'A tabloid published an unflattering hit piece about you.',
+  choices: [
+    { label: 'Issue a public rebuttal', skillCheck: { skillId: SK.spin, bonusPerLevel: 0.005 }, outcomes: [
+      { chance: 0.5, text: 'Your response won public sympathy.', effects: { reputation: 2 } },
+      { chance: 0.5, text: 'It only fanned the flames.', effects: { reputation: -3 } },
+    ] },
+    { label: 'Ignore it', effects: { reputation: -1 } },
+  ],
+});
+ev({
+  id: 'media_viral_meme', category: 'media', weight: 3,
+  text: 'A photo of you became an unexpected internet meme.',
+  choices: [
+    { label: 'Embrace it with humor', effects: { popularity: 3, happiness: 2 } },
+    { label: 'Try to get it taken down', effects: { happiness: -1, reputation: -1 } },
+  ],
+});
+ev({
+  id: 'media_book_deal_offer', category: 'media', weight: 3, conditions: { minReputation: 35 },
+  text: 'A publisher offered you a book deal about your career.',
+  choices: [
+    { label: 'Sign the deal', effects: { money: 15000, reputation: 2 } },
+    { label: 'Not ready to write it', effects: {} },
+  ],
+});
+ev({
+  id: 'media_live_interview_gaffe', category: 'media', weight: 3, conditions: { minReputation: 25 },
+  text: 'You misspoke badly during a live TV interview.',
+  choices: [
+    { label: 'Address it head-on afterward', skillCheck: { skillId: SK.spin, bonusPerLevel: 0.005 }, outcomes: [
+      { chance: 0.5, text: 'Owning it earned you respect.', effects: { reputation: 1 } },
+      { chance: 0.5, text: 'It kept getting replayed online.', effects: { reputation: -4 } },
+    ] },
+    { label: 'Hope it blows over', effects: { reputation: -2 } },
+  ],
+});
+ev({
+  id: 'media_photographer_stalking', category: 'media', weight: 2, conditions: { minReputation: 50 },
+  text: 'Paparazzi have been following you around persistently.',
+  choices: [
+    { label: 'Hire security', effects: { money: -3000, happiness: 1 } },
+    { label: 'Just deal with it', effects: { happiness: -2 } },
+  ],
+});
+ev({
+  id: 'media_op_ed_invite', category: 'media', weight: 4, conditions: { minReputation: 20 },
+  text: 'A major newspaper invited you to write a guest op-ed.',
+  choices: [
+    { label: 'Write something bold', skillCheck: { skillId: SK.writing, bonusPerLevel: 0.005 }, outcomes: [
+      { chance: 0.6, text: 'It struck a chord and was widely shared.', effects: { reputation: 3, popularity: 2 } },
+      { chance: 0.4, text: 'It landed flat.', effects: { reputation: -1 } },
+    ] },
+    { label: 'Play it safe', effects: { reputation: 1 } },
+  ],
+});
+ev({
+  id: 'media_talk_show_banter', category: 'media', weight: 3, conditions: { minReputation: 30 },
+  text: 'You were invited onto a late-night talk show for a light interview.',
+  choices: [
+    { label: 'Be charming and funny', skillCheck: { skillId: SK.charm, bonusPerLevel: 0.006 }, outcomes: [
+      { chance: 0.65, text: 'You were a hit with the audience.', effects: { popularity: 3, happiness: 2 } },
+      { chance: 0.35, text: 'The jokes fell flat.', effects: { popularity: -1 } },
+    ] },
+    { label: 'Keep it professional', effects: { reputation: 1 } },
+  ],
+});
+ev({
+  id: 'media_fact_check_dispute', category: 'media', weight: 3, conditions: { minReputation: 25 },
+  text: 'A fact-checking outlet disputed a claim you made publicly.',
+  choices: [
+    { label: 'Correct the record', effects: { reputation: 1 } },
+    { label: 'Stand by your original statement', outcomes: [
+      { chance: 0.4, text: 'You were vindicated later.', effects: { reputation: 2 } },
+      { chance: 0.6, text: 'It didn\'t hold up.', effects: { reputation: -3 } },
+    ] },
+  ],
+});
+ev({
+  id: 'media_charity_telethon', category: 'media', weight: 3, conditions: { minReputation: 30 },
+  text: 'You were invited to appear on a charity telethon broadcast.',
+  choices: [
+    { label: 'Pledge generously on air', effects: { money: -5000, karma: 4, popularity: 2 } },
+    { label: 'Appear without pledging much', effects: { popularity: 1 } },
+  ],
+});
+
+// --- FAMILY ---
+ev({
+  id: 'fam_inheritance_dispute', category: 'family', weight: 3, conditions: { minAge: 30 },
+  text: 'A family inheritance dispute erupted after a relative\'s passing.',
+  choices: [
+    { label: 'Push for your fair share', skillCheck: { skillId: SK.negotiation, bonusPerLevel: 0.005 }, outcomes: [
+      { chance: 0.5, text: 'It resolved amicably in your favor.', effects: { money: 12000 } },
+      { chance: 0.5, text: 'It dragged on and damaged relationships.', effects: { happiness: -4, money: 2000 } },
+    ] },
+    { label: 'Step back to preserve family peace', effects: { karma: 2, happiness: 1 } },
+  ],
+});
+ev({
+  id: 'fam_sibling_feud', category: 'family', weight: 3,
+  text: 'An old sibling rivalry flared up again at a family gathering.',
+  choices: [
+    { label: 'Address it honestly', effects: { happiness: 2, karma: 1 } },
+    { label: 'Avoid the conflict', effects: { happiness: -1 } },
+  ],
+});
+ev({
+  id: 'fam_child_school_trouble', category: 'family', weight: 4, conditions: { hasChildren: true },
+  text: 'One of your children is struggling at school.',
+  amount: { min: 500, max: 2000 },
+  choices: [
+    { label: 'Get them a tutor ({amount})', effects: { moneyAmountMult: -1, happiness: 2 } },
+    { label: 'Handle it yourself', effects: { happiness: 1 } },
+  ],
+});
+ev({
+  id: 'fam_parent_aging_care', category: 'family', weight: 4, conditions: { minAge: 40 },
+  text: 'An aging parent needs more care and attention than before.',
+  amount: { min: 2000, max: 8000 },
+  choices: [
+    { label: 'Arrange professional care ({amount})', effects: { moneyAmountMult: -1, happiness: 1 } },
+    { label: 'Take on the caregiving yourself', effects: { happiness: -2, health: -2, karma: 3 } },
+  ],
+});
+ev({
+  id: 'fam_surprise_pregnancy', category: 'family', weight: 3, conditions: { hasSpouse: true },
+  text: 'An unexpected pregnancy has your family talking through what comes next.',
+  choices: [
+    { label: 'Embrace it', effects: { happiness: 5 } },
+    { label: 'It complicates your plans', effects: { happiness: -2 } },
+  ],
+});
+ev({
+  id: 'fam_spouse_career_change', category: 'family', weight: 3, conditions: { hasSpouse: true },
+  text: 'Your spouse wants to make a major career change that affects the household budget.',
+  choices: [
+    { label: 'Support them fully', effects: { happiness: 4, money: -3000 } },
+    { label: 'Ask them to wait', effects: { happiness: -2 } },
+  ],
+});
+ev({
+  id: 'fam_estranged_reconciliation', category: 'family', weight: 3, conditions: { minAge: 35 },
+  text: 'An estranged family member reached out wanting to reconcile.',
+  choices: [
+    { label: 'Open the door', effects: { happiness: 4, karma: 2 } },
+    { label: 'Keep your distance', effects: {} },
+  ],
+});
+ev({
+  id: 'fam_kids_college_savings', category: 'family', weight: 4, conditions: { hasChildren: true },
+  text: 'It\'s time to think seriously about saving for your kids\' education.',
+  amount: { min: 2000, max: 10000 },
+  choices: [
+    { label: 'Start a dedicated fund ({amount})', effects: { moneyAmountMult: -1, happiness: 2 } },
+    { label: 'Deal with it later', effects: {} },
+  ],
+});
+ev({
+  id: 'fam_pet_adoption', category: 'family', weight: 4,
+  text: 'A family member wants to adopt a pet.',
+  choices: [
+    { label: 'Say yes', effects: { happiness: 3, money: -400 } },
+    { label: 'Not right now', effects: { happiness: -1 } },
+  ],
+});
+ev({
+  id: 'fam_holiday_hosting', category: 'family', weight: 4,
+  text: 'It\'s your turn to host the whole extended family for the holidays.',
+  amount: { min: 500, max: 2000 },
+  choices: [
+    { label: 'Go all out ({amount})', effects: { moneyAmountMult: -1, happiness: 3 } },
+    { label: 'Keep it simple', effects: { happiness: 1 } },
+  ],
+});
+ev({
+  id: 'fam_grandparent_visit', category: 'family', weight: 4, conditions: { hasChildren: true },
+  text: 'The grandparents are visiting for an extended stay.',
+  choices: [
+    { label: 'Enjoy the extra help and company', effects: { happiness: 3 } },
+    { label: 'Find it a bit stressful', effects: { happiness: -1 } },
+  ],
+});
+
+// --- HEALTH ---
+ev({
+  id: 'health_allergy_discovery', category: 'health', weight: 3,
+  text: 'You discovered a new food allergy the hard way.',
+  choices: [
+    { label: 'Adjust your diet carefully', effects: { health: 1, happiness: -1 } },
+    { label: 'Wing it and hope for the best', effects: { health: -2 } },
+  ],
+});
+ev({
+  id: 'health_sleep_study', category: 'health', weight: 3, conditions: { minAge: 25 },
+  text: 'Chronic tiredness led you to book a sleep study.',
+  amount: { min: 800, max: 2500 },
+  choices: [
+    { label: 'Get the full workup ({amount})', effects: { moneyAmountMult: -1, health: 4 } },
+    { label: 'Just try to sleep more', effects: { health: 1 } },
+  ],
+});
+ev({
+  id: 'health_dental_surgery', category: 'health', weight: 3,
+  text: 'You need a dental procedure that insurance won\'t fully cover.',
+  amount: { min: 1500, max: 6000 },
+  choices: [
+    { label: 'Get it done ({amount})', effects: { moneyAmountMult: -1, health: 3 } },
+    { label: 'Put it off', effects: { health: -3 } },
+  ],
+});
+ev({
+  id: 'health_meditation_retreat', category: 'health', weight: 3,
+  text: 'A meditation retreat is being offered for {amount}.',
+  amount: { min: 400, max: 1500 },
+  choices: [
+    { label: 'Go and unplug', effects: { moneyAmountMult: -1, happiness: 6, health: 2 } },
+    { label: 'Can\'t spare the time', effects: {} },
+  ],
+});
+ev({
+  id: 'health_injury_recovery', category: 'health', weight: 4,
+  text: 'A minor sports injury is taking longer to heal than expected.',
+  amount: { min: 500, max: 1800 },
+  choices: [
+    { label: 'Get physical therapy ({amount})', effects: { moneyAmountMult: -1, health: 4 } },
+    { label: 'Push through it', effects: { health: -3 } },
+  ],
+});
+ev({
+  id: 'health_annual_physical', category: 'health', weight: 5,
+  text: 'It\'s time for your annual physical checkup.',
+  choices: [
+    { label: 'Go and get the full picture', effects: { health: 2, money: -200 } },
+    { label: 'Skip it again this year', effects: { health: -1 } },
+  ],
+});
+ev({
+  id: 'health_diet_overhaul', category: 'health', weight: 4,
+  text: 'You committed to a serious diet overhaul.',
+  choices: [
+    { label: 'Stick with it', effects: { health: 4, happiness: 1, skillXp: [SK.cooking, 8] } },
+    { label: 'Give up after a few weeks', effects: { happiness: -1 } },
+  ],
+});
+
 
 export const EVENT_TEMPLATES: EventTemplate[] = E;

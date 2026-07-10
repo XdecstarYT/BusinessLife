@@ -13,6 +13,13 @@ state instead of affecting anything else if you have no connection.
 
 ## Highlights
 
+- **V29 content pass — ~400 new features, all data-driven.** 108 new industries across every one of the
+  12 sectors (347 total), 70 new laws across 17 categories (185 total), 92 new daily flavor events (139
+  total), 105 new yearly event templates across all ten categories (257 total), and 20 new milestone
+  achievements (casino high-rollers, crypto/savings/bond/forex thresholds, franchise and loyalty-program
+  empires, crime-family kingpins, election landslides, and more) wired into the same generic
+  threshold-check the existing achievement system already used — no new engine logic required, since the
+  whole point of this codebase's data/engine split is that content is just rows in an array.
 - **✨ The Studio: a full Product Design & Commerce pillar** — walk into an innovation lab (a live 3D
   environment with a reflective glass floor, holographic rings, ambient particles and a robotic assembly
   arm) and take products from a spark of an idea to global launch. Design in a real-time parametric 3D
@@ -71,7 +78,7 @@ state instead of affecting anything else if you have no connection.
   year, whether you jump straight there or accumulate days/weeks into it.
 - **Deterministic living world** — 12 fictional nations, dozens of states, ~150 cities, 400+ notable
   NPCs and 170+ companies, all generated from a seed so the same seed reproduces the same world exactly.
-- **239 industries** across 12 sectors, each with distinct economics (margins, cyclicality, capital and
+- **347 industries** across 12 sectors, each with distinct economics (margins, cyclicality, capital and
   labour intensity, tech and regulation sensitivity, commodity exposure).
 - **Full company simulation** — revenue emerges from the business cycle x your pricing, marketing, R&D,
   wages, automation, cyber-defense and brand x the laws in force x competition. IPO, pay dividends,
@@ -131,7 +138,7 @@ state instead of affecting anything else if you have no connection.
   you actually have a relationship with, where it's felt.)
 - **Deep politics** — join or found a party, campaign for eight tiers of office (councillor to head of
   state) with rallies/ads/fundraising/consultants/polling, negotiate coalitions, appoint a cabinet, and
-  pass or repeal **115 laws** whose effects continuously reshape the economy. As head of state, conduct
+  pass or repeal **185 laws** whose effects continuously reshape the economy. As head of state, conduct
   real foreign policy: declare war, sign peace treaties, impose or lift sanctions, send foreign aid, and
   sign trade agreements — on top of the elections, coups, sanctions and wars that unfold on their own.
 - **War has real weight, win or lose** — militaries now have a Readiness score, separate from raw
@@ -344,7 +351,7 @@ only moves when you tell it to, using the three buttons on the Life hub:
 
 - **Career** — study for degrees (15 options), take jobs from a live market, and grow skills (120 of them
   across 10 categories). Performance drives raises, promotions and layoffs.
-- **Business** — found companies in any of 239 industries, then tune strategy (marketing, R&D, pricing,
+- **Business** — found companies in any of 347 industries, then tune strategy (marketing, R&D, pricing,
   wages, automation, cyber-defense, dividends), invest or draw capital, IPO, or sell. Upgrade your HQ tier,
   pick a corporate culture, and hire a CFO/COO/CMO. Run one-off initiatives (brand deals, tiered training
   programs, supply-chain diversification, quality audits, trademark filings, proactive recalls), issue
@@ -460,8 +467,8 @@ src/
     actions.ts         The player "verbs" the UI calls between years
     engine.ts          advanceYear()/advanceDay()/advanceWeek(): orchestrate simulated time
   data/                Data-driven content (the game is authored here)
-    industries.ts      239 industries across 12 sectors
-    laws.ts            115 laws with economic effects and bloc support
+    industries.ts      347 industries across 12 sectors
+    laws.ts            185 laws with economic effects and bloc support
     events.ts          Event templates -> thousands of scenarios
     dailyEvents.ts     22 lightweight flavor events for day/week advancement
     skills.ts          120 skills; countries.ts, names.ts, ...
