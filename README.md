@@ -13,6 +13,19 @@ state instead of affecting anything else if you have no connection.
 
 ## Highlights
 
+- **V33 — the fun-and-addictive update: ribbons, bucket lists, pets, and the lottery.** Every
+  completed life now ends with a **ribbon** — one of 24 BitLife-style life-summary awards (Legend,
+  Kingpin, Centenarian, Saint, Jailbird, Best Friend…) picked by priority from how you actually
+  lived — and the collection persists across lives in a Ribbon Cabinet on the main menu, with
+  unearned ribbons shown as ??? mystery slots. Every new life rolls a six-goal **bucket list**
+  (from a 14-goal pool with random difficulty tiers) checked yearly with real cash/happiness
+  payouts, an achievement for clearing the whole list, and a dedicated ribbon. **Pets** are now a
+  real system: adopt up to four (dog, cat, parrot, horse, snake, goldfish), play yearly to build
+  bond, pay upkeep and surprise vet bills — companionship boosts happiness in proportion to bond,
+  loyal pets occasionally come through with heroics or found treasure, and when they die the grief
+  scales with how close you were. And the **lottery**: instant-result tickets and scratch cards
+  with realistic terrible odds, yearly purchase caps against spam, and a $2M jackpot that feeds a
+  Jackpot Winner achievement and ribbon.
 - **V32 — the BitLife look.** The app chrome now mirrors the BitLife layout it was always inspired
   by: a flat signature-green header banner (identity left, bank balance right), a persistent
   😊❤️🧠😎 Happiness/Health/Smarts/Charisma stat strip pinned above the tab bar, and a five-slot

@@ -20,6 +20,8 @@ import { tickWorldEvents } from './worldEvents';
 import { tryFireDailyEvent } from './dailyEvents';
 import { tickLifestyleAssets } from './lifestyle';
 import { tickProducts } from './products';
+import { tickPets } from './pets';
+import { GOAL_DEF_BY_ID, generateBucketList } from '../data/goals';
 import { SK } from '../data/skills';
 import { CAREER_LADDER, COWORKER_PERSONALITIES, COWORKER_PERSONALITY_BY_ID, rankIndex, titleForRank, WORK_STYLE_BY_ID, WORKPLACE_EVENTS } from '../data/careers';
 import { makePersonName } from '../data/names';
@@ -767,6 +769,27 @@ function computeLegacyScore(state: GameState, worth: number): number {
   return Math.round(clamp(score, 0, 100));
 }
 
+/** Yearly bucket-list pass: pay out any goal whose progress crossed the line. */
+function tickBucketList(state: GameState): void {
+  if (!state.bucketList?.length) return;
+  for (const goal of state.bucketList) {
+    if (goal.done) continue;
+    const def = GOAL_DEF_BY_ID[goal.defId];
+    if (!def) continue;
+    let progress = 0;
+    try { progress = def.progress(state, goal.target); } catch { continue; }
+    if (progress < 1) continue;
+    goal.done = true;
+    state.player.money += goal.rewardMoney;
+    state.player.happiness = clamp100(state.player.happiness + goal.rewardHappiness);
+    log(state, `🎯 Bucket list: "${goal.description}" — DONE. Reward: $${goal.rewardMoney.toLocaleString()}.`, 'milestone');
+    if (state.bucketList.every((g) => g.done) && !state.achievements.includes('bucket_lister')) {
+      state.achievements.push('bucket_lister');
+      log(state, '🏆 Every item on your bucket list is checked off. What a life.', 'milestone');
+    }
+  }
+}
+
 function gameOverCheck(state: GameState): void {
   const p = state.player;
   if (p.alive) return;
@@ -1034,6 +1057,14 @@ export function advanceYear(state: GameState): GameState {
   if (state.player.alive) tickChallenge(state, rng);
   if (state.player.alive) for (const h of tickLifestyleAssets(state, rng)) log(state, h, 'money');
   if (state.player.alive) tickPersonalFinance(state, rng);
+  // V33 fun systems: pets, bucket-list goals, gambling counters. Saves from before
+  // these systems existed migrate here (old lives even get a bucket list rolled).
+  state.player.pets ??= [];
+  if (!state.bucketList) state.bucketList = generateBucketList(rng);
+  state.player.lotteryTicketsThisYear = 0;
+  state.player.scratchCardsThisYear = 0;
+  if (state.player.alive) for (const l of tickPets(state, rng)) log(state, l, 'info');
+  if (state.player.alive) tickBucketList(state);
 
   // 5. Player company income: dividends from private profitable companies
   const p = state.player;

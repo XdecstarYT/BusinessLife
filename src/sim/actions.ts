@@ -4,7 +4,8 @@
  * and eligibility so the UI can surface clean errors. RNG-consuming actions
  * advance the persisted stream so outcomes stay deterministic on replay.
  */
-import type { Advisor, AdvisorSpecialty, CabinetPortfolio, Company, Coworker, Executive, ExecutiveRole, GameState, Gender, InfrastructureKind, ManifestoPromise, MaintenanceLevel, OfficeKind, PropertyAsset, TaxRates, WorkStyle } from './types';
+import type { Advisor, AdvisorSpecialty, CabinetPortfolio, Company, Coworker, Executive, ExecutiveRole, GameState, Gender, InfrastructureKind, ManifestoPromise, MaintenanceLevel, OfficeKind, PetKind, PropertyAsset, TaxRates, WorkStyle } from './types';
+import { createPet, PET_SPEC_BY_KIND } from './pets';
 import { CABINET_PORTFOLIOS, clamp, clamp100 } from './types';
 import { RNG } from './rng';
 import { INDUSTRY_BY_ID, INDUSTRIES } from '../data/industries';
@@ -840,6 +841,97 @@ export function developProperty(state: GameState, propertyId: string, developKin
   if (!state.achievements.includes('property_developer')) state.achievements.push('property_developer');
   log(state, `🏗️ Broke ground on ${prop.name}, developing it into ${spec.label} for $${cost.toLocaleString()}.`, 'money');
   return { ok: true, message: `${prop.name} developed into ${spec.label}.` };
+}
+
+// --------------------------------------------------------------------------- pets
+
+export function adoptPet(state: GameState, kind: PetKind): ActionResult {
+  const p = state.player;
+  p.pets ??= [];
+  const spec = PET_SPEC_BY_KIND[kind];
+  if (!spec) return { ok: false, message: 'Unknown animal.' };
+  if (p.pets.length >= 4) return { ok: false, message: 'Four pets is a full house already.' };
+  if (spec.cost > p.money) return { ok: false, message: `Adoption costs $${spec.cost.toLocaleString()}.` };
+  const rng = withRng(state);
+  const pet = createPet(kind, rng, p.pets.length);
+  p.money -= spec.cost;
+  p.pets.push(pet);
+  p.happiness = clamp100(p.happiness + 5);
+  if (p.pets.length >= 3 && !state.achievements.includes('menagerie')) state.achievements.push('menagerie');
+  commit(state, rng);
+  log(state, `${spec.icon} Adopted a ${spec.label.toLowerCase()} — welcome home, ${pet.name}.`, 'good');
+  return { ok: true, message: `${pet.name} the ${spec.label.toLowerCase()} is home!` };
+}
+
+export function playWithPet(state: GameState, petId: string): ActionResult {
+  const p = state.player;
+  const pet = p.pets?.find((x) => x.id === petId);
+  if (!pet) return { ok: false, message: 'Pet not found.' };
+  const key = `pet_play_${petId}`;
+  if (p.actionCooldowns[key] === state.year) return { ok: false, message: `${pet.name} is all tired out this year.` };
+  const rng = withRng(state);
+  p.actionCooldowns[key] = state.year;
+  pet.bond = clamp100(pet.bond + rng.range(8, 14));
+  p.happiness = clamp100(p.happiness + rng.range(2, 4));
+  p.stress = clamp100(p.stress - rng.range(1, 3));
+  commit(state, rng);
+  return { ok: true, message: `Quality time with ${pet.name}. Bond is now ${Math.round(pet.bond)}.` };
+}
+
+// --------------------------------------------------------------------------- lottery & scratch cards
+
+export function buyLotteryTicket(state: GameState): ActionResult {
+  const p = state.player;
+  p.lotteryTicketsThisYear ??= 0;
+  const cost = 100;
+  if (p.lotteryTicketsThisYear >= 20) return { ok: false, message: 'The kiosk cuts you off at 20 tickets a year.' };
+  if (cost > p.money) return { ok: false, message: 'A ticket costs $100.' };
+  const rng = withRng(state);
+  p.money -= cost;
+  p.lotteryTicketsThisYear++;
+  const r = rng.next();
+  let win = 0;
+  if (r < 0.00002) win = 2_000_000;
+  else if (r < 0.0004) win = 25_000;
+  else if (r < 0.004) win = 2_500;
+  else if (r < 0.05) win = 250;
+  p.money += win;
+  commit(state, rng);
+  if (win >= 2_000_000) {
+    if (!state.achievements.includes('lottery_jackpot')) state.achievements.push('lottery_jackpot');
+    log(state, `🎉 JACKPOT! Your lottery ticket hit for $${win.toLocaleString()}!`, 'money');
+    return { ok: true, message: `🎉 JACKPOT — $${win.toLocaleString()}!!!` };
+  }
+  if (win >= 2_500) {
+    log(state, `🎟️ A lottery ticket paid out $${win.toLocaleString()}.`, 'money');
+    return { ok: true, message: `Winner! $${win.toLocaleString()}!` };
+  }
+  return { ok: true, message: win > 0 ? `Small win — $${win}.` : 'Not a winner. There\'s always next draw…' };
+}
+
+export function buyScratchCard(state: GameState): ActionResult {
+  const p = state.player;
+  p.scratchCardsThisYear ??= 0;
+  const cost = 50;
+  if (p.scratchCardsThisYear >= 30) return { ok: false, message: 'Enough scratching for one year.' };
+  if (cost > p.money) return { ok: false, message: 'A scratch card costs $50.' };
+  const rng = withRng(state);
+  p.money -= cost;
+  p.scratchCardsThisYear++;
+  const r = rng.next();
+  let win = 0;
+  if (r < 0.0002) win = 100_000;
+  else if (r < 0.004) win = 2_000;
+  else if (r < 0.03) win = 200;
+  else if (r < 0.2) win = 50;
+  p.money += win;
+  commit(state, rng);
+  if (win >= 100_000) {
+    if (!state.achievements.includes('lottery_jackpot')) state.achievements.push('lottery_jackpot');
+    log(state, `🎫 A $50 scratch card just paid out $${win.toLocaleString()}.`, 'money');
+    return { ok: true, message: `💥 TOP PRIZE — $${win.toLocaleString()}!` };
+  }
+  return { ok: true, message: win > 0 ? (win >= 2_000 ? `Big scratch — $${win.toLocaleString()}!` : `Scratched a winner: $${win}.`) : 'Three lemons. Nothing.' };
 }
 
 export function setMaintenanceLevel(state: GameState, propertyId: string, level: MaintenanceLevel): ActionResult {

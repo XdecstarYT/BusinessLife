@@ -1,7 +1,8 @@
 /** Toasts and the game-over screen. */
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useGame } from '../store/gameStore';
 import { checkRoyaltyFromTop, fetchTopLegacy, submitLegacyScore } from '../net/leaderboard';
+import { awardRibbonForLife, type RibbonDef } from '../data/ribbons';
 import { Button } from './components';
 
 export function Toasts() {
@@ -25,6 +26,16 @@ export function Toasts() {
 export function GameOver() {
   const { state, toMenu, toast } = useGame();
   const [submitState, setSubmitState] = useState<'idle' | 'submitting' | 'done'>('idle');
+  // Award this life's ribbon exactly once when the game-over screen first shows
+  // (not per render, and not while a succession offer might still continue the run).
+  const [ribbonAward, setRibbonAward] = useState<{ ribbon: RibbonDef; firstTime: boolean } | null>(null);
+  const awardedFor = useRef<object | null>(null);
+  useEffect(() => {
+    if (state?.gameOver && !state.pendingSuccession && awardedFor.current !== state.gameOver) {
+      awardedFor.current = state.gameOver;
+      setRibbonAward(awardRibbonForLife(state));
+    }
+  }, [state, state?.gameOver, state?.pendingSuccession]);
   if (!state?.gameOver || state.pendingSuccession) return null;
   const go = state.gameOver;
   const home = state.countries.find((c) => c.id === state.player.countryId);
@@ -57,6 +68,13 @@ export function GameOver() {
         <div className="text-5xl mb-3">⚰️</div>
         <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-1">{state.player.name}</h2>
         <p className="text-slate-500 dark:text-slate-400 mb-3">{go.reason}</p>
+        {ribbonAward && (
+          <div className="mb-4 rounded-2xl bg-gradient-to-b from-brand-400 to-brand-600 text-white px-5 py-3 [box-shadow:var(--shadow-glow-brand)] anim-in">
+            <div className="text-3xl leading-none mb-1">{ribbonAward.ribbon.icon}</div>
+            <div className="font-black tracking-wide">{ribbonAward.ribbon.name} Ribbon{ribbonAward.firstTime ? ' — NEW!' : ''}</div>
+            <div className="text-[11px] text-white/85">{ribbonAward.ribbon.description}</div>
+          </div>
+        )}
         <div className="inline-flex flex-col items-center bg-brand-500/10 rounded-2xl px-5 py-3 mb-4">
           <div className="text-[10px] uppercase font-bold text-brand-500 tracking-wide">Legacy Score</div>
           <div className="text-3xl font-black text-brand-500">{go.legacyScore}<span className="text-base text-slate-400">/100</span></div>

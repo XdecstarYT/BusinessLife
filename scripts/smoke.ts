@@ -76,6 +76,19 @@ for (const kind of ['book_club', 'therapy', 'adopt_pet', 'road_trip', 'volunteer
   A.doActivity(state, kind);
 }
 
+// V33: adopt pets, play, and gamble on the lottery/scratchers.
+A.adoptPet(state, 'dog');
+A.adoptPet(state, 'cat');
+if (state.player.pets[0]) A.playWithPet(state, state.player.pets[0].id);
+for (let i = 0; i < 25; i++) A.buyLotteryTicket(state);
+for (let i = 0; i < 35; i++) A.buyScratchCard(state);
+console.log(
+  'V33 setup: pets =', state.player.pets.length,
+  '· bucket goals =', state.bucketList.length,
+  '· lottery tickets used =', state.player.lotteryTicketsThisYear, '(cap 20)',
+  '· scratch cards used =', state.player.scratchCardsThisYear, '(cap 30)',
+);
+
 for (let y = 0; y < 82 && state.player.alive; y++) {
   try {
     if (y === 0) {
@@ -634,6 +647,7 @@ console.log('  education:', state.player.education.map((e) => `${e.degree}/${e.f
 console.log('  stress:', Math.round(state.player.stress), '· burnout until:', state.player.burnoutUntilYear ?? 'n/a', '· investigation heat:', Math.round(state.player.investigationHeat), '· years served this sentence:', state.player.yearsServedThisSentence);
 const jvActive = Object.values(state.companies).filter((c) => c.jointVenturePartnerId).length;
 console.log('  joint ventures active:', jvActive, '· total lawsuits across all companies:', Object.values(state.companies).reduce((s, c) => s + c.lawsuits, 0));
+console.log('  pets alive at end:', state.player.pets.length, '· bucket goals done:', state.bucketList.filter((g) => g.done).length, 'of', state.bucketList.length);
 console.log('  errors:', errors);
 
 // Invariant checks

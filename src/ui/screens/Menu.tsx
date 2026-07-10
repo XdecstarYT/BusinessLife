@@ -7,6 +7,7 @@ import { money } from '../format';
 import type { Difficulty, Gender } from '../../sim/types';
 import type { Scenario } from '../../sim/world';
 import { consumeRoyalty, getRoyaltySources } from '../../net/leaderboard';
+import { getRibbonCabinet, RIBBONS } from '../../data/ribbons';
 import { IconBusiness, IconSpark, IconTrophy } from '../icons';
 
 const SCENARIOS: { id: Scenario; label: string; blurb: string }[] = [
@@ -34,6 +35,7 @@ export function Menu() {
   const [useRoyalty, setUseRoyalty] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const royaltySources = getRoyaltySources();
+  const ribbonCabinet = getRibbonCabinet();
 
   useEffect(() => {
     void refreshSaves();
@@ -127,7 +129,37 @@ export function Menu() {
               />
             </div>
 
+            {/* Ribbon cabinet: every life ends with a ribbon; the collection persists across lives */}
             <Card className="p-5 mt-8">
+              <div className="flex items-center justify-between mb-3">
+                <span className="font-bold">🎗️ Ribbon Cabinet</span>
+                <span className="text-xs font-bold text-brand-500">
+                  {RIBBONS.filter((r) => ribbonCabinet[r.id]).length} / {RIBBONS.length} collected
+                </span>
+              </div>
+              <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                {RIBBONS.map((r) => {
+                  const count = ribbonCabinet[r.id] ?? 0;
+                  return (
+                    <div
+                      key={r.id}
+                      title={count > 0 ? `${r.name} ×${count} — ${r.description}` : '??? — keep living lives to discover this ribbon'}
+                      className={`rounded-xl px-1 py-2 text-center ${
+                        count > 0 ? 'bg-brand-500/10' : 'bg-slate-100 dark:bg-ink-800 opacity-50'
+                      }`}
+                    >
+                      <div className="text-xl leading-none">{count > 0 ? r.icon : '❔'}</div>
+                      <div className={`text-[9px] font-bold truncate mt-1 ${count > 0 ? 'text-brand-600 dark:text-brand-400' : 'text-slate-400'}`}>
+                        {count > 0 ? r.name : '???'}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-slate-400 mt-3">Every life ends with a ribbon. Which ones haven't you earned yet?</p>
+            </Card>
+
+            <Card className="p-5 mt-4">
               <div className="flex items-center gap-2 mb-2 text-brand-500">
                 <IconTrophy className="w-5 h-5" />
                 <span className="font-bold">How to play</span>

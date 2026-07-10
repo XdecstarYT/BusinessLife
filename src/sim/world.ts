@@ -11,6 +11,7 @@ import { makeCityName, makeCompanyName, makePartyName, makePersonName, makeState
 import { INDUSTRIES } from '../data/industries';
 import { createCompany, nextCompanyId } from './business';
 import { doIPO } from './market';
+import { generateBucketList } from '../data/goals';
 import { SKILLS } from '../data/skills';
 import { randomMindTraits } from './npcMind';
 import { generateCrimeFamilies } from './crime';
@@ -280,6 +281,7 @@ export function generateWorld(config: NewGameConfig): GameState {
     industryEraMultiplier: {},
     crimeFamilies,
     casinoJackpots: {},
+    bucketList: generateBucketList(rng),
   };
 
   // Public + private NPC companies per country (more in the player's home).
@@ -388,6 +390,9 @@ export function generateWorld(config: NewGameConfig): GameState {
     lastElectionResult: null,
     casinoTotalWagered: 0,
     casinoBiggestWin: 0,
+    pets: [],
+    lotteryTicketsThisYear: 0,
+    scratchCardsThisYear: 0,
     hasPrenup: false,
     lobbyingFirmHired: false,
     marginDebt: 0,

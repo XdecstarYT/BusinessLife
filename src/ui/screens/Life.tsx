@@ -7,7 +7,8 @@
  */
 import { useState, type ReactNode } from 'react';
 import { useGame, type Screen } from '../../store/gameStore';
-import { attemptPrisonEscape, bribeJudge, contestTerritory, CRIME_RANK_TITLES, declareCrimeWar, doActivity, donateToFoundation, enterWitnessProtection, foundCharityFoundation, goStraight, heist, issuePublicApology, joinCrimeFamily, postOnSocialMedia, proposeCrimeAlliance, requestParole, retire, socialMediaPostStyles, writeMemoir } from '../../sim/actions';
+import { adoptPet, attemptPrisonEscape, bribeJudge, buyLotteryTicket, buyScratchCard, contestTerritory, CRIME_RANK_TITLES, declareCrimeWar, doActivity, donateToFoundation, enterWitnessProtection, foundCharityFoundation, goStraight, heist, issuePublicApology, joinCrimeFamily, playWithPet, postOnSocialMedia, proposeCrimeAlliance, requestParole, retire, socialMediaPostStyles, writeMemoir } from '../../sim/actions';
+import { PET_CATALOG, PET_SPEC_BY_KIND } from '../../sim/pets';
 import { playerCrimeFamily } from '../../sim/crime';
 import { netWorth } from '../../sim/engine';
 import { Badge, Button, Card, CircleTile, Pill, PillRow, SectionHeader, StatBar } from '../components';
@@ -130,6 +131,33 @@ export function Life() {
         <StatBar label={`Stress${p.burnoutUntilYear !== null && state.year <= p.burnoutUntilYear ? ' 🔥' : ''}`} value={p.stress} />
       </Card>
 
+      {/* Bucket list — this life's personal goals, each paying out on completion */}
+      {(state.bucketList?.length ?? 0) > 0 && (
+        <>
+          <SectionHeader title="🎯 Bucket List" />
+          <Card className="p-4 space-y-2.5">
+            {state.bucketList.map((g) => (
+              <div key={g.defId} className="flex items-start gap-2.5">
+                <span className={`mt-0.5 w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-black shrink-0 ${
+                  g.done ? 'bg-brand-500 text-white' : 'bg-slate-100 dark:bg-ink-800 text-slate-400'
+                }`}>
+                  {g.done ? '✓' : ''}
+                </span>
+                <div className="min-w-0">
+                  <div className={`text-sm font-semibold leading-snug ${g.done ? 'line-through text-slate-400 dark:text-slate-500' : 'text-slate-700 dark:text-slate-200'}`}>
+                    {g.description}
+                  </div>
+                  <div className="text-[11px] text-slate-400">Reward: {money(g.rewardMoney)} · +{g.rewardHappiness} happiness</div>
+                </div>
+              </div>
+            ))}
+            <div className="text-[11px] font-bold text-brand-600 dark:text-brand-400 pt-1">
+              {state.bucketList.filter((g) => g.done).length} of {state.bucketList.length} complete
+            </div>
+          </Card>
+        </>
+      )}
+
       {/* Status chips */}
       <PillRow>
         <Badge tone={home.economy.regime === 'recession' || home.economy.regime === 'depression' ? 'bad' : home.economy.regime === 'boom' ? 'good' : 'neutral'}>
@@ -218,7 +246,6 @@ export function Life() {
         <Pill label="❤️ Charity" onClick={() => run(doActivity, 'charity')} />
         <Pill label="📚 Book Club" onClick={() => run(doActivity, 'book_club')} />
         <Pill label="🛋️ Therapy" onClick={() => run(doActivity, 'therapy')} />
-        <Pill label="🐶 Adopt Pet" onClick={() => run(doActivity, 'adopt_pet')} />
         <Pill label="🎸 Instrument" onClick={() => run(doActivity, 'learn_instrument')} />
         <Pill label="🚗 Road Trip" onClick={() => run(doActivity, 'road_trip')} />
         <Pill label="🖼️ Art Collecting" onClick={() => run(doActivity, 'art_collecting')} />
@@ -271,6 +298,61 @@ export function Life() {
           <Pill label="🙏 Issue Public Apology" onClick={() => run(issuePublicApology)} />
         </PillRow>
       )}
+
+      {/* Pets — real companions that age, bond, and pass on */}
+      <SectionHeader title="🐾 Pets" />
+      <Card className="p-4 space-y-3">
+        {(p.pets ?? []).map((pet) => {
+          const spec = PET_SPEC_BY_KIND[pet.kind];
+          const playedThisYear = p.actionCooldowns[`pet_play_${pet.id}`] === state.year;
+          return (
+            <div key={pet.id} className="flex items-center gap-3">
+              <span className="text-2xl shrink-0">{spec.icon}</span>
+              <div className="min-w-0 flex-1">
+                <div className="font-bold text-sm leading-tight">{pet.name} <span className="text-[11px] font-semibold text-slate-400">· {spec.label}, age {pet.ageYears}</span></div>
+                <div className="grid grid-cols-2 gap-2 mt-1">
+                  <StatBar label="Bond" value={pet.bond} />
+                  <StatBar label="Health" value={pet.health} />
+                </div>
+              </div>
+              <Button size="sm" variant="soft" disabled={playedThisYear} onClick={() => run(playWithPet, pet.id)}>
+                {playedThisYear ? 'Played' : '🎾 Play'}
+              </Button>
+            </div>
+          );
+        })}
+        {(p.pets ?? []).length === 0 && (
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            A pet boosts your happiness every year in proportion to the bond you build — and a loyal one might just come through for you.
+          </p>
+        )}
+        {(p.pets ?? []).length < 4 && (
+          <PillRow>
+            {PET_CATALOG.map((spec) => (
+              <Pill key={spec.kind} label={`${spec.icon} ${spec.label} (${money(spec.cost)})`} onClick={() => run(adoptPet, spec.kind)} />
+            ))}
+          </PillRow>
+        )}
+      </Card>
+
+      {/* Lottery — instant scratch-and-win dopamine, capped per year */}
+      <SectionHeader title="🎟️ Lottery" />
+      <Card className="p-4">
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+          Feeling lucky? The jackpot is $2,000,000. Results are instant — and the odds are exactly as bad as real life.
+        </p>
+        <div className="grid grid-cols-2 gap-2">
+          <Button variant="soft" disabled={(p.lotteryTicketsThisYear ?? 0) >= 20} onClick={() => run(buyLotteryTicket)}>
+            🎟️ Ticket ($100)
+          </Button>
+          <Button variant="soft" disabled={(p.scratchCardsThisYear ?? 0) >= 30} onClick={() => run(buyScratchCard)}>
+            🎫 Scratch Card ($50)
+          </Button>
+        </div>
+        <div className="text-[11px] text-slate-400 mt-2 text-center">
+          {(p.lotteryTicketsThisYear ?? 0)}/20 tickets · {(p.scratchCardsThisYear ?? 0)}/30 cards this year
+        </div>
+      </Card>
 
       <SectionHeader title="Underworld" />
       <PillRow>

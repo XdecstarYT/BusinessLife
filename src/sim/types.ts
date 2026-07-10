@@ -296,6 +296,31 @@ export interface Player {
   lastElectionResult: ElectionResult | null; // transient: set on resolution, cleared once the UI shows it
   casinoTotalWagered: number; // lifetime stake across all casino games, for the Stats screen
   casinoBiggestWin: number; // single largest payout ever collected (any casino game, including a jackpot)
+  pets: Pet[]; // adopted companions — they age, bond, and eventually pass on
+  lotteryTicketsThisYear: number; // spam guard, resets each year
+  scratchCardsThisYear: number; // spam guard, resets each year
+}
+
+export type PetKind = 'dog' | 'cat' | 'parrot' | 'horse' | 'snake' | 'goldfish';
+
+export interface Pet {
+  id: string;
+  kind: PetKind;
+  name: string;
+  ageYears: number;
+  health: number; // 0..100, decays late in life and with illness
+  bond: number; // 0..100, built by playing; scales the yearly happiness boost and the grief at the end
+}
+
+/** One entry on the player's per-life bucket list. `description` is resolved at
+ * generation time so saves and the UI never need the definition table. */
+export interface BucketGoal {
+  defId: string;
+  description: string;
+  target: number;
+  done: boolean;
+  rewardMoney: number;
+  rewardHappiness: number;
 }
 
 export interface ElectionResult {
@@ -1072,6 +1097,10 @@ export interface GameState {
   // Casino: sparse machineId -> current progressive jackpot pool. World-persistent (not reset per
   // player action) so the pot really does grow between spins and pays out big when it finally hits.
   casinoJackpots: Record<string, number>;
+
+  // Bucket list: a handful of personal goals rolled at birth, checked each year, each paying a
+  // real reward on completion. Finishing the whole list is its own achievement.
+  bucketList: BucketGoal[];
 }
 
 export interface CrimeFamily {
