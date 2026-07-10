@@ -1,5 +1,7 @@
 /** Toasts and the game-over screen. */
+import { useState } from 'react';
 import { useGame } from '../store/gameStore';
+import { submitLegacyScore } from '../net/leaderboard';
 import { Button } from './components';
 
 export function Toasts() {
@@ -21,9 +23,21 @@ export function Toasts() {
 }
 
 export function GameOver() {
-  const { state, toMenu } = useGame();
+  const { state, toMenu, toast } = useGame();
+  const [submitState, setSubmitState] = useState<'idle' | 'submitting' | 'done'>('idle');
   if (!state?.gameOver || state.pendingSuccession) return null;
   const go = state.gameOver;
+  const home = state.countries.find((c) => c.id === state.player.countryId);
+
+  const submitLegacy = async () => {
+    setSubmitState('submitting');
+    const result = await submitLegacyScore(state.player.name, go.legacyScore, go.finalAge, state.year, home?.name ?? null);
+    setSubmitState('done');
+    if (result === 'submitted') toast('🏆 New personal best posted to the Legacy leaderboard.', 'ok');
+    else if (result === 'not_a_new_best') toast("Not a new best for this device — leaderboard wasn't updated.", 'ok');
+    else toast('Could not reach the leaderboard — check your connection.', 'err');
+  };
+
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/80 backdrop-blur" />
@@ -40,6 +54,14 @@ export function GameOver() {
             <p key={i} className={`text-sm ${i === 1 ? 'font-bold text-emerald-500' : 'text-slate-600 dark:text-slate-300'}`}>{line}</p>
           ))}
         </div>
+        <Button
+          variant="soft"
+          className="w-full mb-2"
+          disabled={submitState !== 'idle'}
+          onClick={submitLegacy}
+        >
+          {submitState === 'submitting' ? 'Submitting…' : submitState === 'done' ? '🏆 Submitted' : '🏆 Submit to Legacy Leaderboard'}
+        </Button>
         <Button size="lg" className="w-full" onClick={toMenu}>Start a New Life</Button>
       </div>
     </div>

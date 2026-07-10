@@ -6,8 +6,10 @@ your phone. Start at 18, take decisions, and advance time at your own pace: **Da
 full **Year**, letting a living world simulate forward around you. Build a business empire, get rich
 on the markets, climb the political ladder to run the country — or all three.
 
-Everything runs **entirely in your browser**. No backend, no accounts, fully offline, and every save is
-plain JSON you can export and re-import.
+Everything runs **entirely in your browser**. No accounts, no login, and every save is plain JSON you
+can export and re-import. The simulation itself is fully offline — the one exception is an optional
+global Leaderboard (see Highlights below), backed by Supabase, which degrades to a friendly "offline"
+state instead of affecting anything else if you have no connection.
 
 ## Highlights
 
@@ -411,6 +413,15 @@ only moves when you tell it to, using the three buttons on the Life hub:
   every light with no shadow map to hide behind.
 - **Lifestyle** — 20+ quick activities on the Life hub, from the gym and charity to book clubs, therapy,
   adopting a pet, art collecting, wine tasting, poker nights, blogging and learning a language.
+- **🏆 Global Leaderboard — the one online feature in the game.** Two public, no-login rankings backed by
+  a real Supabase Postgres backend: a live **Net Worth** board you can resubmit any time your run is
+  going, and a **Legacy Score** board that only updates when a completed life actually beats your
+  device's previous best (submitted right from the death screen). Each device holds exactly one row per
+  board — a locally-generated ID, not a real account — so resubmitting updates your own entry instead of
+  spamming new ones; this is an honest honor-system board with no server authority over the client-side
+  sim, not a certified ranking. Every leaderboard call is timeout-bounded and fails soft: no connection
+  (or the board being genuinely empty) just shows a clear, distinct state and a Retry button — it never
+  touches the rest of the offline game.
 
 Life ends when you do — from old age, illness, or misfortune — with a Legacy Score summarizing your wealth,
 dynasty, office and achievements. If a spouse, child, or grandchild survives you, choose to continue playing
@@ -452,6 +463,9 @@ src/
   store/
     gameStore.ts       Zustand store wrapping engine + actions
     persistence.ts     IndexedDB saves (localStorage fallback), export/import
+  net/                 The one online surface: Supabase-backed global leaderboard
+    supabaseClient.ts  Supabase client (publishable key — safe to ship, RLS-gated)
+    leaderboard.ts     Timeout-bounded, fail-soft reads/writes against leaderboard_entries
   ui/                  Mobile-first React UI (light + dark, desktop breakpoints, safe-area aware)
     components.tsx     Cards, pills, circular tiles, stat bars, canvas charts
     AppShell.tsx       Top bar + bottom tab navigation + "More" sheet
@@ -461,7 +475,7 @@ src/
     TutorialOverlay.tsx      Light first-launch walkthrough (shown once per browser)
     three/             Ambient three.js visualizations (lazy-loaded, code-split from the main bundle):
                        HQTourScene, SupplyChainScene, ElectionMapScene, TradeNetworkScene
-    screens/           Life, Career, Business, Market, Assets, Politics, Family, World, News, Stats
+    screens/           Life, Career, Business, Market, Assets, Politics, Family, World, News, Stats, Leaderboard
 ```
 
 ### Modding
@@ -472,7 +486,8 @@ a row — the engine never hard-codes individual content, so mods and expansions
 ## Tech
 
 React + TypeScript (strict) · Vite · Tailwind CSS v4 · Zustand · IndexedDB · HTML Canvas charts ·
-three.js (lazy-loaded, code-split) for ambient 3D visualizations.
+three.js (lazy-loaded, code-split) for ambient 3D visualizations · Supabase (Postgres + RLS) for the
+one online feature, the global Leaderboard — everything else needs no network at all.
 
 ## Development
 

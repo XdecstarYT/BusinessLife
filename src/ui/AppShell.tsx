@@ -24,6 +24,7 @@ import {
   IconSpark,
   IconStats,
   IconSun,
+  IconTrophy,
   IconWorld,
 } from './icons';
 import { Modal } from './components';
@@ -45,6 +46,7 @@ const MORE_SCREENS: { screen: Screen; label: string; Icon: (p: { className?: str
   { screen: 'world', label: 'World', Icon: IconWorld },
   { screen: 'news', label: 'News', Icon: IconNews },
   { screen: 'stats', label: 'Stats', Icon: IconStats },
+  { screen: 'leaderboard', label: 'Leaderboard', Icon: IconTrophy },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {

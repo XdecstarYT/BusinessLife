@@ -36,7 +36,8 @@ export type Screen =
   | 'news'
   | 'stats'
   | 'family'
-  | 'casino';
+  | 'casino'
+  | 'leaderboard';
 
 interface Toast {
   id: number;
