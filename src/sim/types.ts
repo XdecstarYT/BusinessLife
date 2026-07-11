@@ -299,6 +299,7 @@ export interface Player {
   pets: Pet[]; // adopted companions — they age, bond, and eventually pass on
   lotteryTicketsThisYear: number; // spam guard, resets each year
   scratchCardsThisYear: number; // spam guard, resets each year
+  athlete: AthleteCareer | null; // V35: soccer/football/running career, independent of the office job/company paths
 }
 
 export type PetKind = 'dog' | 'cat' | 'parrot' | 'horse' | 'snake' | 'goldfish';
@@ -321,6 +322,114 @@ export interface BucketGoal {
   done: boolean;
   rewardMoney: number;
   rewardHappiness: number;
+}
+
+// ---------------------------------------------------------------------------
+// V35: Athlete career (soccer, football, running)
+// ---------------------------------------------------------------------------
+
+export type AthleteSport = 'soccer' | 'football' | 'running';
+
+/** Soccer/football positions and running specializations are all just string ids defined in
+ * data/athletics.ts (same "content is data" pattern as skills/industries) — the type layer only
+ * needs to know which sport a career belongs to, not enumerate every position by name. */
+export type AthleteLevel = 'youth' | 'academy' | 'college' | 'semipro' | 'pro' | 'elite' | 'retired';
+
+export interface AthleteInjury {
+  kind: string; // e.g. 'hamstring_strain', 'ACL_tear' — id into data/athletics.ts INJURY_TYPES
+  name: string;
+  severity: number; // 1..10, higher = worse
+  weeksOut: number; // remaining recovery time in-season, decremented on advance
+  startYear: number;
+  reinjuryRisk: number; // 0..100, elevated for the rest of the season after returning
+}
+
+export interface AthleteContract {
+  teamId: string | null; // null = free agent / unsigned amateur
+  salary: number; // per year
+  signingBonus: number;
+  yearsLeft: number;
+  performanceBonusPerGoalOrWin: number; // small per-goal (soccer) / per-win (football) kicker
+}
+
+export interface AthleteEndorsement {
+  brand: string;
+  annualValue: number;
+  yearsLeft: number;
+}
+
+export interface AthleteCareerStats {
+  seasonsPlayed: number;
+  matchesPlayed: number;
+  goals: number; // soccer
+  assists: number; // soccer
+  cleanSheets: number; // soccer goalkeepers
+  passingYards: number; // football
+  rushingYards: number; // football
+  receivingYards: number; // football
+  touchdowns: number; // football
+  tackles: number; // football
+  interceptions: number; // football
+  racesRun: number; // running
+  racesWon: number; // running
+  medalsGold: number;
+  medalsSilver: number;
+  medalsBronze: number;
+  mvpAwards: number;
+}
+
+export interface AthleteCareer {
+  sport: AthleteSport;
+  position: string; // id into data/athletics.ts SOCCER_POSITIONS / FOOTBALL_POSITIONS
+  event: string | null; // running only: id into data/athletics.ts RUNNING_EVENTS, e.g. '100m', 'marathon'
+  level: AthleteLevel;
+  attributes: Record<string, number>; // attribute id -> 0..100, ids from data/athletics.ts per sport
+  overallRating: number; // derived 0..100 composite, recomputed after training/aging/injury
+  potentialCeiling: number; // 0..100, rolled at career start; overallRating asymptotes toward it
+  fitness: number; // 0..100, match-day readiness; drained by playing/training, restored by rest
+  form: number; // 0..100, hot/cold streak, drifts toward 50 and nudged by recent results
+  morale: number; // 0..100, affects training gains and injury risk
+  teamId: string | null; // references a team id in data/athletics.ts (soccer/football only)
+  leagueId: string | null;
+  contract: AthleteContract | null;
+  injuries: AthleteInjury[]; // history
+  currentInjury: AthleteInjury | null;
+  trainingFocus: string | null; // attribute id being emphasized this year
+  seasonStats: AthleteCareerStats;
+  careerStats: AthleteCareerStats;
+  personalBests: Partial<Record<string, number>>; // running: event id -> seconds (lower is better)
+  endorsements: AthleteEndorsement[];
+  yearsPro: number;
+  retired: boolean;
+  hallOfFame: boolean;
+  startedYear: number;
+  fixtures: AthleteMatchFixture[]; // this season's schedule, soccer/football only
+  nextMeetId: string | null; // running only: next meet on the calendar
+  seasonYear: number; // the year `fixtures` covers; regenerated when it falls behind state.year
+}
+
+/** One scheduled game in a soccer/football season — the player can play it out in the 3D
+ * match scene or quick-simulate it; either way it resolves into `resultSummary`. */
+export interface AthleteMatchFixture {
+  id: string;
+  opponentTeamId: string;
+  week: number; // 1-based position in the season schedule
+  played: boolean;
+  resultSummary: string | null; // e.g. "W 3-1" once played
+  playerRatingThisMatch: number | null; // 0..10 match rating once played
+}
+
+/** Dynamic per-season standing for a team defined statically in data/athletics.ts —
+ * mirrors the Industry (static) / Company (dynamic) split used elsewhere. */
+export interface AthleteTeamState {
+  teamId: string;
+  wins: number;
+  losses: number;
+  draws: number; // soccer only
+  points: number; // league table points
+  goalsFor: number; // soccer
+  goalsAgainst: number; // soccer
+  seasonYear: number; // the year this record covers; reset when it falls behind state.year
 }
 
 export interface ElectionResult {
@@ -1101,6 +1210,11 @@ export interface GameState {
   // Bucket list: a handful of personal goals rolled at birth, checked each year, each paying a
   // real reward on completion. Finishing the whole list is its own achievement.
   bucketList: BucketGoal[];
+
+  // V35: Athlete career — dynamic per-season state for every soccer/football team defined
+  // statically in data/athletics.ts, keyed by team id. Populated lazily the first time any team
+  // is referenced (tryout, standings view, AI-vs-AI season sim) rather than for all teams up front.
+  athleteTeams: Record<string, AthleteTeamState>;
 }
 
 export interface CrimeFamily {

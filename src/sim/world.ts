@@ -282,6 +282,7 @@ export function generateWorld(config: NewGameConfig): GameState {
     crimeFamilies,
     casinoJackpots: {},
     bucketList: generateBucketList(rng),
+    athleteTeams: {},
   };
 
   // Public + private NPC companies per country (more in the player's home).
@@ -395,6 +396,7 @@ export function generateWorld(config: NewGameConfig): GameState {
     pets: [],
     lotteryTicketsThisYear: 0,
     scratchCardsThisYear: 0,
+    athlete: null,
     hasPrenup: false,
     lobbyingFirmHired: false,
     marginDebt: 0,

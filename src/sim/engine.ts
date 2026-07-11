@@ -21,6 +21,7 @@ import { tryFireDailyEvent } from './dailyEvents';
 import { tickLifestyleAssets } from './lifestyle';
 import { tickProducts } from './products';
 import { tickPets } from './pets';
+import { tickAthleteSeason } from './athletics';
 import { GOAL_DEF_BY_ID, generateBucketList } from '../data/goals';
 import { SK } from '../data/skills';
 import { CAREER_LADDER, COWORKER_PERSONALITIES, COWORKER_PERSONALITY_BY_ID, rankIndex, titleForRank, WORK_STYLE_BY_ID, WORKPLACE_EVENTS } from '../data/careers';
@@ -1090,6 +1091,10 @@ export function advanceYear(state: GameState): GameState {
   state.player.scratchCardsThisYear = 0;
   if (state.player.alive) for (const l of tickPets(state, rng)) log(state, l, 'info');
   if (state.player.alive) tickBucketList(state);
+  // V35: athlete career. Saves from before this system existed migrate here.
+  state.player.athlete ??= null;
+  state.athleteTeams ??= {};
+  if (state.player.alive) for (const h of tickAthleteSeason(state, rng)) log(state, h, 'info');
 
   // 5. Player company income: dividends from private profitable companies
   const p = state.player;
