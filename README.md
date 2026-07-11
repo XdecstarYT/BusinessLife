@@ -14,6 +14,20 @@ connection or choose not to sign in.
 
 ## Highlights
 
+- **V44 — Military Service: a whole new career, enlist to discharge.** A brand-new life path with
+  ~150 new pieces of content: pick from 6 branches (Army, Navy, Air Force, Marines, Coast Guard,
+  Space Force) and 20 specialties from Infantry to Special Forces to Cyber Operations, climb a
+  9-rank enlisted ladder with real pay at each grade, and train across 12 real programs (Ranger
+  School, Officer Candidate School, SERE, and more). Deployment ties directly into the game's real
+  geopolitical war system — you can only deploy while your country is actually at war, and against
+  whichever nation that really is. Once deployed, missions are resolved with genuine risk: 12 injury
+  types (some permanent, driving a VA disability rating), a real death chance, and a stack of 20
+  medals and decorations up to the Medal of Honor. And there's a real moral choice every deployed
+  year — **Act Heroically** risks yourself for reputation, karma and a shot at a medal; **Cross the
+  Line** trades your discipline and karma for a payout, with mounting court-martial risk that can end
+  in a dishonorable discharge. Discharge (honorable, medical, general, or dishonorable) pays a real
+  veteran's pension based on years served and disability rating. 20 new achievements track the arc,
+  from first enlistment to Medal of Honor to Fallen Hero.
 - **V43 — juice: every action feels like it landed.** A whole pass of moment-to-moment feedback on
   top of existing systems, not new content: achievements now unlock with a genuine **gold "Achievement
   Unlocked" toast** and a confetti burst the instant they happen — 130+ of them were unlockable

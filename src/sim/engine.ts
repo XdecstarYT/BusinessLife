@@ -22,6 +22,7 @@ import { tickLifestyleAssets } from './lifestyle';
 import { tickProducts } from './products';
 import { tickPets } from './pets';
 import { tickAthleteSeason, tickAthleteWorld } from './athletics';
+import { tickMilitaryCareer } from './military';
 import { GOAL_DEF_BY_ID, generateBucketList } from '../data/goals';
 import { SK } from '../data/skills';
 import { CAREER_LADDER, COWORKER_PERSONALITIES, COWORKER_PERSONALITY_BY_ID, rankIndex, titleForRank, WORK_STYLE_BY_ID, WORKPLACE_EVENTS } from '../data/careers';
@@ -164,6 +165,10 @@ function tickPersonalFinance(state: GameState, rng: RNG): void {
 
   if (p.retired && p.pensionIncome > 0 && p.alive) {
     p.money += p.pensionIncome;
+  }
+
+  if (p.military && p.military.dischargeType !== null && p.military.dischargeType !== 'kia' && p.military.veteranPensionPerYear > 0 && p.alive) {
+    p.money += p.military.veteranPensionPerYear;
   }
 
   if (p.memoir) {
@@ -1122,6 +1127,10 @@ export function advanceYear(state: GameState): GameState {
   // own every year regardless of whether the player has ever picked up a ball this life — these
   // are world headlines, not personal ones, so they go to news (below), not the life log.
   const athleteHeadlines = tickAthleteWorld(state, rng);
+  // V44: military service career. Runs after tickPolitics (step 2, above) has already updated
+  // every country's atWarWith for this year, so a deployment reads this year's real war state.
+  state.player.military ??= null;
+  if (state.player.alive) for (const h of tickMilitaryCareer(state, rng)) log(state, h, 'info');
 
   // 5. Player company income: dividends from private profitable companies
   const p = state.player;

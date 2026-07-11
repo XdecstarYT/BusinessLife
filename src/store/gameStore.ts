@@ -39,6 +39,7 @@ export type Screen =
   | 'family'
   | 'casino'
   | 'athlete'
+  | 'military'
   | 'leaderboard';
 
 interface Toast {

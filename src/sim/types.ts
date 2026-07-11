@@ -300,6 +300,7 @@ export interface Player {
   lotteryTicketsThisYear: number; // spam guard, resets each year
   scratchCardsThisYear: number; // spam guard, resets each year
   athlete: AthleteCareer | null; // V35: soccer/football/running career, independent of the office job/company paths
+  military: MilitaryCareer | null; // V44: enlisted service career, independent of the job/company/athlete paths
 }
 
 export type PetKind = 'dog' | 'cat' | 'parrot' | 'horse' | 'snake' | 'goldfish';
@@ -434,6 +435,67 @@ export interface AthleteTeamState {
   prestige: number; // 0..100, dynamic team strength: seeded from the static catalog, then evolves every
   // year with results (win big, gain prestige) and random transfer-market swings — see tickAthleteWorld.
   currentLeagueId: string; // may differ from the static catalog's leagueId after a promotion/relegation
+}
+
+// ---------------------------------------------------------------------------
+// V44: Military Service career
+// ---------------------------------------------------------------------------
+
+export type MilitaryBranch = 'army' | 'navy' | 'air_force' | 'marines' | 'coast_guard' | 'space_force';
+
+/** null while still serving; set the moment the career ends, one way or another. */
+export type MilitaryDischargeType = 'honorable' | 'general' | 'medical' | 'dishonorable' | 'kia' | null;
+
+export interface MilitaryInjury {
+  kind: string; // id into data/military.ts MILITARY_INJURY_TYPES
+  name: string;
+  severity: number; // 1..10
+  permanent: boolean; // permanent injuries add to disabilityRating and never fully heal
+  yearSustained: number;
+}
+
+/** One tour: a posting to a base/theater, optionally against a specific enemy nation if the
+ * home country is at war when the tour starts. Ends on rotation home, a wound serious enough to
+ * evacuate, or death. */
+export interface MilitaryDeployment {
+  id: string;
+  baseId: string; // id into data/military.ts MILITARY_BASES — the posting/theater
+  conflictCountryId: string | null; // the enemy nation this tour was fought against, if any (peacetime postings have none)
+  startYear: number;
+  endYear: number | null; // null while still deployed
+  missionsCompleted: number;
+  outcome: 'ongoing' | 'completed' | 'wounded' | 'kia' | 'medically_evacuated';
+}
+
+export interface MilitaryMedal {
+  id: string; // id into data/military.ts MILITARY_MEDALS
+  name: string;
+  yearAwarded: number;
+  citation: string; // flavor text for why it was awarded
+}
+
+export interface MilitaryCareer {
+  branch: MilitaryBranch;
+  specialtyId: string; // id into data/military.ts MILITARY_SPECIALTIES (MOS/rating), fixed at enlistment
+  rankIndex: number; // 0-based index into data/military.ts RANKS_BY_BRANCH[branch]
+  yearsOfService: number;
+  enlistedYear: number;
+  discipline: number; // 0..100 — promotion odds, court-martial risk when it slips low
+  combatSkill: number; // 0..100 — mission success/survival odds; grows with deployments and training
+  leadership: number; // 0..100 — command-billet eligibility and promotion speed; grows with rank/time
+  fitness: number; // 0..100 — drained on deployment, restored by garrison time/training
+  disabilityRating: number; // 0..100 cumulative, from permanent injuries — sets VA compensation after discharge
+  currentDeployment: MilitaryDeployment | null;
+  deployments: MilitaryDeployment[]; // completed tour history
+  injuries: MilitaryInjury[];
+  medals: MilitaryMedal[];
+  warCrimesCommitted: number; // dark-path counter — tanks karma/reputation and raises court-martial risk
+  heroicActsCount: number; // light-path counter — feeds medal odds and reputation
+  courtMartialed: boolean;
+  dischargeType: MilitaryDischargeType;
+  dischargeYear: number | null;
+  veteranPensionPerYear: number; // set on an honorable/medical/general discharge; paid out yearly like a civilian pension
+  reenlistedCount: number; // how many times this life has signed on for another term
 }
 
 export interface ElectionResult {
