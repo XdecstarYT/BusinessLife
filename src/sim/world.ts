@@ -399,6 +399,7 @@ export function generateWorld(config: NewGameConfig): GameState {
     scratchCardsThisYear: 0,
     athlete: null,
     military: null,
+    drugOperation: null,
     hasPrenup: false,
     lobbyingFirmHired: false,
     marginDebt: 0,

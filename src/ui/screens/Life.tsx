@@ -413,6 +413,15 @@ export function Life() {
         );
       })()}
 
+      <SectionHeader title="Drug Empire" />
+      <Card className="p-4 mb-4 flex items-center justify-between cursor-pointer active:scale-[0.99] transition-transform" onClick={() => setScreen('drugs')}>
+        <div>
+          <div className="font-bold">🌿 {p.drugOperation?.active ? 'Run the Operation' : 'Get Into the Game'}</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400">Buy, produce, and sell product; build out a stash house, grow op, or lab; fight for turf.</div>
+        </div>
+        <IconArrowRight className="w-5 h-5 text-slate-400 shrink-0" />
+      </Card>
+
       <SectionHeader title="Casino" />
       <Card className="p-4 flex items-center justify-between cursor-pointer active:scale-[0.99] transition-transform" onClick={() => setScreen('casino')}>
         <div>

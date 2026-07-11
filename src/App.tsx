@@ -24,6 +24,7 @@ import { Studio } from './ui/screens/Studio';
 import { Casino } from './ui/screens/Casino';
 import { Athlete } from './ui/screens/Athlete';
 import { Military } from './ui/screens/Military';
+import { Drugs } from './ui/screens/Drugs';
 import { Leaderboard } from './ui/screens/Leaderboard';
 
 export default function App() {
@@ -62,6 +63,7 @@ export default function App() {
           {screen === 'casino' && <Casino />}
           {screen === 'athlete' && <Athlete />}
           {screen === 'military' && <Military />}
+          {screen === 'drugs' && <Drugs />}
           {screen === 'leaderboard' && <Leaderboard />}
         </div>
       </AppShell>

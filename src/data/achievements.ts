@@ -169,4 +169,16 @@ export const ACHIEVEMENTS: Record<string, AchievementDef> = {
   drafted: { label: 'Drafted', icon: '📜' },
   boot_camp_graduate: { label: 'Boot Camp Graduate', icon: '🏅' },
   tank_ace: { label: 'Tank Ace', icon: '🛡️' },
+  // V47: Drug Empire
+  drug_dealer: { label: 'Drug Dealer', icon: '🌿' },
+  drug_kingpin: { label: 'Drug Kingpin', icon: '👑' },
+  narco_baron: { label: 'Narco Baron', icon: '💼' },
+  green_thumb: { label: 'Green Thumb', icon: '🌱' },
+  the_cook: { label: 'The Cook', icon: '🧫' },
+  stash_master: { label: 'Stash Master', icon: '🏚️' },
+  turf_taken: { label: 'Turf Taken', icon: '🗺️' },
+  first_bust: { label: 'First Bust', icon: '🚨' },
+  untouchable: { label: 'Untouchable', icon: '🕶️' },
+  blood_on_your_hands: { label: 'Blood on Your Hands', icon: '☠️' },
+  gone_straight_dealer: { label: 'Gone Straight', icon: '🚪' },
 };

@@ -14,6 +14,20 @@ connection or choose not to sign in.
 
 ## Highlights
 
+- **V47 — Drug Empire: a full narcotics operation, independent of the mafia.** Start slinging on
+  the corner and build a real business across 8 named products (weed through fentanyl, each with
+  its own wholesale cost, street price, addictiveness, and overdose risk) gated by street
+  reputation. Three independently upgradeable facility tracks — a Stash House for capacity, a
+  Grow House that produces free weed every year, and a Meth Lab that produces free meth and
+  unlocks sourcing the hardest tier — turn a one-man hustle into a real operation. Hire a street
+  crew to move product passively while you're doing other things, fight rival dealers for turf,
+  cut a batch to stretch your supply at real risk, and bribe a cop when the heat gets too high.
+  It's real independent of joining a CrimeFamily (see below) but synergizes with one if you're in
+  it. Every sale is genuine risk: undercover buy-busts and stings can end in real prison time, a
+  bad batch can overdose a customer and blow up your reputation overnight, and a raid can gut your
+  stash, your facilities, and your crew in one year — dirty proceeds land in the same
+  launder-before-you-spend pipeline as heists and rackets. 11 new achievements track the whole
+  arc, from your first sale to walking away a made narco baron.
 - **V46 — Suicide, the wartime draft, real permadeath in combat, boot camp, a third war engine,
   and battlefield terrain.** A somber but real BitLife-standard feature: a confirm-gated
   **Suicide** button under Mind & Body that ends the life immediately, with its own honest cause

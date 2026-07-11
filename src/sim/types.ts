@@ -301,6 +301,28 @@ export interface Player {
   scratchCardsThisYear: number; // spam guard, resets each year
   athlete: AthleteCareer | null; // V35: soccer/football/running career, independent of the office job/company paths
   military: MilitaryCareer | null; // V44: enlisted service career, independent of the job/company/athlete paths
+  drugOperation: DrugOperation | null; // V47: Drug Empire — independent of crimeFamilyId, though membership boosts it
+}
+
+/**
+ * A drug-dealing operation: independent of joining a CrimeFamily (you can run corners solo), but
+ * synergizes with it. Three upgrade tracks (storage/grow/lab) are independently levelled 0..5;
+ * `heat` is this operation's own law-enforcement attention, separate from (but feeding into)
+ * Player.investigationHeat.
+ */
+export interface DrugOperation {
+  active: boolean;
+  storageLevel: number; // 0..5 — stash capacity
+  growLevel: number; // 0..5 — free weed production per year
+  labLevel: number; // 0..5 — free meth production per year; labLevel>=3 unlocks tier-4 sourcing
+  stash: Record<string, number>; // drug id -> units held
+  reputation: number; // 0..100 — street cred; drives demand, dealer recruitment, and tier gating
+  turf: number; // 0..100 — corners controlled, independent of CrimeFamily.turf
+  heat: number; // 0..100 — this operation's own law-enforcement attention
+  dealersHired: number; // street crew selling passively on the player's behalf
+  busts: number; // lifetime raid count
+  lifetimeRevenue: number; // for Stats/achievements
+  odIncidents: number; // customers who overdosed on the player's product
 }
 
 export type PetKind = 'dog' | 'cat' | 'parrot' | 'horse' | 'snake' | 'goldfish';
