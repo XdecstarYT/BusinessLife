@@ -1028,12 +1028,31 @@ export function advanceYear(state: GameState): GameState {
     : rng.range(-0.15, 0.15);
   state.culturalProgressivism = clamp(state.culturalProgressivism + culturalDrift, 0, 100);
   const politicalHeadlines: string[] = [...worldEventHeadlines];
+  // V42: the rest of the world's economies keep cycling through booms, recessions and crises
+  // every year whether or not the player is watching — this collects that so it can surface as
+  // real 'economy' news instead of silently happening off-screen for every non-home country.
+  const worldEconomyHeadlines: string[] = [];
   for (const country of state.countries) {
     const res = tickEconomy(state, country, rng);
-    if (res.crisis === 'crash' && country.isPlayerHome) politicalHeadlines.push(`Stock market crash wipes billions off ${country.name} shares`);
-    if (res.crisis === 'debt' && country.isPlayerHome) politicalHeadlines.push(`${country.name} debt crisis: bond yields spike as investors flee`);
-    if (res.crisis === 'disaster' && country.isPlayerHome) politicalHeadlines.push(`🌪️ Climate disaster strikes ${country.name}: property damaged, confidence shaken`);
-    if (res.weatherHeadline && country.isPlayerHome) politicalHeadlines.push(res.weatherHeadline);
+    if (country.isPlayerHome) {
+      if (res.crisis === 'crash') politicalHeadlines.push(`Stock market crash wipes billions off ${country.name} shares`);
+      if (res.crisis === 'debt') politicalHeadlines.push(`${country.name} debt crisis: bond yields spike as investors flee`);
+      if (res.crisis === 'housing') politicalHeadlines.push(`Housing market slump deepens across ${country.name}`);
+      if (res.crisis === 'disaster') politicalHeadlines.push(`🌪️ Climate disaster strikes ${country.name}: property damaged, confidence shaken`);
+      if (res.weatherHeadline) politicalHeadlines.push(res.weatherHeadline);
+      continue;
+    }
+    if (res.regimeChanged) {
+      const regime = country.economy.regime;
+      if (regime === 'boom') worldEconomyHeadlines.push(`${country.flag} ${country.name}'s economy roars into a boom`);
+      else if (regime === 'depression') worldEconomyHeadlines.push(`${country.flag} ${country.name} plunges into a full depression`);
+      else if (regime === 'recession' && (res.prevRegime === 'expansion' || res.prevRegime === 'boom')) worldEconomyHeadlines.push(`${country.flag} ${country.name} tips into recession`);
+      else if (regime === 'expansion' && (res.prevRegime === 'recession' || res.prevRegime === 'depression')) worldEconomyHeadlines.push(`${country.flag} ${country.name}'s economy turns a corner into recovery`);
+    }
+    if (res.crisis === 'crash') worldEconomyHeadlines.push(`${country.flag} Stock market crash wipes billions off ${country.name} shares`);
+    if (res.crisis === 'debt') worldEconomyHeadlines.push(`${country.flag} ${country.name} debt crisis: bond yields spike as investors flee`);
+    if (res.crisis === 'disaster') worldEconomyHeadlines.push(`${country.flag} 🌪️ Climate disaster strikes ${country.name}: property damaged, confidence shaken`);
+    if (res.weatherHeadline) worldEconomyHeadlines.push(`${country.flag} ${res.weatherHeadline}`);
   }
 
   // 2. Politics & NPCs
@@ -1058,6 +1077,10 @@ export function advanceYear(state: GameState): GameState {
     npcManageCompany(company, rng);
     const res = tickCompany(company, { state, country, rng });
     if (res.headline && (company.playerOwned || company.isPublic)) businessHeadlines.push(res.headline);
+    // V42: an NPC-only private company going under is a real "the world moves without you" event —
+    // worth a headline even though its routine day-to-day headlines (patents, breaches, etc.) stay
+    // gated to companies the player actually has a stake in, to avoid flooding news with noise.
+    else if (res.headline && res.wentBankrupt) businessHeadlines.push(res.headline);
     if (res.wentBankrupt && company.playerOwned) {
       log(state, `💥 ${company.name} went bankrupt. Your equity is worthless.`, 'bad');
       state.player.happiness = clamp100(state.player.happiness - 10);
@@ -1116,7 +1139,7 @@ export function advanceYear(state: GameState): GameState {
   state.pendingEvents = p.alive ? fireEvents(state, rng) : [];
 
   // 7. News
-  const news = generateNews(state, rng, politicalHeadlines.slice(0, 6), businessHeadlines.slice(0, 4), playerHeadlines, athleteHeadlines.slice(0, 5));
+  const news = generateNews(state, rng, politicalHeadlines.slice(0, 6), businessHeadlines.slice(0, 4), playerHeadlines, athleteHeadlines.slice(0, 5), worldEconomyHeadlines.slice(0, 4));
   state.news.push(...news);
   if (state.news.length > 400) state.news.splice(0, state.news.length - 400);
 

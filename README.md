@@ -35,6 +35,14 @@ connection or choose not to sign in.
   down, your career follows it, with a fresh schedule against the new tier's opponents. All of it
   generates real headlines in a new **Sports** category on the News screen, so the league feels alive
   even when you're not the one playing in it.
+- **V42 — the wider world was already alive, now you can actually see it.** Every one of the 12
+  countries' economies has always cycled through real boom/recession/depression regimes on its own,
+  and NPC companies have always merged, IPO'd and gone bankrupt without your involvement — but almost
+  none of it ever reached the News feed unless it happened to your home country or your own company.
+  Now a foreign nation tipping into recession, roaring into a boom, or getting hit by a climate
+  disaster or a debt crisis shows up as a flagged **Economy** headline the moment it happens, and an
+  NPC-only company going under generates a real bankruptcy headline too — so the rest of the world
+  visibly keeps moving, growing and occasionally collapsing, whether or not you're watching it.
 - **V34 — real accounts, a life that starts at birth, and a bigger, more BitLife life.** Sign up with
   email + password (Supabase Auth) to back your life up to the cloud — up to 5 named cloud saves per
   account, managed from a new account panel on the main menu — entirely optional; local play needs no

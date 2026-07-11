@@ -19,7 +19,7 @@ function item(
   return { year: state.year, category, subtype, headline, outlet: rng.pick(NEWS_OUTLETS), sentiment };
 }
 
-export function generateNews(state: GameState, rng: RNG, politicalHeadlines: string[], businessHeadlines: string[], playerHeadlines: string[] = [], sportsHeadlines: string[] = []): NewsItem[] {
+export function generateNews(state: GameState, rng: RNG, politicalHeadlines: string[], businessHeadlines: string[], playerHeadlines: string[] = [], sportsHeadlines: string[] = [], worldEconomyHeadlines: string[] = []): NewsItem[] {
   const news: NewsItem[] = [];
   const home = state.countries.find((c) => c.id === state.player.countryId)!;
   const e = home.economy;
@@ -72,6 +72,11 @@ export function generateNews(state: GameState, rng: RNG, politicalHeadlines: str
   for (const h of sportsHeadlines) {
     const negative = h.includes('relegated') || h.includes('lost a star');
     news.push(item(state, rng, 'sports', h, negative ? -0.4 : 0.4));
+  }
+  const NEGATIVE_ECONOMY_MARKERS = ['recession', 'depression', 'crisis', 'crash', 'disaster', 'slump', 'drought', 'flooding', 'heatwave', 'cyclone', 'snowstorm', 'disrupted', 'damage'];
+  for (const h of worldEconomyHeadlines) {
+    const negative = NEGATIVE_ECONOMY_MARKERS.some((m) => h.includes(m));
+    news.push(item(state, rng, 'economy', h, negative ? -0.6 : 0.5));
   }
 
   // World color

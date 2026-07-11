@@ -130,6 +130,7 @@ const REGIME_TRANSITIONS: Record<EconomicRegime, { growth: [number, number]; nex
 
 export interface EconomyTickResult {
   regimeChanged: boolean;
+  prevRegime: EconomicRegime;
   crisis: string | null; // headline-worthy shock this year
   weatherHeadline: string | null; // a discrete, named weather event this year, if any
 }
@@ -313,7 +314,7 @@ export function tickEconomy(state: GameState, country: Country, rng: RNG): Econo
   });
   if (e.history.length > 120) e.history.shift();
 
-  return { regimeChanged: prevRegime !== e.regime, crisis, weatherHeadline };
+  return { regimeChanged: prevRegime !== e.regime, prevRegime, crisis, weatherHeadline };
 }
 
 /** A simple trend-extrapolation forecast for next year, derived from recent history. */
