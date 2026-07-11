@@ -9,6 +9,14 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import * as THREE from 'three';
 import { useThreeScene } from './useThreeScene';
+import type { WarTerrain } from '../../data/military';
+
+const SKY_PALETTE: Record<WarTerrain, { grad: [string, string, string]; fog: number; cloud: number }> = {
+  desert: { grad: ['#7a4a1e', '#d99a3e', '#f5dba3'], fog: 0xe3b877, cloud: 0xffe9c2 },
+  urban: { grad: ['#334155', '#64748b', '#cbd5e1'], fog: 0x8a94a3, cloud: 0xc7cdd6 },
+  jungle: { grad: ['#14532d', '#3f8556', '#bbe8c9'], fog: 0x6fae82, cloud: 0xe7fbee },
+  arctic: { grad: ['#1e3a8a', '#3b82f6', '#bfdbfe'], fog: 0x93c5fd, cloud: 0xffffff },
+};
 
 export interface AirCombatResult {
   hostilesEliminated: number;
@@ -29,6 +37,7 @@ interface AirCombatSceneProps {
   missionName: string;
   enemyName: string;
   hostilesTotal: number;
+  terrain?: WarTerrain;
   onHud: (hud: AirCombatHud) => void;
   onMissionEnd: (result: AirCombatResult) => void;
 }
@@ -56,14 +65,14 @@ function makeJet(color: number): THREE.Group {
   return g;
 }
 
-function skyTexture(): THREE.CanvasTexture {
+function skyTexture(colors: [string, string, string]): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
   canvas.width = 8; canvas.height = 256;
   const ctx = canvas.getContext('2d')!;
   const grad = ctx.createLinearGradient(0, 0, 0, 256);
-  grad.addColorStop(0, '#1e3a8a');
-  grad.addColorStop(0.5, '#3b82f6');
-  grad.addColorStop(1, '#bfdbfe');
+  grad.addColorStop(0, colors[0]);
+  grad.addColorStop(0.5, colors[1]);
+  grad.addColorStop(1, colors[2]);
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, 8, 256);
   const tex = new THREE.CanvasTexture(canvas);
@@ -81,8 +90,9 @@ interface Bogey {
   speed: number;
 }
 
-export function AirCombatScene({ missionName, enemyName, hostilesTotal, onHud, onMissionEnd }: AirCombatSceneProps) {
+export function AirCombatScene({ missionName, enemyName, hostilesTotal, terrain = 'urban', onHud, onMissionEnd }: AirCombatSceneProps) {
   void missionName;
+  const skyPalette = SKY_PALETTE[terrain];
   const ref = useRef<HTMLDivElement>(null);
   const aimXRef = useRef(0);
   const aimYRef = useRef(0);
@@ -157,15 +167,15 @@ export function AirCombatScene({ missionName, enemyName, hostilesTotal, onHud, o
     ref,
     ({ scene, camera, quality }) => {
       const desktop = quality === 'desktop';
-      scene.background = skyTexture();
-      scene.fog = new THREE.Fog(0x93c5fd, 20, 70);
+      scene.background = skyTexture(skyPalette.grad);
+      scene.fog = new THREE.Fog(skyPalette.fog, 20, 70);
       scene.add(new THREE.AmbientLight(0xffffff, 0.7));
       const sun = new THREE.DirectionalLight(0xfffbe8, desktop ? 1.2 : 1.0);
       sun.position.set(10, 25, -8);
       scene.add(sun);
 
       // A few drifting cloud puffs purely for atmosphere.
-      const cloudMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, transparent: true, opacity: 0.85 });
+      const cloudMat = new THREE.MeshStandardMaterial({ color: skyPalette.cloud, roughness: 1, transparent: true, opacity: 0.85 });
       const clouds: THREE.Mesh[] = [];
       for (let i = 0; i < 8; i++) {
         const c = new THREE.Mesh(new THREE.SphereGeometry(1.5 + Math.random() * 1.5, 8, 6), cloudMat);
@@ -271,7 +281,7 @@ export function AirCombatScene({ missionName, enemyName, hostilesTotal, onHud, o
         }
       };
     },
-    [hostilesTotal],
+    [hostilesTotal, terrain],
     { controls: 'none' },
   );
 

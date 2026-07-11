@@ -3625,6 +3625,21 @@ export function issuePublicApology(state: GameState): ActionResult {
   return { ok: true, message: 'Notoriety reduced; popularity took a small hit.' };
 }
 
+/**
+ * A permanent, irreversible way to end this life on your own terms. The UI is expected to gate
+ * this behind an explicit confirmation dialog since there is no undo — calling it ends the game
+ * immediately (state.pendingDeathReason lets gameOverCheck report the real cause instead of the
+ * usual age/health guess).
+ */
+export function commitSuicide(state: GameState): ActionResult {
+  const p = state.player;
+  if (!p.alive) return { ok: false, message: 'Already gone.' };
+  p.alive = false;
+  state.pendingDeathReason = 'You took your own life.';
+  log(state, `At age ${p.age}, ${p.name} died by suicide.`, 'bad');
+  return { ok: true, message: 'It\'s over.' };
+}
+
 export function takeSabbatical(state: GameState): ActionResult {
   const p = state.player;
   if (!p.job) return { ok: false, message: 'You need a job to take a sabbatical from.' };

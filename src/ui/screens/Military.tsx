@@ -9,8 +9,8 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useGame } from '../../store/gameStore';
 import {
-  actHeroically, commitWarCrime, deployOverseas, enlistInMilitary, reenlistForBonus,
-  requestDischarge, requestRotationHome, resolveCombatMission, trainMilitary,
+  actHeroically, attemptEnlistmentAfterBootCamp, commitWarCrime, deployOverseas, enlistInMilitary,
+  reenlistForBonus, requestDischarge, requestRotationHome, resolveCombatMission, trainMilitary,
 } from '../../sim/military';
 import {
   BRANCH_BY_ID, MILITARY_BASES, MILITARY_BRANCHES, MILITARY_SPECIALTIES,
@@ -21,9 +21,13 @@ import { Badge, Button, Card, Pill, PillRow, SectionHeader, StatBar } from '../c
 import { money } from '../format';
 import type { GroundCombatHud, GroundCombatResult } from '../three/GroundCombatScene';
 import type { AirCombatHud, AirCombatResult } from '../three/AirCombatScene';
+import type { TankCombatHud, TankCombatResult } from '../three/TankCombatScene';
+import type { BootCampHud, BootCampResult } from '../three/BootCampScene';
 
 const GroundCombatScene = lazy(() => import('../three/GroundCombatScene').then((m) => ({ default: m.GroundCombatScene })));
 const AirCombatScene = lazy(() => import('../three/AirCombatScene').then((m) => ({ default: m.AirCombatScene })));
+const TankCombatScene = lazy(() => import('../three/TankCombatScene').then((m) => ({ default: m.TankCombatScene })));
+const BootCampScene = lazy(() => import('../three/BootCampScene').then((m) => ({ default: m.BootCampScene })));
 
 const SceneFallback = <div className="w-full h-full flex items-center justify-center text-white/60 text-sm">Loading…</div>;
 
@@ -35,13 +39,25 @@ const DISCHARGE_LABEL: Record<string, string> = {
   kia: 'Killed in Action',
 };
 
-// Vehicle specialties fly missions; other combat roles fight on the ground; support specialties
-// (and submarine warfare — no flashy visual mission for the silent service) sit this out and
-// keep resolving purely through the yearly tick.
+const OBSTACLE_LABEL: Record<BootCampHud['currentObstacle'], string> = {
+  run: 'Open ground',
+  hurdle: 'Hurdle ahead — tap GO!',
+  wall: 'Climbing wall — hold GO!',
+  crawl: 'Crawl tunnel — hold DUCK',
+  beam: 'Balance beam — steer straight',
+  finish: 'Finish line!',
+};
+
+// Vehicle specialties fly or drive missions; other combat roles fight on the ground; support
+// specialties (and submarine warfare — no flashy visual mission for the silent service) sit this
+// out and keep resolving purely through the yearly tick.
 const AIR_SPECIALTIES = new Set(['pilot', 'naval_aviation']);
-function missionTypeFor(specialtyId: string, combatRole: boolean): 'ground' | 'air' | null {
+const ARMOR_SPECIALTIES = new Set(['armor']);
+function missionTypeFor(specialtyId: string, combatRole: boolean): 'ground' | 'air' | 'armor' | null {
   if (!combatRole || specialtyId === 'submarine_warfare') return null;
-  return AIR_SPECIALTIES.has(specialtyId) ? 'air' : 'ground';
+  if (AIR_SPECIALTIES.has(specialtyId)) return 'air';
+  if (ARMOR_SPECIALTIES.has(specialtyId)) return 'armor';
+  return 'ground';
 }
 
 export function Military() {
@@ -50,11 +66,16 @@ export function Military() {
   const [specialtyPick, setSpecialtyPick] = useState('infantry');
   const [pickingTraining, setPickingTraining] = useState(false);
   const [playingMission, setPlayingMission] = useState(false);
+  const [pickingBootCamp, setPickingBootCamp] = useState(false);
   const [groundHud, setGroundHud] = useState<GroundCombatHud | null>(null);
   const [airHud, setAirHud] = useState<AirCombatHud | null>(null);
+  const [tankHud, setTankHud] = useState<TankCombatHud | null>(null);
+  const [bootCampHud, setBootCampHud] = useState<BootCampHud | null>(null);
+  const [bootCampFailMsg, setBootCampFailMsg] = useState<string | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
   const [isPortrait, setIsPortrait] = useState(() => typeof window !== 'undefined' && window.matchMedia('(orientation: portrait)').matches);
   const fsRef = useRef<HTMLDivElement>(null);
+  const wantsFullscreen = playingMission || pickingBootCamp;
 
   useEffect(() => {
     const mq = window.matchMedia('(orientation: portrait)');
@@ -68,14 +89,14 @@ export function Military() {
     return () => document.removeEventListener('fullscreenchange', onFsChange);
   }, []);
   useEffect(() => {
-    if (!playingMission) return;
+    if (!wantsFullscreen) return;
     setFullscreen(true);
     const el = fsRef.current;
     Promise.resolve(el?.requestFullscreen?.())
       .then(() => (screen as any).orientation?.lock?.('landscape'))
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playingMission]);
+  }, [wantsFullscreen]);
 
   const exitMission = () => {
     setFullscreen(false);
@@ -84,6 +105,15 @@ export function Military() {
     setPlayingMission(false);
     setGroundHud(null);
     setAirHud(null);
+    setTankHud(null);
+  };
+
+  const exitBootCamp = () => {
+    setFullscreen(false);
+    try { (screen as any).orientation?.unlock?.(); } catch { /* unsupported */ }
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    setPickingBootCamp(false);
+    setBootCampHud(null);
   };
 
   if (!state) return null;
@@ -98,6 +128,8 @@ export function Military() {
   const enemy = career?.currentDeployment?.conflictCountryId
     ? state.countries.find((c) => c.id === career.currentDeployment!.conflictCountryId)
     : null;
+  const missionBase = career?.currentDeployment ? MILITARY_BASES.find((b) => b.id === career.currentDeployment!.baseId) : null;
+  const missionTerrain = missionBase?.terrain ?? 'urban';
 
   if (playingMission && career?.currentDeployment && missionType) {
     return (
@@ -109,6 +141,7 @@ export function Military() {
                 missionName="Ground Assault"
                 enemyName={enemy?.name ?? 'hostile'}
                 hostilesTotal={6}
+                terrain={missionTerrain}
                 onHud={setGroundHud}
                 onMissionEnd={(result: GroundCombatResult) => {
                   run(resolveCombatMission, result);
@@ -121,6 +154,7 @@ export function Military() {
                 missionName="Air Intercept"
                 enemyName={enemy?.name ?? 'hostile'}
                 hostilesTotal={6}
+                terrain={missionTerrain}
                 onHud={setAirHud}
                 onMissionEnd={(result: AirCombatResult) => {
                   run(resolveCombatMission, result);
@@ -128,14 +162,63 @@ export function Military() {
                 }}
               />
             )}
+            {missionType === 'armor' && (
+              <TankCombatScene
+                missionName="Armor Assault"
+                enemyName={enemy?.name ?? 'hostile'}
+                hostilesTotal={6}
+                terrain={missionTerrain}
+                onHud={setTankHud}
+                onMissionEnd={(result: TankCombatResult) => {
+                  run(resolveCombatMission, result);
+                  exitMission();
+                }}
+              />
+            )}
           </Suspense>
         </div>
-        {(groundHud || airHud) && (
+        {(groundHud || airHud || tankHud) && (
           <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-black/50 text-white text-xs font-bold px-4 py-1.5 rounded-full">
-            ❤️ {Math.round((groundHud ?? airHud)!.health)} · 🎯 {(groundHud ?? airHud)!.hostilesTotal - (groundHud ?? airHud)!.hostilesRemaining}/{(groundHud ?? airHud)!.hostilesTotal}
+            ❤️ {Math.round((groundHud ?? airHud ?? tankHud)!.health)} · 🎯 {(groundHud ?? airHud ?? tankHud)!.hostilesTotal - (groundHud ?? airHud ?? tankHud)!.hostilesRemaining}/{(groundHud ?? airHud ?? tankHud)!.hostilesTotal}
           </div>
         )}
         <button onClick={exitMission} className="absolute top-3 right-3 bg-black/50 text-white text-xs font-bold px-3 py-1.5 rounded-full">
+          ✕ Abort
+        </button>
+        {fullscreen && isPortrait && (
+          <div className="absolute inset-0 bg-black/90 flex items-center justify-center text-white text-center px-8 z-10">
+            <div>
+              <div className="text-3xl mb-2">📱↻</div>
+              <div className="font-bold">Rotate your device to landscape</div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (pickingBootCamp) {
+    return (
+      <div ref={fsRef} className="fixed inset-0 z-[90] bg-black">
+        <div className="absolute inset-0">
+          <Suspense fallback={SceneFallback}>
+            <BootCampScene
+              branchName={BRANCH_BY_ID[branchPick]?.name ?? 'Army'}
+              onHud={setBootCampHud}
+              onCourseEnd={(result: BootCampResult) => {
+                const res = run(attemptEnlistmentAfterBootCamp, branchPick, specialtyPick, result.passed);
+                if (!res.ok) setBootCampFailMsg(res.message);
+                exitBootCamp();
+              }}
+            />
+          </Suspense>
+        </div>
+        {bootCampHud && (
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-black/50 text-white text-xs font-bold px-4 py-1.5 rounded-full">
+            🏃 {Math.round(bootCampHud.distanceFrac * 100)}% · 💪 {Math.round(bootCampHud.stamina * 100)}% · {OBSTACLE_LABEL[bootCampHud.currentObstacle]}
+          </div>
+        )}
+        <button onClick={exitBootCamp} className="absolute top-3 right-3 bg-black/50 text-white text-xs font-bold px-3 py-1.5 rounded-full">
           ✕ Abort
         </button>
         {fullscreen && isPortrait && (
@@ -200,13 +283,33 @@ export function Military() {
               ))}
             </PillRow>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 px-1">{SPECIALTY_BY_ID[specialtyPick]?.description}</p>
-            {missionTypeFor(specialtyPick, SPECIALTY_BY_ID[specialtyPick]?.combatRole ?? false) && (
-              <p className="text-[11px] text-brand-500 font-semibold mt-1 px-1">
-                {missionTypeFor(specialtyPick, true) === 'air' ? '✈️ Flies real playable air-combat missions once deployed.' : '🎯 Fights real playable ground-combat missions once deployed.'}
+            {(() => {
+              const pickMissionType = missionTypeFor(specialtyPick, SPECIALTY_BY_ID[specialtyPick]?.combatRole ?? false);
+              if (!pickMissionType) return null;
+              const hint =
+                pickMissionType === 'air' ? '✈️ Flies real playable air-combat missions once deployed.'
+                : pickMissionType === 'armor' ? '🛡️ Fights real playable armor missions once deployed.'
+                : '🎯 Fights real playable ground-combat missions once deployed.';
+              return <p className="text-[11px] text-brand-500 font-semibold mt-1 px-1">{hint}</p>;
+            })()}
+            {!career && (
+              <p className="text-[11px] text-amber-500 font-semibold mt-1 px-1">
+                🏃 Volunteers must clear a real 3D boot-camp obstacle course before enlistment is final.
               </p>
             )}
-            <Button className="w-full mt-4" size="lg" onClick={() => run(enlistInMilitary, branchPick, specialtyPick)}>
-              {career ? 'Re-enlist' : 'Enlist'}
+            {bootCampFailMsg && (
+              <p className="text-[11px] text-rose-500 font-semibold mt-2 px-1">{bootCampFailMsg}</p>
+            )}
+            <Button
+              className="w-full mt-4"
+              size="lg"
+              onClick={() => {
+                setBootCampFailMsg(null);
+                if (career) run(enlistInMilitary, branchPick, specialtyPick);
+                else setPickingBootCamp(true);
+              }}
+            >
+              {career ? 'Re-enlist' : '🏃 Report to Boot Camp'}
             </Button>
           </>
         )}
@@ -236,7 +339,10 @@ export function Military() {
             <div className="font-extrabold text-lg">{rank.name} <span className="text-xs font-semibold text-slate-400">({rank.payGrade})</span></div>
             <div className="text-sm text-slate-500 dark:text-slate-400">{career.yearsOfService} years of service</div>
           </div>
-          {deployment && <Badge tone="warn">🌍 Deployed</Badge>}
+          <div className="flex flex-col items-end gap-1">
+            {deployment && <Badge tone="warn">🌍 Deployed</Badge>}
+            {career.drafted && <Badge tone="bad">📜 Drafted</Badge>}
+          </div>
         </div>
         {nextRank && (
           <div className="text-[11px] text-slate-400 mb-2">Next rank: {nextRank.name} (eligible after {nextRank.minYears} yrs of service)</div>
@@ -258,7 +364,12 @@ export function Military() {
         {!deployment && atWar && <Pill label="🌍 Deploy Overseas" tone="brand" onClick={() => run(deployOverseas)} />}
         {deployment && missionType && (
           <Pill
-            label={missionUsedThisYear ? '✅ Mission Flown' : missionType === 'air' ? '✈️ Fly Mission' : '🎯 Run Mission'}
+            label={
+              missionUsedThisYear ? '✅ Mission Flown'
+              : missionType === 'air' ? '✈️ Fly Mission'
+              : missionType === 'armor' ? '🛡️ Roll Out'
+              : '🎯 Run Mission'
+            }
             tone="brand"
             disabled={missionUsedThisYear}
             onClick={() => setPlayingMission(true)}

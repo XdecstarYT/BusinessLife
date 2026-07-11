@@ -261,6 +261,7 @@ export function generateWorld(config: NewGameConfig): GameState {
     achievements: [],
     netWorthHistory: [],
     gameOver: null,
+    pendingDeathReason: null,
     worldEvent: null,
     generation: 1,
     calendarDay: 0,

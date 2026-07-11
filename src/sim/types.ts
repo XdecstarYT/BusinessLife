@@ -496,6 +496,8 @@ export interface MilitaryCareer {
   dischargeYear: number | null;
   veteranPensionPerYear: number; // set on an honorable/medical/general discharge; paid out yearly like a civilian pension
   reenlistedCount: number; // how many times this life has signed on for another term
+  drafted: boolean; // conscripted rather than volunteered — skipped boot camp, sent straight to training
+  bootCampPassed: boolean; // volunteers must clear the 3D obstacle course; drafted service members are exempt
 }
 
 export interface ElectionResult {
@@ -1243,6 +1245,10 @@ export interface GameState {
   achievements: string[];
   netWorthHistory: NetWorthPoint[];
   gameOver: GameOverInfo | null;
+  /** Set by any code path that kills the player outside the yearly tick (suicide, KIA in a
+   * playable mission) so gameOverCheck can report the real cause instead of guessing from
+   * age/health. Cleared once consumed. */
+  pendingDeathReason: string | null;
   worldEvent: WorldEvent | null;
   generation: number; // dynasty counter; increments when an heir inherits and play continues
   calendarDay: number; // 0..364, days elapsed in the current year via daily/weekly advancement

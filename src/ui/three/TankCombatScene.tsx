@@ -1,11 +1,10 @@
 /**
- * A real, player-controlled 3D ground combat mission: hostiles advance toward your position from
- * the far end of a battlefield, and you sweep a horizontal reticle (WASD/joystick) to line up
- * shots and tap FIRE to engage them before they close the distance. Aim precisely and you clear
- * the wave clean; fire wild or freeze up and hostiles reach you, costing health. This is the
- * playable counterpart to the Military career's yearly combat-mission resolution (military.ts) —
- * a strong run here feeds real bonuses back into the sim (combat skill, medal odds, fewer/less
- * severe injuries), same relationship as the Athlete scenes have to resolveMatch/resolveRace.
+ * A real, player-controlled 3D armor mission: enemy vehicles advance down the battlefield and you
+ * traverse your turret (WASD/joystick) to line up the main gun and FIRE before they close the
+ * distance. Slower and heavier than Ground Combat's infantry duel — a long reload between shots
+ * means every shot has to count — but the same lane-aim-and-engage loop and the same
+ * MissionOutcome shape, so it plugs straight into military.ts's resolveCombatMission alongside
+ * Ground Combat and Air Combat. The third of the Military career's playable "war engines".
  */
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import * as THREE from 'three';
@@ -19,47 +18,53 @@ const TERRAIN_PALETTE: Record<WarTerrain, { bg: number; fog: number; groundBase:
   arctic: { bg: 0xc9dbe8, fog: 0xd8e6ef, groundBase: '#e4edf2', groundSpeck: 'rgba(120,140,155,0.15)', cover: 0xb9c9d4, sun: 0xffffff },
 };
 
-export interface GroundCombatResult {
+export interface TankCombatResult {
   hostilesEliminated: number;
   hostilesTotal: number;
   damageTaken: number; // 0..100
   survived: boolean;
 }
 
-export interface GroundCombatHud {
-  health: number; // 0..100
+export interface TankCombatHud {
+  health: number; // 0..100, armor integrity
   hostilesRemaining: number;
   hostilesTotal: number;
   elapsedSeconds: number;
   phase: 'briefing' | 'active' | 'complete';
 }
 
-interface GroundCombatSceneProps {
+interface TankCombatSceneProps {
   missionName: string;
   enemyName: string;
   hostilesTotal: number;
   terrain?: WarTerrain;
-  onHud: (hud: GroundCombatHud) => void;
-  onMissionEnd: (result: GroundCombatResult) => void;
+  onHud: (hud: TankCombatHud) => void;
+  onMissionEnd: (result: TankCombatResult) => void;
 }
 
-const BATTLEFIELD_LEN = 55;
-const SPREAD = 3.4; // world-x range hostiles can spawn across
-const HOSTILE_SPEED = 3.6;
-const FIRE_COOLDOWN = 0.42;
-const AIM_TOLERANCE = 0.16; // in -1..1 aim-space
-const MISSION_TIME_LIMIT = 55;
+const BATTLEFIELD_LEN = 60;
+const SPREAD = 4.2;
+const HOSTILE_SPEED = 2.6; // vehicles are slower than infantry but hit harder
+const FIRE_COOLDOWN = 1.1; // main-gun reload
+const AIM_TOLERANCE = 0.14;
+const MISSION_TIME_LIMIT = 60;
 
-function makeSoldier(color: number, height: number): THREE.Group {
+function makeTank(color: number): THREE.Group {
   const g = new THREE.Group();
-  const uniform = new THREE.MeshStandardMaterial({ color, roughness: 0.7 });
-  const skin = new THREE.MeshStandardMaterial({ color: 0xc98a5c, roughness: 0.8 });
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.24, height, 4, 10), uniform);
-  body.position.y = height / 2 + 0.24;
-  g.add(body);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.17, 12, 10), skin);
-  head.position.y = height + 0.5;
-  g.add(head);
+  const hullMat = new THREE.MeshStandardMaterial({ color, roughness: 0.75, metalness: 0.3 });
+  const hull = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.5, 1.9), hullMat);
+  hull.position.y = 0.35;
+  g.add(hull);
+  const turretGroup = new THREE.Group();
+  turretGroup.position.set(0, 0.65, 0);
+  g.add(turretGroup);
+  const turret = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.55, 0.4, 8), hullMat);
+  turretGroup.add(turret);
+  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, 1.4, 8), hullMat);
+  barrel.rotation.x = Math.PI / 2;
+  barrel.position.set(0, 0, 0.95);
+  turretGroup.add(barrel);
+  (g as unknown as { turret: THREE.Group }).turret = turretGroup;
   return g;
 }
 
@@ -70,29 +75,29 @@ function groundTexture(baseColor: string, speckColor: string): THREE.CanvasTextu
   ctx.fillStyle = baseColor;
   ctx.fillRect(0, 0, 256, 256);
   ctx.fillStyle = speckColor;
-  for (let i = 0; i < 400; i++) {
+  for (let i = 0; i < 300; i++) {
     ctx.beginPath();
-    ctx.arc(Math.random() * 256, Math.random() * 256, Math.random() * 2.5, 0, Math.PI * 2);
+    ctx.arc(Math.random() * 256, Math.random() * 256, Math.random() * 3, 0, Math.PI * 2);
     ctx.fill();
   }
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(6, 12);
+  tex.repeat.set(6, 14);
   return tex;
 }
 
-interface Hostile {
+interface HostileVehicle {
   mesh: THREE.Group;
-  x: number; // world x, spawn position (fixed per hostile)
-  z: number; // world z, closes toward 0
+  x: number;
+  z: number;
   alive: boolean;
-  resolved: boolean; // eliminated or breached
+  resolved: boolean;
   speed: number;
 }
 
-export function GroundCombatScene({ missionName, enemyName, hostilesTotal, terrain = 'urban', onHud, onMissionEnd }: GroundCombatSceneProps) {
+export function TankCombatScene({ missionName, enemyName, hostilesTotal, terrain = 'urban', onHud, onMissionEnd }: TankCombatSceneProps) {
   void missionName;
   const palette = TERRAIN_PALETTE[terrain];
   const ref = useRef<HTMLDivElement>(null);
@@ -101,7 +106,7 @@ export function GroundCombatScene({ missionName, enemyName, hostilesTotal, terra
   const joyKnobRef = useRef<HTMLDivElement>(null);
   const joyBaseRef = useRef<HTMLDivElement>(null);
   const joyPointerId = useRef<number | null>(null);
-  const [phase, setPhase] = useState<GroundCombatHud['phase']>('briefing');
+  const [phase, setPhase] = useState<TankCombatHud['phase']>('briefing');
 
   useEffect(() => {
     const onDown = (e: KeyboardEvent) => {
@@ -163,7 +168,7 @@ export function GroundCombatScene({ missionName, enemyName, hostilesTotal, terra
     ({ scene, camera, quality }) => {
       const desktop = quality === 'desktop';
       scene.background = new THREE.Color(palette.bg);
-      scene.fog = new THREE.Fog(palette.fog, 25, 65);
+      scene.fog = new THREE.Fog(palette.fog, 28, 70);
       scene.add(new THREE.AmbientLight(0xffe8c0, 0.55));
       const sun = new THREE.DirectionalLight(palette.sun, desktop ? 1.1 : 0.9);
       sun.position.set(10, 22, -5);
@@ -174,21 +179,20 @@ export function GroundCombatScene({ missionName, enemyName, hostilesTotal, terra
       ground.position.set(0, 0, BATTLEFIELD_LEN / 2);
       scene.add(ground);
 
-      // Scattered cover blocks purely for atmosphere.
       const coverMat = new THREE.MeshStandardMaterial({ color: palette.cover, roughness: 0.95 });
-      for (let i = 0; i < 10; i++) {
-        const box = new THREE.Mesh(new THREE.BoxGeometry(1.2 + Math.random(), 0.8 + Math.random() * 0.6, 1), coverMat);
-        box.position.set((Math.random() - 0.5) * SPREAD * 3, 0.4, 8 + Math.random() * (BATTLEFIELD_LEN - 12));
+      for (let i = 0; i < 8; i++) {
+        const box = new THREE.Mesh(new THREE.BoxGeometry(1.4 + Math.random(), 1.0 + Math.random() * 0.6, 1.2), coverMat);
+        box.position.set((Math.random() - 0.5) * SPREAD * 3, 0.5, 10 + Math.random() * (BATTLEFIELD_LEN - 16));
         scene.add(box);
       }
 
-      const player = makeSoldier(0x2563eb, 0.9);
+      const player = makeTank(0x2563eb);
       player.position.set(0, 0, 0);
       scene.add(player);
+      const playerTurret = (player as unknown as { turret: THREE.Group }).turret;
 
-      const hostileMat = 0xb91c1c;
-      const hostiles: Hostile[] = Array.from({ length: hostilesTotal }, (_, i) => {
-        const mesh = makeSoldier(hostileMat, 0.85);
+      const hostiles: HostileVehicle[] = Array.from({ length: hostilesTotal }, (_, i) => {
+        const mesh = makeTank(0xb91c1c);
         const x = (Math.random() * 2 - 1) * SPREAD;
         const z = BATTLEFIELD_LEN - i * (BATTLEFIELD_LEN / hostilesTotal) * 0.85 - Math.random() * 4;
         mesh.position.set(x, 0, z);
@@ -201,11 +205,11 @@ export function GroundCombatScene({ missionName, enemyName, hostilesTotal, terra
       let fireCooldown = 0;
       let eliminated = 0;
       let briefingTimer = 1.6;
-      let localPhase: GroundCombatHud['phase'] = 'briefing';
+      let localPhase: TankCombatHud['phase'] = 'briefing';
       let missionEnded = false;
       let hudAccum = 0;
 
-      camera.position.set(0, 2.2, -3.5);
+      camera.position.set(0, 2.4, -4.2);
 
       let lastT = 0;
       return (t) => {
@@ -225,18 +229,18 @@ export function GroundCombatScene({ missionName, enemyName, hostilesTotal, terra
             if (h.resolved) continue;
             h.z = Math.max(-1, h.z - h.speed * dt);
             h.mesh.position.set(h.x, 0, h.z);
-            if (h.z <= 0.5) {
+            if (h.z <= 1) {
               h.resolved = true;
               h.alive = false;
               h.mesh.visible = false;
-              health = Math.max(0, health - THREE.MathUtils.randFloat(12, 22));
+              health = Math.max(0, health - THREE.MathUtils.randFloat(16, 28));
             }
           }
 
           if (fireRequestedRef.current && fireCooldown <= 0) {
             fireRequestedRef.current = false;
             fireCooldown = FIRE_COOLDOWN;
-            let best: Hostile | null = null;
+            let best: HostileVehicle | null = null;
             let bestDelta = Infinity;
             for (const h of hostiles) {
               if (h.resolved || !h.alive) continue;
@@ -264,7 +268,8 @@ export function GroundCombatScene({ missionName, enemyName, hostilesTotal, terra
           onMissionEnd({ hostilesEliminated: eliminated, hostilesTotal, damageTaken: 100 - health, survived: health > 0 });
         }
 
-        camera.position.lerp(new THREE.Vector3(aimRef.current * 0.6, 2.2, -3.5), 0.06);
+        playerTurret.rotation.y = aimRef.current * 0.9;
+        camera.position.lerp(new THREE.Vector3(aimRef.current * 0.7, 2.4, -4.2), 0.06);
         camera.lookAt(aimRef.current * SPREAD * 0.9, 1, 14);
 
         hudAccum += dt;
@@ -283,7 +288,7 @@ export function GroundCombatScene({ missionName, enemyName, hostilesTotal, terra
       <div ref={ref} className="absolute inset-0" />
       {phase === 'active' && (
         <>
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 border-2 border-rose-400/80 rounded-full pointer-events-none" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-9 h-9 border-2 border-amber-400/90 rounded-sm pointer-events-none" />
           <div
             ref={joyBaseRef}
             onPointerDown={onJoyStart}
@@ -294,7 +299,7 @@ export function GroundCombatScene({ missionName, enemyName, hostilesTotal, terra
           </div>
           <button
             onPointerDown={onFire}
-            className="absolute right-6 bottom-6 w-20 h-20 rounded-full bg-rose-500/90 border-4 border-white/60 text-white font-black active:scale-95 transition-transform"
+            className="absolute right-6 bottom-6 w-20 h-20 rounded-full bg-amber-500/90 border-4 border-white/60 text-white font-black active:scale-95 transition-transform"
             style={{ touchAction: 'none' }}
           >
             FIRE
@@ -304,13 +309,13 @@ export function GroundCombatScene({ missionName, enemyName, hostilesTotal, terra
       {phase === 'briefing' && (
         <div className="absolute inset-0 flex items-center justify-center px-6">
           <div className="text-white text-center bg-black/50 px-6 py-5 rounded-2xl">
-            <div className="text-2xl font-black mb-1">Engaging {enemyName} forces</div>
-            <div className="text-sm text-white/70">Aim with the stick, tap FIRE when a hostile is centered.</div>
+            <div className="text-2xl font-black mb-1">Engaging {enemyName} armor</div>
+            <div className="text-sm text-white/70">Traverse the turret, tap FIRE — the main gun reloads slowly, so aim true.</div>
           </div>
         </div>
       )}
       <div className="absolute top-3 left-1/2 -translate-x-1/2 text-[11px] text-white/70 bg-black/30 px-3 py-1 rounded-full">
-        Line up the reticle on a hostile before they close the distance
+        Long reload between shots — line up the reticle before you pull the trigger
       </div>
     </div>
   );

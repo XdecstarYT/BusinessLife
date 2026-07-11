@@ -22,7 +22,7 @@ import { tickLifestyleAssets } from './lifestyle';
 import { tickProducts } from './products';
 import { tickPets } from './pets';
 import { tickAthleteSeason, tickAthleteWorld } from './athletics';
-import { tickMilitaryCareer } from './military';
+import { tickDraft, tickMilitaryCareer } from './military';
 import { GOAL_DEF_BY_ID, generateBucketList } from '../data/goals';
 import { SK } from '../data/skills';
 import { CAREER_LADDER, COWORKER_PERSONALITIES, COWORKER_PERSONALITY_BY_ID, rankIndex, titleForRank, WORK_STYLE_BY_ID, WORKPLACE_EVENTS } from '../data/careers';
@@ -810,9 +810,9 @@ function tickBucketList(state: GameState): void {
   }
 }
 
-function gameOverCheck(state: GameState): void {
+export function gameOverCheck(state: GameState): void {
   const p = state.player;
-  if (p.alive) return;
+  if (p.alive || state.gameOver) return;
   const worth = netWorth(state);
   const summary: string[] = [
     `Died at age ${p.age} in ${state.year}.`,
@@ -825,13 +825,15 @@ function gameOverCheck(state: GameState): void {
   const estateNotes = distributeEstate(state);
   if (estateNotes.length) summary.push(...estateNotes);
   const reason =
-    p.health <= 5
+    state.pendingDeathReason ??
+    (p.health <= 5
       ? 'Your health gave out.'
       : p.age >= 75
         ? 'You died of old age.'
         : p.age >= 50
           ? 'An unexpected illness took you before your time.'
-          : 'Tragedy struck — your life was cut short unexpectedly.';
+          : 'Tragedy struck — your life was cut short unexpectedly.');
+  state.pendingDeathReason = null;
   const legacyScore = computeLegacyScore(state, worth);
   state.gameOver = {
     reason,
@@ -1131,6 +1133,8 @@ export function advanceYear(state: GameState): GameState {
   // every country's atWarWith for this year, so a deployment reads this year's real war state.
   state.player.military ??= null;
   if (state.player.alive) for (const h of tickMilitaryCareer(state, rng)) log(state, h, 'info');
+  // V46: wartime draft — only rolls while not already serving, so it can't clobber an active tour.
+  if (state.player.alive) for (const h of tickDraft(state, rng)) log(state, h, 'bad');
 
   // 5. Player company income: dividends from private profitable companies
   const p = state.player;

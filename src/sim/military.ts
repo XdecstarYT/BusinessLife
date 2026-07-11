@@ -55,6 +55,8 @@ function isServing(career: MilitaryCareer | null): career is MilitaryCareer {
 // Enlistment, training, discharge
 // ---------------------------------------------------------------------------
 
+/** Voluntary enlistment requires clearing the boot-camp obstacle course first — call this once
+ * the 3D BootCampScene reports a pass. Drafted service members bypass this (see tickDraft). */
 export function enlistInMilitary(state: GameState, branch: MilitaryBranch, specialtyId: string): MilitaryActionResult {
   const ageGate = requireAge(state, 18, 'enlisting');
   if (ageGate) return ageGate;
@@ -70,11 +72,56 @@ export function enlistInMilitary(state: GameState, branch: MilitaryBranch, speci
     currentDeployment: null, deployments: [], injuries: [], medals: [],
     warCrimesCommitted: 0, heroicActsCount: 0, courtMartialed: false,
     dischargeType: null, dischargeYear: null, veteranPensionPerYear: 0, reenlistedCount: 0,
+    drafted: false, bootCampPassed: true,
   };
   state.player.military = career;
   awardAchievement(state, 'military_enlisted');
   log(state, `Enlisted in the ${branchDef.name} as ${specialty.name}.`, 'info');
   return { ok: true, message: `Welcome to the ${branchDef.name}, ${specialty.name}.` };
+}
+
+/** Yearly draft check — while your home country is at war, anyone of service age not already
+ * serving has a real chance of being conscripted, boosted further if conscription law is in
+ * force. Drafted personnel skip boot camp (bootCampPassed still starts true) and go straight to
+ * training, same as anyone who already cleared the course voluntarily. */
+export function tickDraft(state: GameState, rng: RNG): string[] {
+  const p = state.player;
+  const headlines: string[] = [];
+  if (!p.alive || p.age < 18 || p.age > 40 || p.inJailYears > 0) return headlines;
+  const existing = p.military;
+  if (existing && existing.dischargeType === null) return headlines; // already serving
+  if (existing && existing.dischargeType === 'dishonorable') return headlines; // barred either way
+  const home = state.countries.find((c) => c.id === p.countryId);
+  if (!home || home.atWarWith.length === 0) return headlines;
+  const conscriptionLaw = home.lawsInForce.includes('conscription');
+  const chance = conscriptionLaw ? 0.12 : 0.03;
+  if (!rng.chance(chance)) return headlines;
+  const branch: MilitaryBranch = 'army';
+  const branchDef = BRANCH_BY_ID[branch];
+  const specialty = SPECIALTY_BY_ID['infantry'];
+  const career: MilitaryCareer = {
+    branch, specialtyId: 'infantry', rankIndex: 0, yearsOfService: 0, enlistedYear: state.year,
+    discipline: 50, combatSkill: 15, leadership: 10, fitness: 60, disabilityRating: 0,
+    currentDeployment: null, deployments: [], injuries: [], medals: [],
+    warCrimesCommitted: 0, heroicActsCount: 0, courtMartialed: false,
+    dischargeType: null, dischargeYear: null, veteranPensionPerYear: 0, reenlistedCount: 0,
+    drafted: true, bootCampPassed: true,
+  };
+  p.military = career;
+  p.stress = clamp100(p.stress + rng.range(10, 20));
+  p.happiness = clamp100(p.happiness - rng.range(5, 15));
+  awardAchievement(state, 'drafted');
+  headlines.push(`⚠️ You've been drafted into the ${branchDef?.name ?? 'military'} as ${specialty?.name ?? 'Infantry'} — your country needs you.`);
+  return headlines;
+}
+
+/** Called once the 3D BootCampScene reports its result — finalizes the enlistment only if the
+ * recruit actually passed the obstacle course. */
+export function attemptEnlistmentAfterBootCamp(state: GameState, branch: MilitaryBranch, specialtyId: string, passed: boolean): MilitaryActionResult {
+  if (!passed) return { ok: false, message: 'You didn\'t clear boot camp — you can try the course again.' };
+  const result = enlistInMilitary(state, branch, specialtyId);
+  if (result.ok) awardAchievement(state, 'boot_camp_graduate');
+  return result;
 }
 
 export function trainMilitary(state: GameState, programId: string): MilitaryActionResult {
@@ -206,6 +253,24 @@ export function resolveCombatMission(state: GameState, outcome: MissionOutcome):
   let kind: 'good' | 'bad' = 'good';
   if (!outcome.survived) {
     kind = 'bad';
+    // Getting overrun in a real firefight is a genuine chance of death, not just an injury —
+    // higher combat skill improves your odds of getting out alive.
+    const deathChance = clamp(0.4 - career.combatSkill / 100 * 0.22, 0.1, 0.4);
+    if (rng.chance(deathChance)) {
+      dep.outcome = 'kia';
+      dep.endYear = state.year;
+      career.deployments.push(dep);
+      career.currentDeployment = null;
+      career.dischargeType = 'kia';
+      career.dischargeYear = state.year;
+      if (career.medals.length > 0) awardAchievement(state, 'fallen_hero');
+      p.alive = false;
+      state.pendingDeathReason = 'Killed in action during a combat mission.';
+      message = `Overrun during the mission — killed in action.`;
+      commit(state, rng);
+      log(state, `💀 ${message}`, 'bad');
+      return { ok: true, message };
+    }
     const injuryDef = rng.pick(MILITARY_INJURY_TYPES);
     const severity = clamp(Math.round(rng.range(injuryDef.minSeverity, injuryDef.maxSeverity) * 0.7), 1, 10);
     const permanent = rng.chance(injuryDef.permanentChance * 0.6);
@@ -227,6 +292,7 @@ export function resolveCombatMission(state: GameState, outcome: MissionOutcome):
     if (medal.id === 'medal_of_honor') awardAchievement(state, 'medal_of_honor');
     if (medal.id === 'bronze_star') awardAchievement(state, 'bronze_star');
     if (medal.id === 'silver_star') awardAchievement(state, 'silver_star');
+    if (career.specialtyId === 'armor') awardAchievement(state, 'tank_ace');
   } else {
     message = `Completed the mission — ${outcome.hostilesEliminated}/${outcome.hostilesTotal} hostiles engaged.`;
   }
@@ -336,6 +402,7 @@ export function tickMilitaryCareer(state: GameState, rng: RNG): string[] {
         career.dischargeYear = state.year;
         if (career.medals.length > 0) awardAchievement(state, 'fallen_hero');
         p.alive = false;
+        state.pendingDeathReason = `Killed in action while deployed with the ${branchDef?.name ?? 'military'}.`;
         headlines.push(`💀 Killed in action while deployed with the ${branchDef?.name ?? 'military'}.`);
         return headlines;
       }

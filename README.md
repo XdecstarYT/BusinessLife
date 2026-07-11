@@ -14,6 +14,23 @@ connection or choose not to sign in.
 
 ## Highlights
 
+- **V46 — Suicide, the wartime draft, real permadeath in combat, boot camp, a third war engine,
+  and battlefield terrain.** A somber but real BitLife-standard feature: a confirm-gated
+  **Suicide** button under Mind & Body that ends the life immediately, with its own honest cause
+  of death on the game-over screen. War now reaches out and grabs you even if you never enlist —
+  while your country is at war, especially under a National Service Act, you have a real yearly
+  chance of being **drafted**, sent straight into uniform without a choice (and without boot
+  camp — you don't get one when you're conscripted). Combat is now genuinely lethal: getting
+  overrun in a playable mission carries a real death chance that scales against your combat
+  skill, not just an injury, and that death is reported immediately — the game ends right then,
+  not on the next Age Up. Volunteers, by contrast, have to earn their spot: enlisting now routes
+  through a real playable 3D **Boot Camp obstacle course** — clear a hurdle, climb a wall, crawl
+  under netting, and hold your balance on a beam — and washing out sends you back to try again
+  instead of guaranteeing a spot. The Military career also gets a third playable **war engine**,
+  **Armor Combat** — traverse a tank turret and fire on advancing enemy vehicles with a slow,
+  weighty main-gun reload — alongside real **war terrain**: Ground, Air, and Armor missions now
+  render desert, urban, jungle, or arctic battlefields depending on which theater you're actually
+  deployed to.
 - **V45 — Two playable 3D combat engines: Ground Combat and Air Combat.** Deployed soldiers with a
   combat specialty no longer just resolve missions on a menu — they fight them. Infantry, armor,
   artillery, special forces, combat medics, snipers and more drop into a real 3D **Ground Combat**

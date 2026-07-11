@@ -6,7 +6,7 @@
 import { create } from 'zustand';
 import type { EventChoice, FiredEvent, GameState } from '../sim/types';
 import { generateWorld, type NewGameConfig } from '../sim/world';
-import { advanceDay, advanceWeek, advanceYear, continueAsHeir as continueAsHeirEngine } from '../sim/engine';
+import { advanceDay, advanceWeek, advanceYear, continueAsHeir as continueAsHeirEngine, gameOverCheck } from '../sim/engine';
 import { resolveChoice } from '../sim/events';
 import { RNG } from '../sim/rng';
 import * as actions from '../sim/actions';
@@ -342,6 +342,7 @@ export const useGame = create<GameStoreState>((set, get) => ({
     const s = get().state;
     if (!s) return { ok: false, message: 'No game in progress.' };
     const res = fn(s, ...args);
+    if (!s.player.alive) gameOverCheck(s);
     commit(get, set);
     get().toast(res.message, res.ok ? 'ok' : 'err');
     return res;

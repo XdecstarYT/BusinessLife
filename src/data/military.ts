@@ -175,23 +175,26 @@ export const MEDAL_BY_ID: Record<string, MilitaryMedalDef> = Object.fromEntries(
 // Bases & deployment theaters
 // ---------------------------------------------------------------------------
 
+export type WarTerrain = 'desert' | 'urban' | 'jungle' | 'arctic';
+
 export interface MilitaryBaseDef {
   id: string;
   name: string;
   homeland: boolean; // true = domestic garrison duty, false = forward-deployed theater
+  terrain: WarTerrain; // sets the battlefield dressing in Ground/Air Combat scenes for this base
 }
 
 export const MILITARY_BASES: MilitaryBaseDef[] = [
-  { id: 'fort_meridian', name: 'Fort Meridian', homeland: true },
-  { id: 'camp_ironwood', name: 'Camp Ironwood', homeland: true },
-  { id: 'naval_station_blackwater', name: 'Naval Station Blackwater', homeland: true },
-  { id: 'lakeview_air_base', name: 'Lakeview Air Force Base', homeland: true },
-  { id: 'fob_talon', name: 'Forward Operating Base Talon', homeland: false },
-  { id: 'fob_sable', name: 'Forward Operating Base Sable', homeland: false },
-  { id: 'combat_outpost_reef', name: 'Combat Outpost Reef', homeland: false },
-  { id: 'carrier_strike_group', name: 'Carrier Strike Group Nine', homeland: false },
-  { id: 'highland_garrison', name: 'Highland Garrison', homeland: false },
-  { id: 'coastal_defense_wing', name: 'Coastal Defense Wing', homeland: true },
+  { id: 'fort_meridian', name: 'Fort Meridian', homeland: true, terrain: 'urban' },
+  { id: 'camp_ironwood', name: 'Camp Ironwood', homeland: true, terrain: 'jungle' },
+  { id: 'naval_station_blackwater', name: 'Naval Station Blackwater', homeland: true, terrain: 'urban' },
+  { id: 'lakeview_air_base', name: 'Lakeview Air Force Base', homeland: true, terrain: 'urban' },
+  { id: 'fob_talon', name: 'Forward Operating Base Talon', homeland: false, terrain: 'desert' },
+  { id: 'fob_sable', name: 'Forward Operating Base Sable', homeland: false, terrain: 'urban' },
+  { id: 'combat_outpost_reef', name: 'Combat Outpost Reef', homeland: false, terrain: 'jungle' },
+  { id: 'carrier_strike_group', name: 'Carrier Strike Group Nine', homeland: false, terrain: 'desert' },
+  { id: 'highland_garrison', name: 'Highland Garrison', homeland: false, terrain: 'arctic' },
+  { id: 'coastal_defense_wing', name: 'Coastal Defense Wing', homeland: true, terrain: 'urban' },
 ];
 
 // ---------------------------------------------------------------------------

@@ -7,11 +7,11 @@
  */
 import { useState, type ReactNode } from 'react';
 import { useGame, type Screen } from '../../store/gameStore';
-import { adoptPet, attemptPrisonEscape, bribeJudge, buyLotteryTicket, buyScratchCard, contestTerritory, CRIME_RANK_TITLES, declareCrimeWar, doActivity, donateToFoundation, enterWitnessProtection, foundCharityFoundation, goStraight, heist, issuePublicApology, joinCrimeFamily, playWithPet, postOnSocialMedia, proposeCrimeAlliance, requestParole, retire, socialMediaPostStyles, writeMemoir } from '../../sim/actions';
+import { adoptPet, attemptPrisonEscape, bribeJudge, buyLotteryTicket, buyScratchCard, commitSuicide, contestTerritory, CRIME_RANK_TITLES, declareCrimeWar, doActivity, donateToFoundation, enterWitnessProtection, foundCharityFoundation, goStraight, heist, issuePublicApology, joinCrimeFamily, playWithPet, postOnSocialMedia, proposeCrimeAlliance, requestParole, retire, socialMediaPostStyles, writeMemoir } from '../../sim/actions';
 import { PET_CATALOG, PET_SPEC_BY_KIND } from '../../sim/pets';
 import { playerCrimeFamily } from '../../sim/crime';
 import { netWorth } from '../../sim/engine';
-import { Badge, Button, Card, CircleTile, Pill, PillRow, SectionHeader, StatBar } from '../components';
+import { Badge, Button, Card, CircleTile, Modal, Pill, PillRow, SectionHeader, StatBar } from '../components';
 import { money } from '../format';
 import {
   IconArrowRight,
@@ -51,6 +51,7 @@ const LOG_DOT: Record<string, string> = {
 export function Life() {
   const { state, setScreen, nextDay, nextWeek, run, eventQueue, activeEvent } = useGame();
   const [showMoreActivities, setShowMoreActivities] = useState(false);
+  const [confirmingSuicide, setConfirmingSuicide] = useState(false);
   if (!state) return null;
   const p = state.player;
   const home = state.countries.find((c) => c.id === p.countryId)!;
@@ -463,6 +464,27 @@ export function Life() {
           </Card>
         </>
       )}
+
+      <SectionHeader title="Mind & Body" />
+      <Card className="p-4 mb-4 border border-rose-500/30">
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-xs text-slate-500 dark:text-slate-400 pr-2">
+            If things ever feel unbearable in real life, please reach out to a crisis line — this button only affects this fictional life.
+          </div>
+          <Button size="sm" variant="danger" onClick={() => setConfirmingSuicide(true)}>💀 Suicide</Button>
+        </div>
+      </Card>
+      <Modal open={confirmingSuicide} onClose={() => setConfirmingSuicide(false)} title="Are you sure?">
+        <p className="text-sm text-slate-600 dark:text-slate-300 mb-4">
+          This ends {p.name}'s life immediately and permanently. There is no undo.
+        </p>
+        <div className="flex gap-2">
+          <Button className="flex-1" variant="ghost" onClick={() => setConfirmingSuicide(false)}>Cancel</Button>
+          <Button className="flex-1" variant="danger" onClick={() => { setConfirmingSuicide(false); run(commitSuicide); }}>
+            End it
+          </Button>
+        </div>
+      </Modal>
 
     </div>
   );

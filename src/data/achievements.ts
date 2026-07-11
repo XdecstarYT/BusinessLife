@@ -165,4 +165,8 @@ export const ACHIEVEMENTS: Record<string, AchievementDef> = {
   court_martialed: { label: 'Court-Martialed', icon: '⚖️' },
   fallen_hero: { label: 'Fallen Hero', icon: '🕊️' },
   reenlisted_veteran: { label: 'Reenlisted', icon: '🔁' },
+  // V46: draft, boot camp, more war engines
+  drafted: { label: 'Drafted', icon: '📜' },
+  boot_camp_graduate: { label: 'Boot Camp Graduate', icon: '🏅' },
+  tank_ace: { label: 'Tank Ace', icon: '🛡️' },
 };
