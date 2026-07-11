@@ -22,6 +22,7 @@ import { Stats } from './ui/screens/Stats';
 import { Family } from './ui/screens/Family';
 import { Studio } from './ui/screens/Studio';
 import { Casino } from './ui/screens/Casino';
+import { Athlete } from './ui/screens/Athlete';
 import { Leaderboard } from './ui/screens/Leaderboard';
 
 export default function App() {
@@ -58,6 +59,7 @@ export default function App() {
           {screen === 'stats' && <Stats />}
           {screen === 'family' && <Family />}
           {screen === 'casino' && <Casino />}
+          {screen === 'athlete' && <Athlete />}
           {screen === 'leaderboard' && <Leaderboard />}
         </div>
       </AppShell>

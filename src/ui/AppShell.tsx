@@ -35,6 +35,7 @@ const ACTIVITY_GROUPS: { title: string; items: ActivityEntry[] }[] = [
     items: [
       { screen: 'life', label: 'Life Story', subtitle: 'Your story, year by year', icon: '📖' },
       { screen: 'explore', label: 'City', subtitle: 'Walk your empire in 3D', icon: '🏙️' },
+      { screen: 'athlete', label: 'Athlete', subtitle: 'Play soccer, football & running in 3D', icon: '🏟️' },
       { screen: 'casino', label: 'Casino', subtitle: 'Slots, tables, sports book', icon: '🎰' },
     ],
   },
