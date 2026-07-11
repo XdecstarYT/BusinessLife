@@ -3,7 +3,9 @@
  * time controls, then the life log as the hero — chronological text entries
  * grouped under bold "Age N" headers, newest chapter first. The year itself
  * advances from the big AGE button in the app shell's tab bar. Below the
- * feed: the manage grid, social media, lifestyle chips, underworld, legacy.
+ * feed and the always-visible Manage grid, everything else lives behind a
+ * tab bar (Story / Activities / Underworld / Legacy) so the screen reads as
+ * a real dashboard instead of one endless scroll.
  */
 import { useState, type ReactNode } from 'react';
 import { useGame, type Screen } from '../../store/gameStore';
@@ -48,8 +50,11 @@ const LOG_DOT: Record<string, string> = {
   info: 'bg-slate-300 dark:bg-ink-600',
 };
 
+type LifeTab = 'story' | 'activities' | 'underworld' | 'legacy';
+
 export function Life() {
   const { state, setScreen, nextDay, nextWeek, run, eventQueue, activeEvent } = useGame();
+  const [tab, setTab] = useState<LifeTab>('story');
   const [showMoreActivities, setShowMoreActivities] = useState(false);
   const [confirmingSuicide, setConfirmingSuicide] = useState(false);
   if (!state) return null;
@@ -74,6 +79,10 @@ export function Life() {
     if (s === 'family') return p.spouseId ? '💍' : undefined;
     return undefined;
   };
+
+  const bucketDone = state.bucketList?.filter((g) => g.done).length ?? 0;
+  const bucketTotal = state.bucketList?.length ?? 0;
+  const inUnderworld = !!p.crimeFamilyId || !!p.drugOperation?.active;
 
   return (
     <div className="space-y-1">
@@ -132,33 +141,6 @@ export function Life() {
         <StatBar label={`Stress${p.burnoutUntilYear !== null && state.year <= p.burnoutUntilYear ? ' 🔥' : ''}`} value={p.stress} />
       </Card>
 
-      {/* Bucket list — this life's personal goals, each paying out on completion */}
-      {(state.bucketList?.length ?? 0) > 0 && (
-        <>
-          <SectionHeader title="🎯 Bucket List" />
-          <Card className="p-4 space-y-2.5">
-            {state.bucketList.map((g) => (
-              <div key={g.defId} className="flex items-start gap-2.5">
-                <span className={`mt-0.5 w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-black shrink-0 ${
-                  g.done ? 'bg-brand-500 text-white' : 'bg-slate-100 dark:bg-ink-800 text-slate-400'
-                }`}>
-                  {g.done ? '✓' : ''}
-                </span>
-                <div className="min-w-0">
-                  <div className={`text-sm font-semibold leading-snug ${g.done ? 'line-through text-slate-400 dark:text-slate-500' : 'text-slate-700 dark:text-slate-200'}`}>
-                    {g.description}
-                  </div>
-                  <div className="text-[11px] text-slate-400">Reward: {money(g.rewardMoney)} · +{g.rewardHappiness} happiness</div>
-                </div>
-              </div>
-            ))}
-            <div className="text-[11px] font-bold text-brand-600 dark:text-brand-400 pt-1">
-              {state.bucketList.filter((g) => g.done).length} of {state.bucketList.length} complete
-            </div>
-          </Card>
-        </>
-      )}
-
       {/* Status chips */}
       <PillRow>
         <Badge tone={home.economy.regime === 'recession' || home.economy.regime === 'depression' ? 'bad' : home.economy.regime === 'boom' ? 'good' : 'neutral'}>
@@ -195,7 +177,7 @@ export function Life() {
         </Card>
       )}
 
-      {/* Hub grid — circular icon tiles */}
+      {/* Hub grid — circular icon tiles, the primary way to move around the game */}
       <SectionHeader title="Manage" />
       <div className="grid grid-cols-4 gap-y-5 gap-x-2">
         {HUB.map((h, i) => (
@@ -210,279 +192,331 @@ export function Life() {
         ))}
       </div>
 
-      {/* Social media */}
-      <SectionHeader title="Social Media" />
-      <Card className="p-4 mb-4">
-        <div className="flex items-center justify-between mb-1">
-          <div className="font-bold text-sm">👥 {p.socialFollowers.toLocaleString()} followers</div>
-          {p.cancelledUntilYear !== null && p.cancelledUntilYear >= state.year && (
-            <Badge tone="bad">🔥 Cancelled until {p.cancelledUntilYear}</Badge>
-          )}
-        </div>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
-          {p.cancelledUntilYear !== null && p.cancelledUntilYear >= state.year
-            ? "You're in the middle of a backlash — posting is off the table until it passes."
-            : 'Post once a year. Bigger reach means bigger risk of it blowing up.'}
-        </p>
+      {/* Tab bar — everything below is grouped so the screen isn't one endless scroll */}
+      <div className="mt-4 sticky top-0 z-10 -mx-4 px-4 py-2 bg-white/90 dark:bg-ink-950/90 backdrop-blur">
         <PillRow>
-          {socialMediaPostStyles().map((s) => (
-            <Pill
-              key={s.id}
-              label={`${s.icon} ${s.label}`}
-              disabled={p.lastSocialPostYear === state.year || (p.cancelledUntilYear !== null && p.cancelledUntilYear >= state.year)}
-              onClick={() => run(postOnSocialMedia, s.id)}
-            />
-          ))}
+          <Pill label="📖 Story" active={tab === 'story'} onClick={() => setTab('story')} />
+          <Pill label="🎉 Activities" active={tab === 'activities'} onClick={() => setTab('activities')} />
+          <Pill label={`🕶️ Underworld${inUnderworld ? ' •' : ''}`} active={tab === 'underworld'} onClick={() => setTab('underworld')} />
+          <Pill label="🏛️ Legacy" active={tab === 'legacy'} onClick={() => setTab('legacy')} />
         </PillRow>
-      </Card>
+      </div>
 
-      {/* Lifestyle quick actions */}
-      <SectionHeader title="Lifestyle" />
-      <PillRow>
-        <Pill label="🏖️ Vacation" onClick={() => run(doActivity, 'vacation')} />
-        <Pill label="💪 Gym" onClick={() => run(doActivity, 'gym')} />
-        <Pill label="🩺 Doctor" onClick={() => run(doActivity, 'doctor')} />
-        <Pill label="🧘 Meditate" onClick={() => run(doActivity, 'meditate')} />
-        <Pill label="🎉 Party" onClick={() => run(doActivity, 'party')} />
-        <Pill label="❤️ Charity" onClick={() => run(doActivity, 'charity')} />
-        <Pill label="📚 Book Club" onClick={() => run(doActivity, 'book_club')} />
-        <Pill label="🛋️ Therapy" onClick={() => run(doActivity, 'therapy')} />
-        <Pill label="🎸 Instrument" onClick={() => run(doActivity, 'learn_instrument')} />
-        <Pill label="🚗 Road Trip" onClick={() => run(doActivity, 'road_trip')} />
-        <Pill label="🖼️ Art Collecting" onClick={() => run(doActivity, 'art_collecting')} />
-        <Pill label="🍷 Wine Tasting" onClick={() => run(doActivity, 'wine_tasting')} />
-        <Pill label="🃏 Poker Night" onClick={() => run(doActivity, 'poker_night')} />
-        <Pill label="🤝 Volunteer" onClick={() => run(doActivity, 'volunteer')} />
-        <Pill label="🎓 Seminar" onClick={() => run(doActivity, 'seminar')} />
-        <Pill label="💆 Spa Day" onClick={() => run(doActivity, 'spa_day')} />
-        <Pill label="🔨 Home Improve" onClick={() => run(doActivity, 'home_improvement')} />
-        <Pill label="✍️ Blog" onClick={() => run(doActivity, 'blog')} />
-        <Pill label="🗣️ Language" onClick={() => run(doActivity, 'learn_language')} />
-        <Pill label="🦁 Zoo" onClick={() => run(doActivity, 'zoo_visit')} />
-        <Pill label="🎬 Movie Theater" onClick={() => run(doActivity, 'movie_theater')} />
-        {p.age >= 18 && <Pill label="🪩 Nightlife" onClick={() => run(doActivity, 'nightlife')} />}
-        <Pill label={showMoreActivities ? '▲ Fewer' : '▼ More'} onClick={() => setShowMoreActivities((v) => !v)} />
-      </PillRow>
-      {showMoreActivities && (
-      <PillRow>
-        <Pill label="🧘‍♀️ Yoga" onClick={() => run(doActivity, 'yoga')} />
-        <Pill label="🍳 Cooking Class" onClick={() => run(doActivity, 'cooking_class')} />
-        <Pill label="⛳ Golf Day" onClick={() => run(doActivity, 'golf_day')} />
-        <Pill label="♟️ Chess Tournament" onClick={() => run(doActivity, 'chess_tournament')} />
-        <Pill label="⛵ Sailing Lesson" onClick={() => run(doActivity, 'sailing_lesson')} />
-        <Pill label="🪂 Skydiving" onClick={() => run(doActivity, 'skydiving')} />
-        <Pill label="🏃 Marathon Training" onClick={() => run(doActivity, 'marathon_training')} />
-        <Pill label="🏛️ Museum Visit" onClick={() => run(doActivity, 'museum_visit')} />
-        <Pill label="🎤 Live Concert" onClick={() => run(doActivity, 'live_concert')} />
-        <Pill label="🏕️ Camping Trip" onClick={() => run(doActivity, 'camping_trip')} />
-        <Pill label="🛥️ Yacht Day" onClick={() => run(doActivity, 'yacht_day')} />
-        <Pill label="🍇 Wine Country Tour" onClick={() => run(doActivity, 'wine_country_tour')} />
-        <Pill label="🖼️ Gallery Opening" onClick={() => run(doActivity, 'gallery_opening')} />
-        <Pill label="🎣 Fishing Trip" onClick={() => run(doActivity, 'fishing_trip')} />
-        <Pill label="🥋 Martial Arts" onClick={() => run(doActivity, 'martial_arts')} />
-        <Pill label="🎙️ Stand-Up Comedy" onClick={() => run(doActivity, 'stand_up_comedy')} />
-        <Pill label="🎓 Public Speaking" onClick={() => run(doActivity, 'public_speaking_course')} />
-        <Pill label="💻 Coding Bootcamp" onClick={() => run(doActivity, 'coding_bootcamp')} />
-        <Pill label="🔐 Cybersecurity Course" onClick={() => run(doActivity, 'cybersecurity_course')} />
-        <Pill label="💰 Personal Finance Course" onClick={() => run(doActivity, 'personal_finance_course')} />
-        <Pill label="🏢 Industry Conference" onClick={() => run(doActivity, 'industry_conference')} />
-        <Pill label="🚀 Startup Weekend" onClick={() => run(doActivity, 'startup_weekend')} />
-        <Pill label="🧑‍🏫 Life Coaching" onClick={() => run(doActivity, 'life_coaching')} />
-        <Pill label="🌄 Mindfulness Retreat" onClick={() => run(doActivity, 'mindfulness_retreat')} />
-        <Pill label="🗣️ Debate Club" onClick={() => run(doActivity, 'debate_club')} />
-        <Pill label="🎭 Improv Class" onClick={() => run(doActivity, 'improv_class')} />
-        <Pill label="💃 Dance Lessons" onClick={() => run(doActivity, 'dance_lessons')} />
-        <Pill label="🩹 First Aid Course" onClick={() => run(doActivity, 'first_aid_course')} />
-        <Pill label="📈 Investment Seminar" onClick={() => run(doActivity, 'investment_seminar')} />
-        <Pill label="🤝 Negotiation Workshop" onClick={() => run(doActivity, 'negotiation_workshop')} />
-      </PillRow>
-      )}
-      {(p.notoriety > 0 || p.reputation < 50) && (
-        <PillRow>
-          <Pill label="🙏 Issue Public Apology" onClick={() => run(issuePublicApology)} />
-        </PillRow>
-      )}
-
-      {/* Pets — real companions that age, bond, and pass on */}
-      <SectionHeader title="🐾 Pets" />
-      <Card className="p-4 space-y-3">
-        {(p.pets ?? []).map((pet) => {
-          const spec = PET_SPEC_BY_KIND[pet.kind];
-          const playedThisYear = p.actionCooldowns[`pet_play_${pet.id}`] === state.year;
-          return (
-            <div key={pet.id} className="flex items-center gap-3">
-              <span className="text-2xl shrink-0">{spec.icon}</span>
-              <div className="min-w-0 flex-1">
-                <div className="font-bold text-sm leading-tight">{pet.name} <span className="text-[11px] font-semibold text-slate-400">· {spec.label}, age {pet.ageYears}</span></div>
-                <div className="grid grid-cols-2 gap-2 mt-1">
-                  <StatBar label="Bond" value={pet.bond} />
-                  <StatBar label="Health" value={pet.health} />
-                </div>
-              </div>
-              <Button size="sm" variant="soft" disabled={playedThisYear} onClick={() => run(playWithPet, pet.id)}>
-                {playedThisYear ? 'Played' : '🎾 Play'}
-              </Button>
-            </div>
-          );
-        })}
-        {(p.pets ?? []).length === 0 && (
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            A pet boosts your happiness every year in proportion to the bond you build — and a loyal one might just come through for you.
-          </p>
-        )}
-        {(p.pets ?? []).length < 4 && (
-          <PillRow>
-            {PET_CATALOG.map((spec) => (
-              <Pill key={spec.kind} label={`${spec.icon} ${spec.label} (${money(spec.cost)})`} onClick={() => run(adoptPet, spec.kind)} />
-            ))}
-          </PillRow>
-        )}
-      </Card>
-
-      {/* Lottery — instant scratch-and-win dopamine, capped per year */}
-      <SectionHeader title="🎟️ Lottery" />
-      <Card className="p-4">
-        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
-          Feeling lucky? The jackpot is $2,000,000. Results are instant — and the odds are exactly as bad as real life.
-        </p>
-        <div className="grid grid-cols-2 gap-2">
-          <Button variant="soft" disabled={(p.lotteryTicketsThisYear ?? 0) >= 20} onClick={() => run(buyLotteryTicket)}>
-            🎟️ Ticket ($100)
-          </Button>
-          <Button variant="soft" disabled={(p.scratchCardsThisYear ?? 0) >= 30} onClick={() => run(buyScratchCard)}>
-            🎫 Scratch Card ($50)
-          </Button>
-        </div>
-        <div className="text-[11px] text-slate-400 mt-2 text-center">
-          {(p.lotteryTicketsThisYear ?? 0)}/20 tickets · {(p.scratchCardsThisYear ?? 0)}/30 cards this year
-        </div>
-      </Card>
-
-      <SectionHeader title="Underworld" />
-      <PillRow>
-        {!p.crimeFamilyId ? (
-          <>
-            <Pill label="🕶️ Join Crime Family" onClick={() => run(joinCrimeFamily)} />
-            {!p.inWitnessProtection && p.criminalRecord > 0 && (
-              <Pill label="🛡️ Witness Protection ($100k)" onClick={() => run(enterWitnessProtection)} />
-            )}
-          </>
-        ) : (
-          <>
-            <Pill label="💰 Heist" onClick={() => run(heist)} />
-            <Pill label="🗺️ Contest Territory" onClick={() => run(contestTerritory)} />
-            <Pill label="🚪 Go Straight" onClick={() => run(goStraight)} />
-          </>
-        )}
-      </PillRow>
-      {(() => {
-        const myFamily = playerCrimeFamily(state);
-        const families = state.crimeFamilies.filter((f) => f.countryId === p.countryId && !f.disbanded);
-        if (families.length === 0) return null;
-        return (
-          <div className="mt-2 space-y-2">
-            <p className="text-xs text-slate-400 px-1">
-              The real crime families operating in your country — they war, ally, and get crushed by the law on their own, whether or not you're in one.
-            </p>
-            {families.map((f) => {
-              const isMine = myFamily?.id === f.id;
-              const atWar = myFamily ? myFamily.atWarWith.includes(f.id) : false;
-              const allied = myFamily ? myFamily.alliedWith.includes(f.id) : false;
-              const boss = state.npcs[f.bossId];
-              return (
-                <Card key={f.id} className="p-4">
-                  <div className="flex justify-between items-start mb-2">
-                    <div className="min-w-0 pr-2">
-                      <div className="font-bold truncate" title={f.name}>{f.name}</div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                        Boss: {boss?.name ?? 'Unknown'} · strength {Math.round(f.strength)} · turf {Math.round(f.turf)}% · heat {Math.round(f.heat)}
+      {tab === 'story' && (
+        <>
+          {bucketTotal > 0 && (
+            <>
+              <SectionHeader title="🎯 Bucket List" />
+              <Card className="p-4 space-y-2.5">
+                {state.bucketList.map((g) => (
+                  <div key={g.defId} className="flex items-start gap-2.5">
+                    <span className={`mt-0.5 w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-black shrink-0 ${
+                      g.done ? 'bg-brand-500 text-white' : 'bg-slate-100 dark:bg-ink-800 text-slate-400'
+                    }`}>
+                      {g.done ? '✓' : ''}
+                    </span>
+                    <div className="min-w-0">
+                      <div className={`text-sm font-semibold leading-snug ${g.done ? 'line-through text-slate-400 dark:text-slate-500' : 'text-slate-700 dark:text-slate-200'}`}>
+                        {g.description}
                       </div>
+                      <div className="text-[11px] text-slate-400">Reward: {money(g.rewardMoney)} · +{g.rewardHappiness} happiness</div>
                     </div>
-                    {isMine ? <Badge tone="brand">Your Family</Badge> : atWar ? <Badge tone="bad">At War</Badge> : allied ? <Badge tone="good">Allied</Badge> : null}
                   </div>
-                  {myFamily && !isMine && !atWar && !allied && (
-                    <div className="grid grid-cols-2 gap-2">
-                      <Pill label="🤝 Propose Alliance" onClick={() => run(proposeCrimeAlliance, f.id)} />
-                      <Pill label="⚔️ Declare War" onClick={() => run(declareCrimeWar, f.id)} />
+                ))}
+                <div className="text-[11px] font-bold text-brand-600 dark:text-brand-400 pt-1">
+                  {bucketDone} of {bucketTotal} complete
+                </div>
+              </Card>
+            </>
+          )}
+
+          <SectionHeader title="Social Media" />
+          <Card className="p-4 mb-4">
+            <div className="flex items-center justify-between mb-1">
+              <div className="font-bold text-sm">👥 {p.socialFollowers.toLocaleString()} followers</div>
+              {p.cancelledUntilYear !== null && p.cancelledUntilYear >= state.year && (
+                <Badge tone="bad">🔥 Cancelled until {p.cancelledUntilYear}</Badge>
+              )}
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+              {p.cancelledUntilYear !== null && p.cancelledUntilYear >= state.year
+                ? "You're in the middle of a backlash — posting is off the table until it passes."
+                : 'Post once a year. Bigger reach means bigger risk of it blowing up.'}
+            </p>
+            <PillRow>
+              {socialMediaPostStyles().map((s) => (
+                <Pill
+                  key={s.id}
+                  label={`${s.icon} ${s.label}`}
+                  disabled={p.lastSocialPostYear === state.year || (p.cancelledUntilYear !== null && p.cancelledUntilYear >= state.year)}
+                  onClick={() => run(postOnSocialMedia, s.id)}
+                />
+              ))}
+            </PillRow>
+          </Card>
+
+          {(p.notoriety > 0 || p.reputation < 50) && (
+            <PillRow>
+              <Pill label="🙏 Issue Public Apology" onClick={() => run(issuePublicApology)} />
+            </PillRow>
+          )}
+        </>
+      )}
+
+      {tab === 'activities' && (
+        <>
+          <SectionHeader title="Lifestyle" />
+          <PillRow>
+            <Pill label="🏖️ Vacation" onClick={() => run(doActivity, 'vacation')} />
+            <Pill label="💪 Gym" onClick={() => run(doActivity, 'gym')} />
+            <Pill label="🩺 Doctor" onClick={() => run(doActivity, 'doctor')} />
+            <Pill label="🧘 Meditate" onClick={() => run(doActivity, 'meditate')} />
+            <Pill label="🎉 Party" onClick={() => run(doActivity, 'party')} />
+            <Pill label="❤️ Charity" onClick={() => run(doActivity, 'charity')} />
+            <Pill label="📚 Book Club" onClick={() => run(doActivity, 'book_club')} />
+            <Pill label="🛋️ Therapy" onClick={() => run(doActivity, 'therapy')} />
+            <Pill label="🎸 Instrument" onClick={() => run(doActivity, 'learn_instrument')} />
+            <Pill label="🚗 Road Trip" onClick={() => run(doActivity, 'road_trip')} />
+            <Pill label="🖼️ Art Collecting" onClick={() => run(doActivity, 'art_collecting')} />
+            <Pill label="🍷 Wine Tasting" onClick={() => run(doActivity, 'wine_tasting')} />
+            <Pill label="🃏 Poker Night" onClick={() => run(doActivity, 'poker_night')} />
+            <Pill label="🤝 Volunteer" onClick={() => run(doActivity, 'volunteer')} />
+            <Pill label="🎓 Seminar" onClick={() => run(doActivity, 'seminar')} />
+            <Pill label="💆 Spa Day" onClick={() => run(doActivity, 'spa_day')} />
+            <Pill label="🔨 Home Improve" onClick={() => run(doActivity, 'home_improvement')} />
+            <Pill label="✍️ Blog" onClick={() => run(doActivity, 'blog')} />
+            <Pill label="🗣️ Language" onClick={() => run(doActivity, 'learn_language')} />
+            <Pill label="🦁 Zoo" onClick={() => run(doActivity, 'zoo_visit')} />
+            <Pill label="🎬 Movie Theater" onClick={() => run(doActivity, 'movie_theater')} />
+            {p.age >= 18 && <Pill label="🪩 Nightlife" onClick={() => run(doActivity, 'nightlife')} />}
+            <Pill label={showMoreActivities ? '▲ Fewer' : '▼ More'} onClick={() => setShowMoreActivities((v) => !v)} />
+          </PillRow>
+          {showMoreActivities && (
+          <PillRow>
+            <Pill label="🧘‍♀️ Yoga" onClick={() => run(doActivity, 'yoga')} />
+            <Pill label="🍳 Cooking Class" onClick={() => run(doActivity, 'cooking_class')} />
+            <Pill label="⛳ Golf Day" onClick={() => run(doActivity, 'golf_day')} />
+            <Pill label="♟️ Chess Tournament" onClick={() => run(doActivity, 'chess_tournament')} />
+            <Pill label="⛵ Sailing Lesson" onClick={() => run(doActivity, 'sailing_lesson')} />
+            <Pill label="🪂 Skydiving" onClick={() => run(doActivity, 'skydiving')} />
+            <Pill label="🏃 Marathon Training" onClick={() => run(doActivity, 'marathon_training')} />
+            <Pill label="🏛️ Museum Visit" onClick={() => run(doActivity, 'museum_visit')} />
+            <Pill label="🎤 Live Concert" onClick={() => run(doActivity, 'live_concert')} />
+            <Pill label="🏕️ Camping Trip" onClick={() => run(doActivity, 'camping_trip')} />
+            <Pill label="🛥️ Yacht Day" onClick={() => run(doActivity, 'yacht_day')} />
+            <Pill label="🍇 Wine Country Tour" onClick={() => run(doActivity, 'wine_country_tour')} />
+            <Pill label="🖼️ Gallery Opening" onClick={() => run(doActivity, 'gallery_opening')} />
+            <Pill label="🎣 Fishing Trip" onClick={() => run(doActivity, 'fishing_trip')} />
+            <Pill label="🥋 Martial Arts" onClick={() => run(doActivity, 'martial_arts')} />
+            <Pill label="🎙️ Stand-Up Comedy" onClick={() => run(doActivity, 'stand_up_comedy')} />
+            <Pill label="🎓 Public Speaking" onClick={() => run(doActivity, 'public_speaking_course')} />
+            <Pill label="💻 Coding Bootcamp" onClick={() => run(doActivity, 'coding_bootcamp')} />
+            <Pill label="🔐 Cybersecurity Course" onClick={() => run(doActivity, 'cybersecurity_course')} />
+            <Pill label="💰 Personal Finance Course" onClick={() => run(doActivity, 'personal_finance_course')} />
+            <Pill label="🏢 Industry Conference" onClick={() => run(doActivity, 'industry_conference')} />
+            <Pill label="🚀 Startup Weekend" onClick={() => run(doActivity, 'startup_weekend')} />
+            <Pill label="🧑‍🏫 Life Coaching" onClick={() => run(doActivity, 'life_coaching')} />
+            <Pill label="🌄 Mindfulness Retreat" onClick={() => run(doActivity, 'mindfulness_retreat')} />
+            <Pill label="🗣️ Debate Club" onClick={() => run(doActivity, 'debate_club')} />
+            <Pill label="🎭 Improv Class" onClick={() => run(doActivity, 'improv_class')} />
+            <Pill label="💃 Dance Lessons" onClick={() => run(doActivity, 'dance_lessons')} />
+            <Pill label="🩹 First Aid Course" onClick={() => run(doActivity, 'first_aid_course')} />
+            <Pill label="📈 Investment Seminar" onClick={() => run(doActivity, 'investment_seminar')} />
+            <Pill label="🤝 Negotiation Workshop" onClick={() => run(doActivity, 'negotiation_workshop')} />
+          </PillRow>
+          )}
+
+          {/* Pets — real companions that age, bond, and pass on */}
+          <SectionHeader title="🐾 Pets" />
+          <Card className="p-4 space-y-3">
+            {(p.pets ?? []).map((pet) => {
+              const spec = PET_SPEC_BY_KIND[pet.kind];
+              const playedThisYear = p.actionCooldowns[`pet_play_${pet.id}`] === state.year;
+              return (
+                <div key={pet.id} className="flex items-center gap-3">
+                  <span className="text-2xl shrink-0">{spec.icon}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-bold text-sm leading-tight">{pet.name} <span className="text-[11px] font-semibold text-slate-400">· {spec.label}, age {pet.ageYears}</span></div>
+                    <div className="grid grid-cols-2 gap-2 mt-1">
+                      <StatBar label="Bond" value={pet.bond} />
+                      <StatBar label="Health" value={pet.health} />
                     </div>
-                  )}
-                </Card>
+                  </div>
+                  <Button size="sm" variant="soft" disabled={playedThisYear} onClick={() => run(playWithPet, pet.id)}>
+                    {playedThisYear ? 'Played' : '🎾 Play'}
+                  </Button>
+                </div>
               );
             })}
-          </div>
-        );
-      })()}
+            {(p.pets ?? []).length === 0 && (
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                A pet boosts your happiness every year in proportion to the bond you build — and a loyal one might just come through for you.
+              </p>
+            )}
+            {(p.pets ?? []).length < 4 && (
+              <PillRow>
+                {PET_CATALOG.map((spec) => (
+                  <Pill key={spec.kind} label={`${spec.icon} ${spec.label} (${money(spec.cost)})`} onClick={() => run(adoptPet, spec.kind)} />
+                ))}
+              </PillRow>
+            )}
+          </Card>
 
-      <SectionHeader title="Drug Empire" />
-      <Card className="p-4 mb-4 flex items-center justify-between cursor-pointer active:scale-[0.99] transition-transform" onClick={() => setScreen('drugs')}>
-        <div>
-          <div className="font-bold">🌿 {p.drugOperation?.active ? 'Run the Operation' : 'Get Into the Game'}</div>
-          <div className="text-xs text-slate-500 dark:text-slate-400">Buy, produce, and sell product; build out a stash house, grow op, or lab; fight for turf.</div>
-        </div>
-        <IconArrowRight className="w-5 h-5 text-slate-400 shrink-0" />
-      </Card>
-
-      <SectionHeader title="Casino" />
-      <Card className="p-4 flex items-center justify-between cursor-pointer active:scale-[0.99] transition-transform" onClick={() => setScreen('casino')}>
-        <div>
-          <div className="font-bold">🎰 Visit the Casino</div>
-          <div className="text-xs text-slate-500 dark:text-slate-400">Named slot machines with real jackpots, blackjack, roulette, high-stakes poker.</div>
-        </div>
-        <IconArrowRight className="w-5 h-5 text-slate-400 shrink-0" />
-      </Card>
-
-      <SectionHeader title="Legacy" />
-      <Card className="p-4 mb-4 space-y-3">
-        {p.foundation ? (
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="font-semibold text-sm">❤️ {p.foundation.name}</div>
-              <div className="text-xs text-slate-500 dark:text-slate-400">Endowment {money(p.foundation.endowment)} · given {money(p.foundation.totalGiven)} to date</div>
-            </div>
-            <Button size="sm" variant="soft" onClick={() => run(donateToFoundation, 100_000)}>Endow $100k</Button>
-          </div>
-        ) : (
-          <div className="flex items-center justify-between">
-            <div className="text-xs text-slate-500 dark:text-slate-400 pr-2">Found a charitable foundation ($250k endowment). It grants 5% a year, building karma and reputation forever.</div>
-            <Button size="sm" variant="soft" onClick={() => run(foundCharityFoundation, '')}>Found</Button>
-          </div>
-        )}
-        {p.memoir ? (
-          <div className="text-xs text-slate-500 dark:text-slate-400">📖 "{p.memoir.title}" is earning {money(p.memoir.royaltyPerYear)}/yr in royalties for {p.memoir.yearsLeft} more year(s).</div>
-        ) : (
-          <div className="flex items-center justify-between">
-            <div className="text-xs text-slate-500 dark:text-slate-400 pr-2">Write your memoir (age 35+). Royalties for 5 years, scaled by your fame — and infamy.</div>
-            <Button size="sm" variant="soft" onClick={() => run(writeMemoir, '')}>Publish</Button>
-          </div>
-        )}
-        {!p.retired && p.age >= 60 && (
-          <div className="flex items-center justify-between">
-            <div className="text-xs text-slate-500 dark:text-slate-400 pr-2">Formally retire: quit working with a pension based on your final salary.</div>
-            <Button size="sm" variant="soft" onClick={() => run(retire)}>🌅 Retire</Button>
-          </div>
-        )}
-        {p.retired && <div className="text-xs text-emerald-500 font-semibold">🌅 Retired · pension {money(p.pensionIncome)}/yr</div>}
-      </Card>
-
-      {p.challenge && (
-        <>
-          <SectionHeader title="Challenge" />
+          {/* Lottery — instant scratch-and-win dopamine, capped per year */}
+          <SectionHeader title="🎟️ Lottery" />
           <Card className="p-4 mb-4">
-            <div className="font-semibold text-sm mb-1">🎯 {p.challenge.description}</div>
-            <div className="text-xs text-slate-500 dark:text-slate-400">Deadline: {p.challenge.deadlineYear} · Reward: {money(p.challenge.rewardMoney)}</div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+              Feeling lucky? The jackpot is $2,000,000. Results are instant — and the odds are exactly as bad as real life.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <Button variant="soft" disabled={(p.lotteryTicketsThisYear ?? 0) >= 20} onClick={() => run(buyLotteryTicket)}>
+                🎟️ Ticket ($100)
+              </Button>
+              <Button variant="soft" disabled={(p.scratchCardsThisYear ?? 0) >= 30} onClick={() => run(buyScratchCard)}>
+                🎫 Scratch Card ($50)
+              </Button>
+            </div>
+            <div className="text-[11px] text-slate-400 mt-2 text-center">
+              {(p.lotteryTicketsThisYear ?? 0)}/20 tickets · {(p.scratchCardsThisYear ?? 0)}/30 cards this year
+            </div>
           </Card>
         </>
       )}
 
-      <SectionHeader title="Mind & Body" />
-      <Card className="p-4 mb-4 border border-rose-500/30">
-        <div className="flex items-center justify-between gap-3">
-          <div className="text-xs text-slate-500 dark:text-slate-400 pr-2">
-            If things ever feel unbearable in real life, please reach out to a crisis line — this button only affects this fictional life.
-          </div>
-          <Button size="sm" variant="danger" onClick={() => setConfirmingSuicide(true)}>💀 Suicide</Button>
-        </div>
-      </Card>
+      {tab === 'underworld' && (
+        <>
+          <SectionHeader title="Underworld" />
+          <PillRow>
+            {!p.crimeFamilyId ? (
+              <>
+                <Pill label="🕶️ Join Crime Family" onClick={() => run(joinCrimeFamily)} />
+                {!p.inWitnessProtection && p.criminalRecord > 0 && (
+                  <Pill label="🛡️ Witness Protection ($100k)" onClick={() => run(enterWitnessProtection)} />
+                )}
+              </>
+            ) : (
+              <>
+                <Pill label="💰 Heist" onClick={() => run(heist)} />
+                <Pill label="🗺️ Contest Territory" onClick={() => run(contestTerritory)} />
+                <Pill label="🚪 Go Straight" onClick={() => run(goStraight)} />
+              </>
+            )}
+          </PillRow>
+          {(() => {
+            const myFamily = playerCrimeFamily(state);
+            const families = state.crimeFamilies.filter((f) => f.countryId === p.countryId && !f.disbanded);
+            if (families.length === 0) return null;
+            return (
+              <div className="mt-2 space-y-2">
+                <p className="text-xs text-slate-400 px-1">
+                  The real crime families operating in your country — they war, ally, and get crushed by the law on their own, whether or not you're in one.
+                </p>
+                {families.map((f) => {
+                  const isMine = myFamily?.id === f.id;
+                  const atWar = myFamily ? myFamily.atWarWith.includes(f.id) : false;
+                  const allied = myFamily ? myFamily.alliedWith.includes(f.id) : false;
+                  const boss = state.npcs[f.bossId];
+                  return (
+                    <Card key={f.id} className="p-4">
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="min-w-0 pr-2">
+                          <div className="font-bold truncate" title={f.name}>{f.name}</div>
+                          <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                            Boss: {boss?.name ?? 'Unknown'} · strength {Math.round(f.strength)} · turf {Math.round(f.turf)}% · heat {Math.round(f.heat)}
+                          </div>
+                        </div>
+                        {isMine ? <Badge tone="brand">Your Family</Badge> : atWar ? <Badge tone="bad">At War</Badge> : allied ? <Badge tone="good">Allied</Badge> : null}
+                      </div>
+                      {myFamily && !isMine && !atWar && !allied && (
+                        <div className="grid grid-cols-2 gap-2">
+                          <Pill label="🤝 Propose Alliance" onClick={() => run(proposeCrimeAlliance, f.id)} />
+                          <Pill label="⚔️ Declare War" onClick={() => run(declareCrimeWar, f.id)} />
+                        </div>
+                      )}
+                    </Card>
+                  );
+                })}
+              </div>
+            );
+          })()}
+
+          <SectionHeader title="Drug Empire" />
+          <Card className="p-4 mb-4 flex items-center justify-between cursor-pointer active:scale-[0.99] transition-transform" onClick={() => setScreen('drugs')}>
+            <div>
+              <div className="font-bold">🌿 {p.drugOperation?.active ? 'Run the Operation' : 'Get Into the Game'}</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400">Buy, produce, and sell product; build out a stash house, grow op, or lab; fight for turf.</div>
+            </div>
+            <IconArrowRight className="w-5 h-5 text-slate-400 shrink-0" />
+          </Card>
+
+          <SectionHeader title="Casino" />
+          <Card className="p-4 flex items-center justify-between cursor-pointer active:scale-[0.99] transition-transform" onClick={() => setScreen('casino')}>
+            <div>
+              <div className="font-bold">🎰 Visit the Casino</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400">Named slot machines with real jackpots, blackjack, roulette, high-stakes poker.</div>
+            </div>
+            <IconArrowRight className="w-5 h-5 text-slate-400 shrink-0" />
+          </Card>
+        </>
+      )}
+
+      {tab === 'legacy' && (
+        <>
+          <SectionHeader title="Legacy" />
+          <Card className="p-4 mb-4 space-y-3">
+            {p.foundation ? (
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="font-semibold text-sm">❤️ {p.foundation.name}</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">Endowment {money(p.foundation.endowment)} · given {money(p.foundation.totalGiven)} to date</div>
+                </div>
+                <Button size="sm" variant="soft" onClick={() => run(donateToFoundation, 100_000)}>Endow $100k</Button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                <div className="text-xs text-slate-500 dark:text-slate-400 pr-2">Found a charitable foundation ($250k endowment). It grants 5% a year, building karma and reputation forever.</div>
+                <Button size="sm" variant="soft" onClick={() => run(foundCharityFoundation, '')}>Found</Button>
+              </div>
+            )}
+            {p.memoir ? (
+              <div className="text-xs text-slate-500 dark:text-slate-400">📖 "{p.memoir.title}" is earning {money(p.memoir.royaltyPerYear)}/yr in royalties for {p.memoir.yearsLeft} more year(s).</div>
+            ) : (
+              <div className="flex items-center justify-between">
+                <div className="text-xs text-slate-500 dark:text-slate-400 pr-2">Write your memoir (age 35+). Royalties for 5 years, scaled by your fame — and infamy.</div>
+                <Button size="sm" variant="soft" onClick={() => run(writeMemoir, '')}>Publish</Button>
+              </div>
+            )}
+            {!p.retired && p.age >= 60 && (
+              <div className="flex items-center justify-between">
+                <div className="text-xs text-slate-500 dark:text-slate-400 pr-2">Formally retire: quit working with a pension based on your final salary.</div>
+                <Button size="sm" variant="soft" onClick={() => run(retire)}>🌅 Retire</Button>
+              </div>
+            )}
+            {p.retired && <div className="text-xs text-emerald-500 font-semibold">🌅 Retired · pension {money(p.pensionIncome)}/yr</div>}
+          </Card>
+
+          {p.challenge && (
+            <>
+              <SectionHeader title="Challenge" />
+              <Card className="p-4 mb-4">
+                <div className="font-semibold text-sm mb-1">🎯 {p.challenge.description}</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Deadline: {p.challenge.deadlineYear} · Reward: {money(p.challenge.rewardMoney)}</div>
+              </Card>
+            </>
+          )}
+
+          <SectionHeader title="Mind & Body" />
+          <Card className="p-4 mb-4 border border-rose-500/30">
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-xs text-slate-500 dark:text-slate-400 pr-2">
+                If things ever feel unbearable in real life, please reach out to a crisis line — this button only affects this fictional life.
+              </div>
+              <Button size="sm" variant="danger" onClick={() => setConfirmingSuicide(true)}>💀 Suicide</Button>
+            </div>
+          </Card>
+        </>
+      )}
+
       <Modal open={confirmingSuicide} onClose={() => setConfirmingSuicide(false)} title="Are you sure?">
         <p className="text-sm text-slate-600 dark:text-slate-300 mb-4">
           This ends {p.name}'s life immediately and permanently. There is no undo.

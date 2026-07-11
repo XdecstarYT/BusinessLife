@@ -14,6 +14,20 @@ connection or choose not to sign in.
 
 ## Highlights
 
+- **V48 — A major UI upgrade and a business expansion: a new Defense sector and 4 new product
+  categories.** The Life screen — which had grown into one enormous scroll as system after system
+  landed on it — is now a real dashboard: a sticky **Story / Activities / Underworld / Legacy**
+  tab bar groups bucket list & social media, lifestyle activities & pets & lottery, crime family &
+  Drug Empire & Casino, and legacy & Mind & Body into focused views instead of one endless feed.
+  The Activities sheet (every other screen) now has a live **search box** that filters across all
+  groups instantly, and the vice-heavy screens (Athlete, Military, Drug Empire, Casino) got pulled
+  into their own **Play** category instead of being mixed in with core navigation. On the business
+  side, a brand-new **Defense & Aerospace** industry sector arrives with 16 named businesses —
+  from a Small Arms Manufacturer and Ammunition Plant up through a Naval Shipyard, Submarine
+  Manufacturer, and Fighter Jet Manufacturer — a natural fit alongside the Military Service career.
+  The Studio also gains **4 new product categories** you can design and launch: Pet Tech &
+  Accessories, Baby & Kids Gear, Outdoor & Camping Gear, and Office & Stationery, each with their
+  own parts, materials, and component supply chain, fully playable in the 3D design viewport.
 - **V47 — Drug Empire: a full narcotics operation, independent of the mafia.** Start slinging on
   the corner and build a real business across 8 named products (weed through fentanyl, each with
   its own wholesale cost, street price, addictiveness, and overdose risk) gated by street

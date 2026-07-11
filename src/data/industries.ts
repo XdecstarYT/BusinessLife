@@ -386,6 +386,24 @@ const SECTORS: Record<string, Row[]> = {
     ['Ocean Cleanup Venture', 15 * M, 0.03, 0.5, 0.2, 0.8, 0.4, 0.6, 0.4, SK.engineering, ['green', 'research', 'services']],
     ['Personalized Medicine Platform', 20 * M, 0.13, 0.5, 0.2, 0.5, 0.3, 0.95, 0.8, SK.biotech, ['health', 'tech', 'research']],
   ],
+  Defense: [
+    ['Small Arms Manufacturer', 4 * M, 0.16, 0.25, 0.2, 0.6, 0.6, 0.4, 0.9, SK.manufacturing, ['industrial', 'defense', 'controversial']],
+    ['Ammunition Plant', 3 * M, 0.15, 0.2, 0.2, 0.6, 0.6, 0.3, 0.9, SK.manufacturing, ['industrial', 'defense']],
+    ['Body Armor & Tactical Gear', 800 * K, 0.18, 0.2, 0.2, 0.4, 0.6, 0.3, 0.7, SK.manufacturing, ['industrial', 'defense']],
+    ['Military Vehicle Manufacturer', 25 * M, 0.14, 0.25, 0.3, 0.9, 0.6, 0.5, 0.9, SK.engineering, ['industrial', 'defense', 'strategic']],
+    ['Naval Shipyard', 40 * M, 0.12, 0.2, 0.3, 1.0, 0.7, 0.4, 0.9, SK.engineering, ['industrial', 'defense', 'strategic']],
+    ['Submarine Manufacturer', 90 * M, 0.1, 0.3, 0.2, 1.0, 0.6, 0.7, 1.0, SK.engineering, ['industrial', 'defense', 'strategic']],
+    ['Fighter Jet Manufacturer', 150 * M, 0.13, 0.3, 0.3, 1.0, 0.5, 0.9, 1.0, SK.aerospace, ['industrial', 'defense', 'strategic', 'export']],
+    ['Missile Systems Contractor', 60 * M, 0.16, 0.35, 0.3, 0.8, 0.4, 0.9, 1.0, SK.aerospace, ['industrial', 'defense', 'strategic']],
+    ['Drone Warfare Company', 8 * M, 0.2, 0.4, 0.3, 0.4, 0.4, 0.8, 0.8, SK.robotics, ['tech', 'defense', 'ai']],
+    ['Radar & Sensor Systems', 12 * M, 0.19, 0.25, 0.2, 0.5, 0.4, 0.85, 0.8, SK.engineering, ['tech', 'defense']],
+    ['Cyberwarfare Contractor', 5 * M, 0.24, 0.3, 0.2, 0.2, 0.4, 0.95, 0.9, SK.cybersecurity, ['tech', 'defense', 'strategic']],
+    ['Defense Software Contractor', 3 * M, 0.22, 0.2, 0.2, 0.2, 0.5, 0.85, 0.8, SK.programming, ['tech', 'defense', 'software']],
+    ['Private Military Contractor', 6 * M, 0.2, 0.4, 0.3, 0.2, 0.9, 0.2, 0.9, SK.operations, ['services', 'defense', 'controversial']],
+    ['Military Logistics Contractor', 10 * M, 0.13, 0.2, 0.2, 0.5, 0.7, 0.3, 0.7, SK.logistics, ['services', 'defense', 'logistics']],
+    ['Satellite Manufacturer', 35 * M, 0.15, 0.35, 0.2, 0.8, 0.4, 0.9, 0.8, SK.aerospace, ['tech', 'defense', 'space']],
+    ['Ballistics Testing Lab', 2 * M, 0.2, 0.15, 0.2, 0.4, 0.5, 0.5, 0.7, SK.engineering, ['services', 'defense', 'research']],
+  ],
 };
 
 export function buildIndustries(): Industry[] {

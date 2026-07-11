@@ -880,7 +880,8 @@ export type ProductCategory =
   | 'appliance' | 'smart_home' | 'furniture' | 'fashion' | 'shoes' | 'jewelry'
   | 'cosmetics' | 'automotive' | 'food_beverage' | 'medical' | 'industrial'
   | 'toys' | 'sports' | 'luxury'
-  | 'drone' | 'camera' | 'tv' | 'bicycle' | 'eyewear' | 'instrument' | 'kitchenware' | 'powertool';
+  | 'drone' | 'camera' | 'tv' | 'bicycle' | 'eyewear' | 'instrument' | 'kitchenware' | 'powertool'
+  | 'pet_tech' | 'baby_gear' | 'outdoor_gear' | 'stationery';
 
 export type ProductMaterialId =
   | 'aluminum' | 'titanium' | 'steel' | 'carbon_fiber' | 'glass' | 'leather'

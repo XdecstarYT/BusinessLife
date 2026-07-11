@@ -12,7 +12,7 @@ import { useGame, type Screen } from '../store/gameStore';
 import { titleForRank } from '../data/careers';
 import { money } from './format';
 import { IconAssets, IconCareer, IconHeart, IconMenu, IconMoon, IconSun } from './icons';
-import { AnimatedNumber, ListRow, ListSectionBar, ListSheetHeader } from './components';
+import { AnimatedNumber, ListRow, ListSectionBar, ListSheetHeader, TextInput } from './components';
 
 const SIDE_TABS: { screen: Screen; label: string; Icon: (p: { className?: string }) => ReactNode }[] = [
   { screen: 'career', label: 'Job', Icon: IconCareer },
@@ -35,6 +35,11 @@ const ACTIVITY_GROUPS: { title: string; items: ActivityEntry[] }[] = [
     items: [
       { screen: 'life', label: 'Life Story', subtitle: 'Your story, year by year', icon: '📖' },
       { screen: 'explore', label: 'City', subtitle: 'Walk your empire in 3D', icon: '🏙️' },
+    ],
+  },
+  {
+    title: 'Play',
+    items: [
       { screen: 'athlete', label: 'Athlete', subtitle: 'Play soccer, football & running in 3D', icon: '🏟️' },
       { screen: 'military', label: 'Military Service', subtitle: 'Enlist, deploy, earn medals', icon: '🪖' },
       { screen: 'drugs', label: 'Drug Empire', subtitle: 'Deal, produce, and control turf', icon: '🌿' },
@@ -90,6 +95,7 @@ function MeterBar({ emoji, label, value }: { emoji: string; label: string; value
 export function AppShell({ children }: { children: ReactNode }) {
   const { state, screen, setScreen, nextYear, darkMode, toggleDark, toMenu } = useGame();
   const [activitiesOpen, setActivitiesOpen] = useState(false);
+  const [activityQuery, setActivityQuery] = useState('');
   const [agePulse, setAgePulse] = useState(0);
   const prevMoney = useRef<number | null>(null);
   const [moneyFlash, setMoneyFlash] = useState<'up' | 'down' | null>(null);
@@ -108,6 +114,14 @@ export function AppShell({ children }: { children: ReactNode }) {
   const p = state.player;
   const home = state.countries.find((c) => c.id === p.countryId)!;
   const inActivities = ACTIVITY_SCREENS.includes(screen);
+  const closeActivities = () => { setActivitiesOpen(false); setActivityQuery(''); };
+  const q = activityQuery.trim().toLowerCase();
+  const filteredGroups = q
+    ? ACTIVITY_GROUPS.map((group) => ({
+        ...group,
+        items: group.items.filter((item) => item.label.toLowerCase().includes(q) || item.subtitle.toLowerCase().includes(q)),
+      })).filter((group) => group.items.length > 0)
+    : ACTIVITY_GROUPS;
   const occupation = p.office
     ? `${p.office.title} of ${p.office.regionName}`
     : p.job
@@ -206,11 +220,22 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* Activities sheet: every other screen, BitLife-style grouped scrolling list */}
       {activitiesOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-          <div className="absolute inset-0 bg-black/55 backdrop-blur-sm anim-fade" onClick={() => setActivitiesOpen(false)} />
+          <div className="absolute inset-0 bg-black/55 backdrop-blur-sm anim-fade" onClick={closeActivities} />
           <div className="relative w-full sm:max-w-lg max-h-[88vh] flex flex-col bg-[#fdf6df] dark:bg-ink-900 rounded-t-3xl sm:rounded-3xl shadow-2xl anim-sheet overflow-hidden">
-            <ListSheetHeader title="Activities" onClose={() => setActivitiesOpen(false)} />
+            <ListSheetHeader title="Activities" onClose={closeActivities} />
+            <div className="px-4 sm:px-4 pb-2">
+              <TextInput
+                value={activityQuery}
+                onChange={(e) => setActivityQuery(e.target.value)}
+                placeholder="🔍 Search activities…"
+                autoFocus={false}
+              />
+            </div>
             <div className="overflow-y-auto flex-1 px-4 sm:px-0">
-              {ACTIVITY_GROUPS.map((group) => (
+              {filteredGroups.length === 0 && (
+                <div className="p-6 text-center text-sm text-slate-500 dark:text-slate-400">No activities match "{activityQuery}".</div>
+              )}
+              {filteredGroups.map((group) => (
                 <div key={group.title}>
                   <ListSectionBar label={group.title} />
                   {group.items.map((item) => (
@@ -219,14 +244,14 @@ export function AppShell({ children }: { children: ReactNode }) {
                       icon={item.icon}
                       title={item.label}
                       subtitle={item.subtitle}
-                      onClick={() => { setScreen(item.screen); setActivitiesOpen(false); }}
+                      onClick={() => { setScreen(item.screen); closeActivities(); }}
                     />
                   ))}
                 </div>
               ))}
               <div className="p-4">
                 <button
-                  onClick={() => { setActivitiesOpen(false); toMenu(); }}
+                  onClick={() => { closeActivities(); toMenu(); }}
                   className="w-full rounded-2xl bg-slate-100 dark:bg-ink-800 px-4 py-3 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-ink-700 transition-colors"
                 >
                   ⏏️ Save &amp; Main Menu

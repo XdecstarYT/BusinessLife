@@ -55,6 +55,10 @@ export const PRODUCT_CATEGORIES: ProductCategoryDef[] = [
   { id: 'instrument', label: 'Musical Instrument', icon: '🎸', archetype: 'device', baseUnitCost: 240, basePrice: 950, marketUnits: 120_000, techAffinity: 0.25, luxuryAffinity: 0.7 },
   { id: 'kitchenware', label: 'Kitchenware', icon: '🫖', archetype: 'vessel', baseUnitCost: 25, basePrice: 95, marketUnits: 1_500_000, techAffinity: 0.3, luxuryAffinity: 0.45 },
   { id: 'powertool', label: 'Power Tools', icon: '🔧', archetype: 'device', baseUnitCost: 60, basePrice: 220, marketUnits: 600_000, techAffinity: 0.55, luxuryAffinity: 0.1 },
+  { id: 'pet_tech', label: 'Pet Tech & Accessories', icon: '🐾', archetype: 'device', baseUnitCost: 25, basePrice: 90, marketUnits: 700_000, techAffinity: 0.6, luxuryAffinity: 0.3 },
+  { id: 'baby_gear', label: 'Baby & Kids Gear', icon: '🍼', archetype: 'seat', baseUnitCost: 60, basePrice: 220, marketUnits: 500_000, techAffinity: 0.25, luxuryAffinity: 0.5 },
+  { id: 'outdoor_gear', label: 'Outdoor & Camping Gear', icon: '🏕️', archetype: 'device', baseUnitCost: 35, basePrice: 140, marketUnits: 600_000, techAffinity: 0.3, luxuryAffinity: 0.25 },
+  { id: 'stationery', label: 'Office & Stationery', icon: '✏️', archetype: 'slab', baseUnitCost: 4, basePrice: 18, marketUnits: 3_000_000, techAffinity: 0.1, luxuryAffinity: 0.35 },
 ];
 
 export const PRODUCT_CATEGORY_BY_ID: Record<string, ProductCategoryDef> =
@@ -304,6 +308,22 @@ export const PRODUCT_PARTS: Record<ProductCategory, ProductPartDef[]> = {
     { id: 'body', label: 'Body', base: 'body' }, { id: 'chuck', label: 'Chuck', base: 'accent' },
     { id: 'grip', label: 'Grip', base: 'accent' }, { id: 'battery', label: 'Battery Pack', base: 'accent' },
   ],
+  pet_tech: [
+    { id: 'body', label: 'Body', base: 'body' }, { id: 'collar', label: 'Collar', base: 'accent' },
+    { id: 'tag', label: 'Tag', base: 'accent' }, { id: 'light', label: 'Status Light', base: 'accent' },
+  ],
+  baby_gear: [
+    { id: 'frame', label: 'Frame', base: 'body' }, { id: 'seat', label: 'Seat Pad', base: 'body' },
+    { id: 'canopy', label: 'Canopy', base: 'accent' }, { id: 'wheels', label: 'Wheels', base: 'accent' },
+  ],
+  outdoor_gear: [
+    { id: 'shell', label: 'Shell', base: 'body' }, { id: 'straps', label: 'Straps', base: 'accent' },
+    { id: 'buckles', label: 'Buckles', base: 'accent' }, { id: 'zipper', label: 'Zipper', base: 'accent' },
+  ],
+  stationery: [
+    { id: 'cover', label: 'Cover', base: 'body' }, { id: 'pages', label: 'Pages', base: 'accent' },
+    { id: 'binding', label: 'Binding', base: 'accent' }, { id: 'clip', label: 'Clip', base: 'accent' },
+  ],
 };
 
 // --------------------------------------------------------------------------- colorways
@@ -376,6 +396,10 @@ export const PRODUCT_COMPONENTS: Record<ProductCategory, string[]> = {
   instrument: ['materials_stock', 'hardware_kit'],
   kitchenware: ['materials_stock', 'frame_parts'],
   powertool: ['motor', 'battery', 'frame_parts'],
+  pet_tech: ['sensor', 'battery', 'hardware_kit'],
+  baby_gear: ['frame_parts', 'materials_stock', 'hardware_kit'],
+  outdoor_gear: ['materials_stock', 'frame_parts', 'hardware_kit'],
+  stationery: ['materials_stock', 'hardware_kit'],
 };
 
 export const COMPONENT_TIERS: Record<ComponentTier, { label: string; costMult: number; quality: number; defectMod: number; luxury: number }> = {
