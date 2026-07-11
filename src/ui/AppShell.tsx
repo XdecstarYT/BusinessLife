@@ -11,26 +11,8 @@ import { useState, type ReactNode } from 'react';
 import { useGame, type Screen } from '../store/gameStore';
 import { titleForRank } from '../data/careers';
 import { money } from './format';
-import {
-  IconAssets,
-  IconBusiness,
-  IconCareer,
-  IconCasino,
-  IconExplore,
-  IconHeart,
-  IconLife,
-  IconMarket,
-  IconMenu,
-  IconMoon,
-  IconNews,
-  IconPolitics,
-  IconSpark,
-  IconStats,
-  IconSun,
-  IconTrophy,
-  IconWorld,
-} from './icons';
-import { Modal } from './components';
+import { IconAssets, IconCareer, IconHeart, IconMenu, IconMoon, IconSun } from './icons';
+import { ListRow, ListSectionBar, ListSheetHeader } from './components';
 
 const SIDE_TABS: { screen: Screen; label: string; Icon: (p: { className?: string }) => ReactNode }[] = [
   { screen: 'career', label: 'Job', Icon: IconCareer },
@@ -38,19 +20,49 @@ const SIDE_TABS: { screen: Screen; label: string; Icon: (p: { className?: string
   { screen: 'family', label: 'Relations', Icon: IconHeart },
 ];
 
-const ACTIVITY_SCREENS: { screen: Screen; label: string; Icon: (p: { className?: string }) => ReactNode }[] = [
-  { screen: 'life', label: 'Life', Icon: IconLife },
-  { screen: 'explore', label: 'City', Icon: IconExplore },
-  { screen: 'business', label: 'Business', Icon: IconBusiness },
-  { screen: 'market', label: 'Markets', Icon: IconMarket },
-  { screen: 'politics', label: 'Politics', Icon: IconPolitics },
-  { screen: 'studio', label: 'Studio', Icon: IconSpark },
-  { screen: 'casino', label: 'Casino', Icon: IconCasino },
-  { screen: 'world', label: 'World', Icon: IconWorld },
-  { screen: 'news', label: 'News', Icon: IconNews },
-  { screen: 'stats', label: 'Stats', Icon: IconStats },
-  { screen: 'leaderboard', label: 'Ranks', Icon: IconTrophy },
+interface ActivityEntry {
+  screen: Screen;
+  label: string;
+  subtitle: string;
+  icon: string;
+}
+
+// Grouped BitLife-style: a gray category bar, then icon + bold title + gray
+// subtitle rows — everything besides the four pinned tab-bar slots lives here.
+const ACTIVITY_GROUPS: { title: string; items: ActivityEntry[] }[] = [
+  {
+    title: 'Featured',
+    items: [
+      { screen: 'life', label: 'Life Story', subtitle: 'Your story, year by year', icon: '📖' },
+      { screen: 'explore', label: 'City', subtitle: 'Walk your empire in 3D', icon: '🏙️' },
+      { screen: 'casino', label: 'Casino', subtitle: 'Slots, tables, sports book', icon: '🎰' },
+    ],
+  },
+  {
+    title: 'Empire',
+    items: [
+      { screen: 'business', label: 'Business', subtitle: 'Found and run companies', icon: '🏢' },
+      { screen: 'market', label: 'Markets', subtitle: 'Trade stocks, crypto & more', icon: '📈' },
+      { screen: 'studio', label: 'Studio', subtitle: 'Design and launch products', icon: '✨' },
+      { screen: 'politics', label: 'Politics', subtitle: 'Run for office, pass laws', icon: '🏛️' },
+    ],
+  },
+  {
+    title: 'World',
+    items: [
+      { screen: 'world', label: 'World', subtitle: 'Foreign relations & global events', icon: '🌍' },
+      { screen: 'news', label: 'News', subtitle: "Today's headlines", icon: '📰' },
+    ],
+  },
+  {
+    title: 'You',
+    items: [
+      { screen: 'stats', label: 'Stats', subtitle: 'Your full life story', icon: '📊' },
+      { screen: 'leaderboard', label: 'Ranks', subtitle: 'Global leaderboard', icon: '🏆' },
+    ],
+  },
 ];
+const ACTIVITY_SCREENS: Screen[] = ACTIVITY_GROUPS.flatMap((g) => g.items.map((i) => i.screen));
 
 /** BitLife-style stat meter: emoji, label, thin bar, percent readout. */
 function MeterBar({ emoji, label, value }: { emoji: string; label: string; value: number }) {
@@ -78,7 +90,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   if (!state) return <>{children}</>;
   const p = state.player;
   const home = state.countries.find((c) => c.id === p.countryId)!;
-  const inActivities = ACTIVITY_SCREENS.some((m) => m.screen === screen);
+  const inActivities = ACTIVITY_SCREENS.includes(screen);
   const occupation = p.office
     ? `${p.office.title} of ${p.office.regionName}`
     : p.job
@@ -167,35 +179,39 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </nav>
 
-      {/* Activities sheet: every other screen, BitLife-style list-of-things-to-do */}
-      <Modal open={activitiesOpen} onClose={() => setActivitiesOpen(false)} title="Activities">
-        <div className="grid grid-cols-3 gap-4">
-          {ACTIVITY_SCREENS.map(({ screen: s, label, Icon }) => (
-            <button
-              key={s}
-              onClick={() => { setScreen(s); setActivitiesOpen(false); }}
-              className="flex flex-col items-center gap-2 group"
-            >
-              <div
-                className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-[background-color,transform,box-shadow] duration-200 group-active:scale-90 ${
-                  screen === s
-                    ? 'bg-gradient-to-b from-brand-400 to-brand-600 text-white [box-shadow:var(--shadow-glow-brand)]'
-                    : 'bg-slate-100 dark:bg-ink-800 text-slate-600 dark:text-slate-300 group-hover:bg-slate-200 dark:group-hover:bg-ink-700'
-                }`}
-              >
-                <Icon className="w-6 h-6" />
+      {/* Activities sheet: every other screen, BitLife-style grouped scrolling list */}
+      {activitiesOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+          <div className="absolute inset-0 bg-black/55 backdrop-blur-sm anim-fade" onClick={() => setActivitiesOpen(false)} />
+          <div className="relative w-full sm:max-w-lg max-h-[88vh] flex flex-col bg-[#fdf6df] dark:bg-ink-900 rounded-t-3xl sm:rounded-3xl shadow-2xl anim-sheet overflow-hidden">
+            <ListSheetHeader title="Activities" onClose={() => setActivitiesOpen(false)} />
+            <div className="overflow-y-auto flex-1 px-4 sm:px-0">
+              {ACTIVITY_GROUPS.map((group) => (
+                <div key={group.title}>
+                  <ListSectionBar label={group.title} />
+                  {group.items.map((item) => (
+                    <ListRow
+                      key={item.screen}
+                      icon={item.icon}
+                      title={item.label}
+                      subtitle={item.subtitle}
+                      onClick={() => { setScreen(item.screen); setActivitiesOpen(false); }}
+                    />
+                  ))}
+                </div>
+              ))}
+              <div className="p-4">
+                <button
+                  onClick={() => { setActivitiesOpen(false); toMenu(); }}
+                  className="w-full rounded-2xl bg-slate-100 dark:bg-ink-800 px-4 py-3 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-ink-700 transition-colors"
+                >
+                  ⏏️ Save &amp; Main Menu
+                </button>
               </div>
-              <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">{label}</span>
-            </button>
-          ))}
+            </div>
+          </div>
         </div>
-        <button
-          onClick={() => { setActivitiesOpen(false); toMenu(); }}
-          className="mt-5 w-full rounded-2xl bg-slate-100 dark:bg-ink-800 px-4 py-3 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-ink-700 transition-colors"
-        >
-          ⏏️ Save & Main Menu
-        </button>
-      </Modal>
+      )}
     </div>
   );
 }

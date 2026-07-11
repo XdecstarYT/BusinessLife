@@ -344,20 +344,22 @@ export function generateWorld(config: NewGameConfig): GameState {
   const player: Player = {
     name: config.playerName,
     gender: config.gender,
-    age: 18,
+    age: 0,
     alive: true,
     countryId: home.id,
     cityId: homeCity.id,
-    health: rng.int(75, 95),
-    happiness: rng.int(60, 85),
-    smarts: royal ? rng.int(60, 95) : rng.int(40, 85),
-    charisma: royal ? rng.int(55, 92) : rng.int(35, 80),
-    reputation: royal ? rng.int(55, 80) : 5,
-    popularity: royal ? rng.int(30, 55) : 0,
-    influence: royal ? rng.int(20, 45) : 0,
+    health: rng.int(80, 98),
+    happiness: rng.int(65, 90),
+    // A newborn has no real "smarts"/"charisma" yet — these read as innate temperament that
+    // childhood events and schooling (see tickChildhood in engine.ts) will build up over time.
+    smarts: royal ? rng.int(8, 18) : rng.int(0, 8),
+    charisma: royal ? rng.int(8, 18) : rng.int(0, 8),
+    reputation: royal ? rng.int(20, 35) : 0,
+    popularity: royal ? rng.int(5, 15) : 0,
+    influence: 0,
     karma: 50,
     notoriety: 0,
-    money: rng.int(500, 5_000) + Math.max(0, config.legacyBonus ?? 0) + royalTreasury,
+    money: rng.int(0, 200) + Math.max(0, config.legacyBonus ?? 0) + royalTreasury,
     criminalRecord: 0,
     inJailYears: 0,
     skills,
@@ -422,7 +424,7 @@ export function generateWorld(config: NewGameConfig): GameState {
     lastSocialPostYear: null,
     actionCooldowns: {},
     yearsServedThisSentence: 0,
-    stress: rng.range(15, 35),
+    stress: rng.range(0, 10),
     burnoutUntilYear: null,
     investigationHeat: 0,
   };
@@ -439,17 +441,18 @@ export function generateWorld(config: NewGameConfig): GameState {
     state.achievements.push('born_royal');
     state.lifeLog.push({
       year: startYear,
-      age: 18,
-      text: `Born into the royal family of ${home.name} — a childhood of private tutors, palace connections and inherited wealth (${homeCity.name} still refers to your family by title).`,
+      age: 0,
+      text: `You are born into the royal family of ${home.name} in ${homeCity.name} — private tutors, palace connections and inherited wealth await, before you can even walk.`,
+      kind: 'milestone',
+    });
+  } else {
+    state.lifeLog.push({
+      year: startYear,
+      age: 0,
+      text: `You are born in ${homeCity.name}, ${home.name}. A whole life is ahead of you — build an empire, run the country, or both, one year at a time.`,
       kind: 'milestone',
     });
   }
-  state.lifeLog.push({
-    year: startYear,
-    age: 18,
-    text: `You turn 18 in ${homeCity.name}, ${home.name}. The world is yours to take — build an empire, run the country, or both.`,
-    kind: 'milestone',
-  });
   state.netWorthHistory.push({ year: startYear, value: player.money });
   return state;
 }

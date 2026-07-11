@@ -2,17 +2,32 @@
 
 A deep, replayable life-simulation game about **business, politics and economics**, inspired by
 BitLife, Democracy 4, Capitalism Lab and Victoria 3 — but designed to be easy to pick up and play on
-your phone. Start at 18, take decisions, and advance time at your own pace: **Day**, **Week**, or a
-full **Year**, letting a living world simulate forward around you. Build a business empire, get rich
-on the markets, climb the political ladder to run the country — or all three.
+your phone. Start at birth, grow up, take decisions, and advance time at your own pace: **Day**,
+**Week**, or a full **Year**, letting a living world simulate forward around you. Build a business
+empire, get rich on the markets, climb the political ladder to run the country — or all three.
 
-Everything runs **entirely in your browser**. No accounts, no login, and every save is plain JSON you
-can export and re-import. The simulation itself is fully offline — the one exception is an optional
-global Leaderboard (see Highlights below), backed by Supabase, which degrades to a friendly "offline"
-state instead of affecting anything else if you have no connection.
+Everything runs **entirely in your browser** by default, and every save is plain JSON you can export
+and re-import — no account required to play. The simulation itself is fully offline; the two optional
+online features (a global Leaderboard and real cloud-backed accounts, see Highlights below) are backed
+by Supabase and degrade to a friendly "offline" state instead of affecting anything else if you have no
+connection or choose not to sign in.
 
 ## Highlights
 
+- **V34 — real accounts, a life that starts at birth, and a bigger, more BitLife life.** Sign up with
+  email + password (Supabase Auth) to back your life up to the cloud — up to 5 named cloud saves per
+  account, managed from a new account panel on the main menu — entirely optional; local play needs no
+  account at all. New games now start at **age 0** instead of 18: a newborn's stats begin near zero and
+  build up through a guaranteed skeleton of childhood milestones (first steps, first words,
+  kindergarten, losing teeth, starting school) plus dozens of new age-gated childhood flavor events and
+  daily vignettes, while grown-up-only actions (founding a company, marrying, the casino floor, taking
+  out a loan, joining a crime family, and more) are cleanly locked until the right age. The Activities
+  sheet was rebuilt as a proper BitLife-style grouped list — navy header, gray category dividers,
+  icon + bold title + subtitle rows — and six new activities/actions arrived: the **Zoo** and **Movie
+  Theater** (all-ages lifestyle outings), **Nightlife** (18+ clubbing with real upside/downside
+  outcomes), a **Fertility Clinic** (a real, sometimes-unsuccessful single-parent path to a child, no
+  spouse required), a personal **lawsuit** system (sue anyone in your relationship register for a real
+  settlement or a real loss), and a **legal Identity** panel to change your name or gender marker.
 - **V33 — the fun-and-addictive update: ribbons, bucket lists, pets, and the lottery.** Every
   completed life now ends with a **ribbon** — one of 24 BitLife-style life-summary awards (Legend,
   Kingpin, Centenarian, Saint, Jailbird, Best Friend…) picked by priority from how you actually

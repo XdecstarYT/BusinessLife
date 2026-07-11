@@ -257,6 +257,9 @@ export function Life() {
         <Pill label="🔨 Home Improve" onClick={() => run(doActivity, 'home_improvement')} />
         <Pill label="✍️ Blog" onClick={() => run(doActivity, 'blog')} />
         <Pill label="🗣️ Language" onClick={() => run(doActivity, 'learn_language')} />
+        <Pill label="🦁 Zoo" onClick={() => run(doActivity, 'zoo_visit')} />
+        <Pill label="🎬 Movie Theater" onClick={() => run(doActivity, 'movie_theater')} />
+        {p.age >= 18 && <Pill label="🪩 Nightlife" onClick={() => run(doActivity, 'nightlife')} />}
         <Pill label={showMoreActivities ? '▲ Fewer' : '▼ More'} onClick={() => setShowMoreActivities((v) => !v)} />
       </PillRow>
       {showMoreActivities && (

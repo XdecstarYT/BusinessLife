@@ -2684,5 +2684,144 @@ ev({
   ],
 });
 
+// --- CHILDHOOD ---
+ev({
+  id: 'child_playground_dare', category: 'life', weight: 5, conditions: { minAge: 5, maxAge: 11 },
+  text: 'A kid at the playground dares you to jump off the tall slide backwards.',
+  choices: [
+    { label: 'Do it', outcomes: [
+      { chance: 0.6, text: 'You stuck the landing. Instant playground legend.', effects: { happiness: 4, popularity: 2 } },
+      { chance: 0.4, text: 'You landed wrong and scraped up both knees.', effects: { health: -4, happiness: -2 } },
+    ] },
+    { label: 'Say no', effects: { happiness: -1 } },
+  ],
+});
+ev({
+  id: 'child_report_card', category: 'life', weight: 6, conditions: { minAge: 6, maxAge: 17, studying: true },
+  text: 'Report cards came out today.',
+  choices: [
+    { label: 'You studied hard all term', outcomes: [
+      { chance: 0.7, text: 'Straight A\'s! Your parents are thrilled.', effects: { happiness: 5, smarts: 3 } },
+      { chance: 0.3, text: 'Decent grades, but not the A\'s you hoped for.', effects: { happiness: 1, smarts: 2 } },
+    ] },
+    { label: 'You barely tried', effects: { happiness: -2, smarts: -1 } },
+  ],
+});
+ev({
+  id: 'child_tooth_fairy', category: 'life', weight: 4, conditions: { minAge: 5, maxAge: 9 },
+  text: 'You lost another tooth and put it under your pillow.',
+  choices: [
+    { label: 'Check under the pillow', effects: { money: 5, happiness: 2 } },
+  ],
+});
+ev({
+  id: 'child_show_and_tell', category: 'life', weight: 4, conditions: { minAge: 5, maxAge: 10 },
+  text: 'It\'s show-and-tell day at school.',
+  choices: [
+    { label: 'Bring your favorite toy', effects: { happiness: 3, charisma: 1 } },
+    { label: 'Forget it\'s today and go empty-handed', effects: { happiness: -2 } },
+  ],
+});
+ev({
+  id: 'child_bully', category: 'life', weight: 4, conditions: { minAge: 6, maxAge: 15 },
+  text: 'A bully has been giving you a hard time at school.',
+  choices: [
+    { label: 'Stand up for yourself', outcomes: [
+      { chance: 0.6, text: 'They backed off. You feel proud.', effects: { happiness: 4, charisma: 2 } },
+      { chance: 0.4, text: 'It turned into a scuffle and you both got in trouble.', effects: { happiness: -3, health: -2 } },
+    ] },
+    { label: 'Tell a teacher', effects: { happiness: 1, smarts: 1 } },
+    { label: 'Avoid them and say nothing', effects: { happiness: -3 } },
+  ],
+});
+ev({
+  id: 'child_talent_show', category: 'life', weight: 4, conditions: { minAge: 7, maxAge: 14 },
+  text: 'The school talent show is coming up. Signups are open.',
+  choices: [
+    { label: 'Perform something', skillCheck: { skillId: SK.publicSpeaking, bonusPerLevel: 0.005 }, outcomes: [
+      { chance: 0.5, text: 'The crowd loved it! You got a standing ovation from the parents.', effects: { happiness: 6, charisma: 3, popularity: 2 } },
+      { chance: 0.5, text: 'You froze up on stage. Embarrassing, but everyone forgot by Monday.', effects: { happiness: -3, charisma: -1 } },
+    ] },
+    { label: 'Watch from the audience', effects: {} },
+  ],
+});
+ev({
+  id: 'child_sibling_rivalry', category: 'family', weight: 4, conditions: { minAge: 4, maxAge: 16, hasChildren: false },
+  text: 'You and a sibling got into a huge fight over the TV remote.',
+  choices: [
+    { label: 'Apologize first', effects: { happiness: 1, karma: 1 } },
+    { label: 'Hold your ground', effects: { happiness: -1, charisma: 1 } },
+  ],
+});
+ev({
+  id: 'child_first_pet_request', category: 'family', weight: 4, once: true, conditions: { minAge: 5, maxAge: 12 },
+  text: 'You begged your parents for a pet for weeks.',
+  choices: [
+    { label: 'Keep begging', outcomes: [
+      { chance: 0.55, text: 'They caved! You got a puppy.', effects: { happiness: 8 } },
+      { chance: 0.45, text: 'They said maybe when you\'re older.', effects: { happiness: -3 } },
+    ] },
+    { label: 'Give up asking', effects: {} },
+  ],
+});
+ev({
+  id: 'child_science_fair', category: 'career', weight: 4, conditions: { minAge: 8, maxAge: 14, studying: true },
+  text: 'The school science fair is here and you need a project.',
+  choices: [
+    { label: 'Build something ambitious', skillCheck: { skillId: SK.economics, bonusPerLevel: 0.004 }, outcomes: [
+      { chance: 0.5, text: 'You won first place at the science fair!', effects: { happiness: 5, smarts: 4, popularity: 2 } },
+      { chance: 0.5, text: 'The volcano fizzled. Literally.', effects: { happiness: -1, smarts: 1 } },
+    ] },
+    { label: 'Do the minimum effort poster', effects: { smarts: 1 } },
+  ],
+});
+ev({
+  id: 'child_summer_camp', category: 'life', weight: 4, conditions: { minAge: 6, maxAge: 15 },
+  text: 'Your parents are asking if you want to go to summer camp this year.',
+  amount: { min: 200, max: 800 },
+  choices: [
+    { label: 'Go to camp ({amount})', effects: { moneyAmountMult: -1, happiness: 5, charisma: 2 } },
+    { label: 'Stay home instead', effects: {} },
+  ],
+});
+ev({
+  id: 'child_video_game_addiction', category: 'life', weight: 4, conditions: { minAge: 8, maxAge: 17 },
+  text: 'You\'ve been staying up way too late playing video games.',
+  choices: [
+    { label: 'Cut back and get more sleep', effects: { health: 3, smarts: 1, happiness: -1 } },
+    { label: 'Keep gaming all night', effects: { health: -3, happiness: 3, smarts: -1 } },
+  ],
+});
+ev({
+  id: 'child_first_crush', category: 'family', weight: 4, conditions: { minAge: 10, maxAge: 16, hasSpouse: false },
+  text: 'You have a huge crush on someone at school.',
+  choices: [
+    { label: 'Pass them a note', outcomes: [
+      { chance: 0.5, text: 'They liked you back! You\'re walking on air.', effects: { happiness: 6, charisma: 2 } },
+      { chance: 0.5, text: 'Awkward silence. You want to disappear.', effects: { happiness: -3 } },
+    ] },
+    { label: 'Keep it to yourself', effects: { happiness: -1 } },
+  ],
+});
+ev({
+  id: 'child_grounded', category: 'family', weight: 3, conditions: { minAge: 8, maxAge: 17 },
+  text: 'You broke a house rule and got grounded.',
+  choices: [
+    { label: 'Accept it and behave', effects: { happiness: -2, karma: 1 } },
+    { label: 'Sneak out anyway', outcomes: [
+      { chance: 0.5, text: 'You got away with it. This time.', effects: { happiness: 3 } },
+      { chance: 0.5, text: 'Caught red-handed. Grounded for even longer now.', effects: { happiness: -5 } },
+    ] },
+  ],
+});
+ev({
+  id: 'child_part_time_job', category: 'career', weight: 4, conditions: { minAge: 14, maxAge: 17, employed: false },
+  text: 'You\'re old enough for a part-time after-school job now.',
+  choices: [
+    { label: 'Get a job at the local shop', effects: { money: 600, happiness: 2, skillXp: [SK.negotiation, 5] } },
+    { label: 'Focus on school and hobbies instead', effects: { smarts: 1 } },
+  ],
+});
+
 
 export const EVENT_TEMPLATES: EventTemplate[] = E;

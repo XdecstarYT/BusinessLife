@@ -28,6 +28,20 @@ import { makePersonName } from '../data/names';
 
 const SPECIAL_BIRTHDAYS = new Set([18, 21, 25, 30, 40, 50, 60, 65, 70, 75, 80, 90, 100]);
 
+// Childhood milestones: guaranteed narrative beats for ages 0-17 (distinct from the random
+// weighted childhood-flavored entries in data/dailyEvents.ts and data/events.ts, which are
+// chance-of-firing colour on top of this guaranteed skeleton).
+const CHILDHOOD_MILESTONES: Record<number, string> = {
+  1: '👣 You took your first steps.',
+  2: '🗣️ You said your first real words.',
+  4: '🖍️ You started preschool — and immediately ate a crayon.',
+  5: '🎒 You started kindergarten.',
+  6: '🦷 You lost your first tooth.',
+  11: '🏫 You started middle school.',
+  14: '🎓 You started high school.',
+  17: "🚗 You got your learner's permit.",
+};
+
 // Building realism: upkeep spend trades cost for condition; neglected, uninsured
 // buildings risk a costly structural incident, and low condition dents both
 // rental income and resale value.
@@ -985,6 +999,17 @@ export function advanceYear(state: GameState): GameState {
   state.calendarDay = 0;
   if (SPECIAL_BIRTHDAYS.has(state.player.age) && state.player.alive) {
     log(state, `🎂 You turn ${state.player.age} today.`, 'milestone');
+  }
+  if (state.player.alive && state.player.age < 18) {
+    const milestone = CHILDHOOD_MILESTONES[state.player.age];
+    if (milestone) log(state, milestone, 'milestone');
+    // Growing up: smarts/charisma build from near-zero through school and social life instead
+    // of innate adult-level stats; health/happiness take a light random walk through an
+    // ordinary childhood. School-age years (5+) get a bigger smarts bump than infancy.
+    state.player.smarts = clamp100(state.player.smarts + rng.range(1, 3) + (state.player.age >= 5 ? rng.range(0.5, 1.5) : 0));
+    state.player.charisma = clamp100(state.player.charisma + rng.range(1, 3));
+    state.player.health = clamp100(state.player.health + rng.range(-2, 3));
+    state.player.happiness = clamp100(state.player.happiness + rng.range(-3, 3));
   }
 
   // 1. World economy

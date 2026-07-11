@@ -107,6 +107,21 @@ export function Casino() {
 
   if (!state) return null;
   const p = state.player;
+
+  // Games start at birth now, so the casino floor needs a real front door — a toast-per-bet
+  // "too young" message would be a poor experience for a whole screen that's simply off-limits.
+  if (p.age < 18) {
+    return (
+      <div className="flex flex-col items-center justify-center text-center py-20 px-6">
+        <div className="text-6xl mb-4">🔞</div>
+        <h2 className="text-xl font-black mb-2">Casino — 18+ Only</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400 max-w-xs">
+          The casino floor opens up once you turn 18. For now, go build up your smarts and charisma — the tables will still be here.
+        </p>
+      </div>
+    );
+  }
+
   const liquidity = p.money + p.savingsBalance;
 
   const machineViews: CasinoMachineView[] = SLOT_MACHINES.map((m) => ({

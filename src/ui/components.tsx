@@ -316,6 +316,66 @@ export function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
 }
 
 // ---------------------------------------------------------------------------
+/** BitLife-style grouped list: a gray category divider bar, then icon + bold
+ * title + gray subtitle rows with a chevron (or custom trailing content),
+ * separated by thin lines. Use ListSectionBar between groups of ListRows. */
+export function ListSectionBar({ label }: { label: string }) {
+  return (
+    <div className="bg-slate-200/80 dark:bg-ink-700/80 px-4 py-1.5 text-center text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300 -mx-4 sm:mx-0">
+      {label}
+    </div>
+  );
+}
+
+export function ListRow({
+  icon,
+  title,
+  subtitle,
+  trailing,
+  onClick,
+  disabled,
+}: {
+  icon: ReactNode;
+  title: ReactNode;
+  subtitle?: ReactNode;
+  trailing?: ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled || !onClick}
+      className={`w-full flex items-center gap-3 px-4 py-3 text-left border-b border-slate-100 dark:border-ink-800 last:border-b-0 -mx-4 sm:mx-0 ${
+        onClick && !disabled ? 'active:bg-slate-50 dark:active:bg-ink-800/60 transition-colors' : ''
+      } ${disabled ? 'opacity-40' : ''}`}
+      style={{ width: 'calc(100% + 2rem)' }}
+    >
+      <span className="text-2xl leading-none shrink-0 w-9 text-center">{icon}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-bold text-sm text-brand-700 dark:text-brand-400 truncate">{title}</span>
+        {subtitle && <span className="block text-xs text-slate-500 dark:text-slate-400 truncate">{subtitle}</span>}
+      </span>
+      <span className="shrink-0 text-slate-300 dark:text-slate-600">{trailing ?? (onClick ? <IconChevron className="w-5 h-5" /> : null)}</span>
+    </button>
+  );
+}
+
+/** Full-bleed navy header used atop a BitLife-style list sheet — pairs with ListRow/ListSectionBar. */
+export function ListSheetHeader({ title, onClose }: { title: string; onClose?: () => void }) {
+  return (
+    <div className="sticky top-0 z-10 bg-gradient-to-b from-ink-700 to-ink-800 dark:from-ink-800 dark:to-ink-900 px-4 py-3.5 flex items-center -mx-4 sm:mx-0 sm:rounded-t-3xl">
+      {onClose && (
+        <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/15 text-white flex items-center justify-center shrink-0 active:scale-90 transition-transform">
+          ✕
+        </button>
+      )}
+      <h3 className="flex-1 text-center font-black tracking-wide text-white uppercase text-sm pr-8">{title}</h3>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 /** Bottom-sheet style modal, mobile-first, centered on desktop. */
 export function Modal({ open, onClose, children, title }: { open: boolean; onClose?: () => void; children: ReactNode; title?: string }) {
   if (!open) return null;

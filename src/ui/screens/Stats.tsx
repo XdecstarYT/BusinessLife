@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useGame } from '../../store/gameStore';
 import { netWorth } from '../../sim/engine';
 import { OFFICE_SPEC_BY_KIND } from '../../sim/politics';
+import { changeGenderIdentity, changeLegalName } from '../../sim/actions';
 import { Badge, Button, Card, LineChart, Modal, SectionHeader, StatBar, TextInput } from '../components';
 import { money } from '../format';
 
@@ -145,10 +146,12 @@ const ACHIEVEMENTS: Record<string, { label: string; icon: string }> = {
 };
 
 export function Stats() {
-  const { state, save, exportCurrent, toast } = useGame();
+  const { state, save, exportCurrent, toast, run } = useGame();
   const [saveName, setSaveName] = useState('');
   const [saving, setSaving] = useState(false);
   const [showTimeline, setShowTimeline] = useState(false);
+  const [editingIdentity, setEditingIdentity] = useState(false);
+  const [nameDraft, setNameDraft] = useState('');
   if (!state) return null;
   const p = state.player;
   const nw = netWorth(state);
@@ -178,7 +181,8 @@ export function Stats() {
             {p.name.charAt(0)}
           </div>
           <div className="font-extrabold text-lg mt-2">{p.name}</div>
-          <div className="text-sm text-slate-500 dark:text-slate-400">Age {p.age} · Started {state.startYear}</div>
+          <div className="text-sm text-slate-500 dark:text-slate-400">Age {p.age} · {p.gender === 'male' ? 'Male' : 'Female'} · Started {state.startYear}</div>
+          <Button size="sm" variant="ghost" className="mt-2" onClick={() => { setNameDraft(p.name); setEditingIdentity(true); }}>🪪 Identity</Button>
         </div>
         <div className="text-center py-3 border-y border-slate-100 dark:border-ink-800">
           <div className="text-xs text-slate-400">Net Worth</div>
@@ -257,6 +261,31 @@ export function Stats() {
               </div>
             </div>
           ))}
+        </div>
+      </Modal>
+
+      <Modal open={editingIdentity} onClose={() => setEditingIdentity(false)} title="Legal Identity">
+        <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">Legally change your name or gender marker. Each can be updated once per year.</p>
+        <div className="flex gap-2 mb-4">
+          <TextInput value={nameDraft} onChange={(e) => setNameDraft(e.target.value)} maxLength={40} className="flex-1" />
+          <Button size="sm" onClick={() => { if (run(changeLegalName, nameDraft).ok) setEditingIdentity(false); }}>Save ($150)</Button>
+        </div>
+        <div className="text-xs text-slate-400 uppercase font-bold mb-2">Gender Marker</div>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant={p.gender === 'male' ? 'primary' : 'soft'}
+            onClick={() => { if (run(changeGenderIdentity, 'male').ok) setEditingIdentity(false); }}
+          >
+            Male
+          </Button>
+          <Button
+            size="sm"
+            variant={p.gender === 'female' ? 'primary' : 'soft'}
+            onClick={() => { if (run(changeGenderIdentity, 'female').ok) setEditingIdentity(false); }}
+          >
+            Female
+          </Button>
         </div>
       </Modal>
     </div>

@@ -16,6 +16,8 @@ import {
   propose,
   relationshipCandidates,
   seekMentor,
+  sueSomeone,
+  useFertilityClinic,
   type DatingCandidate,
 } from '../../sim/family';
 import { giftMoneyToChild, investInChildEducation } from '../../sim/actions';
@@ -53,6 +55,7 @@ export function Family() {
   const [withPrenup, setWithPrenup] = useState(false);
   const [successorFor, setSuccessorFor] = useState<string | null>(null);
   const [pickingRival, setPickingRival] = useState(false);
+  const [pickingSueTarget, setPickingSueTarget] = useState(false);
   const [draftingWill, setDraftingWill] = useState(false);
   if (!state) return null;
   const p = state.player;
@@ -111,9 +114,12 @@ export function Family() {
         </Card>
       ) : (
         <>
-          <Card className="p-4 mb-3 flex items-center justify-between">
+          <Card className="p-4 mb-3 flex items-center justify-between gap-2 flex-wrap">
             <span className="text-sm text-slate-500 dark:text-slate-400">You're single, but you can still grow your family.</span>
-            <Button size="sm" variant="soft" onClick={() => run(adoptChild)}>Adopt ($25k)</Button>
+            <div className="flex gap-2">
+              <Button size="sm" variant="soft" onClick={() => run(adoptChild)}>Adopt ($25k)</Button>
+              <Button size="sm" variant="soft" onClick={() => run(useFertilityClinic)}>🏥 Fertility Clinic ($18k)</Button>
+            </div>
           </Card>
           <Card className="p-4 mb-3 text-sm text-slate-500 dark:text-slate-400">Here's who you've met recently:</Card>
           <div className="space-y-3 mb-4">
@@ -255,6 +261,11 @@ export function Family() {
             <Button size="sm" variant="danger" onClick={() => setPickingRival(true)}>Declare Rival</Button>
           )}
         </Card>
+        <Card className="p-4">
+          <div className="text-xs text-slate-400 uppercase font-bold mb-2">Legal</div>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Take someone you know to court over a personal grievance. Legal fees cost $6,000 either way.</p>
+          <Button size="sm" variant="soft" onClick={() => setPickingSueTarget(true)}>⚖️ Sue Someone</Button>
+        </Card>
         {friends.length > 0 && (
           <Card className="p-4">
             <div className="text-xs text-slate-400 uppercase font-bold mb-2">Friends & Allies</div>
@@ -295,6 +306,24 @@ export function Family() {
               >
                 <div className="font-semibold truncate" title={n.name}>{n.name}</div>
                 <div className="text-xs text-slate-500 dark:text-slate-400">Competence {n.competence} · {n.role}</div>
+              </button>
+            ))}
+          </div>
+        </Modal>
+      )}
+
+      {pickingSueTarget && (
+        <Modal open onClose={() => setPickingSueTarget(false)} title="Sue Someone">
+          <div className="space-y-2 max-h-[50vh] overflow-y-auto">
+            {relationshipCandidates(state).length === 0 && <p className="text-center text-slate-400 py-6">Nobody notable to sue right now.</p>}
+            {relationshipCandidates(state).map((n) => (
+              <button
+                key={n.id}
+                onClick={() => { run(sueSomeone, n.id); setPickingSueTarget(false); }}
+                className="w-full text-left p-3 rounded-2xl bg-slate-100 dark:bg-ink-800 hover:bg-slate-200 dark:hover:bg-ink-700"
+              >
+                <div className="font-semibold truncate" title={n.name}>{n.name}</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Integrity {n.integrity} · {n.role}</div>
               </button>
             ))}
           </div>

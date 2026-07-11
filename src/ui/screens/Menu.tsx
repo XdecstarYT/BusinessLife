@@ -8,6 +8,7 @@ import type { Difficulty, Gender } from '../../sim/types';
 import type { Scenario } from '../../sim/world';
 import { consumeRoyalty, getRoyaltySources } from '../../net/leaderboard';
 import { getRibbonCabinet, RIBBONS } from '../../data/ribbons';
+import { AccountPanel } from '../AccountPanel';
 import { IconBusiness, IconSpark, IconTrophy } from '../icons';
 
 const SCENARIOS: { id: Scenario; label: string; blurb: string }[] = [
@@ -129,8 +130,10 @@ export function Menu() {
               />
             </div>
 
+            <AccountPanel />
+
             {/* Ribbon cabinet: every life ends with a ribbon; the collection persists across lives */}
-            <Card className="p-5 mt-8">
+            <Card className="p-5 mt-4">
               <div className="flex items-center justify-between mb-3">
                 <span className="font-bold">🎗️ Ribbon Cabinet</span>
                 <span className="text-xs font-bold text-brand-500">
@@ -165,7 +168,7 @@ export function Menu() {
                 <span className="font-bold">How to play</span>
               </div>
               <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-                You start at 18. Each year, act — study, take a job, found companies, trade stocks, buy property,
+                You start at birth. Grow up, then act — study, take a job, found companies, trade stocks, buy property,
                 join or found a party, campaign for office, and pass laws — then press <b>Advance Year</b> to let the
                 world simulate forward. Build a business empire, run the country, or both. The economy, markets,
                 elections and rival tycoons all evolve whether you act or not.

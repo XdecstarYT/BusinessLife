@@ -60,16 +60,25 @@ console.log('  npcs:', Object.keys(state.npcs).length);
 console.log('  industries:', state.industries.length);
 console.log('  public cos:', Object.values(state.companies).filter((c) => c.isPublic).length);
 
+let errors = 0;
+let events = 0;
+let dailyFlavorCount = 0;
+
+// Games now start at birth (age 0) — fast-forward through childhood first, since every
+// `y === N` milestone below was written assuming a starting age of 18 and still expects that
+// spacing. This keeps the rest of the file (and its exact simulated ages) unchanged.
+for (let y0 = 0; y0 < 18 && state.player.alive; y0++) {
+  state = advanceYear(state);
+  resolvePending();
+}
+console.log('Childhood fast-forward: age =', state.player.age, '· smarts =', Math.round(state.player.smarts), '· charisma =', Math.round(state.player.charisma), '· alive =', state.player.alive);
+
 // Give the player capital to exercise expensive actions.
 state.player.money = 5_000_000;
 A.enroll(state, 1);
 const cheapInd = INDUSTRIES.filter((i) => i.startupCost < 200_000)[0];
 A.startCompany(state, cheapInd.id, 'Test Co', 150_000);
 A.joinParty(state, state.countries[0].parties[0]?.id ?? 'x');
-
-let errors = 0;
-let events = 0;
-let dailyFlavorCount = 0;
 
 // Exercise the new lifestyle actions once, early.
 for (const kind of ['book_club', 'therapy', 'adopt_pet', 'road_trip', 'volunteer', 'seminar', 'spa_day', 'blog'] as const) {

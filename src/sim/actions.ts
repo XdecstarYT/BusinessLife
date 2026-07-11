@@ -49,6 +49,15 @@ function setCooldown(state: GameState, key: string): void {
   state.player.actionCooldowns[key] = state.year;
 }
 
+/** Minimum-age guard for actions that only make sense for an adult (or near-adult) — since
+ * games now start at birth (age 0), anything not naturally blocked by money/prerequisites
+ * needs an explicit floor here, or a toddler could found a company or hit the casino. Returns
+ * null when old enough (caller proceeds), or a friendly ActionResult to return immediately. */
+function requireAge(state: GameState, minAge: number, activity: string): ActionResult | null {
+  if (state.player.age >= minAge) return null;
+  return { ok: false, message: `You're too young for that — ${activity} opens up at age ${minAge}.` };
+}
+
 // ---------------------------------------------------------------------------
 // Education & careers
 // ---------------------------------------------------------------------------
@@ -84,6 +93,8 @@ export const DEGREES = [
 /** Enrolling rolls for a merit scholarship (smarts-driven) that cuts tuition for the whole
  * programme — a real, one-time-per-enrollment break, not guaranteed. */
 export function enroll(state: GameState, index: number): ActionResult {
+  const ageGate = requireAge(state, 16, 'further education');
+  if (ageGate) return ageGate;
   const p = state.player;
   const d = DEGREES[index];
   if (!d) return { ok: false, message: 'Unknown programme.' };
@@ -162,6 +173,8 @@ function makeCoworker(state: GameState, rng: RNG, role: 'manager' | 'peer', tag:
  * skills/charisma/reputation, and an optional salary negotiation with real upside and
  * a small risk of blowing up the offer. Replaces a flat always-succeeds "Apply". */
 export function takeJob(state: GameState, opening: { title: string; industryId: string; salary: number; requiredSmarts: number; track: string }, negotiate = false): ActionResult {
+  const ageGate = requireAge(state, 16, 'working a job');
+  if (ageGate) return ageGate;
   const p = state.player;
   if (p.inJailYears > 0) return { ok: false, message: 'Not while incarcerated.' };
   if (p.smarts < opening.requiredSmarts) return { ok: false, message: `Requires ${opening.requiredSmarts}+ smarts.` };
@@ -420,6 +433,8 @@ export function postOnSocialMedia(state: GameState, styleId: string): ActionResu
 // ---------------------------------------------------------------------------
 
 export function startCompany(state: GameState, industryId: string, name: string, funding: number): ActionResult {
+  const ageGate = requireAge(state, 18, 'founding a company');
+  if (ageGate) return ageGate;
   const p = state.player;
   const ind = INDUSTRY_BY_ID[industryId];
   if (!ind) return { ok: false, message: 'Unknown industry.' };
@@ -734,6 +749,8 @@ export function propertyListings(state: GameState): Omit<PropertyAsset, 'id' | '
 }
 
 export function buyProperty(state: GameState, listing: Omit<PropertyAsset, 'id' | 'purchasePrice' | 'mortgage' | 'insured' | 'yearBuilt' | 'condition' | 'energyEfficiency' | 'maintenanceLevel' | 'lastRenovatedYear'>, useMortgage: boolean): ActionResult {
+  const ageGate = requireAge(state, 18, 'buying real estate');
+  if (ageGate) return ageGate;
   const p = state.player;
   const deposit = useMortgage ? listing.value * 0.2 : listing.value;
   if (deposit > p.money) return { ok: false, message: useMortgage ? 'Cannot afford the 20% deposit.' : 'Cannot afford it outright.' };
@@ -881,6 +898,8 @@ export function playWithPet(state: GameState, petId: string): ActionResult {
 // --------------------------------------------------------------------------- lottery & scratch cards
 
 export function buyLotteryTicket(state: GameState): ActionResult {
+  const ageGate = requireAge(state, 18, 'the lottery');
+  if (ageGate) return ageGate;
   const p = state.player;
   p.lotteryTicketsThisYear ??= 0;
   const cost = 100;
@@ -910,6 +929,8 @@ export function buyLotteryTicket(state: GameState): ActionResult {
 }
 
 export function buyScratchCard(state: GameState): ActionResult {
+  const ageGate = requireAge(state, 18, 'scratch cards');
+  if (ageGate) return ageGate;
   const p = state.player;
   p.scratchCardsThisYear ??= 0;
   const cost = 50;
@@ -969,6 +990,8 @@ export function togglePropertyInsurance(state: GameState, propertyId: string): A
 // ---------------------------------------------------------------------------
 
 export function buyBond(state: GameState, countryId: string, principal: number, years: number): ActionResult {
+  const ageGate = requireAge(state, 18, 'buying bonds');
+  if (ageGate) return ageGate;
   const p = state.player;
   const country = state.countries.find((c) => c.id === countryId);
   if (!country) return { ok: false, message: 'Unknown country.' };
@@ -992,6 +1015,8 @@ export function sellBondEarly(state: GameState, bondId: string): ActionResult {
 }
 
 export function openForexPosition(state: GameState, countryId: string, notional: number, short: boolean): ActionResult {
+  const ageGate = requireAge(state, 18, 'forex trading');
+  if (ageGate) return ageGate;
   const p = state.player;
   const country = state.countries.find((c) => c.id === countryId);
   if (!country) return { ok: false, message: 'Unknown country.' };
@@ -1513,6 +1538,8 @@ export function leaveParty(state: GameState): ActionResult {
 }
 
 export function foundParty(state: GameState, name: string, ideology: number): ActionResult {
+  const ageGate = requireAge(state, 18, 'founding a political party');
+  if (ageGate) return ageGate;
   const p = state.player;
   const home = state.countries.find((c) => c.id === p.countryId)!;
   if (home.totalSeats === 0) return { ok: false, message: `${home.name} has no free legislature to contest.` };
@@ -2632,6 +2659,8 @@ export function respondToProtests(state: GameState, approach: ProtestResponse): 
 export const CRIME_RANK_TITLES = ['', 'Associate', 'Soldier', 'Capo', 'Underboss', 'Boss'];
 
 export function joinCrimeFamily(state: GameState): ActionResult {
+  const ageGate = requireAge(state, 16, 'joining a crime family');
+  if (ageGate) return ageGate;
   const p = state.player;
   if (p.crimeFamilyId) return { ok: false, message: 'You are already in the family.' };
   if (p.inJailYears > 0) return { ok: false, message: 'Not while incarcerated.' };
@@ -2950,7 +2979,8 @@ export type ActivityKind =
   | 'stand_up_comedy' | 'public_speaking_course' | 'coding_bootcamp' | 'cybersecurity_course'
   | 'personal_finance_course' | 'industry_conference' | 'startup_weekend' | 'life_coaching'
   | 'mindfulness_retreat' | 'debate_club' | 'improv_class' | 'dance_lessons' | 'first_aid_course'
-  | 'investment_seminar' | 'negotiation_workshop';
+  | 'investment_seminar' | 'negotiation_workshop'
+  | 'zoo_visit' | 'movie_theater' | 'nightlife';
 
 export function doActivity(state: GameState, kind: ActivityKind): ActionResult {
   const p = state.player;
@@ -3400,6 +3430,44 @@ export function doActivity(state: GameState, kind: ActivityKind): ActionResult {
       msg = 'You will not be out-negotiated so easily anymore.';
       break;
     }
+    case 'zoo_visit': {
+      const cost = 60;
+      if (cost > p.money) return { ok: false, message: 'Cannot afford the admission ticket.' };
+      p.money -= cost;
+      p.happiness = clamp100(p.happiness + 5);
+      p.health = clamp100(p.health + 1);
+      msg = p.age < 13 ? 'You loved seeing the animals at the zoo!' : 'A relaxing day wandering the zoo.';
+      break;
+    }
+    case 'movie_theater': {
+      const cost = 30;
+      if (cost > p.money) return { ok: false, message: 'Cannot afford a movie ticket.' };
+      p.money -= cost;
+      p.happiness = clamp100(p.happiness + 4);
+      msg = 'You caught a movie at the theater — popcorn included.';
+      break;
+    }
+    case 'nightlife': {
+      const ageGate = requireAge(state, 18, 'clubbing');
+      if (ageGate) return ageGate;
+      const cost = 250;
+      if (cost > p.money) return { ok: false, message: 'Cannot afford a night out.' };
+      p.money -= cost;
+      p.health = clamp100(p.health - 3);
+      if (rng.chance(0.15)) {
+        p.money -= 400;
+        p.happiness = clamp100(p.happiness - 4);
+        msg = 'A wild night out — you woke up with a killer hangover and a mystery charge on your card.';
+      } else if (rng.chance(0.25)) {
+        p.happiness = clamp100(p.happiness + 8);
+        p.charisma = clamp100(p.charisma + 2);
+        msg = 'You hit the club and hit it off with someone new. Great night.';
+      } else {
+        p.happiness = clamp100(p.happiness + 5);
+        msg = 'A fun night out dancing with friends.';
+      }
+      break;
+    }
   }
   setCooldown(state, `activity_${kind}`);
   commit(state, rng);
@@ -3407,6 +3475,8 @@ export function doActivity(state: GameState, kind: ActivityKind): ActionResult {
 }
 
 export function takeLoan(state: GameState, amount: number, years: number): ActionResult {
+  const ageGate = requireAge(state, 18, 'taking out a loan');
+  if (ageGate) return ageGate;
   const p = state.player;
   const home = state.countries.find((c) => c.id === p.countryId)!;
   const netWorthGuess = p.money + p.properties.reduce((s, x) => s + x.value - x.mortgage, 0);
@@ -3431,6 +3501,35 @@ export function renameCompany(state: GameState, companyId: string, newName: stri
   c.name = trimmed.slice(0, 40);
   log(state, `${oldName} was renamed to ${c.name}.`, 'business');
   return { ok: true, message: `Renamed to ${c.name}.` };
+}
+
+/** Legal identity: rename yourself or update your gender marker — pure flavor/self-expression,
+ * gated by a modest filing fee and a once-a-year cooldown rather than by age (a minor can be
+ * renamed by a guardian just as easily as an adult can rename themselves). */
+export function changeLegalName(state: GameState, newName: string): ActionResult {
+  const p = state.player;
+  if (onCooldown(state, 'legal_name_change')) return { ok: false, message: 'You already changed your name this year.' };
+  const trimmed = newName.trim();
+  if (!trimmed || trimmed.length > 40) return { ok: false, message: 'Enter a valid name (1-40 characters).' };
+  const fee = 150;
+  if (fee > p.money) return { ok: false, message: `Filing fees cost $${fee.toLocaleString()}.` };
+  const oldName = p.name;
+  p.money -= fee;
+  p.name = trimmed;
+  setCooldown(state, 'legal_name_change');
+  log(state, `You legally changed your name from ${oldName} to ${p.name}.`, 'milestone');
+  return { ok: true, message: `You are now legally known as ${p.name}.` };
+}
+
+export function changeGenderIdentity(state: GameState, newGender: Gender): ActionResult {
+  const p = state.player;
+  if (onCooldown(state, 'gender_identity_change')) return { ok: false, message: 'You already updated this this year.' };
+  if (p.gender === newGender) return { ok: false, message: 'That is already your gender marker.' };
+  p.gender = newGender;
+  p.happiness = clamp100(p.happiness + 6);
+  setCooldown(state, 'gender_identity_change');
+  log(state, `You legally updated your gender marker to ${newGender}.`, 'milestone');
+  return { ok: true, message: 'Your legal gender marker was updated.' };
 }
 
 export function refinanceMortgage(state: GameState, propertyId: string): ActionResult {
@@ -3592,6 +3691,8 @@ export function withdrawSavings(state: GameState, amount: number): ActionResult 
 }
 
 export function openTermDeposit(state: GameState, amount: number, years: number): ActionResult {
+  const ageGate = requireAge(state, 18, 'term deposits');
+  if (ageGate) return ageGate;
   const p = state.player;
   if (amount < 1_000 || amount > p.money) return { ok: false, message: 'Needs at least $1,000 you can spare.' };
   const yrs = clamp(Math.round(years), 1, 10);
@@ -3604,6 +3705,8 @@ export function openTermDeposit(state: GameState, amount: number, years: number)
 }
 
 export function foundCharityFoundation(state: GameState, name: string): ActionResult {
+  const ageGate = requireAge(state, 18, 'founding a charity');
+  if (ageGate) return ageGate;
   const p = state.player;
   if (p.foundation) return { ok: false, message: 'You already run a foundation.' };
   const cost = 250_000;
