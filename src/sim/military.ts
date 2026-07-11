@@ -178,6 +178,65 @@ export function commitWarCrime(state: GameState): MilitaryActionResult {
   return { ok: true, message };
 }
 
+export interface MissionOutcome {
+  hostilesEliminated: number;
+  hostilesTotal: number;
+  damageTaken: number; // 0..100
+  survived: boolean;
+}
+
+/** Resolves a played-out mission from either the ground-combat or air-combat 3D scene — a strong
+ * run grows combat skill faster and can land a medal; a bad one risks a real (if softened, since
+ * the player was actually fighting back rather than just statistically exposed) injury. One
+ * playable mission per year, on top of whatever the yearly tick resolves automatically. */
+export function resolveCombatMission(state: GameState, outcome: MissionOutcome): MilitaryActionResult {
+  const career = state.player.military;
+  if (!isServing(career) || !career.currentDeployment) return { ok: false, message: 'You need to be deployed to run a mission.' };
+  if (onCooldown(state, 'military_mission')) return { ok: false, message: 'Already ran a mission this year.' };
+  const rng = withRng(state);
+  const p = state.player;
+  const dep = career.currentDeployment;
+  const accuracy = outcome.hostilesTotal > 0 ? outcome.hostilesEliminated / outcome.hostilesTotal : 0;
+  dep.missionsCompleted++;
+  career.combatSkill = clamp100(career.combatSkill + Math.round(2 + accuracy * 6));
+  p.stress = clamp100(p.stress + rng.range(2, 6));
+  p.health = clamp100(p.health - outcome.damageTaken * 0.12);
+
+  let message: string;
+  let kind: 'good' | 'bad' = 'good';
+  if (!outcome.survived) {
+    kind = 'bad';
+    const injuryDef = rng.pick(MILITARY_INJURY_TYPES);
+    const severity = clamp(Math.round(rng.range(injuryDef.minSeverity, injuryDef.maxSeverity) * 0.7), 1, 10);
+    const permanent = rng.chance(injuryDef.permanentChance * 0.6);
+    career.injuries.push({ kind: injuryDef.id, name: injuryDef.name, severity, permanent, yearSustained: state.year });
+    if (permanent) {
+      career.disabilityRating = clamp100(career.disabilityRating + severity * 2);
+      awardAchievement(state, 'disabled_veteran');
+    }
+    awardAchievement(state, 'wounded_warrior');
+    message = `Took heavy fire during the mission — sustained a ${injuryDef.name.toLowerCase()}.`;
+  } else if (accuracy >= 0.8 && rng.chance(0.45)) {
+    p.reputation = clamp100(p.reputation + rng.range(3, 6));
+    p.karma = clamp100(p.karma + rng.range(1, 3));
+    const eligible = MILITARY_MEDALS.filter((m) => m.requiresHeroism);
+    const medal = rng.pick(eligible);
+    career.medals.push({ id: medal.id, name: medal.name, yearAwarded: state.year, citation: `For decisive action in the field — ${outcome.hostilesEliminated}/${outcome.hostilesTotal} hostiles engaged.` });
+    p.reputation = clamp100(p.reputation + medal.reputationGain);
+    message = `Flawless mission — awarded the ${medal.name}.`;
+    if (medal.id === 'medal_of_honor') awardAchievement(state, 'medal_of_honor');
+    if (medal.id === 'bronze_star') awardAchievement(state, 'bronze_star');
+    if (medal.id === 'silver_star') awardAchievement(state, 'silver_star');
+  } else {
+    message = `Completed the mission — ${outcome.hostilesEliminated}/${outcome.hostilesTotal} hostiles engaged.`;
+  }
+  if (dep.missionsCompleted >= 15) awardAchievement(state, 'combat_veteran');
+  commit(state, rng);
+  setCooldown(state, 'military_mission');
+  log(state, message, kind);
+  return { ok: true, message };
+}
+
 export function reenlistForBonus(state: GameState): MilitaryActionResult {
   const career = state.player.military;
   if (!isServing(career)) return { ok: false, message: 'You need to be actively serving to re-enlist.' };

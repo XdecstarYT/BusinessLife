@@ -1,14 +1,16 @@
 /**
  * Military Service career hub: enlist in a branch, pick a specialty, train, deploy overseas
  * against whatever nation your country is actually at war with, and choose — while deployed —
- * between heroism and an atrocity. No 3D scene here (unlike Athlete); the tension comes from real
- * risk resolved yearly: rank progression, injuries, medals, court-martial, and eventual discharge.
+ * between heroism and an atrocity. Combat-role specialties can also play a real mission: a 3D
+ * ground-combat or air-combat engine (mirroring Athlete's fullscreen 3D takeover), whose result
+ * feeds back into the yearly sim via resolveCombatMission. Support specialties (and the yearly
+ * automatic tick) still resolve statistically — the playable mission is a bonus, not the only path.
  */
-import { useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useGame } from '../../store/gameStore';
 import {
   actHeroically, commitWarCrime, deployOverseas, enlistInMilitary, reenlistForBonus,
-  requestDischarge, requestRotationHome, trainMilitary,
+  requestDischarge, requestRotationHome, resolveCombatMission, trainMilitary,
 } from '../../sim/military';
 import {
   BRANCH_BY_ID, MILITARY_BASES, MILITARY_BRANCHES, MILITARY_SPECIALTIES,
@@ -17,6 +19,13 @@ import {
 import type { MilitaryBranch } from '../../sim/types';
 import { Badge, Button, Card, Pill, PillRow, SectionHeader, StatBar } from '../components';
 import { money } from '../format';
+import type { GroundCombatHud, GroundCombatResult } from '../three/GroundCombatScene';
+import type { AirCombatHud, AirCombatResult } from '../three/AirCombatScene';
+
+const GroundCombatScene = lazy(() => import('../three/GroundCombatScene').then((m) => ({ default: m.GroundCombatScene })));
+const AirCombatScene = lazy(() => import('../three/AirCombatScene').then((m) => ({ default: m.AirCombatScene })));
+
+const SceneFallback = <div className="w-full h-full flex items-center justify-center text-white/60 text-sm">Loading…</div>;
 
 const DISCHARGE_LABEL: Record<string, string> = {
   honorable: 'Honorably Discharged',
@@ -26,17 +35,120 @@ const DISCHARGE_LABEL: Record<string, string> = {
   kia: 'Killed in Action',
 };
 
+// Vehicle specialties fly missions; other combat roles fight on the ground; support specialties
+// (and submarine warfare — no flashy visual mission for the silent service) sit this out and
+// keep resolving purely through the yearly tick.
+const AIR_SPECIALTIES = new Set(['pilot', 'naval_aviation']);
+function missionTypeFor(specialtyId: string, combatRole: boolean): 'ground' | 'air' | null {
+  if (!combatRole || specialtyId === 'submarine_warfare') return null;
+  return AIR_SPECIALTIES.has(specialtyId) ? 'air' : 'ground';
+}
+
 export function Military() {
   const { state, run } = useGame();
   const [branchPick, setBranchPick] = useState<MilitaryBranch>('army');
   const [specialtyPick, setSpecialtyPick] = useState('infantry');
   const [pickingTraining, setPickingTraining] = useState(false);
+  const [playingMission, setPlayingMission] = useState(false);
+  const [groundHud, setGroundHud] = useState<GroundCombatHud | null>(null);
+  const [airHud, setAirHud] = useState<AirCombatHud | null>(null);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [isPortrait, setIsPortrait] = useState(() => typeof window !== 'undefined' && window.matchMedia('(orientation: portrait)').matches);
+  const fsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(orientation: portrait)');
+    const onChange = () => setIsPortrait(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  useEffect(() => {
+    const onFsChange = () => { if (!document.fullscreenElement) setFullscreen(false); };
+    document.addEventListener('fullscreenchange', onFsChange);
+    return () => document.removeEventListener('fullscreenchange', onFsChange);
+  }, []);
+  useEffect(() => {
+    if (!playingMission) return;
+    setFullscreen(true);
+    const el = fsRef.current;
+    Promise.resolve(el?.requestFullscreen?.())
+      .then(() => (screen as any).orientation?.lock?.('landscape'))
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playingMission]);
+
+  const exitMission = () => {
+    setFullscreen(false);
+    try { (screen as any).orientation?.unlock?.(); } catch { /* unsupported */ }
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    setPlayingMission(false);
+    setGroundHud(null);
+    setAirHud(null);
+  };
 
   if (!state) return null;
   const p = state.player;
   const career = p.military;
   const home = state.countries.find((c) => c.id === p.countryId);
   const atWar = (home?.atWarWith.length ?? 0) > 0;
+
+  const specialty = career ? SPECIALTY_BY_ID[career.specialtyId] : null;
+  const missionType = career && specialty ? missionTypeFor(career.specialtyId, specialty.combatRole) : null;
+  const missionUsedThisYear = state.player.actionCooldowns['military_mission'] === state.year;
+  const enemy = career?.currentDeployment?.conflictCountryId
+    ? state.countries.find((c) => c.id === career.currentDeployment!.conflictCountryId)
+    : null;
+
+  if (playingMission && career?.currentDeployment && missionType) {
+    return (
+      <div ref={fsRef} className="fixed inset-0 z-[90] bg-black">
+        <div className="absolute inset-0">
+          <Suspense fallback={SceneFallback}>
+            {missionType === 'ground' && (
+              <GroundCombatScene
+                missionName="Ground Assault"
+                enemyName={enemy?.name ?? 'hostile'}
+                hostilesTotal={6}
+                onHud={setGroundHud}
+                onMissionEnd={(result: GroundCombatResult) => {
+                  run(resolveCombatMission, result);
+                  exitMission();
+                }}
+              />
+            )}
+            {missionType === 'air' && (
+              <AirCombatScene
+                missionName="Air Intercept"
+                enemyName={enemy?.name ?? 'hostile'}
+                hostilesTotal={6}
+                onHud={setAirHud}
+                onMissionEnd={(result: AirCombatResult) => {
+                  run(resolveCombatMission, result);
+                  exitMission();
+                }}
+              />
+            )}
+          </Suspense>
+        </div>
+        {(groundHud || airHud) && (
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-black/50 text-white text-xs font-bold px-4 py-1.5 rounded-full">
+            ❤️ {Math.round((groundHud ?? airHud)!.health)} · 🎯 {(groundHud ?? airHud)!.hostilesTotal - (groundHud ?? airHud)!.hostilesRemaining}/{(groundHud ?? airHud)!.hostilesTotal}
+          </div>
+        )}
+        <button onClick={exitMission} className="absolute top-3 right-3 bg-black/50 text-white text-xs font-bold px-3 py-1.5 rounded-full">
+          ✕ Abort
+        </button>
+        {fullscreen && isPortrait && (
+          <div className="absolute inset-0 bg-black/90 flex items-center justify-center text-white text-center px-8 z-10">
+            <div>
+              <div className="text-3xl mb-2">📱↻</div>
+              <div className="font-bold">Rotate your device to landscape</div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   // ---------------------------------------------------------------------------
   // Not currently serving — enlist (or re-enlist after an honorable/general/medical discharge).
@@ -88,6 +200,11 @@ export function Military() {
               ))}
             </PillRow>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 px-1">{SPECIALTY_BY_ID[specialtyPick]?.description}</p>
+            {missionTypeFor(specialtyPick, SPECIALTY_BY_ID[specialtyPick]?.combatRole ?? false) && (
+              <p className="text-[11px] text-brand-500 font-semibold mt-1 px-1">
+                {missionTypeFor(specialtyPick, true) === 'air' ? '✈️ Flies real playable air-combat missions once deployed.' : '🎯 Fights real playable ground-combat missions once deployed.'}
+              </p>
+            )}
             <Button className="w-full mt-4" size="lg" onClick={() => run(enlistInMilitary, branchPick, specialtyPick)}>
               {career ? 'Re-enlist' : 'Enlist'}
             </Button>
@@ -101,13 +218,11 @@ export function Military() {
   // Active service hub.
   // ---------------------------------------------------------------------------
   const branchDef = BRANCH_BY_ID[career.branch];
-  const specialty = SPECIALTY_BY_ID[career.specialtyId];
   const rank = rankAt(career.branch, career.rankIndex);
   const ladder = RANKS_BY_BRANCH[career.branch];
   const nextRank = ladder[career.rankIndex + 1];
   const deployment = career.currentDeployment;
   const base = deployment ? MILITARY_BASES.find((b) => b.id === deployment.baseId) : null;
-  const enemy = deployment?.conflictCountryId ? state.countries.find((c) => c.id === deployment.conflictCountryId) : null;
   const availablePrograms = MILITARY_TRAINING_PROGRAMS.filter((prog) => career.rankIndex >= prog.minRankIndex);
 
   return (
@@ -141,7 +256,15 @@ export function Military() {
       <PillRow>
         <Pill label="💪 Train" onClick={() => setPickingTraining((v) => !v)} />
         {!deployment && atWar && <Pill label="🌍 Deploy Overseas" tone="brand" onClick={() => run(deployOverseas)} />}
-        {deployment && <Pill label="✈️ Request Rotation Home" onClick={() => run(requestRotationHome)} />}
+        {deployment && missionType && (
+          <Pill
+            label={missionUsedThisYear ? '✅ Mission Flown' : missionType === 'air' ? '✈️ Fly Mission' : '🎯 Run Mission'}
+            tone="brand"
+            disabled={missionUsedThisYear}
+            onClick={() => setPlayingMission(true)}
+          />
+        )}
+        {deployment && <Pill label="↩️ Request Rotation Home" onClick={() => run(requestRotationHome)} />}
         {deployment && <Pill label="🦸 Act Heroically" onClick={() => run(actHeroically)} />}
         {deployment && <Pill label="😈 Cross the Line" onClick={() => run(commitWarCrime)} />}
         {!deployment && <Pill label="🔁 Re-enlist for Bonus" onClick={() => run(reenlistForBonus)} />}

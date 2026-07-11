@@ -14,6 +14,18 @@ connection or choose not to sign in.
 
 ## Highlights
 
+- **V45 — Two playable 3D combat engines: Ground Combat and Air Combat.** Deployed soldiers with a
+  combat specialty no longer just resolve missions on a menu — they fight them. Infantry, armor,
+  artillery, special forces, combat medics, snipers and more drop into a real 3D **Ground Combat**
+  mission: aim a reticle across three lanes with a draggable joystick or A/D keys, fire on hostiles
+  closing in on your position before they overrun you, and take real damage for every enemy left
+  unengaged. Pilots and naval aviators instead fly a full 3D **Air Combat** dogfight: a two-axis
+  joystick (or WASD) tracks incoming bogeys against an open sky, with the same fire-and-survive
+  loop. Both engines feed their outcome — hostiles eliminated, damage taken, survival — straight
+  into the existing military sim: accuracy drives combat-skill growth, a clean sweep has a real
+  chance at heroism and a medal, and a bad mission can mean a wound, a permanent disability rating,
+  or worse. Built on the same shared three.js pipeline as the game's other playable sports scenes,
+  with full mobile joystick support, landscape-lock fullscreen, and a live in-mission HUD.
 - **V44 — Military Service: a whole new career, enlist to discharge.** A brand-new life path with
   ~150 new pieces of content: pick from 6 branches (Army, Navy, Air Force, Marines, Coast Guard,
   Space Force) and 20 specialties from Infantry to Special Forces to Cyber Operations, climb a
