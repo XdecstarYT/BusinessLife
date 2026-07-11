@@ -19,7 +19,7 @@ function item(
   return { year: state.year, category, subtype, headline, outlet: rng.pick(NEWS_OUTLETS), sentiment };
 }
 
-export function generateNews(state: GameState, rng: RNG, politicalHeadlines: string[], businessHeadlines: string[], playerHeadlines: string[] = []): NewsItem[] {
+export function generateNews(state: GameState, rng: RNG, politicalHeadlines: string[], businessHeadlines: string[], playerHeadlines: string[] = [], sportsHeadlines: string[] = []): NewsItem[] {
   const news: NewsItem[] = [];
   const home = state.countries.find((c) => c.id === state.player.countryId)!;
   const e = home.economy;
@@ -69,6 +69,10 @@ export function generateNews(state: GameState, rng: RNG, politicalHeadlines: str
   for (const h of businessHeadlines) news.push(item(state, rng, 'business', h, -0.2));
   for (const h of politicalHeadlines) news.push(item(state, rng, 'politics', h, 0));
   for (const h of playerHeadlines) news.push(item(state, rng, 'player', h, h.includes('convicted') || h.includes('burning out') ? -0.5 : 0.2));
+  for (const h of sportsHeadlines) {
+    const negative = h.includes('relegated') || h.includes('lost a star');
+    news.push(item(state, rng, 'sports', h, negative ? -0.4 : 0.4));
+  }
 
   // World color
   const other = rng.pick(state.countries.filter((c) => c.id !== home.id));

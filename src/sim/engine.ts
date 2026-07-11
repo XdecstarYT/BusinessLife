@@ -21,7 +21,7 @@ import { tryFireDailyEvent } from './dailyEvents';
 import { tickLifestyleAssets } from './lifestyle';
 import { tickProducts } from './products';
 import { tickPets } from './pets';
-import { tickAthleteSeason } from './athletics';
+import { tickAthleteSeason, tickAthleteWorld } from './athletics';
 import { GOAL_DEF_BY_ID, generateBucketList } from '../data/goals';
 import { SK } from '../data/skills';
 import { CAREER_LADDER, COWORKER_PERSONALITIES, COWORKER_PERSONALITY_BY_ID, rankIndex, titleForRank, WORK_STYLE_BY_ID, WORKPLACE_EVENTS } from '../data/careers';
@@ -1095,6 +1095,10 @@ export function advanceYear(state: GameState): GameState {
   state.player.athlete ??= null;
   state.athleteTeams ??= {};
   if (state.player.alive) for (const h of tickAthleteSeason(state, rng)) log(state, h, 'info');
+  // V41: the athlete world (results, prestige, transfers, promotion/relegation) evolves on its
+  // own every year regardless of whether the player has ever picked up a ball this life — these
+  // are world headlines, not personal ones, so they go to news (below), not the life log.
+  const athleteHeadlines = tickAthleteWorld(state, rng);
 
   // 5. Player company income: dividends from private profitable companies
   const p = state.player;
@@ -1112,7 +1116,7 @@ export function advanceYear(state: GameState): GameState {
   state.pendingEvents = p.alive ? fireEvents(state, rng) : [];
 
   // 7. News
-  const news = generateNews(state, rng, politicalHeadlines.slice(0, 6), businessHeadlines.slice(0, 4), playerHeadlines);
+  const news = generateNews(state, rng, politicalHeadlines.slice(0, 6), businessHeadlines.slice(0, 4), playerHeadlines, athleteHeadlines.slice(0, 5));
   state.news.push(...news);
   if (state.news.length > 400) state.news.splice(0, state.news.length - 400);
 

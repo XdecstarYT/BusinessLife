@@ -26,6 +26,15 @@ connection or choose not to sign in.
   routes against a real pass rush; and a running race where pacing — when to burn your stamina
   sprinting versus conserving it — is the actual skill, not button-mashing. Every match/race result
   feeds real career stats, league standings, and money back into the life sim.
+- **V41 — the athlete world evolves on its own.** The soccer/football league world is no longer a
+  static backdrop: every year, regardless of whether you've ever picked up a ball this life, all 22
+  teams' results are simulated, team **prestige** drifts toward how they actually performed (a big
+  season nudges it up, a bad one drags it down), and a transfer window occasionally swings a team's
+  fortunes with a marquee signing or a lost star player. Soccer's two tiers now **promote and
+  relegate** at each season's end based on real final standings — and if your own team goes up or
+  down, your career follows it, with a fresh schedule against the new tier's opponents. All of it
+  generates real headlines in a new **Sports** category on the News screen, so the league feels alive
+  even when you're not the one playing in it.
 - **V34 — real accounts, a life that starts at birth, and a bigger, more BitLife life.** Sign up with
   email + password (Supabase Auth) to back your life up to the cloud — up to 5 named cloud saves per
   account, managed from a new account panel on the main menu — entirely optional; local play needs no

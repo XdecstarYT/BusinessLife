@@ -3,8 +3,16 @@
  * (like casino.ts) — not routed through actions.ts — imported directly by the Athlete screen
  * and the three playable 3D match/race scenes. The player's own matches/races are resolved
  * from real outcomes the 3D scenes produce (resolveMatch / resolveRace); every other team's
- * result in the league is resolved statistically once a year in tickAthleteSeason so standings
- * keep evolving without forcing the player to play hundreds of AI-vs-AI games.
+ * result in the league is resolved statistically once a year so standings keep evolving without
+ * forcing the player to play hundreds of AI-vs-AI games.
+ *
+ * The world beyond the player is genuinely dynamic (tickAthleteWorld, called unconditionally
+ * every year regardless of whether the player has an athletic career): team prestige is no longer
+ * the static number from the data catalogue — it's seeded from there once, then drifts every
+ * season toward how that team actually performed, plus the occasional independent transfer-market
+ * swing (a marquee signing or a star departure), each generating real 'sports' news. Soccer's two
+ * tiers promote/relegate at each season's end based on real final standings, and a signed player's
+ * own career.leagueId follows their team if it moves.
  */
 import type {
   AthleteCareer, AthleteCareerStats, AthleteInjury, AthleteLevel,
@@ -14,9 +22,9 @@ import { clamp, clamp100 } from './types';
 import { RNG } from './rng';
 import { log } from './engine';
 import {
-  AA, ATHLETE_TEAMS, ATTRS_BY_SPORT, ENDORSEMENT_BRANDS, INJURY_TYPES, LEAGUE_BY_ID,
+  AA, ATHLETE_LEAGUES, ATHLETE_TEAMS, ATTRS_BY_SPORT, ENDORSEMENT_BRANDS, INJURY_TYPES, LEAGUE_BY_ID,
   POSITIONS_BY_SPORT, RUNNING_EVENT_BY_ID, RUNNING_MEET_BY_ID, RUNNING_MEETS, TEAM_BY_ID,
-  TRAINING_BY_ID, teamsInLeague, type AthleteTeamDef,
+  TRAINING_BY_ID, type AthleteTeamDef,
 } from '../data/athletics';
 
 export interface AthleteActionResult {
@@ -217,10 +225,49 @@ export function availableTeamsForTryout(state: GameState): AthleteTeamDef[] {
   return ATHLETE_TEAMS.filter((t) => t.sport === career.sport);
 }
 
+/** Creates a team's dynamic state on first reference (seeding prestige/currentLeagueId from the
+ * static catalog), or rolls it into a fresh season if the year has moved on — wins/losses/points/
+ * goals reset for the new season, but prestige and currentLeagueId intentionally persist, since
+ * they represent standing that carries across seasons (see tickAthleteWorld for how they move). */
 function ensureTeamState(state: GameState, teamId: string, year: number): AthleteTeamState {
   let ts = state.athleteTeams[teamId];
-  if (!ts || ts.seasonYear !== year) {
-    ts = { teamId, wins: 0, losses: 0, draws: 0, points: 0, goalsFor: 0, goalsAgainst: 0, seasonYear: year };
+  if (!ts) {
+    const def = TEAM_BY_ID[teamId];
+    ts = {
+      teamId, wins: 0, losses: 0, draws: 0, points: 0, goalsFor: 0, goalsAgainst: 0, seasonYear: year,
+      prestige: def?.prestige ?? 50,
+      currentLeagueId: def?.leagueId ?? '',
+    };
+    state.athleteTeams[teamId] = ts;
+  } else if (ts.seasonYear !== year) {
+    ts.wins = 0; ts.losses = 0; ts.draws = 0; ts.points = 0; ts.goalsFor = 0; ts.goalsAgainst = 0; ts.seasonYear = year;
+  }
+  return ts;
+}
+
+/** Every team currently competing in a league, by dynamic membership (a team's static
+ * data/athletics.ts leagueId is only its starting tier — promotion/relegation can move it). */
+function teamsInLeagueNow(state: GameState, leagueId: string): AthleteTeamDef[] {
+  return ATHLETE_TEAMS.filter((t) => (state.athleteTeams[t.id]?.currentLeagueId ?? t.leagueId) === leagueId);
+}
+
+/** A team's current strength: the dynamic, evolving value once it has one, else the static seed. */
+export function teamPrestige(state: GameState, teamId: string): number {
+  return state.athleteTeams[teamId]?.prestige ?? TEAM_BY_ID[teamId]?.prestige ?? 50;
+}
+
+/** Like ensureTeamState, but never resets wins/losses/points even if the season has moved on —
+ * for callers (promotion/relegation) that need to mutate persistent fields like currentLeagueId
+ * without disturbing stats another part of the same yearly tick still needs to read first. */
+function getOrSeedTeamState(state: GameState, teamId: string): AthleteTeamState {
+  let ts = state.athleteTeams[teamId];
+  if (!ts) {
+    const def = TEAM_BY_ID[teamId];
+    ts = {
+      teamId, wins: 0, losses: 0, draws: 0, points: 0, goalsFor: 0, goalsAgainst: 0, seasonYear: state.year,
+      prestige: def?.prestige ?? 50,
+      currentLeagueId: def?.leagueId ?? '',
+    };
     state.athleteTeams[teamId] = ts;
   }
   return ts;
@@ -229,7 +276,7 @@ function ensureTeamState(state: GameState, teamId: string, year: number): Athlet
 function ensureSeasonFixtures(state: GameState, career: AthleteCareer, rng: RNG): void {
   if (career.sport === 'running' || !career.leagueId || !career.teamId) return;
   if (career.seasonYear === state.year && career.fixtures.length) return;
-  const opponents = teamsInLeague(career.leagueId).filter((t) => t.id !== career.teamId);
+  const opponents = teamsInLeagueNow(state, career.leagueId).filter((t) => t.id !== career.teamId);
   const shuffled = rng.shuffle(opponents);
   const count = Math.min(8, shuffled.length);
   career.fixtures = shuffled.slice(0, count).map((t, i) => ({
@@ -252,16 +299,17 @@ export function tryoutForTeam(state: GameState, teamId: string): AthleteActionRe
   if (onCooldown(state, `athlete_tryout_${teamId}`)) return { ok: false, message: 'Already tried out there this year.' };
   const rng = withRng(state);
   setCooldown(state, `athlete_tryout_${teamId}`);
-  const chance = clamp(0.15 + (career.overallRating - team.prestige) * 0.012 + (career.form - 50) * 0.002, 0.03, 0.85);
+  const prestige = teamPrestige(state, team.id);
+  const chance = clamp(0.15 + (career.overallRating - prestige) * 0.012 + (career.form - 50) * 0.002, 0.03, 0.85);
   if (!rng.chance(chance)) {
     commit(state, rng);
     return { ok: false, message: `${team.name} passed on signing you this time.` };
   }
-  const salary = Math.round(15_000 + team.prestige * 900 + career.overallRating * 700);
+  const salary = Math.round(15_000 + prestige * 900 + career.overallRating * 700);
   career.teamId = team.id;
-  career.leagueId = team.leagueId;
+  career.leagueId = ensureTeamState(state, team.id, state.year).currentLeagueId;
   career.contract = { teamId: team.id, salary, signingBonus: Math.round(salary * 0.2), yearsLeft: rng.int(1, 3), performanceBonusPerGoalOrWin: Math.round(salary * 0.002) };
-  career.level = team.prestige >= 80 ? 'pro' : 'semipro';
+  career.level = prestige >= 80 ? 'pro' : 'semipro';
   state.player.money += career.contract.signingBonus;
   ensureSeasonFixtures(state, career, rng);
   commit(state, rng);
@@ -300,14 +348,14 @@ export function requestTrade(state: GameState, targetTeamId: string): AthleteAct
   if (onCooldown(state, 'athlete_trade')) return { ok: false, message: 'Already requested a trade this year.' };
   const rng = withRng(state);
   setCooldown(state, 'athlete_trade');
-  const chance = clamp(0.25 + (career.overallRating - target.prestige) * 0.01, 0.05, 0.7);
+  const chance = clamp(0.25 + (career.overallRating - teamPrestige(state, target.id)) * 0.01, 0.05, 0.7);
   if (!rng.chance(chance)) {
     commit(state, rng);
     return { ok: false, message: `${target.name} isn't interested right now.` };
   }
   const oldTeamName = TEAM_BY_ID[career.teamId]?.name;
   career.teamId = target.id;
-  career.leagueId = target.leagueId;
+  career.leagueId = ensureTeamState(state, target.id, state.year).currentLeagueId;
   if (career.contract) career.contract.teamId = target.id;
   career.fixtures = [];
   career.morale = clamp100(career.morale + rng.range(-5, 10));
@@ -439,8 +487,7 @@ export function quickSimFixture(state: GameState, fixtureId: string): AthleteAct
   const fixture = career.fixtures.find((f) => f.id === fixtureId);
   if (!fixture || fixture.played) return { ok: false, message: 'Invalid fixture.' };
   const rng = withRng(state);
-  const oppTeam = TEAM_BY_ID[fixture.opponentTeamId];
-  const strengthDiff = (career.overallRating - (oppTeam?.prestige ?? 50)) / 100;
+  const strengthDiff = (career.overallRating - teamPrestige(state, fixture.opponentTeamId)) / 100;
   commit(state, rng);
   if (career.sport === 'soccer') {
     const forGoals = Math.max(0, Math.round(rng.normal(1.4 + strengthDiff * 1.5, 1.1)));
@@ -518,10 +565,10 @@ export function resolveRace(state: GameState, input: RaceResultInput): AthleteAc
 // ---------------------------------------------------------------------------
 
 export function standingsForLeague(state: GameState, leagueId: string): { team: AthleteTeamDef; ts: AthleteTeamState }[] {
-  return teamsInLeague(leagueId)
+  return teamsInLeagueNow(state, leagueId)
     .map((team) => ({
       team,
-      ts: state.athleteTeams[team.id] ?? { teamId: team.id, wins: 0, losses: 0, draws: 0, points: 0, goalsFor: 0, goalsAgainst: 0, seasonYear: state.year },
+      ts: state.athleteTeams[team.id] ?? { teamId: team.id, wins: 0, losses: 0, draws: 0, points: 0, goalsFor: 0, goalsAgainst: 0, seasonYear: state.year, prestige: team.prestige, currentLeagueId: team.leagueId },
     }))
     .sort((a, b) => b.ts.points - a.ts.points || (b.ts.goalsFor - b.ts.goalsAgainst) - (a.ts.goalsFor - a.ts.goalsAgainst));
 }
@@ -530,14 +577,14 @@ export function standingsForLeague(state: GameState, leagueId: string): { team: 
  * making the player play or even quick-sim hundreds of games they're not part of. */
 function simulateLeagueSeason(state: GameState, leagueId: string, excludeTeamId: string | null, rng: RNG): void {
   const league = LEAGUE_BY_ID[leagueId];
-  const teams = teamsInLeague(leagueId).filter((t) => t.id !== excludeTeamId);
+  const teams = teamsInLeagueNow(state, leagueId).filter((t) => t.id !== excludeTeamId);
   const isSoccer = league?.sport === 'soccer';
   for (let i = 0; i < teams.length; i++) {
     for (let j = i + 1; j < teams.length; j++) {
       const a = teams[i], b = teams[j];
       const tsA = ensureTeamState(state, a.id, state.year);
       const tsB = ensureTeamState(state, b.id, state.year);
-      const diff = (a.prestige - b.prestige) / 100;
+      const diff = (tsA.prestige - tsB.prestige) / 100;
       if (isSoccer) {
         const scoreA = Math.max(0, Math.round(rng.normal(1.3 + diff, 1.1)));
         const scoreB = Math.max(0, Math.round(rng.normal(1.3 - diff, 1.1)));
@@ -606,9 +653,9 @@ export function tickAthleteSeason(state: GameState, rng: RNG): string[] {
 
   if (career.teamId && career.leagueId && career.sport !== 'running') {
     ensureSeasonFixtures(state, career, rng);
-    simulateLeagueSeason(state, career.leagueId, career.teamId, rng);
-  } else if (career.sport !== 'running') {
-    // unsigned team-sport athlete: nothing else to simulate this year
+    // The league itself (every OTHER team's results, prestige, promotion/relegation) is simulated
+    // unconditionally by tickAthleteWorld — including this player's own league — so it stays alive
+    // whether or not the player has a career at all.
   }
 
   const retireAge = career.sport === 'running' ? 38 : 36;
@@ -618,5 +665,103 @@ export function tickAthleteSeason(state: GameState, rng: RNG): string[] {
     if (!wasHOF) headlines.push(`${p.name} announced their retirement from professional ${sportLabel(career.sport)}.`);
   }
 
+  return headlines;
+}
+
+// ---------------------------------------------------------------------------
+// World dynamics — runs every year regardless of whether the player has an athletic career, so
+// the leagues stay alive on their own: results happened, prestige moves, transfers happen,
+// teams rise and fall between tiers.
+// ---------------------------------------------------------------------------
+
+/** Bottom teams in the Premier trade places with the top teams in the Championship, based on the
+ * season that just finished (read before simulateLeagueSeason resets anyone for the new year). A
+ * signed player whose own team moves follows it — their fixtures regenerate against the new tier. */
+function promotionRelegation(state: GameState): string[] {
+  const headlines: string[] = [];
+  const premierId = 'soccer_premier';
+  const champId = 'soccer_championship';
+  const premier = teamsInLeagueNow(state, premierId);
+  const championship = teamsInLeagueNow(state, champId);
+  if (premier.length < 3 || championship.length < 3) return headlines;
+  const hasSeasonData = premier.some((t) => {
+    const ts = state.athleteTeams[t.id];
+    return ts && ts.wins + ts.losses + ts.draws > 0;
+  });
+  if (!hasSeasonData) return headlines;
+
+  const premierStandings = standingsForLeague(state, premierId);
+  const champStandings = standingsForLeague(state, champId);
+  const relegated = premierStandings.slice(-2);
+  const promoted = champStandings.slice(0, 2);
+  for (const { team } of relegated) {
+    getOrSeedTeamState(state, team.id).currentLeagueId = champId;
+    headlines.push(`⬇️ ${team.name} were relegated to the Championship.`);
+  }
+  for (const { team } of promoted) {
+    getOrSeedTeamState(state, team.id).currentLeagueId = premierId;
+    headlines.push(`⬆️ ${team.name} won promotion to the Premier League!`);
+  }
+
+  const career = state.player.athlete;
+  if (career && career.teamId) {
+    const newLeague = state.athleteTeams[career.teamId]?.currentLeagueId;
+    if (newLeague && newLeague !== career.leagueId) {
+      career.leagueId = newLeague;
+      career.fixtures = []; // force a fresh schedule against the new tier's opponents
+    }
+  }
+  return headlines;
+}
+
+const TRANSFER_BRANDS = ['a marquee signing', 'a shrewd loan deal', 'a record transfer fee'];
+
+/** Every year, independent of results: a small chance per team of a prestige swing from transfer
+ * activity — a big name arriving lifts a club, a star departing dents it — generating real news
+ * regardless of whether the player is even watching that league. */
+function tickTransferMarket(state: GameState, rng: RNG): string[] {
+  const headlines: string[] = [];
+  for (const team of ATHLETE_TEAMS) {
+    if (!rng.chance(0.12)) continue;
+    const ts = ensureTeamState(state, team.id, state.year);
+    const gain = rng.chance(0.5);
+    const delta = gain ? rng.range(3, 9) : rng.range(3, 9);
+    ts.prestige = clamp(ts.prestige + (gain ? delta : -delta), 15, 99);
+    const headline = gain
+      ? `${team.name} completed ${rng.pick(TRANSFER_BRANDS)} this transfer window.`
+      : `${team.name} lost a star player to a rival club.`;
+    headlines.push(headline);
+  }
+  return headlines;
+}
+
+/** Evolves every team's prestige toward how they actually performed the season that just ended
+ * (before it resets for the new one) — win big and rise, lose and fade, with a damping factor so
+ * no team snowballs to the ceiling or floor in a single year. */
+function evolveTeamPrestige(state: GameState): void {
+  for (const team of ATHLETE_TEAMS) {
+    const ts = state.athleteTeams[team.id];
+    if (!ts) continue;
+    const games = ts.wins + ts.losses + ts.draws;
+    if (games === 0) continue;
+    const winRate = (ts.wins + ts.draws * 0.5) / games;
+    const target = clamp(38 + winRate * 58, 15, 99);
+    ts.prestige = clamp(ts.prestige + (target - ts.prestige) * 0.18, 15, 99);
+  }
+}
+
+/** The Athlete world's own yearly tick, called unconditionally from advanceYear() — the leagues
+ * play on, teams rise and fall, whether or not the player has ever picked up a ball this life. */
+export function tickAthleteWorld(state: GameState, rng: RNG): string[] {
+  const headlines: string[] = [];
+  headlines.push(...promotionRelegation(state));
+  evolveTeamPrestige(state);
+  headlines.push(...tickTransferMarket(state, rng));
+
+  const career = state.player.athlete;
+  for (const league of ATHLETE_LEAGUES) {
+    const excludeTeamId = career && !career.retired && career.leagueId === league.id ? career.teamId : null;
+    simulateLeagueSeason(state, league.id, excludeTeamId, rng);
+  }
   return headlines;
 }

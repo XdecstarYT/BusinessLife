@@ -9,7 +9,7 @@ import { useGame } from '../../store/gameStore';
 import {
   negotiateContract, quickSimFixture, requestTrade, resolveMatch,
   resolveRace, retireAthlete, signEndorsement, standingsForLeague, startAthleteCareer,
-  trainAthlete, tryoutForTeam, type MatchOutcomeInput,
+  teamPrestige, trainAthlete, tryoutForTeam, type MatchOutcomeInput,
 } from '../../sim/athletics';
 import {
   ATHLETE_TEAMS, ATTRS_BY_SPORT, ENDORSEMENT_BRANDS, POSITIONS_BY_SPORT, RUNNING_EVENTS,
@@ -430,7 +430,7 @@ export function Athlete() {
               className="w-full text-left p-3 rounded-2xl bg-slate-100 dark:bg-ink-800 hover:bg-slate-200 dark:hover:bg-ink-700"
             >
               <div className="font-semibold">{t.name}</div>
-              <div className="text-xs text-slate-500 dark:text-slate-400">{t.city} · prestige {t.prestige}</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400">{t.city} · prestige {Math.round(teamPrestige(state, t.id))}</div>
             </button>
           ))}
         </div>
@@ -446,7 +446,7 @@ export function Athlete() {
               className="w-full text-left p-3 rounded-2xl bg-slate-100 dark:bg-ink-800 hover:bg-slate-200 dark:hover:bg-ink-700"
             >
               <div className="font-semibold">{t.name}</div>
-              <div className="text-xs text-slate-500 dark:text-slate-400">{t.city} · prestige {t.prestige}</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400">{t.city} · prestige {Math.round(teamPrestige(state, t.id))}</div>
             </button>
           ))}
         </div>

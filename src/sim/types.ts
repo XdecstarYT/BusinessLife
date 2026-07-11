@@ -429,7 +429,11 @@ export interface AthleteTeamState {
   points: number; // league table points
   goalsFor: number; // soccer
   goalsAgainst: number; // soccer
-  seasonYear: number; // the year this record covers; reset when it falls behind state.year
+  seasonYear: number; // the year this record covers; reset (along with wins/losses/etc above) when it
+  // falls behind state.year — prestige and currentLeagueId below intentionally persist across that reset.
+  prestige: number; // 0..100, dynamic team strength: seeded from the static catalog, then evolves every
+  // year with results (win big, gain prestige) and random transfer-market swings — see tickAthleteWorld.
+  currentLeagueId: string; // may differ from the static catalog's leagueId after a promotion/relegation
 }
 
 export interface ElectionResult {
@@ -1110,7 +1114,7 @@ export interface DailyEventTemplate {
 
 export interface NewsItem {
   year: number;
-  category: 'economy' | 'business' | 'politics' | 'world' | 'markets' | 'society' | 'player';
+  category: 'economy' | 'business' | 'politics' | 'world' | 'markets' | 'society' | 'player' | 'sports';
   subtype?: 'breaking' | 'editorial' | 'investigative' | 'interview' | 'election';
   headline: string;
   outlet: string;
