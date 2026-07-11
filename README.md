@@ -14,6 +14,14 @@ connection or choose not to sign in.
 
 ## Highlights
 
+- **V43 — juice: every action feels like it landed.** A whole pass of moment-to-moment feedback on
+  top of existing systems, not new content: achievements now unlock with a genuine **gold "Achievement
+  Unlocked" toast** and a confetti burst the instant they happen — 130+ of them were unlockable
+  silently before, discoverable only by digging into the Stats screen. The Year in Review modal now
+  **counts your net worth up** from where the year started instead of snapping to the final number,
+  and bursts confetti of its own on a genuinely big year. The AGE button gets a satisfying tap ripple,
+  and your bank balance in the header **flashes green or red** for a beat whenever it moves. Small,
+  but it's the difference between a spreadsheet updating and a game reacting to you.
 - **V35-39 — Athlete Career: real playable 3D soccer, football and running.** A whole new life
   path alongside Career/Business/Politics: pick soccer, (American) football or running, train up a
   full attribute set, sign with one of 22 named teams across 3 leagues (or chase a calendar of

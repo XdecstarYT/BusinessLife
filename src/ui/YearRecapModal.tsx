@@ -1,7 +1,8 @@
 /** A brief "Year in Review" recap shown after each Year-advance: net worth change and top headlines. */
 import { useGame } from '../store/gameStore';
-import { Button } from './components';
+import { AnimatedNumber, Button } from './components';
 import { money, signedPct } from './format';
+import { Confetti } from './Confetti';
 
 export function YearRecapModal() {
   const { state, dismissYearRecap } = useGame();
@@ -9,16 +10,19 @@ export function YearRecapModal() {
   if (!recap) return null;
   const delta = recap.netWorthEnd - recap.netWorthStart;
   const pct = recap.netWorthStart !== 0 ? delta / Math.abs(recap.netWorthStart) : 0;
+  // A big win gets a little extra celebration — not every year, so it stays meaningful.
+  const bigWin = delta > 0 && pct > 0.15;
 
   return (
     <div className="fixed inset-0 z-40 flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div className="relative w-full sm:max-w-sm bg-white dark:bg-ink-850 rounded-t-3xl sm:rounded-3xl shadow-2xl p-6 anim-in border border-slate-100 dark:border-ink-800">
+        {bigWin && <Confetti />}
         <div className="text-xs text-center uppercase font-bold tracking-wide text-brand-500 mb-1">Year in Review</div>
         <div className="text-center font-extrabold text-lg mb-4">{recap.year} → {recap.year + 1}</div>
         <div className="bg-slate-100 dark:bg-ink-800 rounded-2xl p-4 text-center mb-4">
           <div className="text-xs text-slate-400">Net Worth</div>
-          <div className="text-2xl font-black">{money(recap.netWorthEnd)}</div>
+          <div className="text-2xl font-black"><AnimatedNumber value={recap.netWorthEnd} from={recap.netWorthStart} format={(n) => money(n)} /></div>
           <div className={`text-sm font-semibold ${delta >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
             {delta >= 0 ? '+' : ''}{money(delta)} ({signedPct(pct)})
           </div>

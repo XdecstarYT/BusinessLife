@@ -3,7 +3,7 @@
  * pill chips, circular icon tiles, section headers with chevrons, stat bars,
  * and canvas sparkline/line charts. All theme-aware (light + dark).
  */
-import { type ReactNode, useEffect, useRef } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { IconChevron } from './icons';
 import { statBarColor } from './format';
 
@@ -21,6 +21,33 @@ export function Card({ children, className = '', onClick }: { children: ReactNod
       {children}
     </div>
   );
+}
+
+// ---------------------------------------------------------------------------
+/** Smoothly counts from its previous value to a new one whenever `value` changes — used for
+ * money/score readouts that should feel like they're ticking up rather than snapping. Pass `from`
+ * to also animate on first mount (e.g. a modal that appears already knowing its start and end). */
+export function AnimatedNumber({ value, format, duration = 800, from }: { value: number; format: (n: number) => string; duration?: number; from?: number }) {
+  const [display, setDisplay] = useState(from ?? value);
+  const fromRef = useRef(from ?? value);
+  useEffect(() => {
+    const from = fromRef.current;
+    const to = value;
+    if (from === to) return;
+    const start = performance.now();
+    let raf = 0;
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / duration);
+      const eased = 1 - (1 - t) * (1 - t); // ease-out quad
+      setDisplay(from + (to - from) * eased);
+      if (t < 1) raf = requestAnimationFrame(tick);
+      else fromRef.current = to;
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+  return <>{format(display)}</>;
 }
 
 // ---------------------------------------------------------------------------

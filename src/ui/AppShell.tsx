@@ -7,12 +7,12 @@
  * classic tabs; "Activities" opens a sheet listing every other screen, so
  * everything stays reachable in at most two taps.
  */
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useGame, type Screen } from '../store/gameStore';
 import { titleForRank } from '../data/careers';
 import { money } from './format';
 import { IconAssets, IconCareer, IconHeart, IconMenu, IconMoon, IconSun } from './icons';
-import { ListRow, ListSectionBar, ListSheetHeader } from './components';
+import { AnimatedNumber, ListRow, ListSectionBar, ListSheetHeader } from './components';
 
 const SIDE_TABS: { screen: Screen; label: string; Icon: (p: { className?: string }) => ReactNode }[] = [
   { screen: 'career', label: 'Job', Icon: IconCareer },
@@ -88,6 +88,20 @@ function MeterBar({ emoji, label, value }: { emoji: string; label: string; value
 export function AppShell({ children }: { children: ReactNode }) {
   const { state, screen, setScreen, nextYear, darkMode, toggleDark, toMenu } = useGame();
   const [activitiesOpen, setActivitiesOpen] = useState(false);
+  const [agePulse, setAgePulse] = useState(0);
+  const prevMoney = useRef<number | null>(null);
+  const [moneyFlash, setMoneyFlash] = useState<'up' | 'down' | null>(null);
+  const currentMoney = state?.player.money ?? null;
+  useEffect(() => {
+    if (currentMoney === null) return;
+    if (prevMoney.current !== null && prevMoney.current !== currentMoney) {
+      setMoneyFlash(currentMoney > prevMoney.current ? 'up' : 'down');
+      const t = setTimeout(() => setMoneyFlash(null), 700);
+      prevMoney.current = currentMoney;
+      return () => clearTimeout(t);
+    }
+    prevMoney.current = currentMoney;
+  }, [currentMoney]);
   if (!state) return <>{children}</>;
   const p = state.player;
   const home = state.countries.find((c) => c.id === p.countryId)!;
@@ -121,7 +135,13 @@ export function AppShell({ children }: { children: ReactNode }) {
           </button>
           <div className="ml-auto flex items-center gap-2 shrink-0">
             <div className="text-right">
-              <div className="font-black leading-tight whitespace-nowrap drop-shadow-sm">{money(p.money, home.currencySymbol)}</div>
+              <div
+                className={`font-black leading-tight whitespace-nowrap drop-shadow-sm rounded-lg px-1 -mx-1 transition-colors duration-500 ${
+                  moneyFlash === 'up' ? 'bg-emerald-400/40' : moneyFlash === 'down' ? 'bg-rose-500/40' : ''
+                }`}
+              >
+                <AnimatedNumber value={p.money} format={(n) => money(n, home.currencySymbol)} />
+              </div>
               <div className="text-[10px] text-white/85 leading-tight whitespace-nowrap">Bank Balance · {state.year}</div>
             </div>
             <button
@@ -162,12 +182,13 @@ export function AppShell({ children }: { children: ReactNode }) {
           {/* The signature center AGE button — raised above the bar */}
           <div className="relative flex-1 min-w-0 flex justify-center">
             <button
-              onClick={nextYear}
+              onClick={() => { setAgePulse((n) => n + 1); nextYear(); }}
               aria-label="Age up one year"
               className="relative -top-5 w-16 h-16 rounded-full bg-gradient-to-b from-brand-400 to-brand-600 text-white flex flex-col items-center justify-center border-4 border-white dark:border-ink-850 [box-shadow:var(--shadow-glow-brand)] active:scale-90 transition-transform duration-150"
             >
-              <span className="text-2xl font-black leading-none">+</span>
-              <span className="text-[10px] font-extrabold tracking-widest leading-none">AGE</span>
+              {agePulse > 0 && <span key={agePulse} aria-hidden className="absolute inset-0 rounded-full bg-brand-400 animate-ping" />}
+              <span className="relative text-2xl font-black leading-none">+</span>
+              <span className="relative text-[10px] font-extrabold tracking-widest leading-none">AGE</span>
             </button>
           </div>
           <TabButton

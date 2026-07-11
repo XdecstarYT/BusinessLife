@@ -4,21 +4,33 @@ import { useGame } from '../store/gameStore';
 import { checkRoyaltyFromTop, fetchTopLegacy, submitLegacyScore } from '../net/leaderboard';
 import { awardRibbonForLife, type RibbonDef } from '../data/ribbons';
 import { Button } from './components';
+import { Confetti } from './Confetti';
 
 export function Toasts() {
   const { toasts } = useGame();
   return (
     <div className="fixed bottom-24 inset-x-0 z-[60] flex flex-col items-center gap-2 pointer-events-none px-4">
-      {toasts.map((t) => (
-        <div
-          key={t.id}
-          className={`anim-in pointer-events-auto rounded-2xl px-4 py-2.5 text-sm font-semibold shadow-lg max-w-sm text-center ${
-            t.tone === 'err' ? 'bg-rose-500 text-white' : 'bg-slate-900 text-white dark:bg-white dark:text-ink-900'
-          }`}
-        >
-          {t.text}
-        </div>
-      ))}
+      {toasts.map((t) =>
+        t.tone === 'achievement' ? (
+          <div key={t.id} className="anim-pop pointer-events-auto flex items-center gap-3 rounded-2xl px-4 py-3 max-w-sm bg-gradient-to-b from-amber-300 to-amber-500 text-amber-950 [box-shadow:0_4px_24px_-4px_rgb(245_158_11/0.6)] border border-amber-200">
+            <Confetti />
+            <span className="text-2xl leading-none shrink-0">{t.icon}</span>
+            <div className="min-w-0">
+              <div className="text-[10px] font-black uppercase tracking-wide text-amber-800">Achievement Unlocked</div>
+              <div className="text-sm font-extrabold leading-tight truncate">{t.text}</div>
+            </div>
+          </div>
+        ) : (
+          <div
+            key={t.id}
+            className={`anim-in pointer-events-auto rounded-2xl px-4 py-2.5 text-sm font-semibold shadow-lg max-w-sm text-center ${
+              t.tone === 'err' ? 'bg-rose-500 text-white' : 'bg-slate-900 text-white dark:bg-white dark:text-ink-900'
+            }`}
+          >
+            {t.text}
+          </div>
+        ),
+      )}
     </div>
   );
 }
@@ -69,7 +81,8 @@ export function GameOver() {
         <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-1">{state.player.name}</h2>
         <p className="text-slate-500 dark:text-slate-400 mb-3">{go.reason}</p>
         {ribbonAward && (
-          <div className="mb-4 rounded-2xl bg-gradient-to-b from-brand-400 to-brand-600 text-white px-5 py-3 [box-shadow:var(--shadow-glow-brand)] anim-in">
+          <div className="mb-4 rounded-2xl bg-gradient-to-b from-brand-400 to-brand-600 text-white px-5 py-3 [box-shadow:var(--shadow-glow-brand)] anim-pop">
+            {ribbonAward.firstTime && <Confetti />}
             <div className="text-3xl leading-none mb-1">{ribbonAward.ribbon.icon}</div>
             <div className="font-black tracking-wide">{ribbonAward.ribbon.name} Ribbon{ribbonAward.firstTime ? ' — NEW!' : ''}</div>
             <div className="text-[11px] text-white/85">{ribbonAward.ribbon.description}</div>
