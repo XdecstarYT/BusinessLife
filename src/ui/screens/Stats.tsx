@@ -43,6 +43,8 @@ const ACHIEVEMENTS: Record<string, { label: string; icon: string }> = {
   adoptive_parent: { label: 'Adoptive Parent', icon: '👨‍👩‍👧' },
   space_pioneer: { label: 'Space Pioneer', icon: '🚀' },
   dynasty_continued: { label: 'Dynasty Continued', icon: '🕯️' },
+  athlete_retired: { label: 'Retired Athlete', icon: '🏟️' },
+  athlete_hall_of_fame: { label: 'Athlete Hall of Fame', icon: '🏆' },
   challenge_crusher: { label: 'Challenge Crusher', icon: '🎯' },
   startup_investor: { label: 'Startup Investor', icon: '🌱' },
   summit_diplomat: { label: 'Summit Diplomat', icon: '🌐' },

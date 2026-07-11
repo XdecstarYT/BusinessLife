@@ -14,6 +14,18 @@ connection or choose not to sign in.
 
 ## Highlights
 
+- **V35-39 — Athlete Career: real playable 3D soccer, football and running.** A whole new life
+  path alongside Career/Business/Politics: pick soccer, (American) football or running, train up a
+  full attribute set, sign with one of 22 named teams across 3 leagues (or chase a calendar of
+  running meets up to the Games), earn contracts and endorsement deals, and manage real injuries,
+  fitness, form and morale across a full career arc through retirement (and a Hall of Fame ribbon
+  for the best of them). The matches and races aren't simulated for you — they're genuinely
+  **playable, real-time 3D minigames**: a 4-a-side soccer match with WASD/joystick movement and a
+  charge-and-release pass/shoot button against AI teammates and opponents; a down-by-down football
+  drive where you call Run or Pass and then execute it yourself, throwing to receivers running real
+  routes against a real pass rush; and a running race where pacing — when to burn your stamina
+  sprinting versus conserving it — is the actual skill, not button-mashing. Every match/race result
+  feeds real career stats, league standings, and money back into the life sim.
 - **V34 — real accounts, a life that starts at birth, and a bigger, more BitLife life.** Sign up with
   email + password (Supabase Auth) to back your life up to the cloud — up to 5 named cloud saves per
   account, managed from a new account panel on the main menu — entirely optional; local play needs no
