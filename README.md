@@ -14,6 +14,23 @@ connection or choose not to sign in.
 
 ## Highlights
 
+- **V52 — Better 3D, mandatory deployment, more hustles, and a deeper BitLife look.** Two of the
+  weakest 3D scenes got a full quality pass: **Supply Chain** now casts real shadows off a grounded
+  plane, glows from emissive pedestals under each stage, and routes goods through tube-geometry pipes
+  colored live by supply-chain resilience (red → amber → green); **Election Map** swapped its flat bar
+  chart for tapered spire monuments with glowing base rings around a central podium whose orb reflects
+  your overall vote share. **Military deployment is no longer optional** — once you're deployed with a
+  playable mission (ground, air, or armor), the year can't end via +1 Day/Week/Year until you fly it;
+  the store gates all three time-advance actions and routes you straight to the Military screen with a
+  clear warning, while the underlying yearly risk resolution still runs automatically for support
+  roles and headless saves so nothing soft-locks. **Four new side hustles** round out the ways to make
+  money outside a formal career or company: monetize your following, sign a multi-year sponsorship
+  deal (a recurring income stream alongside memoirs), hold a garage sale, or busk for tips — plus a
+  new Content Mogul achievement. And the UI leans further into its BitLife roots: stat bars now show a
+  **reactive face** that swaps emoji by value (😭→😄 for Happiness, 💀→💪 for Health) instead of one
+  static icon, and every activity-list row gets a colored icon badge in a deterministic per-item hue
+  instead of a bare flat emoji.
+
 - **V51 — The Dynamic World Engine: the world remembers you, adapts to you, and outlasts you.**
   Rival companies now hold a real, visible **grudge** (surfaced right on their card in Business →
   Rivals) driven by your actual history with them — a failed hostile takeover, a price war, a

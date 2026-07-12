@@ -378,7 +378,7 @@ export function ListRow({
       } ${disabled ? 'opacity-40' : ''}`}
       style={{ width: 'calc(100% + 2rem)' }}
     >
-      <span className="text-2xl leading-none shrink-0 w-9 text-center">{icon}</span>
+      <span className={`text-lg leading-none shrink-0 w-9 h-9 rounded-xl flex items-center justify-center ${iconBadgeTone(String(title))}`}>{icon}</span>
       <span className="min-w-0 flex-1">
         <span className="block font-bold text-sm text-brand-700 dark:text-brand-400 truncate">{title}</span>
         {subtitle && <span className="block text-xs text-slate-500 dark:text-slate-400 truncate">{subtitle}</span>}
@@ -386,6 +386,20 @@ export function ListRow({
       <span className="shrink-0 text-slate-300 dark:text-slate-600">{trailing ?? (onClick ? <IconChevron className="w-5 h-5" /> : null)}</span>
     </button>
   );
+}
+
+// BitLife's activity list wraps every icon in a distinct colored rounded-square tile rather than
+// a bare flat emoji — this derives a stable color per row from its title text so the list reads
+// as varied and "designed" without needing a color assigned by hand for every activity.
+const ICON_BADGE_TONES = [
+  'bg-rose-100 dark:bg-rose-500/20', 'bg-amber-100 dark:bg-amber-500/20', 'bg-emerald-100 dark:bg-emerald-500/20',
+  'bg-sky-100 dark:bg-sky-500/20', 'bg-violet-100 dark:bg-violet-500/20', 'bg-fuchsia-100 dark:bg-fuchsia-500/20',
+  'bg-cyan-100 dark:bg-cyan-500/20', 'bg-orange-100 dark:bg-orange-500/20',
+];
+function iconBadgeTone(seed: string): string {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+  return ICON_BADGE_TONES[hash % ICON_BADGE_TONES.length];
 }
 
 /** Full-bleed navy header used atop a BitLife-style list sheet — pairs with ListRow/ListSectionBar. */

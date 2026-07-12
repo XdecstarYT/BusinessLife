@@ -9,7 +9,7 @@
  */
 import { useState, type ReactNode } from 'react';
 import { useGame, type Screen } from '../../store/gameStore';
-import { adoptPet, attemptPrisonEscape, bribeJudge, buyLotteryTicket, buyScratchCard, commitSuicide, contestTerritory, CRIME_RANK_TITLES, declareCrimeWar, doActivity, donateToFoundation, enterWitnessProtection, foundCharityFoundation, goStraight, heist, issuePublicApology, joinCrimeFamily, playWithPet, postOnSocialMedia, proposeCrimeAlliance, requestParole, retire, socialMediaPostStyles, writeMemoir } from '../../sim/actions';
+import { adoptPet, attemptPrisonEscape, bribeJudge, busk, buyLotteryTicket, buyScratchCard, commitSuicide, contestTerritory, CRIME_RANK_TITLES, declareCrimeWar, doActivity, donateToFoundation, enterWitnessProtection, foundCharityFoundation, goStraight, heist, holdGarageSale, issuePublicApology, joinCrimeFamily, monetizeContent, playWithPet, postOnSocialMedia, proposeCrimeAlliance, requestParole, retire, signSponsorshipDeal, socialMediaPostStyles, writeMemoir } from '../../sim/actions';
 import { PET_CATALOG, PET_SPEC_BY_KIND } from '../../sim/pets';
 import { playerCrimeFamily } from '../../sim/crime';
 import { attemptSnitch, bribeGuard, earnRespect, joinPrisonGang, PRISON_GANGS, sellContraband, smuggleContraband, startRiot } from '../../sim/prison';
@@ -293,6 +293,37 @@ export function Life() {
               <Pill label="🙏 Issue Public Apology" onClick={() => run(issuePublicApology)} />
             </PillRow>
           )}
+
+          <SectionHeader title="Side Hustles" />
+          <Card className="p-4 mb-4">
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+              Quick, no-barrier-to-entry ways to make money outside a job or company.
+            </p>
+            {p.sponsorshipDeal && (
+              <div className="flex items-center justify-between bg-slate-100 dark:bg-ink-800 rounded-xl px-3 py-2 mb-2">
+                <div className="text-xs">
+                  <div className="font-semibold">🤝 {p.sponsorshipDeal.brand} sponsorship</div>
+                  <div className="text-slate-500 dark:text-slate-400">{money(p.sponsorshipDeal.incomePerYear)}/yr · {p.sponsorshipDeal.yearsLeft} yr left</div>
+                </div>
+              </div>
+            )}
+            <PillRow>
+              <Pill label="🏷️ Garage Sale" onClick={() => run(holdGarageSale)} />
+              <Pill label="🎸 Busk" onClick={() => run(busk)} />
+              <Pill
+                label="📱 Monetize Content"
+                disabled={p.socialFollowers < 1_000}
+                onClick={() => run(monetizeContent)}
+              />
+              {!p.sponsorshipDeal && (
+                <Pill
+                  label="🤝 Sign Sponsorship"
+                  disabled={p.socialFollowers < 50_000}
+                  onClick={() => run(signSponsorshipDeal)}
+                />
+              )}
+            </PillRow>
+          </Card>
         </>
       )}
 

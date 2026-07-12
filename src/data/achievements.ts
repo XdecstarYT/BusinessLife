@@ -234,4 +234,6 @@ export const ACHIEVEMENTS: Record<string, AchievementDef> = {
   arch_nemesis: { label: 'Arch Nemesis', icon: '😤' },
   momentum_rider: { label: 'Momentum Rider', icon: '🔥' },
   industry_legend_legacy: { label: 'Industry Legend', icon: '🏛️' },
+  // V52: side hustles
+  content_mogul: { label: 'Content Mogul', icon: '📱' },
 };

@@ -12,6 +12,7 @@ import { RNG } from '../sim/rng';
 import * as actions from '../sim/actions';
 import * as market from '../sim/market';
 import { ACHIEVEMENTS } from '../data/achievements';
+import { SPECIALTY_BY_ID, missionTypeFor } from '../data/military';
 import {
   AUTOSAVE_ID,
   deleteSave,
@@ -22,6 +23,19 @@ import {
   saveGame,
   type SaveSlotMeta,
 } from './persistence';
+
+/** V52: true while deployed with a combat-role specialty that has a real playable mission and
+ * hasn't played it this year — used by nextYear/nextDay/nextWeek to block advancing time (day/week
+ * ticks can silently roll a full year over at day 365 via advanceDay/advanceWeek, so they need the
+ * same gate as nextYear or a player could dodge the mission by spamming +1 Day). */
+function blockedByMandatoryDeployment(s: GameState): boolean {
+  const career = s.player.military;
+  if (!career?.currentDeployment) return false;
+  const specialty = SPECIALTY_BY_ID[career.specialtyId];
+  const missionType = specialty ? missionTypeFor(career.specialtyId, specialty.combatRole) : null;
+  if (!missionType) return false;
+  return s.player.actionCooldowns['military_mission'] !== s.year;
+}
 
 export type Screen =
   | 'menu'
@@ -211,6 +225,14 @@ export const useGame = create<GameStoreState>((set, get) => ({
       get().toast('Resolve your current event first.', 'err');
       return;
     }
+    // V52: while deployed with a combat-role specialty that has a real playable mission, time
+    // cannot advance until that mission is actually played this year — "actual war" means
+    // reporting for duty, not letting the tick resolve it silently in the background.
+    if (blockedByMandatoryDeployment(s)) {
+      get().toast('You are deployed — report for your mission before the year can end.', 'err');
+      set({ screen: 'military' });
+      return;
+    }
     const next = advanceYear(s);
     const queue = next.pendingEvents ?? [];
     set({
@@ -230,6 +252,11 @@ export const useGame = create<GameStoreState>((set, get) => ({
       get().toast('Resolve your current event first.', 'err');
       return;
     }
+    if (blockedByMandatoryDeployment(s)) {
+      get().toast('You are deployed — report for your mission before time can pass.', 'err');
+      set({ screen: 'military' });
+      return;
+    }
     const res = advanceDay(s);
     const queue = res.state.pendingEvents ?? [];
     set({
@@ -247,6 +274,11 @@ export const useGame = create<GameStoreState>((set, get) => ({
     if (!s || s.gameOver) return;
     if (get().eventQueue.length > 0 || get().activeEvent) {
       get().toast('Resolve your current event first.', 'err');
+      return;
+    }
+    if (blockedByMandatoryDeployment(s)) {
+      get().toast('You are deployed — report for your mission before time can pass.', 'err');
+      set({ screen: 'military' });
       return;
     }
     const res = advanceWeek(s);

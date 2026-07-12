@@ -427,6 +427,7 @@ export function generateWorld(config: NewGameConfig): GameState {
     retired: false,
     pensionIncome: 0,
     memoir: null,
+    sponsorshipDeal: null,
     lastFiredYear: null,
     freelanceReputation: 30,
     freelanceGigsCompleted: 0,

@@ -1,10 +1,12 @@
 /**
  * Military Service career hub: enlist in a branch, pick a specialty, train, deploy overseas
  * against whatever nation your country is actually at war with, and choose — while deployed —
- * between heroism and an atrocity. Combat-role specialties can also play a real mission: a 3D
- * ground-combat or air-combat engine (mirroring Athlete's fullscreen 3D takeover), whose result
- * feeds back into the yearly sim via resolveCombatMission. Support specialties (and the yearly
- * automatic tick) still resolve statistically — the playable mission is a bonus, not the only path.
+ * between heroism and an atrocity. Combat-role specialties (missionTypeFor() != null) MUST play
+ * a real mission each year they're deployed — a 3D ground-combat, air-combat, or armor engine
+ * (mirroring Athlete's fullscreen 3D takeover) whose result feeds back into the yearly sim via
+ * resolveCombatMission — gameStore.ts's nextYear() refuses to advance until they do (V52).
+ * Support specialties (and submarine warfare) have no scene and keep resolving statistically
+ * through the yearly tick, same as before.
  */
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useGame } from '../../store/gameStore';
@@ -14,7 +16,7 @@ import {
 } from '../../sim/military';
 import {
   BRANCH_BY_ID, MILITARY_BASES, MILITARY_BRANCHES, MILITARY_SPECIALTIES,
-  MILITARY_TRAINING_PROGRAMS, RANKS_BY_BRANCH, SPECIALTY_BY_ID, rankAt,
+  MILITARY_TRAINING_PROGRAMS, RANKS_BY_BRANCH, SPECIALTY_BY_ID, missionTypeFor, rankAt,
 } from '../../data/military';
 import type { MilitaryBranch } from '../../sim/types';
 import { Badge, Button, Card, Pill, PillRow, SectionHeader, StatBar } from '../components';
@@ -47,18 +49,6 @@ const OBSTACLE_LABEL: Record<BootCampHud['currentObstacle'], string> = {
   beam: 'Balance beam — steer straight',
   finish: 'Finish line!',
 };
-
-// Vehicle specialties fly or drive missions; other combat roles fight on the ground; support
-// specialties (and submarine warfare — no flashy visual mission for the silent service) sit this
-// out and keep resolving purely through the yearly tick.
-const AIR_SPECIALTIES = new Set(['pilot', 'naval_aviation']);
-const ARMOR_SPECIALTIES = new Set(['armor']);
-function missionTypeFor(specialtyId: string, combatRole: boolean): 'ground' | 'air' | 'armor' | null {
-  if (!combatRole || specialtyId === 'submarine_warfare') return null;
-  if (AIR_SPECIALTIES.has(specialtyId)) return 'air';
-  if (ARMOR_SPECIALTIES.has(specialtyId)) return 'armor';
-  return 'ground';
-}
 
 export function Military() {
   const { state, run } = useGame();
@@ -357,6 +347,13 @@ export function Military() {
           <div className="mt-2 text-xs text-amber-500 font-semibold">Disability rating: {Math.round(career.disabilityRating)}/100</div>
         )}
       </Card>
+
+      {deployment && missionType && !missionUsedThisYear && (
+        <Card className="p-3 mb-3 border-2 border-rose-400 bg-rose-50 dark:bg-rose-950/30">
+          <div className="text-sm font-bold text-rose-600 dark:text-rose-400">🚨 You're deployed — report for duty</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400">The year can't end until you fly this year's mission.</div>
+        </Card>
+      )}
 
       <SectionHeader title="Actions" />
       <PillRow>

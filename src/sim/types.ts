@@ -92,6 +92,14 @@ export interface Memoir {
   royaltyPerYear: number;
 }
 
+// V52: a multi-year personal brand deal, paid out the same way as Memoir royalties (see
+// tickPersonalFinance) — signed via signSponsorshipDeal() once socialFollowers is high enough.
+export interface SponsorshipDeal {
+  brand: string;
+  yearsLeft: number;
+  incomePerYear: number;
+}
+
 export interface Bond {
   id: string;
   countryId: string;
@@ -280,6 +288,7 @@ export interface Player {
   freelanceGigsCompleted: number;
   unemployedYears: number; // consecutive years without a job or company; drives skill decay and safety-net support
   memoir: Memoir | null; // published autobiography paying royalties for a few years
+  sponsorshipDeal: SponsorshipDeal | null; // V52: multi-year personal brand deal, paid like memoir royalties
   socialFollowers: number; // social-media audience size
   cancelledUntilYear: number | null; // a viral backlash is actively depressing reputation/popularity until this year
   lastSocialPostYear: number | null; // cooldown so posting can't be spammed for free rolls

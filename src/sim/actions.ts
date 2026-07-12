@@ -429,6 +429,91 @@ export function postOnSocialMedia(state: GameState, styleId: string): ActionResu
 }
 
 // ---------------------------------------------------------------------------
+// V52: Side Hustles — quick, repeatable ways to make money outside a job/company, distinct from
+// the existing freelance-gig board (a real assignment with a client) and lifestyle.ts's luxury
+// asset resale. Each is a lightweight once-a-year action.
+// ---------------------------------------------------------------------------
+
+/** Turn your existing following into real income — distinct from postOnSocialMedia (which grows
+ * followers but never pays out directly). Needs a real audience; bigger creators earn more per
+ * follower (brand deals scale with reach) but risk a sponsor-unfriendly misstep. */
+export function monetizeContent(state: GameState): ActionResult {
+  const p = state.player;
+  if (p.socialFollowers < 1_000) return { ok: false, message: 'You need at least 1,000 followers before anyone will pay to reach your audience.' };
+  if (onCooldown(state, 'monetize_content')) return { ok: false, message: 'Already ran ad reads/sponsor content this year.' };
+  if (p.cancelledUntilYear !== null && p.cancelledUntilYear >= state.year) return { ok: false, message: "You're still cancelled — sponsors won't touch you right now." };
+  setCooldown(state, 'monetize_content');
+  const rng = withRng(state);
+  const skillLvl = p.skills[SK.socialMedia] ?? 0;
+  const perFollower = 0.02 + skillLvl * 0.0004;
+  const income = Math.round(p.socialFollowers * perFollower * rng.range(0.7, 1.4));
+  p.money += income;
+  p.skills[SK.socialMedia] = clamp100(skillLvl + rng.range(1, 3));
+  if (rng.chance(0.06)) {
+    p.reputation = clamp100(p.reputation - rng.range(3, 8));
+    commit(state, rng);
+    log(state, `💰 Monetized your following for $${income.toLocaleString()} — but one sponsor read didn't land well with your audience.`, 'money');
+    return { ok: true, message: `Earned $${income.toLocaleString()}, but reputation took a small hit.` };
+  }
+  if (p.socialFollowers >= 100_000 && !state.achievements.includes('content_mogul')) state.achievements.push('content_mogul');
+  commit(state, rng);
+  log(state, `💰 Ran sponsor content and ad reads for $${income.toLocaleString()}.`, 'money');
+  return { ok: true, message: `Earned $${income.toLocaleString()} from your audience.` };
+}
+
+/** A big-follower-count creator can land a real multi-year brand deal — same shape as writeMemoir's
+ * royalty pattern (see p.sponsorshipDeal, paid out in engine.ts's tickPersonalFinance). */
+export function signSponsorshipDeal(state: GameState): ActionResult {
+  const p = state.player;
+  if (p.socialFollowers < 50_000) return { ok: false, message: 'Needs at least 50,000 followers to interest a real sponsor.' };
+  if (p.sponsorshipDeal) return { ok: false, message: 'Your current sponsorship deal is still active.' };
+  if (p.cancelledUntilYear !== null && p.cancelledUntilYear >= state.year) return { ok: false, message: "You're still cancelled — no sponsor will sign you right now." };
+  const rng = withRng(state);
+  const brand = rng.pick(['Lumen', 'Northwind', 'Kestrel', 'Verdant', 'Cobalt', 'Aurora', 'Solace', 'Ridgeline']);
+  const yearsLeft = rng.int(2, 4);
+  const incomePerYear = Math.round(p.socialFollowers * rng.range(0.15, 0.35));
+  p.sponsorshipDeal = { brand, yearsLeft, incomePerYear };
+  p.reputation = clamp100(p.reputation + 2);
+  commit(state, rng);
+  log(state, `🤝 Signed a ${yearsLeft}-year sponsorship deal with ${brand} — $${incomePerYear.toLocaleString()}/yr.`, 'money');
+  return { ok: true, message: `Signed with ${brand}: $${incomePerYear.toLocaleString()}/yr for ${yearsLeft} years.` };
+}
+
+/** No skills, no capital, no barrier to entry — clear out closet junk for quick cash. Available to
+ * anyone regardless of career or age, the way BitLife's odd-jobs always are. */
+export function holdGarageSale(state: GameState): ActionResult {
+  const p = state.player;
+  if (onCooldown(state, 'garage_sale')) return { ok: false, message: 'Already held a sale this year — you\'re out of stuff to sell.' };
+  setCooldown(state, 'garage_sale');
+  const rng = withRng(state);
+  const income = Math.round(rng.range(60, 650) * (1 + Math.min(2, p.age / 40)));
+  p.money += income;
+  p.happiness = clamp100(p.happiness + 1);
+  commit(state, rng);
+  log(state, `🏷️ Held a garage sale and made $${income.toLocaleString()} off stuff you didn't need.`, 'money');
+  return { ok: true, message: `Made $${income.toLocaleString()}.` };
+}
+
+/** Charisma-driven street performance — low stakes, low ceiling, but always available, and a
+ * genuinely good crowd occasionally tips big. */
+export function busk(state: GameState): ActionResult {
+  const p = state.player;
+  if (onCooldown(state, 'busk')) return { ok: false, message: 'Already busked this year.' };
+  setCooldown(state, 'busk');
+  const rng = withRng(state);
+  const skillLvl = Math.max(p.skills[SK.charm] ?? 0, p.skills[SK.persuasion] ?? 0);
+  const base = rng.range(30, 180) * (1 + (p.charisma + skillLvl) / 150);
+  const bigCrowd = rng.chance(0.1);
+  const income = Math.round(bigCrowd ? base * rng.range(3, 6) : base);
+  p.money += income;
+  p.happiness = clamp100(p.happiness + (bigCrowd ? 5 : 2));
+  p.skills[SK.charm] = clamp100((p.skills[SK.charm] ?? 0) + rng.range(0.5, 2));
+  commit(state, rng);
+  log(state, bigCrowd ? `🎸 Busked to a huge crowd — walked away with $${income.toLocaleString()}!` : `🎸 Busked downtown for $${income.toLocaleString()}.`, 'money');
+  return { ok: true, message: `Earned $${income.toLocaleString()}.` };
+}
+
+// ---------------------------------------------------------------------------
 // Business
 // ---------------------------------------------------------------------------
 

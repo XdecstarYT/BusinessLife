@@ -186,6 +186,15 @@ function tickPersonalFinance(state: GameState, rng: RNG): void {
       p.memoir = null;
     }
   }
+
+  if (p.sponsorshipDeal) {
+    p.money += p.sponsorshipDeal.incomePerYear;
+    p.sponsorshipDeal.yearsLeft--;
+    if (p.sponsorshipDeal.yearsLeft <= 0) {
+      log(state, `Your sponsorship deal with ${p.sponsorshipDeal.brand} has run its course.`, 'info');
+      p.sponsorshipDeal = null;
+    }
+  }
 }
 
 /** Annual industry awards: the home nation's standout company is honored each year. */
@@ -306,6 +315,7 @@ function tickPlayerLife(state: GameState, rng: RNG): string[] {
     p.investigationHeat = 0;
     p.yearsServedThisSentence = 0;
   }
+  p.sponsorshipDeal ??= null; // backfill for saves from before V52 side hustles
 
   // --- Jail ---------------------------------------------------------------
   if (p.inJailYears > 0) {

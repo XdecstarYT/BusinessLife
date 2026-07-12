@@ -76,13 +76,16 @@ const ACTIVITY_GROUPS: { title: string; items: ActivityEntry[] }[] = [
 ];
 const ACTIVITY_SCREENS: Screen[] = ACTIVITY_GROUPS.flatMap((g) => g.items.map((i) => i.screen));
 
-/** BitLife-style stat meter: emoji, label, thin bar, percent readout. */
-function MeterBar({ emoji, label, value }: { emoji: string; label: string; value: number }) {
+/** BitLife-style stat meter: emoji, label, thin bar, percent readout. `faces`, if given, is a
+ * worst-to-best tier list — the icon itself reacts to the stat instead of staying static, the
+ * same way BitLife's own head icon changes expression with mood. */
+function MeterBar({ emoji, label, value, faces }: { emoji: string; label: string; value: number; faces?: string[] }) {
   const v = Math.max(0, Math.min(100, value));
   const fill = v < 25 ? 'bg-rose-500' : v < 50 ? 'bg-amber-400' : 'bg-brand-500';
+  const icon = faces ? faces[Math.min(faces.length - 1, Math.floor((v / 100) * faces.length))] : emoji;
   return (
     <div className="flex items-center gap-1.5 min-w-0">
-      <span className="text-sm leading-none shrink-0">{emoji}</span>
+      <span className="text-sm leading-none shrink-0 transition-all duration-300">{icon}</span>
       <div className="min-w-0 flex-1">
         <div className="flex justify-between text-[9px] font-bold text-slate-500 dark:text-slate-400 leading-tight">
           <span className="truncate">{label}</span>
@@ -190,8 +193,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           className="w-full max-w-2xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 pt-2 pb-1.5 grid grid-cols-4 gap-3 border-b border-slate-100 dark:border-ink-800"
           aria-label="Open full stats"
         >
-          <MeterBar emoji="😊" label="Happiness" value={p.happiness} />
-          <MeterBar emoji="❤️" label="Health" value={p.health} />
+          <MeterBar emoji="😊" label="Happiness" value={p.happiness} faces={['😭', '😢', '😕', '😐', '🙂', '😄']} />
+          <MeterBar emoji="❤️" label="Health" value={p.health} faces={['💀', '🤒', '😷', '🙂', '💪', '💪']} />
           <MeterBar emoji="🧠" label="Smarts" value={p.smarts} />
           <MeterBar emoji="😎" label="Charisma" value={p.charisma} />
         </button>

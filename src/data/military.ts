@@ -103,6 +103,20 @@ export const MILITARY_SPECIALTIES: MilitarySpecialtyDef[] = [
 
 export const SPECIALTY_BY_ID: Record<string, MilitarySpecialtyDef> = Object.fromEntries(MILITARY_SPECIALTIES.map((s) => [s.id, s]));
 
+// V52: shared with sim/military.ts (mandatory-deployment gating) and ui/screens/Military.tsx
+// (which mission scene to launch) — a single source of truth for "does this specialty have a
+// real playable mission, and which one." Vehicle specialties fly or drive missions; other combat
+// roles fight on the ground; support specialties (and submarine warfare — no flashy visual
+// mission for the silent service) have no playable mission and stay purely statistical.
+const AIR_SPECIALTIES = new Set(['pilot', 'naval_aviation']);
+const ARMOR_SPECIALTIES = new Set(['armor']);
+export function missionTypeFor(specialtyId: string, combatRole: boolean): 'ground' | 'air' | 'armor' | null {
+  if (!combatRole || specialtyId === 'submarine_warfare') return null;
+  if (AIR_SPECIALTIES.has(specialtyId)) return 'air';
+  if (ARMOR_SPECIALTIES.has(specialtyId)) return 'armor';
+  return 'ground';
+}
+
 // ---------------------------------------------------------------------------
 // Training programs
 // ---------------------------------------------------------------------------

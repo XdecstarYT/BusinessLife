@@ -1,9 +1,13 @@
 /**
  * Military Service career: enlist, train, deploy against a real enemy nation your country is
  * currently at war with, rank up, earn medals, and eventually discharge — a self-contained leaf
- * module (like casino.ts/athletics.ts), not routed through actions.ts. Combat is resolved
- * statistically rather than played out (no 3D scene, unlike Athlete) — the drama comes from real
- * risk: injury, death, medals, and a genuine heroism-vs-atrocity choice while deployed.
+ * module (like casino.ts/athletics.ts), not routed through actions.ts. Combat-role specialties
+ * with a playable mission (missionTypeFor()) are meant to be played out via a 3D scene in
+ * Military.tsx (resolveCombatMission) — gameStore.ts's nextYear() requires it (V52). Support
+ * specialties, submarine warfare, and any headless/automated caller of advanceYear() that never
+ * played a mission still resolve combat statistically here, so the sim stays complete on its own.
+ * The drama comes from real risk either way: injury, death, medals, and a genuine
+ * heroism-vs-atrocity choice while deployed.
  *
  * Deployment ties directly into the existing geopolitical war system (Country.atWarWith, mutated
  * by tickPolitics) rather than duplicating it — a soldier can only deploy while their home country
@@ -15,7 +19,7 @@ import { RNG } from './rng';
 import { log } from './engine';
 import {
   BRANCH_BY_ID, MILITARY_BASES, MILITARY_INJURY_TYPES, MILITARY_MEDALS,
-  MILITARY_TRAINING_PROGRAMS, RANKS_BY_BRANCH, SPECIALTY_BY_ID, rankAt,
+  MILITARY_TRAINING_PROGRAMS, RANKS_BY_BRANCH, SPECIALTY_BY_ID, missionTypeFor, rankAt,
 } from '../data/military';
 
 export interface MilitaryActionResult {
@@ -378,6 +382,20 @@ export function tickMilitaryCareer(state: GameState, rng: RNG): string[] {
 
   if (career.currentDeployment) {
     const dep = career.currentDeployment;
+    // V52: combat-role specialties with a playable mission are gated at the UI layer
+    // (gameStore.ts's nextYear()) to require playing it before the year can advance. If they did,
+    // resolveCombatMission() already resolved this year's real risk/reward — don't roll a second,
+    // redundant statistical risk on top. Support roles, submarine warfare, and any headless caller
+    // that never played (smoke tests, old saves) still resolve fully here, so the sim never soft-locks.
+    const missionType = specialty ? missionTypeFor(career.specialtyId, specialty.combatRole) : null;
+    const missionPlayedThisYear = p.actionCooldowns['military_mission'] === state.year;
+    const skipAutoRisk = missionType !== null && missionPlayedThisYear;
+
+    if (skipAutoRisk) {
+      career.fitness = clamp100(career.fitness - rng.range(2, 6));
+      p.stress = clamp100(p.stress + rng.range(1, 3));
+      if (dep.missionsCompleted >= 15) awardAchievement(state, 'combat_veteran');
+    } else {
     const missionsThisYear = rng.int(2, 6);
     dep.missionsCompleted += missionsThisYear;
     career.combatSkill = clamp100(career.combatSkill + rng.range(1, 4));
@@ -428,6 +446,7 @@ export function tickMilitaryCareer(state: GameState, rng: RNG): string[] {
       } else {
         headlines.push(`Sustained a ${injuryDef.name.toLowerCase()} in the field but remained deployed.`);
       }
+    }
     }
 
     if (career.currentDeployment && state.year - dep.startYear >= rng.int(1, 2)) {
