@@ -986,6 +986,17 @@ export interface Company {
   // frequent retaliation via tickCorporateSabotage; decays slowly on its own.
   grudgeAgainstPlayer: number; // 0..100
 
+  // V54: Manufacturing capacity vs. demand — for physical-goods industries (see
+  // MANUFACTURING_TAGS in business.ts), this actually gates revenue growth, unlike the V50
+  // factories' pure cash dividend. manufacturingCapacity is computed each tick from factories
+  // (see corpExpansion.ts) relative to the company's current scale; when demand growth outstrips
+  // it, the shortfall is banked as demandBacklog (lost sales the company is failing to fulfill)
+  // instead of silently vanishing, and can be recovered once capacity catches up. Non-physical
+  // industries (software, finance, services, ...) are never gated by this at all.
+  manufacturingCapacity: number; // 0..~200; 100 = comfortably meeting current demand
+  demandBacklog: number; // $ of unmet demand carried forward, revenue-equivalent
+  stockoutStreak: number; // consecutive years capacity failed to keep up with demand
+
   status: CompanyStatus;
   history: CompanyHistoryPoint[];
 }

@@ -14,6 +14,21 @@ connection or choose not to sign in.
 
 ## Highlights
 
+- **V54 — Real manufacturing capacity vs. demand.** Physical-goods companies (retail,
+  auto, consumer, industrial, food, agriculture, construction, defense, luxury, mining, energy,
+  and other production-tagged industries — software, finance, and services are untouched) can no
+  longer just will their revenue up to whatever the growth formula wants: a new
+  **Manufacturing Capacity** stat, computed from real factories (V50's Corporate Empire) relative
+  to the company's current scale, actually gates how much of a year's demand growth converts into
+  revenue. Run hot without building capacity and the shortfall banks as a **demand backlog** — real
+  unmet demand, shown in dollars, that decays as frustrated customers buy elsewhere, with a
+  "customers are waiting on backorders" warning once it bites for two years running, and a
+  reputation hit if it drags on for three or more. Build or automate factories and spare capacity
+  first fulfills that year's growth, then chips away at any backlog — a factory investment finally
+  showing up as recovered sales, not just a cash dividend. Two new achievements (Supply Chain
+  Master, Back on Track) track keeping comfortably ahead of demand and recovering from a serious
+  shortfall. Fully additive: non-physical industries and old saves behave exactly as before.
+
 - **V53 — Supply-train buildings.** The "supply train" idea now has a real physical presence in
   both 3D scenes that touch supply chains. The ambient **Supply Chain Visualizer** (each company's
   detail screen) swaps its abstract primitives for small building silhouettes at every stage — a

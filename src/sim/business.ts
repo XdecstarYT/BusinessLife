@@ -105,9 +105,41 @@ export function createCompany(opts: FoundCompanyOptions, rng: RNG): Company {
     activeCampaign: null,
     campaignsRun: 0,
     grudgeAgainstPlayer: 0,
+    manufacturingCapacity: 100,
+    demandBacklog: 0,
+    stockoutStreak: 0,
     status: 'active',
     history: [],
   };
+}
+
+/** Physical-goods industries whose revenue growth is actually gated by production capacity (see
+ * Company.manufacturingCapacity below) — software, finance, media and other non-physical
+ * industries are exempt and behave exactly as before this system existed. */
+const MANUFACTURING_TAGS = new Set([
+  'manufacturing', 'industrial', 'auto', 'consumer', 'retail', 'food', 'agriculture',
+  'construction', 'defense', 'luxury', 'mining', 'energy', 'oil', 'gas', 'coal', 'solar',
+  'nuclear', 'housing',
+]);
+
+export function isManufacturingIndustry(ind: Industry): boolean {
+  return ind.tags.some((t) => MANUFACTURING_TAGS.has(t));
+}
+
+/** V54: recompute manufacturingCapacity toward its target each tick (smoothed, not snapped, so
+ * building/losing a factory shows up as a trend rather than an instant jump). Two sources:
+ * a small organic baseline from automation/workforce (artisanal-scale output with no dedicated
+ * factories), and the real payoff from V50's factories — normalized against the company's current
+ * revenue so bigger companies genuinely need more factories to stay at 100, not just one. */
+function tickManufacturingCapacity(c: Company): void {
+  const factoryScore = c.factories.reduce(
+    (sum, f) => sum + f.capacityUnits * (0.7 + f.automationLevel * 0.15) * (f.condition / 100),
+    0,
+  );
+  const capacityFromFactories = (factoryScore / Math.max(1, c.revenue / 40_000)) * 100;
+  const organicCapacity = 55 + Math.min(25, c.automation * 0.25);
+  const targetCapacity = clamp(organicCapacity + capacityFromFactories, 10, 220);
+  c.manufacturingCapacity += (targetCapacity - c.manufacturingCapacity) * 0.35;
 }
 
 /** Fair-value estimate used for sales, acquisitions and IPO pricing. */
@@ -154,6 +186,10 @@ export function tickCompany(c: Company, ctx: CompanyTickContext): CompanyTickRes
   const e = country.economy;
   const law = aggregateLawEffects(country);
   let headline: string | null = null;
+  // Backfill for saves from before V54's manufacturing-capacity system.
+  c.manufacturingCapacity ??= 100;
+  c.demandBacklog ??= 0;
+  c.stockoutStreak ??= 0;
 
   // --- Demand ------------------------------------------------------------
   const cycle = 1 + e.gdpGrowth * (1 + ind.cyclicality * 3);
@@ -253,7 +289,56 @@ export function tickCompany(c: Company, ctx: CompanyTickContext): CompanyTickRes
 
   const growthPotential = cycle * confidence * lawMult * priceFit * marketingPower * qualityPull * managerMult * moraleMult * commodityMult * worldEventMult * climateMult * eraMult * noise;
   const cappedGrowth = 1 + (clamp(growthPotential, 0.4, 2.2) - 1) * saturation;
-  c.revenue = Math.max(1000, c.revenue * cappedGrowth);
+  const desiredRevenue = Math.max(1000, c.revenue * cappedGrowth);
+
+  // --- Manufacturing capacity vs. demand (V54) ----------------------------
+  // Physical-goods companies can't just will their revenue up to what the formula above wants —
+  // they need real production capacity (factories) to fulfill it. Service/software/finance
+  // industries are untouched: desiredRevenue applies exactly as before this system existed.
+  if (isManufacturingIndustry(ind)) {
+    tickManufacturingCapacity(c);
+    const capacityRatio = clamp(c.manufacturingCapacity / 100, 0.15, 2.5);
+    const desiredGrowth = desiredRevenue - c.revenue;
+    const prevStockoutStreak = c.stockoutStreak;
+    if (desiredGrowth > 0) {
+      const fulfillableGrowth = desiredGrowth * Math.min(1, capacityRatio);
+      const unmet = desiredGrowth - fulfillableGrowth;
+      c.revenue += fulfillableGrowth;
+      // Backlog accumulates unmet demand but also bleeds away (customers who can't wait buy
+      // from a competitor instead), and spare capacity beyond this year's growth chips into
+      // any existing backlog — a factory investment finally showing results.
+      c.demandBacklog = Math.max(0, c.demandBacklog * 0.6 + unmet);
+      if (capacityRatio > 1 && c.demandBacklog > 0) {
+        const spare = c.revenue * (capacityRatio - 1) * 0.2;
+        const recovered = Math.min(c.demandBacklog, spare);
+        c.revenue += recovered;
+        c.demandBacklog -= recovered;
+      }
+      c.stockoutStreak = unmet > desiredGrowth * 0.1 ? c.stockoutStreak + 1 : Math.max(0, c.stockoutStreak - 1);
+    } else {
+      c.revenue = desiredRevenue;
+      c.demandBacklog *= 0.7;
+      c.stockoutStreak = Math.max(0, c.stockoutStreak - 1);
+    }
+    // Sustained stockouts finally cost real customers, not just this year's growth.
+    if (c.stockoutStreak >= 3) {
+      c.revenue *= 0.97;
+      c.customerSatisfaction = clamp100(c.customerSatisfaction - 2);
+    }
+    if (c.playerOwned && c.stockoutStreak === 2) {
+      headline = headline ?? `${c.name} can't keep up with demand — customers are waiting on backorders`;
+    }
+    if (c.playerOwned) {
+      if (capacityRatio >= 1.5 && c.stockoutStreak === 0 && !state.achievements.includes('supply_chain_master')) {
+        state.achievements.push('supply_chain_master');
+      }
+      if (prevStockoutStreak >= 3 && c.stockoutStreak === 0 && !state.achievements.includes('back_on_track')) {
+        state.achievements.push('back_on_track');
+      }
+    }
+  } else {
+    c.revenue = desiredRevenue;
+  }
 
   // Retail theft & security: unprotected retail-tagged businesses lose a slice of revenue to
   // shrinkage, scaled by the country's average crime rate; security investment eliminates it

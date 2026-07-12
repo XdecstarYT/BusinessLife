@@ -54,7 +54,7 @@ import {
   type BoardProposal,
   type CompanyLever,
 } from '../../sim/actions';
-import { companyValuation } from '../../sim/business';
+import { companyValuation, isManufacturingIndustry } from '../../sim/business';
 import { marketCap } from '../../sim/market';
 import {
   acquireCompany, buildFactory, exitVentureStake, foundVentureArm, launchAdCampaign,
@@ -65,6 +65,7 @@ import { Badge, Button, Card, Field, LineChart, Modal, Pill, PillRow, SectionHea
 import { money, moneyFull, pct } from '../format';
 import { INDUSTRIES, INDUSTRY_BY_ID } from '../../data/industries';
 import type { AdChannel, Company, ExecutiveRole } from '../../sim/types';
+import { clamp100 } from '../../sim/types';
 
 const HQTourScene = lazy(() => import('../three/HQTourScene').then((m) => ({ default: m.HQTourScene })));
 const SupplyChainScene = lazy(() => import('../three/SupplyChainScene').then((m) => ({ default: m.SupplyChainScene })));
@@ -616,6 +617,29 @@ function ManageModal({ companyId, onClose }: { companyId: string; onClose: () =>
 
       <div className="font-bold mt-5 mb-2">🌍 Corporate Empire</div>
       <div className="space-y-2 mb-2">
+        {isManufacturingIndustry(ind) && (
+          <Card className="p-3">
+            <div className="flex items-center justify-between mb-1">
+              <div className="text-xs font-bold">🏗️ Manufacturing Capacity</div>
+              <span className={`text-xs font-bold ${c.manufacturingCapacity >= 100 ? 'text-emerald-500' : c.manufacturingCapacity >= 70 ? 'text-amber-500' : 'text-rose-500'}`}>
+                {Math.round(c.manufacturingCapacity)}% of demand
+              </span>
+            </div>
+            <StatBar label="Capacity vs. demand" value={clamp100(c.manufacturingCapacity)} />
+            {c.demandBacklog > c.revenue * 0.01 && (
+              <div className="text-[11px] text-rose-500 mt-1">
+                ⚠️ {money(c.demandBacklog)} in unmet demand — customers are waiting on backorders
+                {c.stockoutStreak >= 1 ? ` (${c.stockoutStreak} year${c.stockoutStreak === 1 ? '' : 's'} running short)` : ''}
+              </div>
+            )}
+            {c.manufacturingCapacity < 100 && c.demandBacklog <= c.revenue * 0.01 && (
+              <div className="text-[11px] text-amber-500 mt-1">Build or upgrade factories to keep growth from outrunning production.</div>
+            )}
+            {c.manufacturingCapacity >= 100 && (
+              <div className="text-[11px] text-emerald-500 mt-1">Production is comfortably keeping up with demand.</div>
+            )}
+          </Card>
+        )}
         <Card className="p-3">
           <div className="flex items-center justify-between mb-1">
             <div className="text-xs font-bold">🏭 Factories ({c.factories.length})</div>
@@ -638,7 +662,10 @@ function ManageModal({ companyId, onClose }: { companyId: string; onClose: () =>
               })}
             </div>
           ) : (
-            <div className="text-[11px] text-slate-400">Build a factory for ongoing production capacity and an output dividend.</div>
+            <div className="text-[11px] text-slate-400">
+              Build a factory for ongoing production capacity and an output dividend
+              {isManufacturingIndustry(ind) ? ' — and to keep growth from outrunning demand (see Manufacturing Capacity above).' : '.'}
+            </div>
           )}
         </Card>
 

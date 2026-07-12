@@ -236,4 +236,7 @@ export const ACHIEVEMENTS: Record<string, AchievementDef> = {
   industry_legend_legacy: { label: 'Industry Legend', icon: '🏛️' },
   // V52: side hustles
   content_mogul: { label: 'Content Mogul', icon: '📱' },
+  // V54: manufacturing capacity vs. demand
+  supply_chain_master: { label: 'Supply Chain Master', icon: '🚂' },
+  back_on_track: { label: 'Back on Track', icon: '📦' },
 };
