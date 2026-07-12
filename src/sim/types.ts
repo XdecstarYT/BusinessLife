@@ -972,6 +972,11 @@ export interface Company {
   activeCampaign: AdCampaign | null;
   campaignsRun: number; // lifetime count, informational
 
+  // V51: Dynamic World Engine — an NPC rival's memory of specific player actions against it
+  // (failed takeover bids, price wars, patent suits, espionage, shakedowns). Grows targeted, more
+  // frequent retaliation via tickCorporateSabotage; decays slowly on its own.
+  grudgeAgainstPlayer: number; // 0..100
+
   status: CompanyStatus;
   history: CompanyHistoryPoint[];
 }
@@ -1245,6 +1250,7 @@ export interface EffectSpec {
   achievement?: string; // unlocks this achievement id if not already held
   socialFollowersPct?: number; // fraction change to social-media follower count
   cancelledYears?: number; // sets/extends a social-media backlash window this many years out
+  companyGrudgeDelta?: number; // V51: adjusts the subject company's grudgeAgainstPlayer
 }
 
 export interface EventOutcome {
@@ -1291,6 +1297,10 @@ export interface EventConditions {
   hasRival?: boolean;
   minFollowers?: number;
   cancelled?: boolean; // is currently in the middle of a social-media backlash
+  // V51: Dynamic World Engine
+  hasGrudgingRival?: boolean; // an active NPC company (any industry, same country) with real grudge built up
+  minAchievements?: number;
+  momentumState?: 'hot' | 'cold'; // gates on state.worldMomentum crossing a threshold either way
 }
 
 export interface EventTemplate {
@@ -1309,7 +1319,8 @@ export interface EventTemplate {
   weight: number;
   once?: boolean;
   conditions?: EventConditions;
-  /** Text supports placeholders: {name} {city} {country} {company} {npc} {amount} {industry} {year} */
+  /** Text supports placeholders: {name} {city} {country} {company} {npc} {amount} {industry} {year}
+   * {achievementCount} — {company} resolves to the grudging rival when hasGrudgingRival is set. */
   text: string;
   /** Resolved once when the event fires; referenced by {amount} and moneyAmountMult. */
   amount?: { min: number; max: number; pctOfMoney?: number };
@@ -1456,6 +1467,12 @@ export interface GameState {
   // statically in data/athletics.ts, keyed by team id. Populated lazily the first time any team
   // is referenced (tryout, standings view, AI-vs-AI season sim) rather than for all teams up front.
   athleteTeams: Record<string, AthleteTeamState>;
+
+  // V51: Dynamic World Engine — self-relative momentum (dynamic difficulty/pacing) and a
+  // persistent per-industry record of how much the player's own companies have shaped it, which
+  // outlives the player exiting that industry (see business.ts's tickIndustryEra).
+  worldMomentum: number; // -100..100, recent net-worth growth vs. the player's own longer-run trend
+  industryDisruptionLegacy: Record<string, number>; // sparse industryId -> cumulative player impact, decays slowly
 }
 
 export interface CrimeFamily {

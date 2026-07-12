@@ -14,6 +14,20 @@ connection or choose not to sign in.
 
 ## Highlights
 
+- **V51 — The Dynamic World Engine: the world remembers you, adapts to you, and outlasts you.**
+  Rival companies now hold a real, visible **grudge** (surfaced right on their card in Business →
+  Rivals) driven by your actual history with them — a failed hostile takeover, a price war, a
+  patent suit, corporate espionage, or a mob shakedown all leave a mark. A grudging rival is both
+  more likely to retaliate and specifically the one who does, with headlines and personalized
+  events (`{company}` resolves to the actual rival) calling out the beef by name — and you can
+  buy peace or provoke it further from inside those events. **World Momentum** is a new
+  self-relative score comparing your recent net-worth trajectory to your own longer-run trend —
+  a real hot streak makes life more eventful (and riskier), a cold streak eases off — with its own
+  edge-triggered headlines and callback events when the tide turns. **Industry Legacy** makes
+  your economic footprint permanent: dominate an industry with real market share and patents and
+  it keeps trending in your favor for years after you've sold up and moved on, gutting one leaves
+  it depressed just as long. Three new achievements (Arch Nemesis, Momentum Rider, Industry
+  Legend) track all of it.
 - **V50 — The biggest business expansion yet: a Corporate Empire layer on top of every
   company.** **Friendly Acquisitions** let you buy out any private rival outright at a fair-value
   premium — no board vote, no contest, distinct from the existing hostile-takeover bid which stays

@@ -557,6 +557,7 @@ export function spyOnCompany(state: GameState, targetCompanyId: string): ActionR
     }
     target.brand = clamp100(target.brand - 5);
     target.quality = clamp100(target.quality - 3);
+    target.grudgeAgainstPlayer = clamp100(target.grudgeAgainstPlayer + 8);
     p.notoriety = clamp100(p.notoriety + 4);
     commit(state, rng);
     log(state, `🕵️ Corporate espionage against ${target.name} paid off.`, 'business');
@@ -572,6 +573,7 @@ export function spyOnCompany(state: GameState, targetCompanyId: string): ActionR
   const founder = target.founderId !== 'player' ? state.npcs[target.founderId] : null;
   if (founder) founder.opinionOfPlayer = clamp(founder.opinionOfPlayer - 40, -100, 100);
   if (rng.chance(0.3)) p.criminalRecord++;
+  target.grudgeAgainstPlayer = clamp100(target.grudgeAgainstPlayer + 20);
   commit(state, rng);
   log(state, `🚨 Your corporate espionage attempt against ${target.name} was exposed.`, 'bad');
   return { ok: false, message: `Caught red-handed spying on ${target.name}.` };
@@ -606,6 +608,7 @@ export function startPriceWar(state: GameState, companyId: string, targetCompany
     target.priceLevel = clamp(target.priceLevel - rng.range(0.05, 0.15), 0.7, 1.5);
     logHistory(state, `${target.name} slashed prices in retaliation against ${mine.name}'s price war.`);
   }
+  target.grudgeAgainstPlayer = clamp100(target.grudgeAgainstPlayer + 9);
   commit(state, rng);
   log(state, `Undercut ${target.name} on price with ${mine.name}.`, 'business');
   return {
@@ -643,12 +646,14 @@ export function filePatentLawsuit(state: GameState, companyId: string, targetCom
     target.cash -= settlement;
     mine.cash += settlement;
     target.brand = clamp100(target.brand - rng.range(4, 10));
+    target.grudgeAgainstPlayer = clamp100(target.grudgeAgainstPlayer + 14);
     commit(state, rng);
     log(state, `${mine.name} won a patent-infringement suit against ${target.name}.`, 'business');
     return { ok: true, message: `Won! ${target.name} pays a $${Math.round(settlement).toLocaleString()} settlement.` };
   }
   mine.cash -= cost * rng.range(0.5, 1.2);
   mine.brand = clamp100(mine.brand - rng.range(2, 6));
+  target.grudgeAgainstPlayer = clamp100(target.grudgeAgainstPlayer + 6);
   commit(state, rng);
   log(state, `${mine.name} lost a patent-infringement suit against ${target.name}.`, 'bad');
   return { ok: false, message: `Lost the case — ${target.name} successfully defended itself, plus extra legal costs.` };
@@ -695,6 +700,7 @@ export function attemptHostileTakeover(state: GameState, targetCompanyId: string
   const dueDiligenceFee = offerAmount * 0.05;
   if (!success) {
     p.money -= dueDiligenceFee;
+    target.grudgeAgainstPlayer = clamp100(target.grudgeAgainstPlayer + 22);
     commit(state, rng);
     log(state, `Your takeover bid for ${target.name} was rebuffed by the board.`, 'bad');
     return { ok: false, message: `${target.name}'s board rejected your bid.` };
@@ -703,6 +709,7 @@ export function attemptHostileTakeover(state: GameState, targetCompanyId: string
   target.playerOwned = true;
   target.playerSharePct = clamp(0.51 + (ratio - 1) * 0.2, 0.51, 0.95);
   target.founderId = 'player';
+  target.grudgeAgainstPlayer = 0;
   p.companies.push(target.id);
   p.reputation = clamp100(p.reputation + 3);
   p.influence = clamp100(p.influence + 2);
@@ -2737,6 +2744,7 @@ export function protectionRacket(state: GameState, targetCompanyId: string): Act
     p.dirtyMoney += take * (1 + p.turfControl / 200);
     p.notoriety = clamp100(p.notoriety + 3);
     p.investigationHeat = clamp100(p.investigationHeat + 8);
+    target.grudgeAgainstPlayer = clamp100(target.grudgeAgainstPlayer + 18);
     commit(state, rng);
     log(state, `Shook down ${target.name} for $${Math.round(take).toLocaleString()}.`, 'bad');
     return { ok: true, message: `Collected $${Math.round(take).toLocaleString()}.` };
@@ -2744,6 +2752,7 @@ export function protectionRacket(state: GameState, targetCompanyId: string): Act
   p.reputation = clamp100(p.reputation - 5);
   p.notoriety = clamp100(p.notoriety + 6);
   p.investigationHeat = clamp100(p.investigationHeat + 20);
+  target.grudgeAgainstPlayer = clamp100(target.grudgeAgainstPlayer + 10);
   commit(state, rng);
   log(state, `${target.name} refused to pay and reported you.`, 'bad');
   return { ok: false, message: 'They refused and reported you.' };

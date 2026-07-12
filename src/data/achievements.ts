@@ -230,4 +230,8 @@ export const ACHIEVEMENTS: Record<string, AchievementDef> = {
   viral_campaign: { label: 'Viral Campaign', icon: '📢' },
   ad_disaster: { label: 'PR Disaster', icon: '💥' },
   mega_corp: { label: 'Mega Corp', icon: '🏙️' },
+  // V51: Dynamic World Engine — grudge-driven rivalries, dynamic pacing, persistent legacy.
+  arch_nemesis: { label: 'Arch Nemesis', icon: '😤' },
+  momentum_rider: { label: 'Momentum Rider', icon: '🔥' },
+  industry_legend_legacy: { label: 'Industry Legend', icon: '🏛️' },
 };

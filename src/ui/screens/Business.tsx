@@ -117,7 +117,14 @@ export function Business() {
                       {ind?.name} · cap {money(marketCap(c))} · price {c.priceLevel < 0.9 ? 'discount' : c.priceLevel > 1.1 ? 'premium' : 'mid-market'} · {Math.round(c.marketShare * 100)}% share
                     </div>
                   </div>
-                  {c.isPublic ? <Badge tone="brand">Public</Badge> : <Badge>Private</Badge>}
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    {c.isPublic ? <Badge tone="brand">Public</Badge> : <Badge>Private</Badge>}
+                    {c.grudgeAgainstPlayer > 60 ? (
+                      <Badge tone="bad">😤 Grudge {Math.round(c.grudgeAgainstPlayer)}</Badge>
+                    ) : c.grudgeAgainstPlayer > 30 ? (
+                      <Badge tone="warn">😒 Grudge {Math.round(c.grudgeAgainstPlayer)}</Badge>
+                    ) : null}
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <Button size="sm" variant="soft" onClick={() => run(spyOnCompany, c.id)}>🕵️ Espionage</Button>

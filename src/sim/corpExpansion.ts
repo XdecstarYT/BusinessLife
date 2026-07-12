@@ -63,6 +63,7 @@ export function acquireCompany(state: GameState, targetCompanyId: string): CorpA
   target.playerOwned = true;
   target.playerSharePct = 1;
   target.founderId = 'player';
+  target.grudgeAgainstPlayer = 0;
   p.companies.push(target.id);
   p.reputation = clamp100(p.reputation + 2);
   awardAchievement(state, 'acquisition_king');

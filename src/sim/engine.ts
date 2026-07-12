@@ -796,6 +796,24 @@ function computeLegacyScore(state: GameState, worth: number): number {
   return Math.round(clamp(score, 0, 100));
 }
 
+/** V51: Dynamic World Engine — a self-relative "hot streak vs. cold streak" score (-100..100)
+ * comparing the player's recent net-worth growth rate to their own longer-run trend, rather than
+ * needing a global leaderboard. Used to pace event frequency (fireEvents) and drives a couple of
+ * edge-triggered callback headlines/events. Deliberately noisy-resistant: needs real history and
+ * moves gradually, not a single good/bad year. */
+function computeWorldMomentum(state: GameState): number {
+  const hist = state.netWorthHistory;
+  const n = hist.length;
+  if (n < 6) return 0;
+  const recentSpan = Math.min(4, n - 1);
+  const longerSpan = Math.min(19, n - 1);
+  const recentRate = (hist[n - 1].value - hist[n - 1 - recentSpan].value) / recentSpan;
+  const longerRate = (hist[n - 1].value - hist[n - 1 - longerSpan].value) / longerSpan;
+  const scale = Math.abs(longerRate) + Math.abs(hist[n - 1].value) * 0.02 + 20_000;
+  const relative = (recentRate - longerRate) / scale;
+  return Math.round(clamp(relative * 250, -100, 100));
+}
+
 /** Yearly bucket-list pass: pay out any goal whose progress crossed the line. */
 function tickBucketList(state: GameState): void {
   if (!state.bucketList?.length) return;
@@ -1004,6 +1022,9 @@ export function advanceYear(state: GameState): GameState {
   if (state.casinoJackpots === undefined) state.casinoJackpots = {}; // backfill for saves from before the Casino
   if (state.player.casinoTotalWagered === undefined) state.player.casinoTotalWagered = 0;
   if (state.player.casinoBiggestWin === undefined) state.player.casinoBiggestWin = 0;
+  // V51: Dynamic World Engine. Saves from before it migrate here.
+  state.worldMomentum ??= 0;
+  state.industryDisruptionLegacy ??= {};
   const rng = new RNG(state.seed);
   rng.state = state.rngState;
   const netWorthStart = netWorth(state);
@@ -1103,6 +1124,16 @@ export function advanceYear(state: GameState): GameState {
     // V50: Corporate Empire expansion — factory dividends, foreign office ramp-up, campaign
     // resolution, venture portfolio auto-resolution. Additive to tickCompany() above.
     if (!res.wentBankrupt) businessHeadlines.push(...tickCorpExpansion(company, state, rng));
+    // V51: a player company that's genuinely moving the needle in its industry (real share,
+    // real patents) leaves a permanent mark on that industry's long-run trajectory — see
+    // tickIndustryEra's legacy bias, which outlives the player exiting the industry entirely.
+    if (!res.wentBankrupt && company.playerOwned) {
+      const legacyGain = company.marketShare * 0.6 + company.patents * 0.03;
+      if (legacyGain > 0) {
+        const key = company.industryId;
+        state.industryDisruptionLegacy[key] = Math.min(20, (state.industryDisruptionLegacy[key] ?? 0) + legacyGain);
+      }
+    }
     tickStock(company, state, rng);
   }
   businessHeadlines.push(...tickMergers(state, rng));
@@ -1183,6 +1214,16 @@ export function advanceYear(state: GameState): GameState {
   // 8. Records & endings
   const netWorthEnd = netWorth(state);
   state.netWorthHistory.push({ year: state.year, value: netWorthEnd });
+  // V51: world momentum — lags one tick behind by design (this year's fireEvents() pacing above
+  // used last year's value), which reads as "recent momentum shapes what happens next," not a
+  // same-year feedback loop.
+  const momentumBefore = state.worldMomentum;
+  state.worldMomentum = computeWorldMomentum(state);
+  if (p.alive && momentumBefore < 60 && state.worldMomentum >= 60) {
+    log(state, `📈 Everything is clicking lately — you're on the hottest streak of your life.`, 'good');
+  } else if (p.alive && momentumBefore > -60 && state.worldMomentum <= -60) {
+    log(state, `📉 The tide has turned — it feels like nothing's going your way lately.`, 'bad');
+  }
   state.yearRecap = {
     year: yearBefore,
     netWorthStart,
@@ -1255,6 +1296,8 @@ export function advanceYear(state: GameState): GameState {
     ['crime_family_kingpin', p.crimeRank >= 5],
     ['election_landslide', !!p.lastElectionResult && p.lastElectionResult.won && p.lastElectionResult.playerSharePct >= 65],
     ['stock_market_legend', portfolioValue(state) >= 1e8],
+    ['momentum_rider', state.worldMomentum >= 75],
+    ['industry_legend_legacy', Object.values(state.industryDisruptionLegacy).some((v) => v >= 15)],
   ];
   const MILESTONE_LOG: Record<string, string> = {
     millionaire: '🏆 You are a millionaire!',
@@ -1317,6 +1360,8 @@ export function advanceYear(state: GameState): GameState {
     crime_family_kingpin: '🏆 Climbed to the top rank of your crime family.',
     election_landslide: '🏆 Won an election in a landslide.',
     stock_market_legend: '🏆 Your stock portfolio passed $100 million.',
+    momentum_rider: '🏆 Riding the hottest streak of your life.',
+    industry_legend_legacy: '🏆 Your mark on an entire industry will outlast you.',
   };
   for (const [key, hit] of milestones) {
     if (hit && !state.achievements.includes(key)) {

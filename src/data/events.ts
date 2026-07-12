@@ -2823,5 +2823,65 @@ ev({
   ],
 });
 
+// ---------------------------------------------------------------------------
+// V51: Dynamic World Engine — personalized callback events. hasGrudgingRival forces
+// {company} to the NPC company (any industry, your country) holding the most grudge against
+// you (see corpExpansion-adjacent grudge hooks in actions.ts and business.ts's
+// tickCorporateSabotage); momentumState gates on state.worldMomentum crossing a real threshold;
+// minAchievements references the player's actual accumulated career, not generic flavor text.
+// ---------------------------------------------------------------------------
+ev({
+  id: 'grudge_rival_smear', category: 'business', weight: 5, conditions: { hasGrudgingRival: true },
+  text: '{company} clearly hasn\'t forgotten what happened between you — word is they\'re telling anyone who\'ll listen that you can\'t be trusted in a deal.',
+  amount: { min: 2_000, max: 8_000 },
+  choices: [
+    { label: 'Hit back through the press', skillCheck: { skillId: SK.spin, bonusPerLevel: 0.005 }, outcomes: [
+      { chance: 0.5, text: 'Your version of events won out. {company} looks petty.', effects: { reputation: 4, companyGrudgeDelta: -10 } },
+      { chance: 0.5, text: 'It just fanned the flames. Everyone\'s talking about the feud now.', effects: { reputation: -3, notoriety: 3, companyGrudgeDelta: 10 } },
+    ] },
+    { label: 'Offer an olive branch — buy them a drink and clear the air ({amount})', skillCheck: { skillId: SK.persuasion, bonusPerLevel: 0.006 }, outcomes: [
+      { chance: 0.5, text: 'It actually worked. The grudge seems to be fading.', effects: { moneyAmountMult: -1, companyGrudgeDelta: -35, karma: 3 } },
+      { chance: 0.5, text: 'They took the drink and kept the grudge.', effects: { moneyAmountMult: -1, happiness: -2 } },
+    ] },
+    { label: 'Ignore it — let the work speak for itself', effects: { karma: 2, smarts: 1 } },
+  ],
+});
+ev({
+  id: 'grudge_rival_boils_over', category: 'business', weight: 3, conditions: { hasGrudgingRival: true, minReputation: 20 },
+  text: 'Sources say {company} has been quietly rallying other players in the industry against you — old grudges have a way of finding company.',
+  amount: { min: 5_000, max: 20_000 },
+  choices: [
+    { label: 'Get ahead of it — call in favors of your own ({amount})', outcomes: [
+      { chance: 0.55, text: 'Your network held. The coalition against you fizzled out.', effects: { moneyAmountMult: -1, influence: 4, companyGrudgeDelta: -15 } },
+      { chance: 0.45, text: 'It cost you and didn\'t change much.', effects: { moneyAmountMult: -1, happiness: -2 } },
+    ] },
+    { label: 'Let them come — you\'ll deal with it head-on', effects: { notoriety: 4, karma: -2 } },
+  ],
+});
+ev({
+  id: 'momentum_hot_streak', category: 'life', weight: 4, conditions: { momentumState: 'hot' },
+  text: 'Everything you\'ve touched lately has turned to gold — {name}, this is about as hot as a streak gets.',
+  choices: [
+    { label: 'Press the advantage — go bigger', effects: { happiness: 6, notoriety: 2, karma: -1 } },
+    { label: 'Stay grounded and bank the gains', effects: { happiness: 3, karma: 2, money: 10_000 } },
+  ],
+});
+ev({
+  id: 'momentum_cold_streak', category: 'life', weight: 4, conditions: { momentumState: 'cold' },
+  text: 'It feels like the tide has turned against you lately — nothing\'s been landing the way it used to.',
+  choices: [
+    { label: 'Double down and grind through it', effects: { happiness: -3, smarts: 2, skillXp: [SK.strategy, 8] } },
+    { label: 'Take a step back and regroup', effects: { happiness: 4, health: 3 } },
+  ],
+});
+ev({
+  id: 'legacy_career_retrospective', category: 'media', weight: 2, once: true, conditions: { minAchievements: 10 },
+  text: 'A local magazine wants to run a retrospective on your career — {achievementCount} milestones and counting, by their count.',
+  choices: [
+    { label: 'Sit for the interview', effects: { reputation: 6, popularity: 3, happiness: 4 } },
+    { label: 'Decline — let the record speak for itself', effects: { karma: 2 } },
+  ],
+});
+
 
 export const EVENT_TEMPLATES: EventTemplate[] = E;

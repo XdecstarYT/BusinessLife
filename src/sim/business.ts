@@ -104,6 +104,7 @@ export function createCompany(opts: FoundCompanyOptions, rng: RNG): Company {
     ventureInvestments: [],
     activeCampaign: null,
     campaignsRun: 0,
+    grudgeAgainstPlayer: 0,
     status: 'active',
     history: [],
   };
@@ -124,8 +125,14 @@ export function companyValuation(c: Company): number {
 export function tickIndustryEra(state: GameState, rng: RNG): void {
   for (const ind of state.industries) {
     const prev = state.industryEraMultiplier[ind.id] ?? 1;
-    const drift = (ind.techIntensity - 0.4) * 0.006 - (ind.regulationSensitivity - 0.5) * 0.002 + rng.range(-0.003, 0.003);
+    // V51: a persistent, permanent-outlasting-the-player nudge from how much the player's own
+    // companies have historically shaped this industry (see the legacy-accumulation hook in
+    // engine.ts's per-company loop) — an industry you dominated keeps trending your way for
+    // years after you've moved on, and one you gutted keeps sagging.
+    const legacy = state.industryDisruptionLegacy[ind.id] ?? 0;
+    const drift = (ind.techIntensity - 0.4) * 0.006 - (ind.regulationSensitivity - 0.5) * 0.002 + legacy * 0.0015 + rng.range(-0.003, 0.003);
     state.industryEraMultiplier[ind.id] = clamp(prev + drift, 0.55, 1.85);
+    if (legacy !== 0) state.industryDisruptionLegacy[ind.id] = legacy * 0.985;
   }
 }
 
@@ -482,33 +489,49 @@ export function tickNpcIPOs(state: GameState, rng: RNG): string[] {
 }
 
 /** NPC rivals occasionally take a shot at a player-owned company: smear campaigns, poaching,
- * price undercutting, or aggressive legal action. Purely emergent — the player doesn't trigger this. */
+ * price undercutting, or aggressive legal action. Purely emergent — the player doesn't trigger
+ * this directly, but V51's grudge system (bumped by attemptHostileTakeover/startPriceWar/
+ * filePatentLawsuit/spyOnCompany/protectionRacket in actions.ts) makes it targeted: a rival who
+ * remembers being wronged is both more likely to strike and more likely to be the one who does. */
 export function tickCorporateSabotage(state: GameState, rng: RNG): string[] {
   const headlines: string[] = [];
+  // Grudge decays on its own every year regardless of whether it boils over this time.
+  for (const co of Object.values(state.companies)) {
+    if (co.status !== 'active') continue;
+    co.grudgeAgainstPlayer ??= 0;
+    if (co.grudgeAgainstPlayer >= 90 && !state.achievements.includes('arch_nemesis')) state.achievements.push('arch_nemesis');
+    if (co.grudgeAgainstPlayer > 0) co.grudgeAgainstPlayer = Math.max(0, co.grudgeAgainstPlayer - 3);
+  }
   for (const c of Object.values(state.companies)) {
     if (c.status !== 'active' || !c.playerOwned) continue;
     const rivals = Object.values(state.companies).filter(
       (r) => r.status === 'active' && !r.playerOwned && r.industryId === c.industryId && r.countryId === c.countryId && r.revenue > c.revenue * 0.3,
     );
-    if (!rivals.length || !rng.chance(0.06)) continue;
-    const rival = rng.pick(rivals);
+    if (!rivals.length) continue;
+    const maxGrudge = Math.max(0, ...rivals.map((r) => r.grudgeAgainstPlayer));
+    if (!rng.chance(0.06 + maxGrudge * 0.0035)) continue;
+    const rival = rng.weighted(rivals, (r) => 1 + r.grudgeAgainstPlayer * 0.2);
+    const grudging = rival.grudgeAgainstPlayer > 40;
     const kind = rng.pick(['misinformation', 'poaching', 'undercutting', 'legal_action'] as const);
+    const grudgeSuffix = grudging ? ` — still settling the score over your past dealings` : '';
     if (kind === 'misinformation') {
-      c.brand = clamp100(c.brand - rng.range(4, 10));
-      headlines.push(`${rival.name} is spreading misinformation about ${c.name} online.`);
+      c.brand = clamp100(c.brand - rng.range(4, 10) * (grudging ? 1.4 : 1));
+      headlines.push(`${rival.name} is spreading misinformation about ${c.name} online${grudgeSuffix}.`);
     } else if (kind === 'poaching') {
       c.managerQuality = clamp100(c.managerQuality - rng.range(3, 8));
       c.morale = clamp100(c.morale - rng.range(2, 6));
-      headlines.push(`${rival.name} poached several key staff from ${c.name}.`);
+      headlines.push(`${rival.name} poached several key staff from ${c.name}${grudgeSuffix}.`);
     } else if (kind === 'undercutting') {
-      c.revenue = Math.max(1000, c.revenue * (1 - rng.range(0.03, 0.08)));
-      headlines.push(`${rival.name} is aggressively undercutting ${c.name} on price.`);
+      c.revenue = Math.max(1000, c.revenue * (1 - rng.range(0.03, 0.08) * (grudging ? 1.3 : 1)));
+      headlines.push(`${rival.name} is aggressively undercutting ${c.name} on price${grudgeSuffix}.`);
     } else {
       const legalCost = Math.min(c.cash, Math.max(5_000, c.revenue * 0.02));
       c.cash -= legalCost;
       c.brand = clamp100(c.brand - rng.range(1, 4));
-      headlines.push(`${c.name} is fighting off a nuisance lawsuit filed by ${rival.name}.`);
+      headlines.push(`${c.name} is fighting off a nuisance lawsuit filed by ${rival.name}${grudgeSuffix}.`);
     }
+    // Acting on the grudge is cathartic — it doesn't erase the history, but it takes the edge off.
+    rival.grudgeAgainstPlayer = clamp(rival.grudgeAgainstPlayer * 0.5, 0, 100);
   }
   return headlines;
 }
