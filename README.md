@@ -14,6 +14,14 @@ connection or choose not to sign in.
 
 ## Highlights
 
+- **V61 — The in-game Update Log switches to Major.Minor version numbers.** Instead of a flat
+  per-session counter, `data/changelog.ts` entries are now versioned like `V1.0`, `V1.1`, `V2.0`
+  — a minor update (content batch, polish, one extension to an existing system) bumps the decimal
+  by 0.1, and a major update (a brand-new life path, a new core system, a fundamental UI/engine
+  change) rounds up to the next whole number, decimal reset to 0. The existing 15 entries were
+  renumbered under the new scheme, starting from `V1.0` at Drug Empire; every future entry follows
+  the same rule from here on.
+
 - **V60 — An in-game Update Log.** A new player-facing changelog (`data/changelog.ts`), condensed
   into scannable patch notes rather than developer prose, covering everything since V47 (Drug
   Empire) through the current version. Reachable two ways: a "🆕 What's New" button on the main
