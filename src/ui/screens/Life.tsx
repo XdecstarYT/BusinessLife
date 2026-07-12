@@ -12,6 +12,7 @@ import { useGame, type Screen } from '../../store/gameStore';
 import { adoptPet, attemptPrisonEscape, bribeJudge, buyLotteryTicket, buyScratchCard, commitSuicide, contestTerritory, CRIME_RANK_TITLES, declareCrimeWar, doActivity, donateToFoundation, enterWitnessProtection, foundCharityFoundation, goStraight, heist, issuePublicApology, joinCrimeFamily, playWithPet, postOnSocialMedia, proposeCrimeAlliance, requestParole, retire, socialMediaPostStyles, writeMemoir } from '../../sim/actions';
 import { PET_CATALOG, PET_SPEC_BY_KIND } from '../../sim/pets';
 import { playerCrimeFamily } from '../../sim/crime';
+import { attemptSnitch, bribeGuard, earnRespect, joinPrisonGang, PRISON_GANGS, sellContraband, smuggleContraband, startRiot } from '../../sim/prison';
 import { netWorth } from '../../sim/engine';
 import { Badge, Button, Card, CircleTile, Modal, Pill, PillRow, SectionHeader, StatBar } from '../components';
 import { money } from '../format';
@@ -173,6 +174,38 @@ export function Life() {
             <Button size="sm" variant="soft" className="col-span-2" disabled={p.yearsServedThisSentence < 1} onClick={() => run(requestParole)}>
               ⚖️ Request Parole
             </Button>
+          </div>
+
+          {/* Cellblock politics — deepens the jail state itself rather than adding a standalone
+              career screen, since incarceration is modal, not a path to navigate to. */}
+          <div className="mt-3 pt-3 border-t border-rose-200 dark:border-rose-900/50">
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-bold text-sm">🏚️ Cellblock</span>
+              {p.prisonLife?.gangId && <Badge tone="neutral">{p.prisonLife.gangId}</Badge>}
+              {(p.prisonLife?.cellblockHeat ?? 0) > 40 && <Badge tone="warn">🔥 Heat {Math.round(p.prisonLife!.cellblockHeat)}</Badge>}
+            </div>
+            {p.prisonLife && (
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
+                Respect {Math.round(p.prisonLife.respect)} · Contraband {p.prisonLife.contraband}
+                {p.prisonLife.snitched && ' · Marked as a snitch'}
+              </p>
+            )}
+            {!p.prisonLife?.gangId ? (
+              <PillRow>
+                {PRISON_GANGS.map((g) => (
+                  <Pill key={g} label={`🤝 ${g}`} onClick={() => run(joinPrisonGang, g)} />
+                ))}
+              </PillRow>
+            ) : (
+              <PillRow>
+                <Pill label="👊 Earn Respect" onClick={() => run(earnRespect)} />
+                <Pill label="📦 Smuggle Contraband" onClick={() => run(smuggleContraband)} />
+                {(p.prisonLife?.contraband ?? 0) > 0 && <Pill label="🤝 Trade Contraband" onClick={() => run(sellContraband)} />}
+                <Pill label="🔥 Start a Riot" onClick={() => run(startRiot)} />
+                <Pill label="💵 Bribe a Guard" onClick={() => run(bribeGuard)} />
+                {!p.prisonLife?.snitched && <Pill label="🗣️ Snitch for Time Off" onClick={() => run(attemptSnitch)} />}
+              </PillRow>
+            )}
           </div>
         </Card>
       )}

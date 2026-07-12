@@ -25,6 +25,10 @@ import { Casino } from './ui/screens/Casino';
 import { Athlete } from './ui/screens/Athlete';
 import { Military } from './ui/screens/Military';
 import { Drugs } from './ui/screens/Drugs';
+import { Entertainment } from './ui/screens/Entertainment';
+import { Medical } from './ui/screens/Medical';
+import { Cult } from './ui/screens/Cult';
+import { Space } from './ui/screens/Space';
 import { Leaderboard } from './ui/screens/Leaderboard';
 
 export default function App() {
@@ -64,6 +68,10 @@ export default function App() {
           {screen === 'athlete' && <Athlete />}
           {screen === 'military' && <Military />}
           {screen === 'drugs' && <Drugs />}
+          {screen === 'entertainment' && <Entertainment />}
+          {screen === 'medical' && <Medical />}
+          {screen === 'cult' && <Cult />}
+          {screen === 'space' && <Space />}
           {screen === 'leaderboard' && <Leaderboard />}
         </div>
       </AppShell>

@@ -302,6 +302,106 @@ export interface Player {
   athlete: AthleteCareer | null; // V35: soccer/football/running career, independent of the office job/company paths
   military: MilitaryCareer | null; // V44: enlisted service career, independent of the job/company/athlete paths
   drugOperation: DrugOperation | null; // V47: Drug Empire — independent of crimeFamilyId, though membership boosts it
+  entertainmentCareer: EntertainmentCareer | null; // V49: actor/musician fame career
+  medicalCareer: MedicalCareer | null; // V49: doctor/surgeon career
+  cult: CultMovement | null; // V49: founded religious/spiritual movement
+  astronaut: AstronautCareer | null; // V49: space agency career
+  prisonLife: PrisonLifeState | null; // V49: cellblock politics while incarcerated, reset on release
+}
+
+// ---------------------------------------------------------------------------
+// V49: five mega features — Entertainment, Medical, Cult, Space, Prison Life
+// ---------------------------------------------------------------------------
+
+export type EntertainmentTrack = 'actor' | 'musician';
+
+export interface EntertainmentProject {
+  id: string;
+  title: string;
+  kind: 'film' | 'album' | 'tour' | 'single' | 'show';
+  yearReleased: number;
+  budgetOrBudgetTier: number;
+  performanceScore: number; // 0..100, box office / chart performance
+  awardsWon: string[]; // award ids
+}
+
+export interface EntertainmentCareer {
+  active: boolean;
+  track: EntertainmentTrack;
+  fame: number; // 0..100
+  talent: number; // 0..100, grows with training/roles
+  wealth: number; // lifetime entertainment earnings, informational
+  hasAgent: boolean;
+  agentCut: number; // 0..1, share of earnings taken
+  labelOrStudioId: string | null; // name of the label/studio currently signed to, if any
+  projects: EntertainmentProject[];
+  scandalsCount: number;
+  feudTargetName: string | null;
+  retired: boolean;
+}
+
+export type MedicalSpecialty = string; // id into data/medical.ts MEDICAL_SPECIALTIES
+
+export interface MedicalCareer {
+  active: boolean;
+  stage: 'med_school' | 'residency' | 'attending' | 'retired';
+  specialtyId: string | null;
+  hospitalId: string | null;
+  yearsOfService: number;
+  skill: number; // 0..100, patient outcomes and promotion odds
+  reputation: number; // 0..100, hospital standing
+  patientsSaved: number;
+  patientsLost: number;
+  malpracticeSuits: number;
+  publications: number;
+  rank: number; // 0 = student/resident, 1..4 = attending -> senior -> chief -> medical director
+  licenseRevoked: boolean;
+}
+
+export interface CultMovement {
+  active: boolean;
+  name: string;
+  founded: number; // year founded
+  followers: number;
+  funds: number; // donations collected, separate from player.money until extracted
+  charisma: number; // 0..100, drives recruitment and donation size
+  suspicion: number; // 0..100, law-enforcement/media attention
+  compoundLevel: number; // 0..5
+  raidsSurvived: number;
+  disbanded: boolean;
+  disbandedReason: 'raided' | 'collapsed' | 'voluntary' | null;
+}
+
+export interface AstronautCareer {
+  active: boolean;
+  agencyId: string | null; // national space agency (by countryId) or 'private'
+  rank: number; // 0 = candidate, 1..4 = pilot -> commander -> veteran -> chief astronaut
+  trainingScore: number; // 0..100
+  missionsFlown: number;
+  hoursInSpace: number;
+  walkedOnMoon: boolean;
+  walkedOnMars: boolean;
+  fatalityRisk: number; // 0..1, current mission risk, informational
+  activeMission: SpaceMission | null;
+}
+
+export interface SpaceMission {
+  id: string;
+  name: string;
+  kind: 'orbital' | 'station' | 'moon' | 'mars';
+  startYear: number;
+  durationYears: number;
+  danger: number; // 0..1
+}
+
+export interface PrisonLifeState {
+  gangId: string | null; // prison gang name, distinct from outside CrimeFamily
+  respect: number; // 0..100, standing in the yard
+  contraband: number; // units of smuggled goods held
+  cellblockHeat: number; // 0..100, guard attention on the player specifically
+  timesInSolitary: number;
+  riotsParticipated: number;
+  snitched: boolean;
 }
 
 /**

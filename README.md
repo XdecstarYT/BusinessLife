@@ -14,6 +14,25 @@ connection or choose not to sign in.
 
 ## Highlights
 
+- **V49 — A massive expansion: 5 new mega features.** **Entertainment Career** lets you chase
+  fame as an actor or musician — train your craft, audition for roles or pitch albums at
+  budget tiers gated by fame (Indie through Franchise Tentpole), sign an agent who takes a cut,
+  go on tour, court controversy for a risky publicity spike, and win real awards (Best Picture,
+  Album of the Year, Lifetime Achievement) at a yearly ceremony. **Medical Career** takes you
+  through med school, a residency match into one of 10 specialties (General Practice through
+  Surgery, each with its own difficulty and malpractice risk), and a full attending career
+  treating patients, publishing research, and climbing from Attending Physician to Medical
+  Director — a bad outcome risks a real malpractice suit, and three strikes costs you your
+  license. **Cult/Movement Founder** lets you found your own following: recruit believers, hold
+  gatherings, collect donations, and expand a compound — or embezzle the collection plate
+  straight into dirty money, at the cost of rising suspicion that can end in an authorities raid.
+  **Space Program** puts you through astronaut training at a national or private agency, flying
+  orbital, station, lunar, and Mars missions that carry genuine fatality risk — a failed mission
+  ends the game for real, the same permadeath pattern established by V46's combat deaths.
+  **Prison Life** deepens incarceration itself: join a cellblock gang, fight for yard respect,
+  smuggle and trade contraband, start a riot, bribe a guard, or snitch for time off — all folded
+  directly into the existing "In Prison" card rather than a separate screen, since jail is a
+  state you're in, not a career you navigate to. 39 new achievements track all five arcs.
 - **V48 — A major UI upgrade and a business expansion: a new Defense sector and 4 new product
   categories.** The Life screen — which had grown into one enormous scroll as system after system
   landed on it — is now a real dashboard: a sticky **Story / Activities / Underworld / Legacy**

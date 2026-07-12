@@ -24,6 +24,11 @@ import { tickPets } from './pets';
 import { tickAthleteSeason, tickAthleteWorld } from './athletics';
 import { tickDraft, tickMilitaryCareer } from './military';
 import { tickDrugOperation } from './drugs';
+import { tickEntertainmentCareer } from './entertainment';
+import { tickMedicalCareer } from './medical';
+import { tickCult } from './cult';
+import { tickSpaceProgram } from './space';
+import { tickPrisonLife } from './prison';
 import { GOAL_DEF_BY_ID, generateBucketList } from '../data/goals';
 import { SK } from '../data/skills';
 import { CAREER_LADDER, COWORKER_PERSONALITIES, COWORKER_PERSONALITY_BY_ID, rankIndex, titleForRank, WORK_STYLE_BY_ID, WORKPLACE_EVENTS } from '../data/careers';
@@ -1139,6 +1144,17 @@ export function advanceYear(state: GameState): GameState {
   // V47: Drug Empire — production, passive dealer sales, heat decay, raids.
   state.player.drugOperation ??= null;
   if (state.player.alive) for (const h of tickDrugOperation(state, rng)) log(state, h, 'bad');
+  // V49: five mega features — Entertainment, Medical, Cult, Space, Prison Life.
+  state.player.entertainmentCareer ??= null;
+  state.player.medicalCareer ??= null;
+  state.player.cult ??= null;
+  state.player.astronaut ??= null;
+  state.player.prisonLife ??= null;
+  if (state.player.alive) for (const h of tickEntertainmentCareer(state, rng)) log(state, h, 'info');
+  if (state.player.alive) for (const h of tickMedicalCareer(state, rng)) log(state, h, 'info');
+  if (state.player.alive) for (const h of tickCult(state, rng)) log(state, h, 'bad');
+  if (state.player.alive) for (const h of tickSpaceProgram(state, rng)) log(state, h, 'milestone');
+  if (state.player.alive) for (const h of tickPrisonLife(state, rng)) log(state, h, 'bad');
 
   // 5. Player company income: dividends from private profitable companies
   const p = state.player;

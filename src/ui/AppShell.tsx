@@ -44,6 +44,10 @@ const ACTIVITY_GROUPS: { title: string; items: ActivityEntry[] }[] = [
       { screen: 'military', label: 'Military Service', subtitle: 'Enlist, deploy, earn medals', icon: '🪖' },
       { screen: 'drugs', label: 'Drug Empire', subtitle: 'Deal, produce, and control turf', icon: '🌿' },
       { screen: 'casino', label: 'Casino', subtitle: 'Slots, tables, sports book', icon: '🎰' },
+      { screen: 'entertainment', label: 'Entertainment', subtitle: 'Chase fame as an actor or musician', icon: '🎬' },
+      { screen: 'medical', label: 'Medical Career', subtitle: 'Med school, residency, save lives', icon: '🩺' },
+      { screen: 'cult', label: 'Movement', subtitle: 'Found a following, collect donations', icon: '🔮' },
+      { screen: 'space', label: 'Space Program', subtitle: 'Train and fly real missions', icon: '🚀' },
     ],
   },
   {

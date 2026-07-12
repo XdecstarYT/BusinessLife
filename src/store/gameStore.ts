@@ -41,6 +41,10 @@ export type Screen =
   | 'athlete'
   | 'military'
   | 'drugs'
+  | 'entertainment'
+  | 'medical'
+  | 'cult'
+  | 'space'
   | 'leaderboard';
 
 interface Toast {
