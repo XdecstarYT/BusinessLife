@@ -59,8 +59,13 @@ export function Market() {
               .sort((a, b) => Math.abs(yearGain(b)) - Math.abs(yearGain(a)))
               .slice(0, 6)
               .map((c) => ({ name: c.name, price: c.sharePrice, gainPct: yearGain(c) }))}
+            onSelectMover={(name) => {
+              const c = listed.find((x) => x.name === name);
+              if (c) setSelected(c.id);
+            }}
           />
         </Suspense>
+        <div className="text-xs text-slate-400 mt-1">Tap a ticker booth to trade that stock.</div>
       </div>
 
       <LiveTicker companies={listed} />

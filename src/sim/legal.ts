@@ -84,7 +84,9 @@ export function joinFirm(state: GameState, specialtyId: string): LegalActionResu
 }
 
 /** Take on a case this year — the core skill-building, reputation-risking loop of the career. */
-export function takeCase(state: GameState): LegalActionResult {
+/** `bonusChance` (0..0.3) is the real payoff from a sharp Courtroom Trial minigame round — see
+ * runTrialArgument below — layered on top of the normal skill-driven odds, not a separate roll. */
+export function takeCase(state: GameState, bonusChance = 0): LegalActionResult {
   const c = state.player.legalCareer;
   if (!isActive(c) || (c.stage !== 'associate' && c.stage !== 'partner')) return { ok: false, message: 'You need to be practicing law.' };
   if (c.disbarred) return { ok: false, message: 'You were disbarred — you can no longer practice.' };
@@ -93,7 +95,7 @@ export function takeCase(state: GameState): LegalActionResult {
   const p = state.player;
   const specialty = c.specialtyId ? LEGAL_SPECIALTY_BY_ID[c.specialtyId] : LEGAL_SPECIALTIES[0];
   const rng = withRng(state);
-  const successChance = clamp(0.5 + c.skill * 0.005 - specialty.difficulty * 0.003 + (p.skills[SK.law] ?? 0) * 0.002, 0.15, 0.96);
+  const successChance = clamp(0.5 + c.skill * 0.005 - specialty.difficulty * 0.003 + (p.skills[SK.law] ?? 0) * 0.002 + bonusChance, 0.15, 0.99);
   if (rng.chance(successChance)) {
     c.casesWon++;
     c.skill = clamp100(c.skill + rng.range(1, 3));
@@ -151,6 +153,16 @@ export function publishLawReview(state: GameState): LegalActionResult {
   commit(state, rng);
   log(state, `Published a law review article — reputation up to ${Math.round(c.reputation)}.`, 'info');
   return { ok: true, message: 'Law review article published.' };
+}
+
+/** V57: resolve a Courtroom Trial minigame round (see ui/three/CourtroomScene.tsx interactive
+ * mode) — a 0..1 accuracy score converts into up to +30% success chance for this year's
+ * takeCase, so playing it well is a genuine shortcut, not just a score for its own sake. */
+export function runTrialArgument(state: GameState, score: number): LegalActionResult {
+  const bonus = clamp(score, 0, 1) * 0.3;
+  const result = takeCase(state, bonus);
+  if (score >= 0.95) awardAchievement(state, 'flawless_argument');
+  return result;
 }
 
 /** Push for the next rank up the partner ladder. */

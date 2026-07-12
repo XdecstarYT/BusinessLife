@@ -5,13 +5,22 @@
  * the camera from an advocate's-eye view at counsel table to sitting behind the bench looking out
  * over the room, once the player's own LegalCareer has reached the 'judge' stage.
  */
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { useThreeScene } from './useThreeScene';
+
+type TrialPrompt = 'witness' | 'evidence' | 'objection';
+const TRIAL_PROMPT_LABEL: Record<TrialPrompt, string> = { witness: 'Call Witness', evidence: 'Present Evidence', objection: 'Objection!' };
+const TRIAL_ROUND_SECONDS = 15;
 
 interface CourtroomSceneProps {
   verdict: 'pending' | 'won' | 'lost';
   asJudge: boolean;
+  // V57: when set, the scene runs a real argument-building minigame instead of just sitting
+  // ambient — tap the witness stand / counsel tables in time as each lights up. Final accuracy
+  // is reported once via onComplete (see runTrialArgument in sim/legal.ts for what it's worth).
+  interactive?: boolean;
+  onComplete?: (score: number) => void;
 }
 
 function verdictColor(verdict: CourtroomSceneProps['verdict']): number {
@@ -36,12 +45,72 @@ function makeChair(seatColor: number): THREE.Group {
   return g;
 }
 
-export function CourtroomScene({ verdict, asJudge }: CourtroomSceneProps) {
+export function CourtroomScene({ verdict, asJudge, interactive, onComplete }: CourtroomSceneProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const [activePrompt, setActivePrompt] = useState<TrialPrompt | null>(null);
+  const [timeLeft, setTimeLeft] = useState(TRIAL_ROUND_SECONDS);
+  const [hits, setHits] = useState(0);
+  const [prompts, setPrompts] = useState(0);
+  const [done, setDone] = useState(false);
+  const activeRef = useRef<TrialPrompt | null>(null);
+  const doneRef = useRef(false);
+  const hitsRef = useRef(0);
+
+  useEffect(() => {
+    if (!interactive || done) return;
+    const tick = window.setInterval(() => {
+      setTimeLeft((t) => {
+        if (t <= 1) {
+          window.clearInterval(tick);
+          doneRef.current = true;
+          setDone(true);
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
+    return () => window.clearInterval(tick);
+  }, [interactive, done]);
+
+  useEffect(() => {
+    if (!interactive || !done) return;
+    onComplete?.(prompts > 0 ? hits / prompts : 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [interactive, done]);
+
+  useEffect(() => {
+    if (!interactive) return;
+    let cancelled = false;
+    const targets: TrialPrompt[] = ['witness', 'evidence', 'objection'];
+    const spawn = () => {
+      if (cancelled || doneRef.current) return;
+      const s = targets[Math.floor(Math.random() * targets.length)];
+      activeRef.current = s;
+      setActivePrompt(s);
+      setPrompts((n) => n + 1);
+      const windowMs = Math.max(700, 1500 - hitsRef.current * 25);
+      window.setTimeout(() => {
+        if (cancelled || doneRef.current) return;
+        if (activeRef.current === s) { activeRef.current = null; setActivePrompt(null); }
+        window.setTimeout(spawn, 250);
+      }, windowMs);
+    };
+    const startTimer = window.setTimeout(spawn, 500);
+    return () => { cancelled = true; window.clearTimeout(startTimer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [interactive]);
+
+  const handlePromptHit = (s: TrialPrompt) => {
+    if (doneRef.current || activeRef.current !== s) return;
+    hitsRef.current += 1;
+    setHits(hitsRef.current);
+    activeRef.current = null;
+    setActivePrompt(null);
+  };
 
   useThreeScene(
     ref,
-    ({ scene, camera, makeLabel, quality }) => {
+    ({ scene, camera, makeLabel, quality, registerClickable }) => {
       scene.fog = new THREE.Fog(0x0e1420, 9, 26);
       scene.background = new THREE.Color(0x0e1420);
       scene.add(new THREE.AmbientLight(0xffffff, 0.5));
@@ -81,16 +150,22 @@ export function CourtroomScene({ verdict, asJudge }: CourtroomSceneProps) {
       seal.position.set(0, 1.6, -4.49);
       scene.add(seal);
 
-      // Witness stand, stage-right of the bench.
-      const standBase = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.45, 0.85, 12), woodMat);
+      // Witness stand, stage-right of the bench. Interactive mode gets its own material instance
+      // (not the shared woodMat the bench also uses) so highlighting it doesn't light up the bench too.
+      const standBase = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.45, 0.85, 12), interactive ? woodMat.clone() : woodMat);
       standBase.position.set(2.6, 0.42, -3);
       standBase.castShadow = true;
       scene.add(standBase);
+      const promptGlow: Partial<Record<TrialPrompt, THREE.Mesh>> = {};
+      if (interactive) {
+        promptGlow.witness = standBase;
+        registerClickable(standBase, 'witness');
+      }
 
       // Counsel tables facing the bench, prosecution left / defense right.
       const tableMat = new THREE.MeshStandardMaterial({ color: 0x3f3327, roughness: 0.5 });
       for (const side of [-1, 1] as const) {
-        const table = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.06, 0.8), tableMat);
+        const table = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.06, 0.8), interactive ? tableMat.clone() : tableMat);
         table.position.set(side * 1.7, 0.45, -1);
         table.castShadow = true;
         scene.add(table);
@@ -107,6 +182,11 @@ export function CourtroomScene({ verdict, asJudge }: CourtroomSceneProps) {
         const label = makeLabel(side < 0 ? 'Prosecution' : 'Defense', 0.32);
         label.position.set(side * 1.7, 1.05, -1);
         scene.add(label);
+        if (interactive) {
+          const promptId: TrialPrompt = side < 0 ? 'objection' : 'evidence';
+          promptGlow[promptId] = table;
+          registerClickable(table, promptId);
+        }
       }
 
       // Jury box: two rows of six along stage-left.
@@ -157,10 +237,29 @@ export function CourtroomScene({ verdict, asJudge }: CourtroomSceneProps) {
           camera.position.x = -1.7 + Math.sin(t * 0.1) * 0.6;
           camera.lookAt(0, 1.1, -4);
         }
+        if (interactive) {
+          for (const [id, mesh] of Object.entries(promptGlow) as [TrialPrompt, THREE.Mesh][]) {
+            const lit = activeRef.current === id;
+            const mat = mesh.material as THREE.MeshStandardMaterial;
+            mat.emissive.setHex(lit ? 0xffd166 : 0x000000);
+            mat.emissiveIntensity = lit ? 0.9 + Math.sin(t * 6) * 0.2 : 0;
+          }
+        }
       };
     },
-    [verdict, asJudge],
+    [verdict, asJudge, interactive],
+    interactive ? { controls: 'none', onPick: (id) => handlePromptHit(id as TrialPrompt) } : undefined,
   );
 
-  return <div ref={ref} className="w-full h-48 rounded-2xl overflow-hidden bg-slate-950" />;
+  return (
+    <div>
+      <div ref={ref} className="w-full h-48 rounded-2xl overflow-hidden bg-slate-950" />
+      {interactive && (
+        <div className="flex justify-between text-xs mt-2 px-1">
+          <span className="text-slate-400">⏱️ {timeLeft}s left{activePrompt ? ` · ${TRIAL_PROMPT_LABEL[activePrompt]}!` : ''}</span>
+          <span className="font-bold">{hits}/{prompts} hit</span>
+        </div>
+      )}
+    </div>
+  );
 }

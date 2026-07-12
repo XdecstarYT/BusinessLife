@@ -23,8 +23,8 @@ import { useThreeScene } from './useThreeScene';
 import { makeTexture, windowGridTexture } from './textures';
 import { loadModel } from './modelLoader';
 
-export type HubBuildingId = 'hq' | 'bank' | 'parliament' | 'exchange' | 'studio' | 'home' | 'office' | 'park' | 'docks' | 'newsstand';
-export type HubArchetype = 'tower' | 'bank' | 'capitol' | 'exchange' | 'storefront' | 'house' | 'office' | 'park' | 'dock' | 'kiosk';
+export type HubBuildingId = 'hq' | 'bank' | 'parliament' | 'exchange' | 'studio' | 'home' | 'office' | 'park' | 'docks' | 'newsstand' | 'courthouse' | 'restaurant' | 'hospital' | 'casino';
+export type HubArchetype = 'tower' | 'bank' | 'capitol' | 'exchange' | 'storefront' | 'house' | 'office' | 'park' | 'dock' | 'kiosk' | 'courthouse' | 'restaurant' | 'hospital' | 'casinofront';
 export type HubSeason = 'spring' | 'summer' | 'autumn' | 'winter';
 
 export interface HubBuilding {
@@ -470,6 +470,141 @@ function buildKiosk(group: THREE.Group, tier: number, accent: string, dormant: b
   group.add(board);
 }
 
+// V57: four more system buildings — Legal, Culinary, Medical and Casino all previously had zero
+// presence in the primary walkable hub despite being full life-path systems.
+
+function buildCourthouse(group: THREE.Group, tier: number, accent: string, dormant: boolean): void {
+  const scale = 0.9 + tier * 0.15;
+  const base = new THREE.Mesh(new THREE.BoxGeometry(2.2 * scale, 1.5 * scale, 1.7 * scale), new THREE.MeshStandardMaterial({ color: dormant ? 0x6b6f76 : 0xe8e4d8, roughness: 0.55 }));
+  base.position.y = (1.5 * scale) / 2;
+  group.add(base);
+  const pediment = new THREE.Mesh(new THREE.ConeGeometry(1.4 * scale, 0.6, 3), new THREE.MeshStandardMaterial({ color: dormant ? 0x565a60 : 0xd9d4c4, roughness: 0.5 }));
+  pediment.rotation.y = Math.PI;
+  pediment.position.y = 1.5 * scale + 0.3;
+  group.add(pediment);
+  const colCount = 4 + Math.min(2, tier);
+  for (let i = 0; i < colCount; i++) {
+    const col = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 1.4 * scale, 10), new THREE.MeshStandardMaterial({ color: 0xf2efe4, roughness: 0.3 }));
+    col.position.set((i - (colCount - 1) / 2) * (0.42 * scale), (1.4 * scale) / 2, 0.95 * scale);
+    group.add(col);
+  }
+  if (!dormant) {
+    // A pair of scale-pans hung from a beam — the archetype's one unmistakable "this is a
+    // courthouse" cue, distinct from the Bank's plain door-and-columns silhouette.
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.7, 8), new THREE.MeshStandardMaterial({ color: accent, metalness: 0.6, roughness: 0.3 }));
+    beam.rotation.z = Math.PI / 2;
+    beam.position.set(0, 1.5 * scale + 0.65, 0.95 * scale);
+    group.add(beam);
+    for (const dx of [-0.3, 0.3]) {
+      const pan = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.02, 12), new THREE.MeshStandardMaterial({ color: accent, metalness: 0.6, roughness: 0.3 }));
+      pan.position.set(dx, 1.5 * scale + 0.4, 0.95 * scale);
+      group.add(pan);
+    }
+  }
+  const stepMat = new THREE.MeshStandardMaterial({ color: 0xd0cbb8, roughness: 0.75 });
+  for (let i = 0; i < 3; i++) {
+    const step = new THREE.Mesh(new THREE.BoxGeometry((1.9 * scale) - i * 0.16, 0.08, 0.26 - i * 0.05), stepMat);
+    step.position.set(0, 0.04 + i * 0.08, 1.05 * scale + i * 0.12);
+    group.add(step);
+  }
+}
+
+function buildRestaurant(group: THREE.Group, tier: number, accent: string, dormant: boolean): void {
+  const scale = 0.9 + Math.min(tier, 3) * 0.14;
+  const box = new THREE.Mesh(new THREE.BoxGeometry(1.9 * scale, 1.3, 1.5 * scale), new THREE.MeshStandardMaterial({ color: 0x3a2c22, roughness: 0.7 }));
+  box.position.y = 0.65;
+  group.add(box);
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(2.1 * scale, 0.18, 1.7 * scale), new THREE.MeshStandardMaterial({ color: 0x241a14, roughness: 0.8 }));
+  roof.position.y = 1.39;
+  group.add(roof);
+  const awning = new THREE.Mesh(new THREE.BoxGeometry(2 * scale, 0.08, 0.55), new THREE.MeshStandardMaterial({ color: dormant ? 0x4a4a4a : accent, roughness: 0.6 }));
+  awning.position.set(0, 1.1, 0.9 * scale);
+  awning.rotation.x = -0.2;
+  group.add(awning);
+  const windowMat = new THREE.MeshStandardMaterial({ color: dormant ? 0x1a1a1a : 0xffd98a, emissive: dormant ? 0x000000 : 0xffb347, emissiveIntensity: dormant ? 0 : 0.6, roughness: 0.4 });
+  const window1 = new THREE.Mesh(new THREE.PlaneGeometry(0.55, 0.6), windowMat);
+  window1.position.set(-0.5 * scale, 0.75, 0.76 * scale);
+  group.add(window1);
+  const door = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.9), new THREE.MeshStandardMaterial({ color: 0x1a120c, roughness: 0.5 }));
+  door.position.set(0.4 * scale, 0.45, 0.76 * scale);
+  group.add(door);
+  if (!dormant) {
+    // Two little outdoor bistro tables with parasols — the visual "restaurant with real
+    // customers" cue, sized/lit by the same accent color the sim assigns.
+    for (const dx of [-0.85, 0.85]) {
+      const table = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.35, 10), new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.6 }));
+      table.position.set(dx * scale, 0.18, 1.15 * scale);
+      group.add(table);
+      const parasol = new THREE.Mesh(new THREE.ConeGeometry(0.32, 0.22, 10), new THREE.MeshStandardMaterial({ color: accent, roughness: 0.5 }));
+      parasol.position.set(dx * scale, 0.75, 1.15 * scale);
+      group.add(parasol);
+    }
+  }
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.3), new THREE.MeshStandardMaterial({ map: signTexture(dormant ? 'CLOSED' : 'DINING'), emissive: 0xffffff, emissiveMap: signTexture(dormant ? 'CLOSED' : 'DINING'), emissiveIntensity: dormant ? 0.1 : 0.75 }));
+  sign.position.set(0, 1.55, 0.6 * scale);
+  group.add(sign);
+}
+
+function buildHospital(group: THREE.Group, tier: number, accent: string, dormant: boolean): void {
+  const scale = 0.9 + tier * 0.16;
+  const floors = 1 + Math.min(tier, 3);
+  const tower = new THREE.Mesh(new THREE.BoxGeometry(1.7 * scale, 0.9 * floors, 1.5 * scale), new THREE.MeshStandardMaterial({ color: dormant ? 0x6b6f76 : 0xf3f5f7, roughness: 0.55 }));
+  tower.position.y = (0.9 * floors) / 2;
+  group.add(tower);
+  // A real red cross, not just a colored panel — the archetype's single unmistakable cue.
+  const crossMat = new THREE.MeshStandardMaterial({ color: dormant ? 0x555555 : 0xe11d48, emissive: dormant ? 0x000000 : 0xe11d48, emissiveIntensity: dormant ? 0 : 0.7 });
+  const crossY = 0.9 * floors + 0.2;
+  const crossH = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.16, 0.05), crossMat);
+  crossH.position.set(0, crossY, 0.76 * scale);
+  group.add(crossH);
+  const crossV = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.55, 0.05), crossMat);
+  crossV.position.set(0, crossY, 0.76 * scale);
+  group.add(crossV);
+  const canopy = new THREE.Mesh(new THREE.BoxGeometry(1.1 * scale, 0.08, 0.7), new THREE.MeshStandardMaterial({ color: accent, roughness: 0.5 }));
+  canopy.position.set(0, 0.85, 0.9 * scale);
+  group.add(canopy);
+  const support = new THREE.MeshStandardMaterial({ color: 0xcfd4da, roughness: 0.4 });
+  for (const dx of [-0.45, 0.45]) {
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.8, 8), support);
+    pole.position.set(dx * scale, 0.42, 1.15 * scale);
+    group.add(pole);
+  }
+  if (!dormant) {
+    const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 8), new THREE.MeshBasicMaterial({ color: 0xff3b30 }));
+    beacon.position.set(0, 0.9 * floors + 0.05, 0);
+    beacon.userData.blink = true;
+    group.add(beacon);
+  }
+}
+
+function buildCasinoFront(group: THREE.Group, tier: number, accent: string, dormant: boolean): void {
+  const scale = 0.95 + tier * 0.14;
+  const box = new THREE.Mesh(new THREE.BoxGeometry(2 * scale, 1.6, 1.6 * scale), new THREE.MeshStandardMaterial({ color: 0x1a0f24, roughness: 0.6, metalness: 0.15 }));
+  box.position.y = 0.8;
+  group.add(box);
+  const marqueeMat = new THREE.MeshStandardMaterial({ color: dormant ? 0x2a2a2a : accent, emissive: dormant ? 0x000000 : accent, emissiveIntensity: dormant ? 0 : 0.85 });
+  const marquee = new THREE.Mesh(new THREE.BoxGeometry(2.1 * scale, 0.5, 0.15), marqueeMat);
+  marquee.position.set(0, 1.75, 0.85 * scale);
+  group.add(marquee);
+  // A ring of small bulb-like spheres along the marquee edge, blinking in the animation loop —
+  // reads as neon signage rather than a flat glowing panel.
+  if (!dormant) {
+    const bulbCount = 10;
+    for (let i = 0; i < bulbCount; i++) {
+      const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.035, 6, 6), new THREE.MeshBasicMaterial({ color: 0xfff2c8 }));
+      bulb.position.set((i - (bulbCount - 1) / 2) * (2 * scale) / bulbCount, 2.02, 0.85 * scale);
+      bulb.userData.blink = i % 2 === 0;
+      group.add(bulb);
+    }
+  }
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.35), new THREE.MeshStandardMaterial({ map: signTexture(dormant ? 'DARK' : 'JACKPOT'), emissive: 0xffffff, emissiveMap: signTexture(dormant ? 'DARK' : 'JACKPOT'), emissiveIntensity: dormant ? 0.1 : 0.8 }));
+  sign.position.set(0, 1.0, 0.82 * scale);
+  group.add(sign);
+  const door = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 1), new THREE.MeshStandardMaterial({ color: 0x0d0712, roughness: 0.3, metalness: 0.4 }));
+  door.position.set(0, 0.5, 0.81 * scale);
+  group.add(door);
+}
+
 /** A freshly-IPO'd company's first year: scaffolding cage, safety netting, a translucent ghost
  * of the future tower (tinted by the company's real accent color), a crane and a "COMING SOON"
  * sign. Swapped out for the real tier-driven building the moment isBuildingUnderConstruction()
@@ -566,6 +701,10 @@ function buildBuilding(group: THREE.Group, b: HubBuilding, foliage: string): voi
     case 'park': buildPark(group, b.tier, foliage, !!b.dormant); return;
     case 'dock': buildDock(group, b.tier, b.accent, !!b.dormant); return;
     case 'kiosk': buildKiosk(group, b.tier, b.accent, !!b.dormant); return;
+    case 'courthouse': buildCourthouse(group, b.tier, b.accent, !!b.dormant); return;
+    case 'restaurant': buildRestaurant(group, b.tier, b.accent, !!b.dormant); return;
+    case 'hospital': buildHospital(group, b.tier, b.accent, !!b.dormant); return;
+    case 'casinofront': buildCasinoFront(group, b.tier, b.accent, !!b.dormant); return;
   }
 }
 

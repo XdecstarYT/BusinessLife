@@ -14,6 +14,24 @@ connection or choose not to sign in.
 
 ## Highlights
 
+- **V57 — 3D becomes a core part of the game, not a backdrop.** A shared tap-to-interact
+  facility landed in the 3D pipeline itself (`registerClickable`/`onPick` in the reusable scene
+  hook — real raycasting that coexists with drag-to-rotate, distinguishing a tap from a rotate
+  gesture) and now powers real gameplay in three previously-ambient scenes: the **HQ Tour**
+  grows four clickable department kiosks (Marketing, R&D, Operations, Workforce) that pull the
+  matching company lever directly from the 3D view; the **Political Chamber**'s cabinet podiums
+  open a minister investigation or the appointment flow, and tapping a party's benches sends a
+  quick donation; the **Exchange Floor**'s ticker booths jump straight into trading that stock.
+  The walkable **City Hub** — the game's primary navigation surface — gained four new buildings
+  (Courthouse, Restaurant, Hospital, Casino) so Legal, Culinary, Medical and Casino all now have
+  real physical presence in the plaza, bringing it to fourteen system buildings plus the public
+  company skyline. And two life-path systems got genuine 3D minigames: a **Kitchen Service**
+  reaction game (tap the lit station — Prep, Grill, Plate — before it goes cold) and an upgraded
+  **Courtroom Trial** (tap the witness stand or counsel tables as each lights up) — both feed a
+  real accuracy score into a bonus success chance for that year's cook-service or case roll, so
+  playing them well is a genuine shortcut, not just a score for its own sake. Two new
+  achievements for a flawless round of either.
+
 - **V56 — The biggest politics and business expansion yet.** Six substantial new systems, three
   per domain. In politics: a real multi-seat **Supreme Court** (up to nine justices with their own
   ideology and tenure) replaces the old single-Chief-Justice flavor field — nominate justices

@@ -266,4 +266,7 @@ export const ACHIEVEMENTS: Record<string, AchievementDef> = {
   aaa_rated: { label: 'AAA Rated', icon: '💎' },
   antitrust_survivor: { label: 'Antitrust Survivor', icon: '🛡️' },
   proxy_fight_winner: { label: 'Proxy Fight Winner', icon: '📣' },
+  // V57: 3D minigames — Kitchen Service + Courtroom Trial
+  perfect_service: { label: 'Perfect Service', icon: '🔥' },
+  flawless_argument: { label: 'Flawless Argument', icon: '⚖️' },
 };

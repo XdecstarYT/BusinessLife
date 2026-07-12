@@ -3,18 +3,22 @@
  * own restaurant and chasing Michelin stars. Simple confirm-and-go actions like Medical/Casino —
  * no dedicated 3D scene (see data/culinary.ts for the catalog).
  */
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { useGame } from '../../store/gameStore';
 import {
-  cookService, growRestaurant, openRestaurant, pursueMichelinStar, retireFromCooking, seekKitchenPromotion, startCookingCareer,
+  cookService, growRestaurant, openRestaurant, pursueMichelinStar, retireFromCooking, runKitchenService, seekKitchenPromotion, startCookingCareer,
 } from '../../sim/culinary';
 import { CUISINE_BY_ID, CUISINES, MICHELIN_STAR_REQUIREMENTS, OPEN_RESTAURANT_BASE_COST, RESTAURANT_TIER_TITLES } from '../../data/culinary';
 import { Badge, Button, Card, Pill, PillRow, SectionHeader, StatBar } from '../components';
 import { money } from '../format';
 
+const KitchenServiceScene = lazy(() => import('../three/KitchenServiceScene').then((m) => ({ default: m.KitchenServiceScene })));
+const SceneFallback = <div className="w-full h-56 rounded-2xl bg-slate-100 dark:bg-ink-800 animate-pulse" />;
+
 export function Culinary() {
-  const { state, run } = useGame();
+  const { state, run, toast } = useGame();
   const [cuisinePick, setCuisinePick] = useState('diner');
+  const [playingService, setPlayingService] = useState(false);
   if (!state) return null;
   const p = state.player;
   const c = p.culinaryCareer;
@@ -89,12 +93,27 @@ export function Culinary() {
         <>
           <SectionHeader title="Actions" />
           <PillRow>
-            <Pill label="🍳 Cook a Service" tone="brand" onClick={() => run(cookService)} />
+            <Pill label="🎮 Play the Service" tone="brand" onClick={() => setPlayingService(true)} />
+            <Pill label="🍳 Cook a Service (quick)" onClick={() => run(cookService)} />
             {c.stage !== 'head_chef' && <Pill label="📈 Seek Promotion" onClick={() => run(seekKitchenPromotion)} />}
             {c.stage === 'head_chef' && (
               <Pill label={`🏮 Open Restaurant (${money(openCost)})`} tone="brand" onClick={() => run(openRestaurant)} />
             )}
           </PillRow>
+          {playingService && (
+            <Card className="p-4 mt-3">
+              <div className="text-xs text-slate-500 dark:text-slate-400 mb-2">Tap the lit station before it goes cold — a sharp service gives your real cook-service roll a real edge.</div>
+              <Suspense fallback={SceneFallback}>
+                <KitchenServiceScene
+                  onComplete={(score) => {
+                    const r = run(runKitchenService, score);
+                    toast(`${Math.round(score * 100)}% accuracy — ${r.message}`, r.ok ? 'ok' : 'err');
+                    setPlayingService(false);
+                  }}
+                />
+              </Suspense>
+            </Card>
+          )}
         </>
       )}
 

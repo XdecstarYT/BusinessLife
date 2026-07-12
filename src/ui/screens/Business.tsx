@@ -503,8 +503,24 @@ function ManageModal({ companyId, onClose }: { companyId: string; onClose: () =>
         </div>
       </Card>
       <Suspense fallback={SceneFallback}>
-        <HQTourScene hqTier={c.hqTier} employees={c.employees} morale={c.morale} culture={c.culture} />
+        <HQTourScene
+          hqTier={c.hqTier}
+          employees={c.employees}
+          morale={c.morale}
+          culture={c.culture}
+          marketingPct={c.marketingPct}
+          rdPct={c.rdPct}
+          automation={c.automation}
+          salaryLevel={c.salaryLevel}
+          onDepartmentClick={(dept) => {
+            if (dept === 'marketing') run(setCompanyLever, companyId, 'marketingPct', Math.min(0.25, c.marketingPct + 0.01));
+            else if (dept === 'rd') run(setCompanyLever, companyId, 'rdPct', Math.min(0.25, c.rdPct + 0.01));
+            else if (dept === 'automation') run(setCompanyLever, companyId, 'automation', Math.min(100, c.automation + 5));
+            else run(setCompanyLever, companyId, 'salaryLevel', Math.min(1.4, c.salaryLevel + 0.05));
+          }}
+        />
       </Suspense>
+      <div className="text-xs text-slate-400 -mt-1 mb-2">Tap a department kiosk to invest in it directly.</div>
       <div className="font-bold mb-2 mt-3">Culture</div>
       <div className="grid grid-cols-2 gap-2 mb-1">
         {(Object.keys(CULTURE_INFO) as Company['culture'][]).map((k) => (

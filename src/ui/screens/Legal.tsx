@@ -7,7 +7,7 @@
 import { lazy, Suspense, useState } from 'react';
 import { useGame } from '../../store/gameStore';
 import {
-  enrollLawSchool, joinFirm, publishLawReview, retireFromLaw, seekJudgeship, seekLegalPromotion, takeCase,
+  enrollLawSchool, joinFirm, publishLawReview, retireFromLaw, runTrialArgument, seekJudgeship, seekLegalPromotion, takeCase,
 } from '../../sim/legal';
 import { JUDGESHIP_MIN_PARTNER_RANK, JUDGESHIP_MIN_REPUTATION, LAW_SCHOOL_YEARS, LEGAL_RANK_TITLES, LEGAL_SPECIALTIES, LEGAL_SPECIALTY_BY_ID } from '../../data/legal';
 import { Badge, Button, Card, Pill, PillRow, SectionHeader, StatBar } from '../components';
@@ -16,9 +16,10 @@ const CourtroomScene = lazy(() => import('../three/CourtroomScene').then((m) => 
 const SceneFallback = <div className="w-full h-48 rounded-2xl bg-slate-100 dark:bg-ink-800 animate-pulse" />;
 
 export function Legal() {
-  const { state, run } = useGame();
+  const { state, run, toast } = useGame();
   const [specialtyPick, setSpecialtyPick] = useState('family_law');
   const [verdict, setVerdict] = useState<'pending' | 'won' | 'lost'>('pending');
+  const [playingTrial, setPlayingTrial] = useState(false);
   if (!state) return null;
   const p = state.player;
   const c = p.legalCareer;
@@ -106,9 +107,24 @@ export function Legal() {
         </div>
       </Card>
 
-      {c.stage !== 'judge' && (
+      {c.stage !== 'judge' && !playingTrial && (
         <Suspense fallback={SceneFallback}>
           <CourtroomScene verdict={verdict} asJudge={false} />
+        </Suspense>
+      )}
+      {c.stage !== 'judge' && playingTrial && (
+        <Suspense fallback={SceneFallback}>
+          <CourtroomScene
+            verdict="pending"
+            asJudge={false}
+            interactive
+            onComplete={(score) => {
+              const r = run(runTrialArgument, score);
+              setVerdict(r.ok ? 'won' : 'lost');
+              toast(`${Math.round(score * 100)}% accuracy — ${r.message}`, r.ok ? 'ok' : 'err');
+              setPlayingTrial(false);
+            }}
+          />
         </Suspense>
       )}
       {c.stage === 'judge' && (
@@ -121,9 +137,9 @@ export function Legal() {
         <>
           <SectionHeader title="Actions" />
           <PillRow>
+            <Pill label="🎮 Argue the Trial" tone="brand" onClick={() => setPlayingTrial(true)} />
             <Pill
-              label="📜 Take a Case"
-              tone="brand"
+              label="📜 Take a Case (quick)"
               onClick={() => { const r = run(takeCase); setVerdict(r.ok ? 'won' : 'lost'); }}
             />
             {c.stage === 'partner' && <Pill label="📄 Publish Law Review" onClick={() => run(publishLawReview)} />}

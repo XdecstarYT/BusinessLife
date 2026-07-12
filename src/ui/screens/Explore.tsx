@@ -37,6 +37,10 @@ const HUB_SCREEN: Record<HubBuildingId, Screen> = {
   park: 'family',
   docks: 'world',
   newsstand: 'news',
+  courthouse: 'legal',
+  restaurant: 'culinary',
+  hospital: 'medical',
+  casino: 'casino',
 };
 
 const STOREFRONT_THEME_COLOR: Record<string, string> = {
@@ -165,7 +169,43 @@ export function Explore() {
     accent: '#f59e0b', quickAction: latestNews ? { icon: '📰', label: 'Skim the headlines' } : undefined,
   };
 
-  const systemBuildings = [hq, bank, parliament, exchange, studio, homeBuilding, careerOffice, park, docks, newsstand];
+  // --- Courthouse: Legal career (V57 — Legal previously had zero hub presence) ---
+  const legal = p.legalCareer;
+  const courthouse: HubBuilding = legal && legal.active
+    ? {
+        id: 'courthouse', label: legal.stage === 'judge' ? 'The Bench' : 'Law Offices', sublabel: `${legal.stage.replace('_', ' ')} · rep ${Math.round(legal.reputation)}`,
+        archetype: 'courthouse', tier: clampTier(legal.stage === 'judge' ? 3 : legal.rank >= 2 ? 2 : legal.rank >= 1 ? 1 : 0), accent: '#c9a227',
+      }
+    : { id: 'courthouse', label: 'Courthouse', sublabel: 'Start a legal career to open it', archetype: 'courthouse', tier: 0, accent: '#64748b', dormant: true };
+
+  // --- Restaurant: Culinary career (V57) ---
+  const culinary = p.culinaryCareer;
+  const restaurant: HubBuilding = culinary && culinary.active
+    ? {
+        id: 'restaurant', label: culinary.workplaceName ?? 'The Kitchen', sublabel: `${culinary.stage.replace('_', ' ')} · ${culinary.michelinStars} ⭐`,
+        archetype: 'restaurant', tier: clampTier(culinary.stage === 'restaurant_owner' ? 2 + Math.min(1, culinary.michelinStars) : culinary.rank),
+        accent: '#e8734a',
+      }
+    : { id: 'restaurant', label: 'Restaurant', sublabel: 'Start cooking to open it', archetype: 'restaurant', tier: 0, accent: '#64748b', dormant: true };
+
+  // --- Hospital: Medical career (V57) ---
+  const medical = p.medicalCareer;
+  const hospital: HubBuilding = medical && medical.active
+    ? {
+        id: 'hospital', label: 'General Hospital', sublabel: `${medical.stage.replace('_', ' ')} · ${medical.patientsSaved} saved`,
+        archetype: 'hospital', tier: clampTier(medical.rank), accent: '#e11d48',
+      }
+    : { id: 'hospital', label: 'Hospital', sublabel: 'Enroll in med school to open it', archetype: 'hospital', tier: 0, accent: '#64748b', dormant: true };
+
+  // --- Casino: lifetime wagering (V57) ---
+  const wagered = p.casinoTotalWagered;
+  const casino: HubBuilding = {
+    id: 'casino', label: 'The Casino', sublabel: wagered > 0 ? `Biggest win ${money(p.casinoBiggestWin)}` : 'Try your luck',
+    archetype: 'casinofront', tier: clampTier(wagered >= 1_000_000 ? 3 : wagered >= 100_000 ? 2 : wagered >= 10_000 ? 1 : 0),
+    accent: '#c026d3', dormant: wagered === 0,
+  };
+
+  const systemBuildings = [hq, bank, parliament, exchange, studio, homeBuilding, careerOffice, park, docks, newsstand, courthouse, restaurant, hospital, casino];
 
   // --- Skyline: one building per publicly-listed company, freshest IPOs still scaffolded ---
   const publicCompanies = Object.values(state.companies)

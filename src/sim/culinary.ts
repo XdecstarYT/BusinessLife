@@ -64,8 +64,10 @@ export function startCookingCareer(state: GameState, cuisineId: string): Culinar
   return { ok: true, message: `Started as a line cook at ${p.culinaryCareer.workplaceName}.` };
 }
 
-/** Cook a service this year — the core skill-building, reputation-risking loop while employed. */
-export function cookService(state: GameState): CulinaryActionResult {
+/** Cook a service this year — the core skill-building, reputation-risking loop while employed.
+ * `bonusChance` (0..0.3) is the real payoff from a sharp Kitchen Service minigame round — see
+ * runKitchenService below — layered on top of the normal skill-driven odds, not a separate roll. */
+export function cookService(state: GameState, bonusChance = 0): CulinaryActionResult {
   const c = state.player.culinaryCareer;
   if (!isActive(c) || (c.stage !== 'line_cook' && c.stage !== 'sous_chef' && c.stage !== 'head_chef')) {
     return { ok: false, message: 'You need to be working a kitchen.' };
@@ -75,7 +77,7 @@ export function cookService(state: GameState): CulinaryActionResult {
   const p = state.player;
   const cuisine = c.cuisineId ? CUISINE_BY_ID[c.cuisineId] : CUISINES[0];
   const rng = withRng(state);
-  const successChance = clamp(0.55 + c.skill * 0.005 - cuisine.difficulty * 0.003 + (p.skills[SK.cooking] ?? 0) * 0.002, 0.2, 0.97);
+  const successChance = clamp(0.55 + c.skill * 0.005 - cuisine.difficulty * 0.003 + (p.skills[SK.cooking] ?? 0) * 0.002 + bonusChance, 0.2, 0.99);
   if (rng.chance(successChance)) {
     c.dishesServed++;
     c.skill = clamp100(c.skill + rng.range(1, 3));
@@ -103,6 +105,16 @@ export function cookService(state: GameState): CulinaryActionResult {
   commit(state, rng);
   log(state, `A rough service. The pass sent more than a few dishes back.`, 'bad');
   return { ok: false, message: 'Rough service.' };
+}
+
+/** V57: resolve a Kitchen Service minigame round (see ui/three/KitchenServiceScene.tsx) — a
+ * 0..1 accuracy score converts into up to +30% success chance for this year's cookService,
+ * so playing it well is a genuine shortcut, not just a score for its own sake. */
+export function runKitchenService(state: GameState, score: number): CulinaryActionResult {
+  const bonus = clamp(score, 0, 1) * 0.3;
+  const result = cookService(state, bonus);
+  if (score >= 0.95) awardAchievement(state, 'perfect_service');
+  return result;
 }
 
 export function seekKitchenPromotion(state: GameState): CulinaryActionResult {

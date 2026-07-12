@@ -80,8 +80,18 @@ export function Politics() {
                 filled: !!home.cabinet[portfolio],
                 byPlayer: home.cabinet[portfolio] === 'player',
               }))}
+              onSelectParty={(partyId) => {
+                if (partyId === p.partyId) { setTab('party'); return; }
+                run(donateToPoliticalParty, partyId, 10_000);
+              }}
+              onSelectPortfolio={(portfolio) => {
+                const npcId = home.cabinet[portfolio as CabinetPortfolio];
+                if (npcId && npcId !== 'player') run(investigateOfficial, npcId);
+                else setTab('cabinet');
+              }}
             />
           </Suspense>
+          <div className="text-xs text-slate-400 mt-1 px-1">Tap a party's benches to donate; tap a cabinet podium to investigate its minister (or jump to Cabinet to appoint one).</div>
         </div>
       )}
 
