@@ -14,6 +14,18 @@ connection or choose not to sign in.
 
 ## Highlights
 
+- **V53 — Supply-train buildings.** The "supply train" idea now has a real physical presence in
+  both 3D scenes that touch supply chains. The ambient **Supply Chain Visualizer** (each company's
+  detail screen) swaps its abstract primitives for small building silhouettes at every stage — a
+  silo cluster, a smoking factory, a loading-dock warehouse, a port crane, a storefront, a house —
+  and the flowing particles are now boxy little freight wagons riding the resilience-colored rail
+  instead of glowing orbs. The walkable **City Hub** gains a rail-yard ring circling just past the
+  plaza's edge: a gravel apron, a looping double rail on wooden ties, a trackside grain-silo cluster
+  and freight warehouse with its own loading crane, and a four-car freight train (locomotive plus
+  three liveried cargo cars) that continuously loops the track, headlight flaring after dark like
+  the ambient traffic. The Docks building also picked up a stack of shipping containers to tie the
+  theme together.
+
 - **V52 — Better 3D, mandatory deployment, more hustles, and a deeper BitLife look.** Two of the
   weakest 3D scenes got a full quality pass: **Supply Chain** now casts real shadows off a grounded
   plane, glows from emissive pedestals under each stage, and routes goods through tube-geometry pipes

@@ -442,6 +442,20 @@ function buildDock(group: THREE.Group, tier: number, accent: string, dormant: bo
   flag.position.set(1.05, 0.82, -0.2);
   flag.userData.flag = true;
   group.add(flag);
+  // A stack of shipping containers beside the warehouse ties this into the wider supply-train
+  // theme circling the plaza (see the rail yard ring below) without needing its own screen.
+  if (!dormant) {
+    const containerColors = [0xd8483f, 0x3a6fd8, 0xe0a83f];
+    for (let i = 0; i < 3; i++) {
+      const container = new THREE.Mesh(
+        new THREE.BoxGeometry(0.4, 0.22, 0.24),
+        new THREE.MeshStandardMaterial({ color: containerColors[i % containerColors.length], roughness: 0.6, metalness: 0.2 }),
+      );
+      container.position.set(-0.85 + i * 0.02, 0.12 + i * 0.23, 0.55 - i * 0.03);
+      container.rotation.y = 0.06 * i;
+      group.add(container);
+    }
+  }
 }
 
 function buildKiosk(group: THREE.Group, tier: number, accent: string, dormant: boolean): void {
@@ -591,6 +605,101 @@ function makeCar(color: number): THREE.Group {
   // Exposed so the day/night loop can flare the headlights after dark.
   g.userData.headMat = headlightMat;
   g.userData.tailMat = taillightMat;
+  return g;
+}
+
+const WHEEL_GAUGE_GEO = new THREE.CylinderGeometry(0.045, 0.045, 0.05, 10);
+const WHEEL_GAUGE_MAT = new THREE.MeshStandardMaterial({ color: 0x14171d, roughness: 0.7, metalness: 0.4 });
+
+function addTrainWheels(g: THREE.Group, length: number): void {
+  for (const dx of [-length * 0.32, length * 0.32]) {
+    for (const dz of [0.16, -0.16]) {
+      const wheel = new THREE.Mesh(WHEEL_GAUGE_GEO, WHEEL_GAUGE_MAT);
+      wheel.rotation.z = Math.PI / 2;
+      wheel.position.set(dx, 0.1, dz);
+      g.add(wheel);
+    }
+  }
+}
+
+/** The freight-train locomotive that loops the rail yard ring — a boxy body, a raised cab up
+ * front, and a headlight exposed to userData so the day/night loop can flare it after dark. */
+function makeTrainLoco(): THREE.Group {
+  const g = new THREE.Group();
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0x8a2f2f, roughness: 0.4, metalness: 0.4 });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.32, 0.36), bodyMat);
+  body.position.y = 0.26;
+  g.add(body);
+  const cab = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.22, 0.34), new THREE.MeshStandardMaterial({ color: 0x1c1f24, roughness: 0.5 }));
+  cab.position.set(0.24, 0.53, 0);
+  g.add(cab);
+  const stack = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.24, 8), new THREE.MeshStandardMaterial({ color: 0x2a2f22, roughness: 0.6 }));
+  stack.position.set(-0.28, 0.54, 0);
+  g.add(stack);
+  const headlightMat = new THREE.MeshStandardMaterial({ color: 0xfff6d8, emissive: 0xfff6d8, emissiveIntensity: 0.7 });
+  const headlight = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 8), headlightMat);
+  headlight.position.set(0.46, 0.32, 0);
+  g.add(headlight);
+  addTrainWheels(g, 0.9);
+  g.userData.headMat = headlightMat;
+  return g;
+}
+
+/** A cargo car behind the locomotive — a plain freight box in one of a few liveries so the
+ * convoy reads as a real train rather than repeated identical units. */
+function makeTrainCar(color: number): THREE.Group {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.34, 0.34), new THREE.MeshStandardMaterial({ color, roughness: 0.55, metalness: 0.25 }));
+  body.position.y = 0.27;
+  g.add(body);
+  addTrainWheels(g, 0.8);
+  return g;
+}
+
+/** A grain-silo cluster standing trackside in the rail yard ring — pure decoration reinforcing
+ * the "supply train" theme circling the city, not an enterable building. */
+function makeTrackSilo(): THREE.Group {
+  const g = new THREE.Group();
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0xb8bdc4, roughness: 0.5, metalness: 0.3 });
+  const capMat = new THREE.MeshStandardMaterial({ color: 0x6b7078, roughness: 0.55 });
+  const silos: [number, number, number][] = [[-0.5, 1.6, 0.42], [0.15, 1.9, 0.46], [0.85, 1.5, 0.4]];
+  for (const [dx, h, r] of silos) {
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 14), bodyMat);
+    body.position.set(dx, h / 2, 0);
+    g.add(body);
+    const cap = new THREE.Mesh(new THREE.ConeGeometry(r * 1.05, r * 0.9, 14), capMat);
+    cap.position.set(dx, h + (r * 0.9) / 2, 0);
+    g.add(cap);
+  }
+  return g;
+}
+
+/** A trackside freight warehouse with a loading dock and a small crane — the other half of the
+ * rail-yard flavor pair, mirroring the silo cluster on the opposite side of the loop. */
+function makeTrackWarehouse(accent: string): THREE.Group {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.3, 1.1), new THREE.MeshStandardMaterial({ color: 0x3f4a52, roughness: 0.7 }));
+  body.position.y = 0.65;
+  g.add(body);
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.1, 1.2), new THREE.MeshStandardMaterial({ color: 0x2a2f22, roughness: 0.7 }));
+  roof.position.y = 1.35;
+  g.add(roof);
+  const dock = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.28, 0.5), new THREE.MeshStandardMaterial({ color: 0x555a52, roughness: 0.8 }));
+  dock.position.set(0, 0.14, 0.75);
+  g.add(dock);
+  const doorMat = new THREE.MeshStandardMaterial({ color: 0x1c2230, roughness: 0.8 });
+  for (const dx of [-0.6, 0.6]) {
+    const door = new THREE.Mesh(new THREE.PlaneGeometry(0.55, 0.9), doorMat);
+    door.position.set(dx, 0.5, 0.556);
+    g.add(door);
+  }
+  const craneMat = new THREE.MeshStandardMaterial({ color: accent, roughness: 0.4, metalness: 0.4 });
+  const crane = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 1.7, 8), craneMat);
+  crane.position.set(-1.35, 0.85, -0.3);
+  g.add(crane);
+  const arm = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.06, 0.06), craneMat);
+  arm.position.set(-0.85, 1.65, -0.3);
+  g.add(arm);
   return g;
 }
 
@@ -888,6 +997,63 @@ export function CityHubScene({ buildings, season, onEnter, onQuickAction }: City
         scene.add(tree);
       }
 
+      // Rail yard ring: a gravel apron just past the plaza's edge carrying a looping freight
+      // track, two trackside supply buildings (silo cluster + warehouse), and a train that
+      // circles it continuously — the outdoor half of the "supply train" theme (the indoor half
+      // lives in the ambient Supply Chain Visualizer on each company's detail screen).
+      const trainRadius = dynamicPlazaRadius + 1.8;
+      const yardOuter = dynamicPlazaRadius + 3.4;
+      const yardGround = new THREE.Mesh(
+        new THREE.RingGeometry(dynamicPlazaRadius, yardOuter, 64),
+        new THREE.MeshStandardMaterial({ color: 0x453f34, roughness: 0.95 }),
+      );
+      yardGround.rotation.x = -Math.PI / 2;
+      yardGround.receiveShadow = castsShadows;
+      scene.add(yardGround);
+
+      const railMat = new THREE.MeshStandardMaterial({ color: 0x2b2f35, metalness: 0.6, roughness: 0.4 });
+      for (const railOffset of [-0.09, 0.09]) {
+        const rail = new THREE.Mesh(new THREE.TorusGeometry(trainRadius + railOffset, 0.02, 8, 96), railMat);
+        rail.rotation.x = -Math.PI / 2;
+        rail.position.y = 0.02;
+        rail.castShadow = castsShadows;
+        scene.add(rail);
+      }
+      const tieMat = new THREE.MeshStandardMaterial({ color: 0x2a2018, roughness: 0.9 });
+      const tieGeo = new THREE.BoxGeometry(0.5, 0.04, 0.16);
+      const tieCount = 56;
+      for (let i = 0; i < tieCount; i++) {
+        const a = (i / tieCount) * Math.PI * 2;
+        const tie = new THREE.Mesh(tieGeo, tieMat);
+        tie.position.set(Math.cos(a) * trainRadius, 0.01, Math.sin(a) * trainRadius);
+        tie.rotation.y = -a;
+        scene.add(tie);
+      }
+
+      const silo = makeTrackSilo();
+      silo.position.set(Math.cos(0.35 * Math.PI) * yardOuter * 0.94, 0, Math.sin(0.35 * Math.PI) * yardOuter * 0.94);
+      silo.lookAt(0, 0, 0);
+      const warehouseAccent = systemBuildings.find((b) => b.archetype === 'dock')?.accent ?? '#d9a441';
+      const trackWarehouse = makeTrackWarehouse(warehouseAccent);
+      trackWarehouse.position.set(Math.cos(1.25 * Math.PI) * yardOuter * 0.92, 0, Math.sin(1.25 * Math.PI) * yardOuter * 0.92);
+      trackWarehouse.lookAt(0, 0, 0);
+      for (const yardProp of [silo, trackWarehouse]) {
+        if (castsShadows) {
+          yardProp.traverse((obj) => { if (obj instanceof THREE.Mesh) { obj.castShadow = true; obj.receiveShadow = true; } });
+        }
+        scene.add(yardProp);
+      }
+
+      const trainColors = [0x3a5a7a, 0xb5651d, 0x4a7a4a];
+      const train = [makeTrainLoco(), ...trainColors.map((c) => makeTrainCar(c))];
+      const trainSpacing = (2 * Math.PI * trainRadius) / 40; // even gaps regardless of yard size
+      train.forEach((unit) => {
+        if (castsShadows) {
+          unit.traverse((obj) => { if (obj instanceof THREE.Mesh) { obj.castShadow = true; obj.receiveShadow = true; } });
+        }
+        scene.add(unit);
+      });
+
       // Drifting clouds and circling birds — sky-level life for the bigger map.
       const clouds: THREE.Group[] = [];
       for (let i = 0; i < 5; i++) {
@@ -977,6 +1143,8 @@ export function CityHubScene({ buildings, season, onEnter, onQuickAction }: City
 
       let heading = 0;
       let lastT = 0;
+      let trainAngle = 0;
+      const trainSpeed = 0.09; // rad/sec around the rail-yard ring
       const dayCycle = 70; // seconds for a full day/night loop
 
       return (t) => {
@@ -1053,6 +1221,15 @@ export function CityHubScene({ buildings, season, onEnter, onQuickAction }: City
           (car.userData.headMat as THREE.MeshStandardMaterial).emissiveIntensity = isNight ? 2.4 : 0.4;
           (car.userData.tailMat as THREE.MeshStandardMaterial).emissiveIntensity = isNight ? 1.6 : 0.6;
         }
+        // The freight train: each unit trails the one ahead by a fixed angular gap around the
+        // rail-yard ring, all riding the same leading angle so the convoy stays rigid.
+        trainAngle += trainSpeed * dt;
+        train.forEach((unit, i) => {
+          const a = trainAngle - (i * trainSpacing) / trainRadius;
+          unit.position.set(Math.cos(a) * trainRadius, 0.02, Math.sin(a) * trainRadius);
+          unit.rotation.y = -a + Math.PI / 2;
+        });
+        (train[0].userData.headMat as THREE.MeshStandardMaterial).emissiveIntensity = isNight ? 2.4 : 0.4;
         for (const ped of peds) {
           ped.userData.angle += ped.userData.speed * dt;
           const a = ped.userData.angle;
