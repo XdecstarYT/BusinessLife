@@ -219,4 +219,15 @@ export const ACHIEVEMENTS: Record<string, AchievementDef> = {
   snitch: { label: 'Snitch', icon: '🗣️' },
   untouchable_inmate: { label: 'Untouchable Inmate', icon: '🛡️' },
   prison_kingpin: { label: 'Prison Kingpin', icon: '👑' },
+  // V50: Corporate Empire expansion — acquisitions, venture arm, international offices,
+  // manufacturing, and advertising campaigns.
+  acquisition_king: { label: 'Acquisition King', icon: '🤝' },
+  venture_capitalist: { label: 'Venture Capitalist', icon: '💰' },
+  unicorn_exit: { label: 'Unicorn Exit', icon: '🦄' },
+  global_conglomerate: { label: 'Global Conglomerate', icon: '🌐' },
+  industrialist: { label: 'Industrialist', icon: '🏭' },
+  automation_pioneer: { label: 'Automation Pioneer', icon: '🤖' },
+  viral_campaign: { label: 'Viral Campaign', icon: '📢' },
+  ad_disaster: { label: 'PR Disaster', icon: '💥' },
+  mega_corp: { label: 'Mega Corp', icon: '🏙️' },
 };

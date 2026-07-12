@@ -14,6 +14,22 @@ connection or choose not to sign in.
 
 ## Highlights
 
+- **V50 — The biggest business expansion yet: a Corporate Empire layer on top of every
+  company.** **Friendly Acquisitions** let you buy out any private rival outright at a fair-value
+  premium — no board vote, no contest, distinct from the existing hostile-takeover bid which stays
+  reserved for public companies. An in-house **Venture Capital Arm** (once a company reaches
+  Campus-tier HQ) turns company cash into a real startup portfolio: back small private rivals for
+  a minority stake, watch them rise or fail alongside the rest of the simulated economy, and exit
+  for a payout — or get auto-cashed-out if a portfolio company is later acquired or wiped out in
+  bankruptcy. **International Expansion** opens foreign offices abroad that ramp up over several
+  years into a genuine second revenue stream, riding that country's own GDP growth. **Manufacturing**
+  adds physical factories — domestic or, once an office is open there, foreign — with upgradeable
+  automation (5 levels) that raises their ongoing output dividend. And structured **Advertising
+  Campaigns** across 5 channels (TV, Social, Influencer, Billboards, Guerrilla) commit a real
+  multi-year budget for a brand payoff, with a genuine chance of going viral or backfiring into a
+  PR disaster depending on the channel. All five systems are additive to the existing financial
+  model — they layer new revenue/cost streams on top of tickCompany() rather than touching its
+  tuning — and come with 9 new achievements, from Acquisition King to Mega Corp.
 - **V49 — A massive expansion: 5 new mega features.** **Entertainment Career** lets you chase
   fame as an actor or musician — train your craft, audition for roles or pitch albums at
   budget tiers gated by fame (Indie through Franchise Tentpole), sign an agent who takes a cut,

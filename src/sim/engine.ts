@@ -29,6 +29,7 @@ import { tickMedicalCareer } from './medical';
 import { tickCult } from './cult';
 import { tickSpaceProgram } from './space';
 import { tickPrisonLife } from './prison';
+import { tickCorpExpansion } from './corpExpansion';
 import { GOAL_DEF_BY_ID, generateBucketList } from '../data/goals';
 import { SK } from '../data/skills';
 import { CAREER_LADDER, COWORKER_PERSONALITIES, COWORKER_PERSONALITY_BY_ID, rankIndex, titleForRank, WORK_STYLE_BY_ID, WORKPLACE_EVENTS } from '../data/careers';
@@ -1099,6 +1100,9 @@ export function advanceYear(state: GameState): GameState {
       state.player.happiness = clamp100(state.player.happiness - 10);
       state.player.reputation = clamp100(state.player.reputation - 5);
     }
+    // V50: Corporate Empire expansion — factory dividends, foreign office ramp-up, campaign
+    // resolution, venture portfolio auto-resolution. Additive to tickCompany() above.
+    if (!res.wentBankrupt) businessHeadlines.push(...tickCorpExpansion(company, state, rng));
     tickStock(company, state, rng);
   }
   businessHeadlines.push(...tickMergers(state, rng));

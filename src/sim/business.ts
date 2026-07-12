@@ -98,6 +98,12 @@ export function createCompany(opts: FoundCompanyOptions, rng: RNG): Company {
     jointVenturePartnerId: null,
     jointVentureYearsLeft: 0,
     jointVentureInvestment: 0,
+    factories: [],
+    internationalOffices: [],
+    hasVentureArm: false,
+    ventureInvestments: [],
+    activeCampaign: null,
+    campaignsRun: 0,
     status: 'active',
     history: [],
   };

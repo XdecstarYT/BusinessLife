@@ -962,6 +962,16 @@ export interface Company {
   jointVentureYearsLeft: number;
   jointVentureInvestment: number;
 
+  // V50: Corporate Empire expansion — physical manufacturing capacity, international
+  // subsidiaries, an in-house venture capital arm, and structured advertising campaigns.
+  // All additive/orthogonal to the core tickCompany() financial model (see corpExpansion.ts).
+  factories: Factory[];
+  internationalOffices: ForeignOffice[];
+  hasVentureArm: boolean;
+  ventureInvestments: VentureInvestment[];
+  activeCampaign: AdCampaign | null;
+  campaignsRun: number; // lifetime count, informational
+
   status: CompanyStatus;
   history: CompanyHistoryPoint[];
 }
@@ -969,6 +979,42 @@ export interface Company {
 export interface Moonshot {
   yearsLeft: number;
   invested: number; // total committed; burned over the project's life
+}
+
+// V50: Corporate Empire expansion sub-types (see Company.factories/internationalOffices/
+// ventureInvestments/activeCampaign above, and sim/corpExpansion.ts for the behavior).
+export interface Factory {
+  id: string;
+  countryId: string; // domestic (== Company.countryId) or foreign (requires an office there first)
+  capacityUnits: number; // production capacity; grants an ongoing output dividend in the tick
+  automationLevel: number; // 0..5, raises the dividend and is itself upgradeable
+  condition: number; // 0..100, decays slowly and dents the dividend when low
+  builtYear: number;
+}
+
+export interface ForeignOffice {
+  id: string;
+  countryId: string;
+  openedYear: number;
+  strength: number; // 0..100, ramps up over time and scales the international revenue contribution
+}
+
+export interface VentureInvestment {
+  id: string;
+  targetCompanyId: string;
+  investedYear: number;
+  amountInvested: number;
+  equityPct: number; // 0..1 stake in the target, fixed at investment time
+}
+
+export type AdChannel = 'tv' | 'social' | 'influencer' | 'billboard' | 'guerrilla';
+
+export interface AdCampaign {
+  channel: AdChannel;
+  totalBudget: number; // charged upfront from company cash when launched
+  totalYears: number;
+  yearsLeft: number;
+  startYear: number;
 }
 
 // ---------------------------------------------------------------------------
