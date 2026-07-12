@@ -162,8 +162,9 @@ export function consolidateControl(state: GameState, countryId: string): Dominat
 export function tickDomination(state: GameState, rng: RNG): string[] {
   const headlines: string[] = [];
   const dom = state.domination;
-  if (!dom?.active || dom.won) return headlines;
+  if (!dom?.active) return headlines;
 
+  let tribute = 0;
   for (const t of dom.targets) {
     const country = state.countries.find((c) => c.id === t.countryId);
     if (!t.controlled) {
@@ -171,6 +172,15 @@ export function tickDomination(state: GameState, rng: RNG): string[] {
       t.hostility = clamp100(t.hostility + rng.range(0, 1.5));
       t.influence = clamp100(t.influence - rng.range(0, 1)); // influence decays without attention
     } else {
+      // Controlled nations pay yearly tribute into your fortune — this is the payoff that ties
+      // world conquest back into the economic empire, scaled by the client state's GDP and how
+      // firmly you hold it (low hostility = a compliant, better-paying vassal).
+      if (country) {
+        // economy.gdp is in billions of local currency (~2000–9000 for major nations); a
+        // fraction of that, softened by lingering hostility, is a major-but-earned endgame income.
+        const gdp = country.economy?.gdp ?? 0;
+        tribute += Math.max(0, gdp * 40_000 * (1 - t.hostility / 150));
+      }
       // A controlled nation with lingering hostility can occasionally rebel and slip free.
       if (rng.chance(t.hostility / 900)) {
         t.controlled = false;
@@ -179,6 +189,11 @@ export function tickDomination(state: GameState, rng: RNG): string[] {
         headlines.push(`Unrest in ${country?.name ?? 'a client state'} threw off your control`);
       }
     }
+  }
+  if (tribute > 0) {
+    state.player.money += Math.round(tribute);
+    const controlledCount = dom.targets.filter((t) => t.controlled).length;
+    headlines.push(`${controlledCount} client state${controlledCount === 1 ? '' : 's'} paid you $${Math.round(tribute).toLocaleString()} in tribute`);
   }
   return headlines;
 }

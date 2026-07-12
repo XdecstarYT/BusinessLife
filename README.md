@@ -14,6 +14,24 @@ connection or choose not to sign in.
 
 ## Highlights
 
+- **V8.0 — Massive expansion: a new playable career, a world-conquest endgame, and a 3D overhaul.**
+  The biggest single update in a while, spanning four fronts. **Aviation** is a brand-new playable
+  life path in the mould of the Athlete career: enroll in flight school, log hours toward your PPL,
+  CPL and ATPL licenses, earn type ratings on six aircraft from a Cessna 172 up to an A380
+  superjumbo, and climb from first officer to Chief Pilot — flying your routes yourself in a real
+  playable 3D cockpit (`FlightScene`) where you take off, thread a course of waypoint rings through
+  the sky, and grease the landing, with your performance feeding the sim (block hours, pay, and a
+  three-strike safety-incident system that grounds you for good). **World Domination** is a true
+  endgame meta-layer, unlocked once you're a billionaire, a head of state, or hugely influential:
+  a live, interactive **3D globe** (`GlobeScene`) ringed with a glowing beacon per nation, where
+  you project economic, political and soft power under a chosen doctrine to build influence against
+  each nation's hostility, consolidate control, and win by bringing every country on Earth under
+  your rule — and conquered nations pay **yearly tribute** into your fortune, wiring world power
+  straight back into the economic empire. Under the hood, a **graphics pass on the shared 3D
+  pipeline** (richer image-based lighting for metal/glass reflections, and a cleaner,
+  higher-threshold bloom) lifts the look of every existing scene at once. Ten new achievements
+  across the two systems.
+
 - **V61 — The in-game Update Log switches to Major.Minor version numbers.** Instead of a flat
   per-session counter, `data/changelog.ts` entries are now versioned like `V1.0`, `V1.1`, `V2.0`
   — a minor update (content batch, polish, one extension to an existing system) bumps the decimal

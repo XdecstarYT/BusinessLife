@@ -17,6 +17,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'V8.0',
+    title: 'Massive Expansion: Aviation, World Domination & a 3D Overhaul',
+    bullets: [
+      'New playable career — Aviation: fly real 3D routes as a pilot, from a Cessna to a superjumbo',
+      'New endgame — World Domination: conquer every nation on a live, interactive 3D globe',
+      'Conquered nations pay you yearly tribute, tying world power back into your fortune',
+      'A graphics pass on every 3D scene — richer reflections and cleaner, cinematic glow',
+    ],
+  },
+  {
     version: 'V7.3',
     title: 'Semantic Versioning',
     bullets: [
