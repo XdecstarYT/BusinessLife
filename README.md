@@ -14,6 +14,17 @@ connection or choose not to sign in.
 
 ## Highlights
 
+- **V59 — 200 new content features across the simulation.** 60 new industries spread across 12
+  sectors (from craft marketplaces and vertical air taxis to direct air capture startups), each
+  with its own startup cost, margin, volatility and skill tie-in; 50 new laws spanning Taxation,
+  Labor, Environment, Business, Tech/Media, Social, Migration, Justice, Defense/Foreign,
+  Infrastructure, Governance, Consumer, Trade and Agriculture, each with real effects on the
+  economy and party-bloc support; 50 new daily flavor events for the fast-forward day/week
+  advancement; and 40 new yearly event templates (life, career, business, market, politics,
+  crime, world, media, family, health) with genuine choices, skill checks and branching outcomes
+  — none of it special-cased by the engine, all of it drawn from the same catalogues every
+  existing screen already reads from.
+
 - **V58 — Complete UI overhaul: minimal, editorial, easy to navigate.** The entire visual
   language changed. The BitLife-green gradients, glow shadows, and rainbow icon tiles are gone,
   replaced by a monochrome surface with one sharp accent color (a single indigo, `--color-brand-*`
