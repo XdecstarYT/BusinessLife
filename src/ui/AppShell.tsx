@@ -68,6 +68,7 @@ const ACTIVITY_GROUPS: { title: string; items: ActivityEntry[] }[] = [
     title: 'World',
     items: [
       { screen: 'world', label: 'World', subtitle: 'Foreign relations & global events', icon: '🌍' },
+      { screen: 'domination', label: 'World Domination', subtitle: 'The endgame — conquer the globe', icon: '👑' },
       { screen: 'news', label: 'News', subtitle: "Today's headlines", icon: '📰' },
     ],
   },

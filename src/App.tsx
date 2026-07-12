@@ -32,6 +32,7 @@ import { Space } from './ui/screens/Space';
 import { Legal } from './ui/screens/Legal';
 import { Culinary } from './ui/screens/Culinary';
 import { Aviation } from './ui/screens/Aviation';
+import { Domination } from './ui/screens/Domination';
 import { Leaderboard } from './ui/screens/Leaderboard';
 import { Updates } from './ui/screens/Updates';
 
@@ -79,6 +80,7 @@ export default function App() {
           {screen === 'legal' && <Legal />}
           {screen === 'culinary' && <Culinary />}
           {screen === 'aviation' && <Aviation />}
+          {screen === 'domination' && <Domination />}
           {screen === 'leaderboard' && <Leaderboard />}
           {screen === 'updates' && <Updates />}
         </div>

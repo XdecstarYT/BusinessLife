@@ -1621,6 +1621,27 @@ export interface GameState {
   // outlives the player exiting that industry (see business.ts's tickIndustryEra).
   worldMomentum: number; // -100..100, recent net-worth growth vs. the player's own longer-run trend
   industryDisruptionLegacy: Record<string, number>; // sparse industryId -> cumulative player impact, decays slowly
+
+  // V8.0: World Domination — the endgame meta-layer. Once you're powerful enough (a billionaire,
+  // a head of state, or hugely influential) you can open a campaign to bring every foreign nation
+  // under your sway via economic, political and soft power, visualized on a 3D globe. Null until
+  // launched.
+  domination: WorldDomination | null;
+}
+
+export interface DominationTarget {
+  countryId: string;
+  influence: number; // 0..100, your sway over this nation
+  hostility: number; // 0..100, resistance — slows influence gains and can spark setbacks
+  controlled: boolean; // influence crossed the control threshold and you consolidated it
+}
+
+export interface WorldDomination {
+  active: boolean;
+  founded: number; // year the campaign began
+  doctrine: 'economic' | 'political' | 'soft' | null; // your strongest lever (set at launch)
+  targets: DominationTarget[]; // one per foreign country (home is your auto-controlled base)
+  won: boolean;
 }
 
 export interface CrimeFamily {

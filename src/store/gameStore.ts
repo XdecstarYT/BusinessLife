@@ -62,6 +62,7 @@ export type Screen =
   | 'legal'
   | 'culinary'
   | 'aviation'
+  | 'domination'
   | 'leaderboard'
   | 'updates';
 

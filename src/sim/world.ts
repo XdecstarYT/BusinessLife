@@ -293,6 +293,7 @@ export function generateWorld(config: NewGameConfig): GameState {
     athleteTeams: {},
     worldMomentum: 0,
     industryDisruptionLegacy: {},
+    domination: null,
   };
 
   // Public + private NPC companies per country (more in the player's home).

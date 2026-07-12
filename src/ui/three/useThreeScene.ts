@@ -125,7 +125,10 @@ export function useThreeScene(
     const pmrem = new THREE.PMREMGenerator(renderer);
     const envTexture = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     scene.environment = envTexture;
-    scene.environmentIntensity = 0.4;
+    // V8.0 graphics pass: a touch more IBL so metal/glass across every scene picks up richer
+    // reflections. Kept a small step (0.4 → 0.46) so it enriches PBR surfaces without blowing
+    // out the pale ground planes each scene's direct lights were tuned against.
+    scene.environmentIntensity = 0.46;
     pmrem.dispose();
 
     // Bloom + a final output pass (correct tone mapping/color space through the composer)
@@ -149,9 +152,12 @@ export function useThreeScene(
       // against the ground, a seat against its neighbor) — the single biggest cue that grounds
       // objects in a real space instead of having them float, cheap-looking, over a flat plane.
       const aoPass = new GTAOPass(scene, camera, 1, 1);
-      aoPass.blendIntensity = 0.6;
+      aoPass.blendIntensity = 0.7;
       composer.addPass(aoPass);
-      bloomPass = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.4, 0.55, 0.82);
+      // V8.0 graphics pass: a slightly stronger but higher-threshold bloom — only genuinely bright
+      // emissives (windows, screens, beacons, the globe's markers) bloom, and they bloom a little
+      // harder, for a cleaner, more cinematic glow than the previous wash.
+      bloomPass = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.5, 0.6, 0.85);
       composer.addPass(bloomPass);
       composer.addPass(new OutputPass());
     }
