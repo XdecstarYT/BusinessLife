@@ -4,7 +4,7 @@
  * x laws in force x competition. Applies to both player-run companies and
  * the hundreds of NPC/public companies that populate the stock market.
  */
-import type { Company, Country, GameState, Industry, RivalStrategy } from './types';
+import type { ActivistDemand, Company, Country, CreditRating, GameState, Industry, RivalStrategy } from './types';
 import { clamp, clamp01, clamp100 } from './types';
 import { aggregateLawEffects, lawIndustryModifier } from './economy';
 import { INDUSTRY_BY_ID } from '../data/industries';
@@ -109,6 +109,10 @@ export function createCompany(opts: FoundCompanyOptions, rng: RNG): Company {
     manufacturingCapacity: 100,
     demandBacklog: 0,
     stockoutStreak: 0,
+    creditRating: 'BBB',
+    antitrustScrutinyYears: 0,
+    antitrustCaseOpen: false,
+    activistCampaign: null,
     status: 'active',
     history: [],
   };
@@ -150,6 +154,35 @@ export function companyValuation(c: Company): number {
   const brandMult = 0.8 + (c.brand / 100) * 0.6;
   const value = profitBase * 12 * growthMult * brandMult + c.assets + c.cash - c.debt - c.bondDebt;
   return Math.max(0, Math.round(value));
+}
+
+/** V56: Credit Rating Agency — a pure function of leverage, profitability and cash runway, so it
+ * can be recomputed cheaply every tick without any persisted history. Feeds into the interest
+ * rate charged on new debt (see debtRate below and issueCorporateBond in actions.ts); it does
+ * NOT retroactively reprice debt already on the books. */
+const CREDIT_RATING_ORDER: CreditRating[] = ['D', 'CCC', 'B', 'BB', 'BBB', 'A', 'AA', 'AAA'];
+export const CREDIT_RATING_SPREAD: Record<CreditRating, number> = {
+  AAA: -0.012, AA: -0.006, A: -0.002, BBB: 0.004, BB: 0.014, B: 0.03, CCC: 0.06, D: 0.1,
+};
+
+export function computeCreditRating(c: Company): CreditRating {
+  const totalDebt = c.debt + c.bondDebt;
+  const leverage = totalDebt / Math.max(1, c.assets + c.cash);
+  const margin = c.revenue > 0 ? c.profit / c.revenue : -1;
+  const cashRunwayMonths = c.expenses > 0 ? c.cash / (c.expenses / 12) : 12;
+  let score = 100;
+  score -= leverage * 120;
+  score -= Math.max(0, -margin) * 200;
+  score += clamp(margin, -0.1, 0.2) * 100;
+  score -= Math.max(0, 6 - cashRunwayMonths) * 5;
+  if (score >= 90) return 'AAA';
+  if (score >= 78) return 'AA';
+  if (score >= 65) return 'A';
+  if (score >= 50) return 'BBB';
+  if (score >= 35) return 'BB';
+  if (score >= 20) return 'B';
+  if (score >= 5) return 'CCC';
+  return 'D';
 }
 
 /** Secular industry rise/decline across decades: tech-driven, lightly-regulated industries
@@ -481,8 +514,66 @@ export function tickCompany(c: Company, ctx: CompanyTickContext): CompanyTickRes
     headline = headline ?? `${c.name} discloses a data breach`;
   }
 
+  // --- Credit rating (V56) -------------------------------------------------------
+  c.creditRating ??= 'BBB';
+  const newRating = computeCreditRating(c);
+  if (newRating !== c.creditRating) {
+    const upgraded = CREDIT_RATING_ORDER.indexOf(newRating) > CREDIT_RATING_ORDER.indexOf(c.creditRating);
+    if (c.playerOwned) {
+      headline = headline ?? `${c.name}'s credit rating was ${upgraded ? 'upgraded' : 'downgraded'} to ${newRating}`;
+      if (newRating === 'AAA' && !state.achievements.includes('aaa_rated')) state.achievements.push('aaa_rated');
+    }
+    c.creditRating = newRating;
+  }
+
+  // --- Antitrust regulation (V56) -------------------------------------------------
+  // Sustained market dominance draws real regulatory scrutiny — ignoring it too long forces an
+  // automatic settlement; the player can instead proactively settleAntitrustCase or gamble on
+  // fightAntitrustCase (see actions.ts) once a case is open.
+  if (c.playerOwned) {
+    c.antitrustScrutinyYears ??= 0;
+    c.antitrustCaseOpen ??= false;
+    if (c.marketShare > 0.35) c.antitrustScrutinyYears++;
+    else c.antitrustScrutinyYears = Math.max(0, c.antitrustScrutinyYears - 1);
+    if (!c.antitrustCaseOpen && c.antitrustScrutinyYears >= 3) {
+      c.antitrustCaseOpen = true;
+      headline = headline ?? `Regulators open an antitrust investigation into ${c.name}'s dominant market position`;
+    } else if (c.antitrustCaseOpen && c.antitrustScrutinyYears >= 6) {
+      c.marketShare *= 0.6;
+      c.revenue *= 0.9;
+      c.cash = Math.max(0, c.cash - Math.max(20_000, c.revenue * 0.02));
+      c.antitrustCaseOpen = false;
+      c.antitrustScrutinyYears = 0;
+      headline = `Regulators forced a breakup of ${c.name} after its antitrust case went unresolved too long`;
+    }
+  }
+
+  // --- Shareholder activism (V56) -------------------------------------------------
+  c.activistCampaign ??= null;
+  if (c.playerOwned && c.isPublic && !c.activistCampaign) {
+    const margin = c.revenue > 0 ? c.profit / c.revenue : 0;
+    const underperforming = margin < 0.03 || c.brand < 35;
+    const triggerChance = underperforming ? 0.05 + c.institutionalOwnPct * 0.001 : 0.005;
+    if (rng.chance(triggerChance)) {
+      const demandPool: ActivistDemand[] = c.revenue > 5_000_000
+        ? ['dividend', 'buyback', 'ceo_change', 'spinoff']
+        : ['dividend', 'buyback', 'ceo_change'];
+      const demand = rng.pick(demandPool);
+      const investorName = `${rng.pick(['Ironclad', 'Vanguard Point', 'Blackridge', 'Harbor Peak', 'Meridian', 'Northbridge'])} Capital`;
+      c.activistCampaign = {
+        investorName,
+        demand,
+        strength: clamp(40 + c.institutionalOwnPct * 0.4 + rng.range(-10, 15), 20, 95),
+        yearsActive: 0,
+      };
+      headline = headline ?? `${investorName} builds a stake in ${c.name} and demands changes`;
+    }
+  } else if (c.activistCampaign) {
+    c.activistCampaign.yearsActive++;
+  }
+
   // --- Debt & bankruptcy ---------------------------------------------------------
-  c.debtRate = e.interestRate + 0.03 + (c.debt > c.assets ? 0.04 : 0);
+  c.debtRate = Math.max(0.01, e.interestRate + 0.03 + (c.debt > c.assets ? 0.04 : 0) + (CREDIT_RATING_SPREAD[c.creditRating] ?? 0));
   if (c.cash < 0) {
     // Auto-borrow to cover shortfalls while creditworthy.
     const need = -c.cash;

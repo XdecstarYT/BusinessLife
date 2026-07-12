@@ -7,9 +7,11 @@ import {
   attemptHostileTakeover,
   bidOnGovernmentContract,
   buybackShares,
+  concedeToActivist,
   consultantRecommendation,
   CULTURE_INFO,
   diversifySupplyChain,
+  fightAntitrustCase,
   fileTrademark,
   filePatentLawsuit,
   fireCEO,
@@ -32,6 +34,7 @@ import {
   qualityAudit,
   raceForInnovation,
   renameCompany,
+  resistActivist,
   runClinicalTrial,
   runFavorableCoverage,
   runRecruitmentDrive,
@@ -39,6 +42,7 @@ import {
   runLeadershipProgram,
   runTrainingProgram,
   sellCompany,
+  settleAntitrustCase,
   setCompanyCulture,
   setCompanyLever,
   sponsorLocalSportsTeam,
@@ -64,8 +68,15 @@ import { ACQUISITION_PREMIUM, AD_CAMPAIGN_MAX_YEARS, AD_CAMPAIGN_MIN_BUDGET, AD_
 import { Badge, Button, Card, Field, LineChart, Modal, Pill, PillRow, SectionHeader, StatBar, TextInput } from '../components';
 import { money, moneyFull, pct } from '../format';
 import { INDUSTRIES, INDUSTRY_BY_ID } from '../../data/industries';
-import type { AdChannel, Company, ExecutiveRole } from '../../sim/types';
+import type { ActivistDemand, AdChannel, Company, CreditRating, ExecutiveRole } from '../../sim/types';
 import { clamp100 } from '../../sim/types';
+
+const CREDIT_RATING_TONE: Record<CreditRating, 'good' | 'neutral' | 'warn' | 'bad'> = {
+  AAA: 'good', AA: 'good', A: 'good', BBB: 'neutral', BB: 'warn', B: 'warn', CCC: 'bad', D: 'bad',
+};
+const ACTIVIST_DEMAND_LABEL: Record<ActivistDemand, string> = {
+  dividend: 'a bigger dividend payout', buyback: 'a share buyback', ceo_change: 'a CEO change', spinoff: 'a spin-off',
+};
 
 const HQTourScene = lazy(() => import('../three/HQTourScene').then((m) => ({ default: m.HQTourScene })));
 const SupplyChainScene = lazy(() => import('../three/SupplyChainScene').then((m) => ({ default: m.SupplyChainScene })));
@@ -396,12 +407,41 @@ function ManageModal({ companyId, onClose }: { companyId: string; onClose: () =>
           ✏️ Rename company
         </button>
       )}
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
         <Badge tone="brand">{ind?.name}</Badge>
         {c.isPublic && <Badge tone="good">Public · {money(c.sharePrice)}/sh</Badge>}
         {c.unionized && <Badge tone="warn">Unionized</Badge>}
         <Badge>{pct(c.playerSharePct, 0)} owned</Badge>
+        <Badge tone={CREDIT_RATING_TONE[c.creditRating]} title="Credit rating: drives the interest rate on new debt and bonds.">
+          {c.creditRating} Rated
+        </Badge>
       </div>
+
+      {c.antitrustCaseOpen && (
+        <Card className="p-4 mb-4 border-2 border-rose-400">
+          <div className="font-bold text-rose-500 mb-1">⚖️ Antitrust Investigation</div>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+            Regulators have opened a case over {c.name}'s dominant market position. Settle now for a fine, or fight it in court and risk a forced divestiture.
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <Button size="sm" variant="soft" onClick={() => run(settleAntitrustCase, c.id)}>Settle (pay fine)</Button>
+            <Button size="sm" variant="danger" onClick={() => run(fightAntitrustCase, c.id)}>Fight in Court</Button>
+          </div>
+        </Card>
+      )}
+
+      {c.activistCampaign && (
+        <Card className="p-4 mb-4 border-2 border-amber-400">
+          <div className="font-bold text-amber-500 mb-1">📣 Activist Investor Campaign</div>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+            {c.activistCampaign.investorName} is demanding {ACTIVIST_DEMAND_LABEL[c.activistCampaign.demand]} (active {c.activistCampaign.yearsActive}yr, strength {Math.round(c.activistCampaign.strength)}).
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <Button size="sm" variant="soft" onClick={() => run(concedeToActivist, c.id)}>Concede</Button>
+            <Button size="sm" variant="danger" onClick={() => run(resistActivist, c.id)}>Resist</Button>
+          </div>
+        </Card>
+      )}
 
       <div className="h-24 mb-3">
         <LineChart data={c.history.map((h) => h.revenue)} height={96} color="#337dff" />

@@ -229,6 +229,8 @@ export function generateWorld(config: NewGameConfig): GameState {
       warExhaustion: 0,
       warCasualtiesTotal: 0,
       lastNoConfidenceYear: null,
+      supremeCourt: [],
+      tradeAgreementIds: [],
     };
     countries.push(country);
 
@@ -412,6 +414,7 @@ export function generateWorld(config: NewGameConfig): GameState {
     politicalHeirId: null,
     advisors: [],
     campaign: null,
+    vicePresidentId: null,
     lastElectionResult: null,
     casinoTotalWagered: 0,
     casinoBiggestWin: 0,

@@ -320,6 +320,7 @@ function tickPlayerLife(state: GameState, rng: RNG): string[] {
   p.sponsorshipDeal ??= null; // backfill for saves from before V52 side hustles
   p.guardianAngelAvailable ??= false; // backfill for saves from before V55 Prestige Vault
   p.guardianAngelUsed ??= false;
+  p.vicePresidentId ??= null; // backfill for saves from before V56's Running Mate system
 
   // --- Jail ---------------------------------------------------------------
   if (p.inJailYears > 0) {
@@ -611,6 +612,7 @@ function tickPlayerLife(state: GameState, rng: RNG): string[] {
 
   // --- Campaign -----------------------------------------------------------
   if (p.campaign) {
+    p.campaign.runningMateId ??= null; // backfill for saves from before V56's Running Mate system
     p.campaign.yearsToElection--;
     p.campaign.momentum = clamp(p.campaign.momentum * 0.8, -50, 50);
     if (p.campaign.yearsToElection <= 0) {
@@ -645,6 +647,13 @@ function tickPlayerLife(state: GameState, rng: RNG): string[] {
           home.leaderId = 'player';
           home.approvalOfGovernment = clamp100(52 + rng.range(-4, 8));
           log(state, `You are now the ${home.leaderTitle} of ${home.name}.`, 'milestone');
+          // V56: a running mate chosen via chooseRunningMate is sworn in as VP alongside the win.
+          if (p.campaign.runningMateId) {
+            p.vicePresidentId = p.campaign.runningMateId;
+            const mateName = state.npcs[p.vicePresidentId]?.name ?? 'Your running mate';
+            log(state, `${mateName} is sworn in as Vice ${home.leaderTitle}.`, 'milestone');
+            if (!state.achievements.includes('winning_ticket')) state.achievements.push('winning_ticket');
+          }
         }
         if (spec.kind === 'party_leader' && p.partyId) {
           const party = home.parties.find((x) => x.id === p.partyId);

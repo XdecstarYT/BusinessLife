@@ -14,6 +14,24 @@ connection or choose not to sign in.
 
 ## Highlights
 
+- **V56 — The biggest politics and business expansion yet.** Six substantial new systems, three
+  per domain. In politics: a real multi-seat **Supreme Court** (up to nine justices with their own
+  ideology and tenure) replaces the old single-Chief-Justice flavor field — nominate justices
+  through a genuine confirmation vote, petition the bench to strike down a specific law, and watch
+  judicial review itself skew toward whichever laws clash with the court's makeup as justices age,
+  retire, and die over the years. Head-of-state campaigns can now name a **running mate**, whose
+  own standing feeds a real bonus into the race and who's sworn in as VP (quietly building
+  influence) on a win. Alliances finally have teeth: a **mutual-defense** clause automatically
+  drags allied nations into a war the moment one member enters it, and bilateral **trade
+  agreements** are now persistent pacts with an ongoing GDP and relations tailwind instead of a
+  one-off nudge. In business: a **Credit Rating Agency** grades every company AAA through D from
+  real leverage, profitability and cash runway, and that rating now prices new debt and corporate
+  bonds. Sustained market dominance draws real **antitrust** scrutiny — settle for a fine or fight
+  in court and risk a forced divestiture. And public companies can now face **shareholder
+  activism**: an investor campaign demanding a dividend hike, buyback, CEO change or spin-off,
+  which the player can concede to or resist in a contested proxy fight. Eight new achievements
+  round it out.
+
 - **V55 — The biggest expansion yet: Rival Empires, the Prestige Vault, and two new life
   paths.** Corporate rivals are no longer interchangeable — each grudge-holding competitor now
   gets assigned one of five **rival strategies** (Aggressive Expander, Price Warrior, Tech

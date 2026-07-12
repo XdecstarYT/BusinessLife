@@ -6,7 +6,7 @@
  */
 import type { Advisor, AdvisorSpecialty, CabinetPortfolio, Company, Coworker, Executive, ExecutiveRole, GameState, Gender, InfrastructureKind, ManifestoPromise, MaintenanceLevel, OfficeKind, PetKind, PropertyAsset, TaxRates, WorkStyle } from './types';
 import { createPet, PET_SPEC_BY_KIND } from './pets';
-import { CABINET_PORTFOLIOS, clamp, clamp100 } from './types';
+import { CABINET_PORTFOLIOS, clamp, clamp100, SUPREME_COURT_SEATS } from './types';
 import { RNG } from './rng';
 import { INDUSTRY_BY_ID, INDUSTRIES } from '../data/industries';
 import { LAW_BY_ID } from '../data/laws';
@@ -16,9 +16,9 @@ import {
   CAREER_LADDER, COWORKER_PERSONALITIES, COWORKER_PERSONALITY_BY_ID,
   FREELANCE_GIG_BY_ID, FREELANCE_GIGS, rankIndex, titleForRank, WORK_STYLE_BY_ID,
 } from '../data/careers';
-import { createCompany, nextCompanyId, companyValuation } from './business';
+import { createCompany, nextCompanyId, companyValuation, CREDIT_RATING_SPREAD } from './business';
 import { doIPO, marketCap } from './market';
-import { OFFICE_SPEC_BY_KIND, campaignWinChance, eligibleFor, estimateLawVote } from './politics';
+import { OFFICE_SPEC_BY_KIND, campaignWinChance, dragInAllies, eligibleFor, estimateLawVote, ideologyStance, courtIdeologyLean } from './politics';
 import { log, logHistory } from './engine';
 import { playerCrimeFamily } from './crime';
 import { pushMemory } from './npcMind';
@@ -1328,7 +1328,7 @@ export function issueCorporateBond(state: GameState, companyId: string, amount: 
   if (amount <= 0 || amount > c.assets * 2 + c.revenue) return { ok: false, message: 'Bond amount is too large relative to the company\'s size.' };
   const country = state.countries.find((k) => k.id === c.countryId)!;
   const riskSpread = clamp((c.debt + c.bondDebt) / Math.max(1, c.assets), 0, 1) * 0.03;
-  const rate = country.economy.interestRate + 0.02 + riskSpread;
+  const rate = Math.max(0.01, country.economy.interestRate + 0.02 + riskSpread + (CREDIT_RATING_SPREAD[c.creditRating] ?? 0));
   c.cash += amount;
   c.bondDebt = amount;
   c.bondRate = rate;
@@ -1387,6 +1387,101 @@ export function spinOffCompany(state: GameState, companyId: string): ActionResul
   commit(state, rng);
   log(state, `${c.name} spun off a new entity, ${spin.name}, retaining a 70% stake.`, 'business');
   return { ok: true, message: `${spin.name} spun off successfully.` };
+}
+
+// ---------------------------------------------------------------------------
+// V56: Antitrust regulation — sustained dominant market share (see the tick in business.ts)
+// opens a real case the player must resolve, not just flavor text.
+// ---------------------------------------------------------------------------
+
+export function settleAntitrustCase(state: GameState, companyId: string): ActionResult {
+  const c = state.companies[companyId];
+  if (!c || !c.playerOwned || c.status !== 'active') return { ok: false, message: 'Not your company.' };
+  if (!c.antitrustCaseOpen) return { ok: false, message: 'No open antitrust case.' };
+  const fine = Math.max(50_000, companyValuation(c) * 0.03);
+  if (fine > c.cash) return { ok: false, message: `Needs $${Math.round(fine).toLocaleString()} in company cash to settle.` };
+  c.cash -= fine;
+  c.antitrustCaseOpen = false;
+  c.antitrustScrutinyYears = 0;
+  log(state, `${c.name} settled its antitrust case for $${Math.round(fine).toLocaleString()}.`, 'business');
+  return { ok: true, message: `Settled for $${Math.round(fine).toLocaleString()}.` };
+}
+
+export function fightAntitrustCase(state: GameState, companyId: string): ActionResult {
+  const c = state.companies[companyId];
+  if (!c || !c.playerOwned || c.status !== 'active') return { ok: false, message: 'Not your company.' };
+  if (!c.antitrustCaseOpen) return { ok: false, message: 'No open antitrust case.' };
+  const rng = withRng(state);
+  const chance = clamp(0.35 + (state.player.influence - 50) * 0.003 + (state.player.reputation - 50) * 0.002, 0.1, 0.75);
+  const won = rng.chance(chance);
+  commit(state, rng);
+  if (won) {
+    c.antitrustCaseOpen = false;
+    c.antitrustScrutinyYears = Math.max(0, c.antitrustScrutinyYears - 2);
+    if (!state.achievements.includes('antitrust_survivor')) state.achievements.push('antitrust_survivor');
+    log(state, `${c.name} beat back its antitrust case in court.`, 'business');
+    return { ok: true, message: 'Case dismissed — you won.' };
+  }
+  c.marketShare *= 0.5;
+  c.revenue *= 0.85;
+  c.assets *= 0.85;
+  c.antitrustCaseOpen = false;
+  c.antitrustScrutinyYears = 0;
+  log(state, `${c.name} lost its antitrust case and was forced to divest operations.`, 'bad');
+  return { ok: false, message: 'Case lost — forced divestiture.' };
+}
+
+// ---------------------------------------------------------------------------
+// V56: Shareholder activism — an activist investor campaign (see the tick in business.ts) on a
+// public player-owned company, demanding a specific change.
+// ---------------------------------------------------------------------------
+
+export function concedeToActivist(state: GameState, companyId: string): ActionResult {
+  const c = state.companies[companyId];
+  if (!c || !c.playerOwned || c.status !== 'active') return { ok: false, message: 'Not your company.' };
+  const campaign = c.activistCampaign;
+  if (!campaign) return { ok: false, message: 'No active investor campaign.' };
+  if (campaign.demand === 'dividend') {
+    c.dividendPayoutPct = clamp(c.dividendPayoutPct + 0.1, 0, 0.6);
+  } else if (campaign.demand === 'buyback') {
+    const amount = Math.min(c.cash, c.revenue * 0.05);
+    c.cash -= amount;
+    c.sharesOutstanding = Math.max(1, c.sharesOutstanding - amount / Math.max(0.01, c.sharePrice));
+  } else if (campaign.demand === 'ceo_change') {
+    c.ceoName = null;
+    c.ceoSkill = 0;
+    c.ceoSalary = 0;
+    c.morale = clamp100(c.morale - 5);
+  } else {
+    const res = spinOffCompany(state, companyId);
+    if (!res.ok) return res;
+  }
+  c.brand = clamp100(c.brand + 4);
+  c.activistCampaign = null;
+  log(state, `${c.name} conceded to ${campaign.investorName}'s demands.`, 'business');
+  return { ok: true, message: 'Investor demands met.' };
+}
+
+export function resistActivist(state: GameState, companyId: string): ActionResult {
+  const c = state.companies[companyId];
+  if (!c || !c.playerOwned || c.status !== 'active') return { ok: false, message: 'Not your company.' };
+  const campaign = c.activistCampaign;
+  if (!campaign) return { ok: false, message: 'No active investor campaign.' };
+  const rng = withRng(state);
+  const chance = clamp(0.55 - campaign.strength * 0.005 + (c.managerQuality - 50) * 0.003 + (state.player.reputation - 50) * 0.002, 0.1, 0.85);
+  const won = rng.chance(chance);
+  commit(state, rng);
+  if (won) {
+    c.activistCampaign = null;
+    c.brand = clamp100(c.brand + 2);
+    if (!state.achievements.includes('proxy_fight_winner')) state.achievements.push('proxy_fight_winner');
+    log(state, `${c.name} fought off ${campaign.investorName}'s activist campaign.`, 'business');
+    return { ok: true, message: 'You fought off the activist campaign.' };
+  }
+  c.brand = clamp100(c.brand - 6);
+  campaign.strength = clamp(campaign.strength + 10, 0, 100);
+  log(state, `${c.name}'s resistance to ${campaign.investorName} backfired — the pressure intensifies.`, 'bad');
+  return { ok: false, message: 'Resistance failed — the campaign intensifies.' };
 }
 
 export function fileTrademark(state: GameState, companyId: string): ActionResult {
@@ -1699,9 +1794,30 @@ export function launchCampaign(state: GameState, officeKind: OfficeKind, warChes
     yearsToElection: officeKind === 'head_of_state' || officeKind === 'governor' ? 1 : 0,
     consultantHired: false,
     promises: promises.slice(0, 3),
+    runningMateId: null,
   };
   log(state, `📣 Launched a campaign for ${spec.title} of ${region} with a $${warChest.toLocaleString()} war chest.`, 'politics');
   return { ok: true, message: `Campaign for ${spec.title} underway.` };
+}
+
+/** V56: only meaningful for a head_of_state campaign — see the ticket bonus in campaignWinChance
+ * and the VP inauguration in engine.ts's election-resolution block. */
+export function runningMateCandidates(state: GameState) {
+  const p = state.player;
+  return Object.values(state.npcs).filter((n) => n.alive && n.countryId === p.countryId && n.role === 'politician');
+}
+
+export function chooseRunningMate(state: GameState, npcId: string): ActionResult {
+  const p = state.player;
+  if (!p.campaign || p.campaign.officeKind !== 'head_of_state') return { ok: false, message: 'Only available while campaigning for the top office.' };
+  if (p.campaign.runningMateId) return { ok: false, message: 'You already have a running mate.' };
+  const npc = state.npcs[npcId];
+  if (!npc || !npc.alive || npc.countryId !== p.countryId || npc.role !== 'politician') return { ok: false, message: 'Invalid running mate.' };
+  p.campaign.runningMateId = npc.id;
+  p.campaign.momentum = clamp(p.campaign.momentum + 4, -50, 50);
+  if (!state.achievements.includes('running_mate')) state.achievements.push('running_mate');
+  log(state, `You named ${npc.name} as your running mate.`, 'politics');
+  return { ok: true, message: `${npc.name} joins the ticket as your running mate.` };
 }
 
 /** Discretionary campaign activities that spend money/PC for momentum. */
@@ -1992,6 +2108,7 @@ export function declareWar(state: GameState, targetCountryId: string, strategy: 
   const label = strategy === 'blockade' ? 'an economic blockade' : 'a full invasion';
   log(state, `⚔️ You declared war on ${target.name} with ${label}.`, 'politics');
   logHistory(state, `⚔️ WAR: ${home.name} declares war on ${target.name} (${strategy})`);
+  for (const h of dragInAllies(state, home.id, target.id)) logHistory(state, h);
   return { ok: true, message: `War declared on ${target.name} (${strategy}).` };
 }
 
@@ -2054,21 +2171,45 @@ export function sendForeignAid(state: GameState, targetCountryId: string): Actio
   return { ok: true, message: `Aid sent to ${target.name}.` };
 }
 
+/** V56: signing now creates a persistent, symmetric bilateral pact (see tradeAgreementIds) with a
+ * real ongoing GDP/relations tailwind each year in tickPolitics, on top of the immediate one-off
+ * bump this action already gave. */
 export function signTradeAgreement(state: GameState, targetCountryId: string): ActionResult {
   const { home, error } = requireLeadership(state);
   if (error) return error;
+  home.tradeAgreementIds ??= [];
   const p = state.player;
-  if (p.politicalCapital < 10) return { ok: false, message: 'Needs at least 10 political capital.' };
   const target = state.countries.find((c) => c.id === targetCountryId);
   if (!target || target.id === home.id) return { ok: false, message: 'Invalid target nation.' };
+  if (home.tradeAgreementIds.includes(target.id)) return { ok: false, message: `Already have a trade agreement with ${target.name}.` };
+  if (p.politicalCapital < 10) return { ok: false, message: 'Needs at least 10 political capital.' };
   p.politicalCapital = clamp(p.politicalCapital - 10, 0, 100);
+  target.tradeAgreementIds ??= [];
+  home.tradeAgreementIds.push(target.id);
+  target.tradeAgreementIds.push(home.id);
   home.relations[target.id] = clamp((home.relations[target.id] ?? 0) + 20, -100, 100);
   target.relations[home.id] = clamp((target.relations[home.id] ?? 0) + 20, -100, 100);
   home.economy.businessConfidence = clamp100(home.economy.businessConfidence + 3);
   target.economy.businessConfidence = clamp100(target.economy.businessConfidence + 3);
   if (!state.achievements.includes('diplomat')) state.achievements.push('diplomat');
+  if (home.tradeAgreementIds.length >= 5 && !state.achievements.includes('trade_bloc')) state.achievements.push('trade_bloc');
   log(state, `🤝 You signed a trade agreement with ${target.name}.`, 'politics');
   return { ok: true, message: `Trade agreement signed with ${target.name}.` };
+}
+
+export function breakTradeAgreement(state: GameState, targetCountryId: string): ActionResult {
+  const { home, error } = requireLeadership(state);
+  if (error) return error;
+  home.tradeAgreementIds ??= [];
+  if (!home.tradeAgreementIds.includes(targetCountryId)) return { ok: false, message: 'No trade agreement with that nation.' };
+  home.tradeAgreementIds = home.tradeAgreementIds.filter((id) => id !== targetCountryId);
+  const target = state.countries.find((c) => c.id === targetCountryId);
+  if (target) {
+    target.tradeAgreementIds = (target.tradeAgreementIds ?? []).filter((id) => id !== home.id);
+    home.relations[target.id] = clamp((home.relations[target.id] ?? 0) - 10, -100, 100);
+  }
+  log(state, `Trade agreement with ${target?.name ?? 'the nation'} was withdrawn.`, 'politics');
+  return { ok: true, message: 'Trade agreement withdrawn.' };
 }
 
 // ---------------------------------------------------------------------------
@@ -2282,6 +2423,78 @@ export function nominateChiefJustice(state: GameState, npcId: string): ActionRes
   home.judicialIntegrity = clamp100(home.judicialIntegrity * 0.4 + npc.integrity * 0.6);
   log(state, `${npc.name} was confirmed as Chief Justice of ${home.name}.`, 'politics');
   return { ok: true, message: `${npc.name} confirmed as Chief Justice.` };
+}
+
+// ---------------------------------------------------------------------------
+// V56: Supreme Court — a real multi-seat bench alongside the flavor Chief Justice field above.
+// ---------------------------------------------------------------------------
+
+/** NPC politicians in the player's home country not already sitting on the bench. */
+export function judiciaryCandidates(state: GameState) {
+  const p = state.player;
+  const home = state.countries.find((c) => c.id === p.countryId);
+  const seated = new Set((home?.supremeCourt ?? []).map((j) => j.id));
+  return Object.values(state.npcs).filter((n) => n.alive && n.countryId === p.countryId && n.role === 'politician' && !seated.has(n.id));
+}
+
+export function nominateJustice(state: GameState, npcId: string): ActionResult {
+  const { home, error } = requireLeadership(state);
+  if (error) return error;
+  home.supremeCourt ??= [];
+  if (home.supremeCourt.length >= SUPREME_COURT_SEATS) return { ok: false, message: 'The bench is already full.' };
+  const npc = state.npcs[npcId];
+  if (!npc || !npc.alive || npc.countryId !== home.id) return { ok: false, message: 'Invalid nominee.' };
+  if (home.supremeCourt.some((j) => j.id === npcId)) return { ok: false, message: 'Already sitting on the bench.' };
+  const p = state.player;
+  if (p.politicalCapital < 12) return { ok: false, message: 'Needs at least 12 political capital.' };
+  const rng = withRng(state);
+  const confirmChance = clamp(0.4 + p.politicalCapital * 0.004 + (npc.integrity - 50) * 0.003 + (npc.competence - 50) * 0.002, 0.05, 0.95);
+  const confirmed = rng.chance(confirmChance);
+  if (!confirmed) {
+    p.politicalCapital = clamp(p.politicalCapital - 8, 0, 100);
+    commit(state, rng);
+    log(state, `⚖️ ${npc.name}'s nomination to the Supreme Court was rejected by the legislature.`, 'bad');
+    return { ok: false, message: `${npc.name}'s confirmation vote failed.` };
+  }
+  const party = home.parties.find((x) => x.id === p.partyId);
+  const centerIdeology = party ? party.ideology : 0;
+  const ideology = clamp(centerIdeology + rng.range(-30, 30), -100, 100);
+  commit(state, rng);
+  home.supremeCourt.push({ id: npc.id, name: npc.name, ideology, age: npc.age, appointedYear: state.year });
+  home.chiefJusticeId ??= npc.id;
+  p.politicalCapital = clamp(p.politicalCapital - 12, 0, 100);
+  if (home.supremeCourt.length >= 5 && !state.achievements.includes('court_packer')) state.achievements.push('court_packer');
+  log(state, `⚖️ ${npc.name} confirmed to the ${home.name} Supreme Court.`, 'politics');
+  return { ok: true, message: `${npc.name} confirmed to the bench.` };
+}
+
+/** Formally ask the Supreme Court to review and (if it agrees) strike down a specific law in
+ * force — success skews toward laws that ideologically clash with the bench's lean (see
+ * courtIdeologyLean/ideologyStance in politics.ts), same math the automatic judicial-review roll
+ * in tickPolitics uses, just player-initiated and targeted rather than random. */
+export function petitionSupremeCourt(state: GameState, lawId: string): ActionResult {
+  const { home, error } = requireLeadership(state);
+  if (error) return error;
+  home.supremeCourt ??= [];
+  if (!home.lawsInForce.includes(lawId)) return { ok: false, message: 'That law is not currently in force.' };
+  const law = LAW_BY_ID[lawId];
+  if (!law) return { ok: false, message: 'Unknown law.' };
+  const p = state.player;
+  if (p.politicalCapital < 15) return { ok: false, message: 'Needs at least 15 political capital.' };
+  p.politicalCapital = clamp(p.politicalCapital - 15, 0, 100);
+  const conflict = Math.max(0, -ideologyStance(courtIdeologyLean(home), law));
+  const chance = clamp(0.15 + conflict * 0.6 + (p.influence - 50) * 0.002 + (p.reputation - 50) * 0.001, 0.05, 0.9);
+  const rng = withRng(state);
+  const success = rng.chance(chance);
+  commit(state, rng);
+  if (success) {
+    home.lawsInForce = home.lawsInForce.filter((id) => id !== lawId);
+    if (!state.achievements.includes('landmark_ruling')) state.achievements.push('landmark_ruling');
+    log(state, `⚖️ The Supreme Court struck down the ${law.name} in a landmark ruling.`, 'politics');
+    return { ok: true, message: `The court struck down ${law.name}.` };
+  }
+  log(state, `⚖️ The Supreme Court declined to strike down the ${law.name}.`, 'bad');
+  return { ok: false, message: `The court upheld ${law.name}.` };
 }
 
 export function callReferendum(state: GameState, lawId: string): ActionResult {

@@ -301,7 +301,9 @@ export interface Player {
     yearsToElection: number;
     consultantHired: boolean; // boosts momentum gains from campaign actions
     promises: ManifestoPromise[]; // manifesto pledges made at launch, tracked for fulfillment in office
+    runningMateId: string | null; // V56: NPC id; only meaningful for a head_of_state campaign
   };
+  vicePresidentId: string | null; // V56: set once a head_of_state campaign with a running mate wins
   lastElectionResult: ElectionResult | null; // transient: set on resolution, cleared once the UI shows it
   casinoTotalWagered: number; // lifetime stake across all casino games, for the Stats screen
   casinoBiggestWin: number; // single largest payout ever collected (any casino game, including a jackpot)
@@ -874,6 +876,27 @@ export interface Country {
   warCasualtiesTotal: number; // cumulative population lost to war across this playthrough (flavor + real population drag)
 
   lastNoConfidenceYear: number | null; // gates automatic legislative no-confidence risk to at most one attempt per year
+
+  // V56: a real multi-seat Supreme Court alongside the existing single chiefJusticeId/
+  // judicialIntegrity flavor fields — chiefJusticeId is kept in sync with the senior justice
+  // on this bench so old displays of it stay meaningful.
+  supremeCourt: Justice[];
+  // V56: bilateral trade agreements with real ongoing GDP/relations effects, distinct from the
+  // one-off relations bump signTradeAgreement used to give; symmetric (each side lists the other).
+  tradeAgreementIds: string[];
+}
+
+export const SUPREME_COURT_SEATS = 9;
+
+/** V56: one seat on a national Supreme Court. `ideology` uses the same -100..100 scale as
+ * Party.ideology so court composition can be compared against a law's support blocs with the
+ * same math estimateLawVote already uses per-party. */
+export interface Justice {
+  id: string; // underlying NPC id
+  name: string;
+  ideology: number; // -100..100
+  age: number;
+  appointedYear: number;
 }
 
 export const CABINET_PORTFOLIOS = ['Finance', 'Foreign Affairs', 'Defense', 'Health', 'Education', 'Justice'] as const;
@@ -1052,8 +1075,33 @@ export interface Company {
   demandBacklog: number; // $ of unmet demand carried forward, revenue-equivalent
   stockoutStreak: number; // consecutive years capacity failed to keep up with demand
 
+  // V56: Credit Rating Agency — computed each tick from leverage/profitability/cash runway (see
+  // computeCreditRating in business.ts); feeds into new-debt pricing (debtRate, corporate bonds).
+  creditRating: CreditRating;
+
+  // V56: Antitrust regulation — sustained dominant market share opens a real case the player
+  // must resolve (settle for a fine, or fight and risk a forced divestiture), not just flavor text.
+  antitrustScrutinyYears: number;
+  antitrustCaseOpen: boolean;
+
+  // V56: Shareholder activism — an activist investor campaign against a public player-owned
+  // company demanding a specific change; the player concedes (auto-executes the demand) or
+  // resists (a contested roll that can backfire).
+  activistCampaign: ActivistCampaign | null;
+
   status: CompanyStatus;
   history: CompanyHistoryPoint[];
+}
+
+export type CreditRating = 'AAA' | 'AA' | 'A' | 'BBB' | 'BB' | 'B' | 'CCC' | 'D';
+
+export type ActivistDemand = 'dividend' | 'buyback' | 'ceo_change' | 'spinoff';
+
+export interface ActivistCampaign {
+  investorName: string;
+  demand: ActivistDemand;
+  strength: number; // 0..100, resistance difficulty
+  yearsActive: number;
 }
 
 export interface Moonshot {

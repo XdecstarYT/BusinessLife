@@ -257,4 +257,13 @@ export const ACHIEVEMENTS: Record<string, AchievementDef> = {
   first_michelin_star: { label: 'First Michelin Star', icon: '⭐' },
   second_michelin_star: { label: 'Second Michelin Star', icon: '⭐' },
   three_michelin_stars: { label: 'Three Michelin Stars', icon: '⭐' },
+  // V56: Supreme Court + Running Mate + Trade Agreements + Credit Rating + Antitrust + Activism
+  court_packer: { label: 'Court Packer', icon: '⚖️' },
+  landmark_ruling: { label: 'Landmark Ruling', icon: '🔨' },
+  running_mate: { label: 'Running Mate', icon: '🤵' },
+  winning_ticket: { label: 'Winning Ticket', icon: '🎫' },
+  trade_bloc: { label: 'Trade Bloc Builder', icon: '🚢' },
+  aaa_rated: { label: 'AAA Rated', icon: '💎' },
+  antitrust_survivor: { label: 'Antitrust Survivor', icon: '🛡️' },
+  proxy_fight_winner: { label: 'Proxy Fight Winner', icon: '📣' },
 };
