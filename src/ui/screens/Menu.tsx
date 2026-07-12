@@ -80,7 +80,7 @@ export function Menu() {
       <div className="max-w-2xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-brand-500 to-violet-500 flex items-center justify-center text-white">
+            <div className="w-12 h-12 rounded-2xl bg-brand-500 flex items-center justify-center text-white">
               <IconBusiness className="w-7 h-7" />
             </div>
             <div>

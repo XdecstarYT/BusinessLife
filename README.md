@@ -14,6 +14,21 @@ connection or choose not to sign in.
 
 ## Highlights
 
+- **V58 — Complete UI overhaul: minimal, editorial, easy to navigate.** The entire visual
+  language changed. The BitLife-green gradients, glow shadows, and rainbow icon tiles are gone,
+  replaced by a monochrome surface with one sharp accent color (a single indigo, `--color-brand-*`
+  in `index.css`) and a true-neutral gray/near-black scale for dark mode — flat cards, hairline
+  borders, restrained typography, generous whitespace, in both light and dark themes. Because the
+  whole app draws from the same CSS custom properties and the same shared primitives
+  (`Card`/`Button`/`Pill`/`ListRow`/`CircleTile`/etc. in `components.tsx`), this cascaded to
+  essentially every one of the ~30 screens without hand-editing each one. Navigation was
+  restructured, not just restyled: on wider viewports (`lg:` and up) a persistent left sidebar
+  lists every screen — pinned tabs plus all grouped activities, with its own search — so nothing
+  is ever more than one click away and the old "open a sheet to find a screen" pattern disappears
+  entirely on desktop. On narrower viewports the classic bottom tab bar and searchable, grouped
+  Activities sheet remain, now with a localStorage-backed **Recents** section pinned above the
+  groups so getting back to whatever you were just doing takes one tap instead of a search.
+
 - **V57 — 3D becomes a core part of the game, not a backdrop.** A shared tap-to-interact
   facility landed in the 3D pipeline itself (`registerClickable`/`onPick` in the reusable scene
   hook — real raycasting that coexists with drag-to-rotate, distinguishing a tap from a rotate

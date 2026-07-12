@@ -88,7 +88,7 @@ export function GameOver() {
         <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-1">{state.player.name}</h2>
         <p className="text-slate-500 dark:text-slate-400 mb-3">{go.reason}</p>
         {ribbonAward && (
-          <div className="mb-4 rounded-2xl bg-gradient-to-b from-brand-400 to-brand-600 text-white px-5 py-3 [box-shadow:var(--shadow-glow-brand)] anim-pop">
+          <div className="mb-4 rounded-2xl bg-brand-500 text-white px-5 py-3 [box-shadow:var(--shadow-glow-brand)] anim-pop">
             {ribbonAward.firstTime && <Confetti />}
             <div className="text-3xl leading-none mb-1">{ribbonAward.ribbon.icon}</div>
             <div className="font-black tracking-wide">{ribbonAward.ribbon.name} Ribbon{ribbonAward.firstTime ? ' — NEW!' : ''}</div>

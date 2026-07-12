@@ -5,29 +5,29 @@
 
 @theme {
   --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  /* BitLife-style signature green */
-  --color-brand-50: #f0fbee;
-  --color-brand-100: #dcf6d8;
-  --color-brand-200: #bdedb6;
-  --color-brand-300: #8fdf85;
-  --color-brand-400: #5ecf54;
-  --color-brand-500: #3cbe32;
-  --color-brand-600: #2da226;
-  --color-brand-700: #268021;
-  --color-brand-800: #22651f;
-  --color-brand-900: #1e531d;
-  --color-ink-950: #070c17;
-  --color-ink-900: #0b1220;
-  --color-ink-850: #101a2e;
-  --color-ink-800: #16223a;
-  --color-ink-700: #223252;
-  --color-ink-600: #33456b;
-  /* Layered elevation: ambient wash + tight contact shadow reads as depth,
-     not the single flat drop-shadow of a default card. */
-  --shadow-lift: 0 1px 2px rgb(15 23 42 / 0.04), 0 4px 16px -4px rgb(15 23 42 / 0.08);
-  --shadow-lift-lg: 0 2px 4px rgb(15 23 42 / 0.05), 0 12px 32px -8px rgb(15 23 42 / 0.14);
-  --shadow-glow-brand: 0 4px 20px -4px rgb(60 190 50 / 0.5);
-  --shadow-glow-danger: 0 4px 20px -4px rgb(244 63 94 / 0.4);
+  /* Editorial single accent — sharp indigo against a monochrome field. */
+  --color-brand-50: #f1f1fd;
+  --color-brand-100: #e3e3fb;
+  --color-brand-200: #c7c8f6;
+  --color-brand-300: #a3a4ef;
+  --color-brand-400: #7b7de5;
+  --color-brand-500: #5150d6;
+  --color-brand-600: #4240c0;
+  --color-brand-700: #3634a0;
+  --color-brand-800: #2c2b81;
+  --color-brand-900: #252468;
+  /* True-neutral ink scale — no navy tint, reads as black/gray, not "dark game UI". */
+  --color-ink-950: #08080a;
+  --color-ink-900: #0e0e11;
+  --color-ink-850: #141417;
+  --color-ink-800: #1b1b1f;
+  --color-ink-700: #2a2a2f;
+  --color-ink-600: #45454c;
+  /* Understated elevation: a thin, mostly-flat contact shadow, not a glow. */
+  --shadow-lift: 0 1px 2px rgb(0 0 0 / 0.03), 0 1px 3px rgb(0 0 0 / 0.05);
+  --shadow-lift-lg: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px -12px rgb(0 0 0 / 0.14);
+  --shadow-glow-brand: 0 4px 16px -6px rgb(81 80 214 / 0.35);
+  --shadow-glow-danger: 0 4px 16px -6px rgb(244 63 94 / 0.3);
 }
 
 :root {
@@ -57,13 +57,13 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* Ambient background: a faint brand-tinted radial glow at the top of the page
-   so surfaces sit in an atmosphere rather than on a flat fill. */
+/* Ambient background: a faint, restrained accent wash at the top of the page —
+   just enough to keep the flat editorial field from feeling sterile. */
 .app-bg {
-  background-image: radial-gradient(60rem 24rem at 50% -8rem, rgb(60 190 50 / 0.06), transparent 70%);
+  background-image: radial-gradient(60rem 24rem at 50% -8rem, rgb(81 80 214 / 0.05), transparent 70%);
 }
 .dark .app-bg {
-  background-image: radial-gradient(60rem 24rem at 50% -8rem, rgb(60 190 50 / 0.1), transparent 70%);
+  background-image: radial-gradient(60rem 24rem at 50% -8rem, rgb(81 80 214 / 0.09), transparent 70%);
 }
 
 /* Thin, theme-aware scrollbars */
@@ -104,7 +104,7 @@ input[type='range']::-webkit-slider-thumb {
   background: var(--color-brand-500);
   cursor: pointer;
   border: 2px solid #fff2;
-  box-shadow: 0 1px 6px rgb(60 190 50 / 0.4);
+  box-shadow: 0 1px 6px rgb(81 80 214 / 0.35);
   transition: transform 0.15s ease;
 }
 input[type='range']::-webkit-slider-thumb:active {
@@ -117,7 +117,7 @@ input[type='range']::-moz-range-thumb {
   background: var(--color-brand-500);
   cursor: pointer;
   border: none;
-  box-shadow: 0 1px 6px rgb(60 190 50 / 0.4);
+  box-shadow: 0 1px 6px rgb(81 80 214 / 0.35);
 }
 
 @keyframes floatIn {

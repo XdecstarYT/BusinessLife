@@ -101,7 +101,7 @@ export function AccountPanel() {
         {user ? (
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 text-white flex items-center justify-center font-black shrink-0">
+              <div className="w-10 h-10 rounded-full bg-brand-500 text-white flex items-center justify-center font-black shrink-0">
                 {displayNameOf(user).charAt(0).toUpperCase()}
               </div>
               <div className="min-w-0">

@@ -3,7 +3,7 @@
  * incrementing id) to replay — used for achievement unlocks and big year-end wins. */
 import { useEffect, useState } from 'react';
 
-const COLORS = ['#3cbe32', '#fbbf24', '#f472b6', '#60a5fa', '#f87171', '#a78bfa', '#34d399'];
+const COLORS = ['#5150d6', '#fbbf24', '#f472b6', '#60a5fa', '#f87171', '#a78bfa', '#34d399'];
 
 const PIECES = Array.from({ length: 28 }, (_, i) => ({
   left: (i * 37) % 100,

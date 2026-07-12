@@ -12,9 +12,9 @@ export function Card({ children, className = '', onClick }: { children: ReactNod
   return (
     <div
       onClick={onClick}
-      className={`rounded-3xl bg-white dark:bg-ink-850 border border-slate-100 dark:border-ink-800 [box-shadow:var(--shadow-lift)] ${
+      className={`rounded-2xl bg-white dark:bg-ink-850 border border-slate-200 dark:border-ink-800 [box-shadow:var(--shadow-lift)] ${
         onClick
-          ? 'cursor-pointer transition-[transform,box-shadow] duration-200 hover:[box-shadow:var(--shadow-lift-lg)] hover:-translate-y-px active:scale-[0.985] active:translate-y-0'
+          ? 'cursor-pointer transition-[border-color,box-shadow] duration-200 hover:border-slate-300 dark:hover:border-ink-700 hover:[box-shadow:var(--shadow-lift-lg)] active:scale-[0.985]'
           : ''
       } ${className}`}
     >
@@ -65,13 +65,13 @@ export function Pill({
   tone?: 'neutral' | 'brand';
 }) {
   const activeCls = tone === 'brand'
-    ? 'bg-brand-500 text-white border-brand-500 [box-shadow:var(--shadow-glow-brand)]'
-    : 'bg-slate-900 text-white border-slate-900 dark:bg-white dark:text-ink-900 dark:border-white shadow-md';
+    ? 'bg-brand-500 text-white border-brand-500'
+    : 'bg-slate-900 text-white border-slate-900 dark:bg-white dark:text-ink-900 dark:border-white';
   return (
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`shrink-0 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-semibold transition-[background-color,box-shadow,transform] duration-200 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed ${
+      className={`shrink-0 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-semibold transition-[background-color,transform] duration-200 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed ${
         active ? activeCls : 'bg-slate-100 text-slate-700 border-transparent dark:bg-ink-800 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-ink-700'
       }`}
     >
@@ -88,8 +88,8 @@ export function PillRow({ children }: { children: ReactNode }) {
 export function SectionHeader({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
   return (
     <div className="flex items-center justify-between mb-3 mt-6 px-1">
-      <h2 className="flex items-center gap-2.5 text-xl font-extrabold tracking-tight text-slate-900 dark:text-white">
-        <span aria-hidden className="w-1 h-5 rounded-full bg-gradient-to-b from-brand-400 to-brand-600 shrink-0" />
+      <h2 className="flex items-center gap-2.5 text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+        <span aria-hidden className="w-1 h-5 rounded-full bg-brand-500 shrink-0" />
         {title}
       </h2>
       {(action || onAction) && (
@@ -102,23 +102,10 @@ export function SectionHeader({ title, action, onAction }: { title: string; acti
 }
 
 // ---------------------------------------------------------------------------
-const TILE_GRADIENTS = [
-  'from-rose-500 to-orange-500',
-  'from-brand-500 to-cyan-500',
-  'from-amber-400 to-yellow-500',
-  'from-emerald-500 to-teal-500',
-  'from-violet-500 to-fuchsia-500',
-  'from-sky-500 to-indigo-500',
-  'from-pink-500 to-rose-500',
-  'from-lime-500 to-emerald-500',
-  'from-slate-600 to-slate-800',
-];
-
 export function CircleTile({
   icon,
   label,
   onClick,
-  index = 0,
   badge,
 }: {
   icon: ReactNode;
@@ -127,12 +114,11 @@ export function CircleTile({
   index?: number;
   badge?: string | number;
 }) {
-  const grad = TILE_GRADIENTS[index % TILE_GRADIENTS.length];
   return (
     <button onClick={onClick} className="flex flex-col items-center gap-2 group w-full">
       <div className="relative">
         <div
-          className={`w-16 h-16 rounded-full bg-gradient-to-br ${grad} flex items-center justify-center text-white shadow-lg ring-2 ring-white/40 dark:ring-white/10 group-active:scale-90 group-hover:scale-105 transition-transform duration-200 [transition-timing-function:cubic-bezier(0.34,1.56,0.64,1)]`}
+          className="w-16 h-16 rounded-full bg-slate-100 dark:bg-ink-800 border border-slate-200 dark:border-ink-700 flex items-center justify-center text-slate-900 dark:text-white group-active:scale-90 group-hover:border-brand-400 dark:group-hover:border-brand-500 transition-[transform,border-color] duration-200 [transition-timing-function:cubic-bezier(0.34,1.56,0.64,1)]"
         >
           {icon}
         </div>
@@ -193,19 +179,17 @@ export function Button({
   size?: 'sm' | 'md' | 'lg';
 }) {
   const variants = {
-    primary:
-      'bg-gradient-to-b from-brand-400 to-brand-600 text-white hover:from-brand-500 hover:to-brand-700 [box-shadow:var(--shadow-glow-brand),inset_0_1px_0_rgb(255_255_255/0.25)]',
-    soft: 'bg-slate-100 text-slate-800 dark:bg-ink-800 dark:text-slate-100 hover:bg-slate-200 dark:hover:bg-ink-700 shadow-sm',
+    primary: 'bg-brand-500 text-white hover:bg-brand-600',
+    soft: 'bg-slate-100 text-slate-800 dark:bg-ink-800 dark:text-slate-100 hover:bg-slate-200 dark:hover:bg-ink-700',
     ghost: 'bg-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-ink-800',
-    danger:
-      'bg-gradient-to-b from-rose-400 to-rose-600 text-white hover:from-rose-500 hover:to-rose-700 [box-shadow:var(--shadow-glow-danger),inset_0_1px_0_rgb(255_255_255/0.25)]',
+    danger: 'bg-rose-600 text-white hover:bg-rose-700',
   };
   const sizes = { sm: 'px-3 py-1.5 text-sm', md: 'px-4 py-2.5 text-sm', lg: 'px-5 py-3 text-base' };
   return (
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`rounded-2xl font-semibold transition-[background-color,box-shadow,transform,opacity] duration-200 active:scale-[0.96] disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 ${variants[variant]} ${sizes[size]} ${className}`}
+      className={`rounded-xl font-semibold transition-[background-color,transform,opacity] duration-200 active:scale-[0.96] disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 ${variants[variant]} ${sizes[size]} ${className}`}
     >
       {children}
     </button>
@@ -229,7 +213,7 @@ export function Badge({ children, tone = 'neutral', title }: { children: ReactNo
 export function LineChart({
   data,
   height = 120,
-  color = '#337dff',
+  color = '#5150d6',
   showAxis = false,
   format,
 }: {
@@ -315,7 +299,7 @@ export function BarList({ items, format }: { items: { label: string; value: numb
             <span className="font-bold text-slate-500 dark:text-slate-400">{format ? format(it.value) : Math.round(it.value)}</span>
           </div>
           <div className="h-2.5 rounded-full bg-slate-100 dark:bg-ink-800 overflow-hidden">
-            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${(it.value / max) * 100}%`, background: it.color ?? '#337dff' }} />
+            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${(it.value / max) * 100}%`, background: it.color ?? '#5150d6' }} />
           </div>
         </div>
       ))}
@@ -337,7 +321,7 @@ export function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       {...props}
-      className={`w-full rounded-2xl bg-slate-100 dark:bg-ink-800 border border-transparent focus:border-brand-400 focus:ring-4 focus:ring-brand-500/15 focus:bg-white dark:focus:bg-ink-850 outline-none px-4 py-3 text-slate-900 dark:text-white placeholder:text-slate-400 transition-[border-color,box-shadow,background-color] ${props.className ?? ''}`}
+      className={`w-full rounded-xl bg-slate-100 dark:bg-ink-800 border border-transparent focus:border-brand-400 focus:ring-2 focus:ring-brand-500/15 focus:bg-white dark:focus:bg-ink-850 outline-none px-4 py-3 text-slate-900 dark:text-white placeholder:text-slate-400 transition-[border-color,box-shadow,background-color] ${props.className ?? ''}`}
     />
   );
 }
@@ -348,7 +332,7 @@ export function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
  * separated by thin lines. Use ListSectionBar between groups of ListRows. */
 export function ListSectionBar({ label }: { label: string }) {
   return (
-    <div className="bg-slate-200/80 dark:bg-ink-700/80 px-4 py-1.5 text-center text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300 -mx-4 sm:mx-0">
+    <div className="px-4 py-1.5 text-xs font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 -mx-4 sm:mx-0">
       {label}
     </div>
   );
@@ -378,9 +362,9 @@ export function ListRow({
       } ${disabled ? 'opacity-40' : ''}`}
       style={{ width: 'calc(100% + 2rem)' }}
     >
-      <span className={`text-lg leading-none shrink-0 w-9 h-9 rounded-xl flex items-center justify-center ${iconBadgeTone(String(title))}`}>{icon}</span>
+      <span className="text-lg leading-none shrink-0 w-9 h-9 rounded-xl flex items-center justify-center bg-slate-100 dark:bg-ink-800">{icon}</span>
       <span className="min-w-0 flex-1">
-        <span className="block font-bold text-sm text-brand-700 dark:text-brand-400 truncate">{title}</span>
+        <span className="block font-semibold text-sm text-slate-900 dark:text-white truncate">{title}</span>
         {subtitle && <span className="block text-xs text-slate-500 dark:text-slate-400 truncate">{subtitle}</span>}
       </span>
       <span className="shrink-0 text-slate-300 dark:text-slate-600">{trailing ?? (onClick ? <IconChevron className="w-5 h-5" /> : null)}</span>
@@ -388,30 +372,16 @@ export function ListRow({
   );
 }
 
-// BitLife's activity list wraps every icon in a distinct colored rounded-square tile rather than
-// a bare flat emoji — this derives a stable color per row from its title text so the list reads
-// as varied and "designed" without needing a color assigned by hand for every activity.
-const ICON_BADGE_TONES = [
-  'bg-rose-100 dark:bg-rose-500/20', 'bg-amber-100 dark:bg-amber-500/20', 'bg-emerald-100 dark:bg-emerald-500/20',
-  'bg-sky-100 dark:bg-sky-500/20', 'bg-violet-100 dark:bg-violet-500/20', 'bg-fuchsia-100 dark:bg-fuchsia-500/20',
-  'bg-cyan-100 dark:bg-cyan-500/20', 'bg-orange-100 dark:bg-orange-500/20',
-];
-function iconBadgeTone(seed: string): string {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
-  return ICON_BADGE_TONES[hash % ICON_BADGE_TONES.length];
-}
-
-/** Full-bleed navy header used atop a BitLife-style list sheet — pairs with ListRow/ListSectionBar. */
+/** Sticky header atop a list sheet — pairs with ListRow/ListSectionBar. */
 export function ListSheetHeader({ title, onClose }: { title: string; onClose?: () => void }) {
   return (
-    <div className="sticky top-0 z-10 bg-gradient-to-b from-ink-700 to-ink-800 dark:from-ink-800 dark:to-ink-900 px-4 py-3.5 flex items-center -mx-4 sm:mx-0 sm:rounded-t-3xl">
+    <div className="sticky top-0 z-10 bg-ink-900 px-4 py-3.5 flex items-center -mx-4 sm:mx-0 sm:rounded-t-2xl">
       {onClose && (
-        <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/15 text-white flex items-center justify-center shrink-0 active:scale-90 transition-transform">
+        <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/10 text-white flex items-center justify-center shrink-0 active:scale-90 transition-transform">
           ✕
         </button>
       )}
-      <h3 className="flex-1 text-center font-black tracking-wide text-white uppercase text-sm pr-8">{title}</h3>
+      <h3 className="flex-1 text-center font-bold tracking-wide text-white uppercase text-sm pr-8">{title}</h3>
     </div>
   );
 }
@@ -423,7 +393,7 @@ export function Modal({ open, onClose, children, title }: { open: boolean; onClo
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-black/55 backdrop-blur-sm anim-fade" onClick={onClose} />
-      <div className="relative w-full sm:max-w-lg max-h-[90vh] overflow-y-auto bg-white dark:bg-ink-850 rounded-t-3xl sm:rounded-3xl shadow-2xl anim-sheet border border-slate-100 dark:border-ink-800">
+      <div className="relative w-full sm:max-w-lg max-h-[90vh] overflow-y-auto bg-white dark:bg-ink-850 rounded-t-2xl sm:rounded-2xl shadow-2xl anim-sheet border border-slate-200 dark:border-ink-800">
         {/* bottom-sheet grab handle (mobile affordance) */}
         <div className="sm:hidden pt-2.5 flex justify-center">
           <div className="w-10 h-1 rounded-full bg-slate-300 dark:bg-ink-600" />

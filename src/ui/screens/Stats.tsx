@@ -40,7 +40,7 @@ export function Stats() {
       <SectionHeader title="Profile" />
       <Card className="p-5 mb-4">
         <div className="text-center mb-3">
-          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-brand-500 to-violet-500 mx-auto flex items-center justify-center text-white text-2xl font-black">
+          <div className="w-16 h-16 rounded-full bg-brand-500 mx-auto flex items-center justify-center text-white text-2xl font-black">
             {p.name.charAt(0)}
           </div>
           <div className="font-extrabold text-lg mt-2">{p.name}</div>
