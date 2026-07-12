@@ -32,6 +32,7 @@ import { Space } from './ui/screens/Space';
 import { Legal } from './ui/screens/Legal';
 import { Culinary } from './ui/screens/Culinary';
 import { Leaderboard } from './ui/screens/Leaderboard';
+import { Updates } from './ui/screens/Updates';
 
 export default function App() {
   const { state, screen, darkMode } = useGame();
@@ -77,6 +78,7 @@ export default function App() {
           {screen === 'legal' && <Legal />}
           {screen === 'culinary' && <Culinary />}
           {screen === 'leaderboard' && <Leaderboard />}
+          {screen === 'updates' && <Updates />}
         </div>
       </AppShell>
       <YearRecapModal />

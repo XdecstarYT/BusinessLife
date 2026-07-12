@@ -14,6 +14,13 @@ connection or choose not to sign in.
 
 ## Highlights
 
+- **V60 — An in-game Update Log.** A new player-facing changelog (`data/changelog.ts`), condensed
+  into scannable patch notes rather than developer prose, covering everything since V47 (Drug
+  Empire) through the current version. Reachable two ways: a "🆕 What's New" button on the main
+  menu opens it in a modal before you've even started a life, and an "Update Log" entry in the
+  in-game Activities sheet's **You** group opens the same content as a full screen. Every future
+  version adds one entry here, the same way it already adds one to this README's Highlights.
+
 - **V59 — 200 new content features across the simulation.** 60 new industries spread across 12
   sectors (from craft marketplaces and vertical air taxis to direct air capture startups), each
   with its own startup cost, margin, volatility and skill tie-in; 50 new laws spanning Taxation,

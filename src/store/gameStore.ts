@@ -61,7 +61,8 @@ export type Screen =
   | 'space'
   | 'legal'
   | 'culinary'
-  | 'leaderboard';
+  | 'leaderboard'
+  | 'updates';
 
 interface Toast {
   id: number;

@@ -9,6 +9,7 @@ import type { Scenario } from '../../sim/world';
 import { consumeRoyalty, getRoyaltySources } from '../../net/leaderboard';
 import { buyPrestigePerk, getOwnedPrestigePerks, getPrestigePoints, PRESTIGE_PERKS } from '../../net/prestige';
 import { getRibbonCabinet, RIBBONS } from '../../data/ribbons';
+import { CHANGELOG } from '../../data/changelog';
 import { AccountPanel } from '../AccountPanel';
 import { IconBusiness, IconSpark, IconTrophy } from '../icons';
 
@@ -36,6 +37,7 @@ export function Menu() {
   const [useLegacyBonus, setUseLegacyBonus] = useState(false);
   const [useRoyalty, setUseRoyalty] = useState(false);
   const [showPrestigeShop, setShowPrestigeShop] = useState(false);
+  const [showChangelog, setShowChangelog] = useState(false);
   // localStorage isn't reactive, so a purchase calls setPrestigeTick to force a re-render —
   // that's the only thing this state is for, the reads below always pull fresh from localStorage.
   const [, setPrestigeTick] = useState(0);
@@ -88,9 +90,14 @@ export function Menu() {
               <p className="text-xs text-slate-500 dark:text-slate-400">Business &amp; Politics Life Simulator</p>
             </div>
           </div>
-          <button onClick={toggleDark} className="text-sm font-semibold text-slate-500 dark:text-slate-400">
-            {darkMode ? '☀️ Light' : '🌙 Dark'}
-          </button>
+          <div className="flex items-center gap-3 shrink-0">
+            <button onClick={() => setShowChangelog(true)} className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+              🆕 What's New
+            </button>
+            <button onClick={toggleDark} className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+              {darkMode ? '☀️ Light' : '🌙 Dark'}
+            </button>
+          </div>
         </div>
 
         {!creating ? (
@@ -329,6 +336,27 @@ export function Menu() {
                 );
               })}
             </div>
+          </div>
+        </Modal>
+
+        <Modal open={showChangelog} onClose={() => setShowChangelog(false)} title="🆕 Update Log">
+          <div className="p-5 space-y-3">
+            {CHANGELOG.map((entry) => (
+              <Card key={entry.version} className="p-4">
+                <div className="flex items-baseline gap-2 mb-2">
+                  <span className="text-xs font-bold text-brand-500 uppercase tracking-wide shrink-0">{entry.version}</span>
+                  <span className="font-bold text-sm text-slate-900 dark:text-white">{entry.title}</span>
+                </div>
+                <ul className="space-y-1">
+                  {entry.bullets.map((b, i) => (
+                    <li key={i} className="text-sm text-slate-600 dark:text-slate-300 flex gap-2">
+                      <span className="text-slate-300 dark:text-slate-600 shrink-0">•</span>
+                      <span>{b}</span>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            ))}
           </div>
         </Modal>
       </div>

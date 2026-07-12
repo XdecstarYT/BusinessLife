@@ -75,6 +75,7 @@ const ACTIVITY_GROUPS: { title: string; items: ActivityEntry[] }[] = [
     items: [
       { screen: 'stats', label: 'Stats', subtitle: 'Your full life story', icon: '📊' },
       { screen: 'leaderboard', label: 'Ranks', subtitle: 'Global leaderboard', icon: '🏆' },
+      { screen: 'updates', label: 'Update Log', subtitle: "What's new in the game", icon: '🆕' },
     ],
   },
 ];
