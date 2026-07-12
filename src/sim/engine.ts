@@ -28,6 +28,7 @@ import { tickEntertainmentCareer } from './entertainment';
 import { tickMedicalCareer } from './medical';
 import { tickLegalCareer } from './legal';
 import { tickCulinaryCareer } from './culinary';
+import { tickAviation } from './aviation';
 import { tickCult } from './cult';
 import { tickSpaceProgram } from './space';
 import { tickPrisonLife } from './prison';
@@ -1227,6 +1228,7 @@ export function advanceYear(state: GameState): GameState {
   if (state.player.alive) for (const h of tickPrisonLife(state, rng)) log(state, h, 'bad');
   if (state.player.alive) for (const h of tickLegalCareer(state, rng)) log(state, h, 'info');
   if (state.player.alive) for (const h of tickCulinaryCareer(state, rng)) log(state, h, 'info');
+  if (state.player.alive) for (const h of tickAviation(state, rng)) log(state, h, 'info');
 
   // 5. Player company income: dividends from private profitable companies
   const p = state.player;

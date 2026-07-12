@@ -431,6 +431,7 @@ export function generateWorld(config: NewGameConfig): GameState {
     prisonLife: null,
     legalCareer: null,
     culinaryCareer: null,
+    aviation: null,
     hasPrenup: false,
     lobbyingFirmHired: false,
     marginDebt: 0,

@@ -43,6 +43,7 @@ const ACTIVITY_GROUPS: { title: string; items: ActivityEntry[] }[] = [
     title: 'Play',
     items: [
       { screen: 'athlete', label: 'Athlete', subtitle: 'Play soccer, football & running in 3D', icon: '🏟️' },
+      { screen: 'aviation', label: 'Aviation', subtitle: 'Become a pilot — fly real 3D routes', icon: '✈️' },
       { screen: 'military', label: 'Military Service', subtitle: 'Enlist, deploy, earn medals', icon: '🪖' },
       { screen: 'drugs', label: 'Drug Empire', subtitle: 'Deal, produce, and control turf', icon: '🌿' },
       { screen: 'casino', label: 'Casino', subtitle: 'Slots, tables, sports book', icon: '🎰' },

@@ -61,6 +61,7 @@ export type Screen =
   | 'space'
   | 'legal'
   | 'culinary'
+  | 'aviation'
   | 'leaderboard'
   | 'updates';
 

@@ -31,6 +31,7 @@ import { Cult } from './ui/screens/Cult';
 import { Space } from './ui/screens/Space';
 import { Legal } from './ui/screens/Legal';
 import { Culinary } from './ui/screens/Culinary';
+import { Aviation } from './ui/screens/Aviation';
 import { Leaderboard } from './ui/screens/Leaderboard';
 import { Updates } from './ui/screens/Updates';
 
@@ -77,6 +78,7 @@ export default function App() {
           {screen === 'space' && <Space />}
           {screen === 'legal' && <Legal />}
           {screen === 'culinary' && <Culinary />}
+          {screen === 'aviation' && <Aviation />}
           {screen === 'leaderboard' && <Leaderboard />}
           {screen === 'updates' && <Updates />}
         </div>

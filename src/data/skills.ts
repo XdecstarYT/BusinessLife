@@ -1,5 +1,5 @@
 /**
- * Skill catalogue: 10 categories x 12 skills = 120 skills.
+ * Skill catalogue: 10 categories, ~12 skills each (~121 total).
  * Skills gate event outcomes, job promotions, business performance and
  * political effectiveness. Each industry names a primary skill.
  */
@@ -44,7 +44,7 @@ const CATALOG: Record<string, string[]> = {
   ],
   Lifestyle: [
     'Fitness', 'Cooking', 'Golf', 'Chess', 'Poker', 'Sailing',
-    'Wine Tasting', 'Art Collecting', 'Meditation', 'Fashion Sense', 'Travel Planning', 'Gardening',
+    'Wine Tasting', 'Art Collecting', 'Meditation', 'Fashion Sense', 'Travel Planning', 'Gardening', 'Piloting',
   ],
   Shadow: [
     'Street Smarts', 'Smuggling', 'Forgery', 'Money Laundering', 'Hacking', 'Surveillance',
@@ -113,6 +113,7 @@ export const SK = {
   teaching: toId('Knowledge', 'Teaching'),
   foreignLanguages: toId('Knowledge', 'Foreign Languages'),
   poker: toId('Lifestyle', 'Poker'),
+  aviation: toId('Lifestyle', 'Piloting'),
   fitness: toId('Lifestyle', 'Fitness'),
   cooking: toId('Lifestyle', 'Cooking'),
   golf: toId('Lifestyle', 'Golf'),

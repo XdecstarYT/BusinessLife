@@ -320,6 +320,7 @@ export interface Player {
   prisonLife: PrisonLifeState | null; // V49: cellblock politics while incarcerated, reset on release
   legalCareer: LegalCareer | null; // V55: lawyer -> partner -> (optional) judge career
   culinaryCareer: CulinaryCareer | null; // V55: line cook -> celebrity chef career
+  aviation: AviationCareer | null; // V8.0: student pilot -> first officer -> airline captain, with a playable 3D flight minigame
   // V55: Prestige Vault — the permanent "Guardian Angel" perk (see net/prestige.ts) grants one
   // reprieve per life from the natural-mortality roll in engine.ts; guardianAngelUsed tracks
   // whether this life has already spent it, resetting fresh on every new generateWorld() call.
@@ -411,6 +412,27 @@ export interface CulinaryCareer {
   michelinStars: number; // 0..3, only earnable as restaurant_owner
   rank: number; // while stage === 'restaurant_owner': 0..3 growth tier of the restaurant
   restaurantClosed: boolean;
+}
+
+// V8.0: Aviation Career — student pilot → first officer → airline captain. You log flight hours
+// (partly by flying the real 3D FlightScene minigame), earn PPL/CPL/ATPL licenses that gate which
+// aircraft you can fly, and climb a captain rank ladder. Safety incidents work like legal.ts's bar
+// complaints: too many and your license is suspended for good. Structurally parallel to LegalCareer.
+export interface AviationCareer {
+  active: boolean;
+  stage: 'flight_school' | 'first_officer' | 'captain' | 'retired';
+  licenseId: string | null; // highest license held: 'ppl' | 'cpl' | 'atpl'
+  airlineName: string | null;
+  aircraftId: string | null; // current type rating being flown
+  typeRatings: string[]; // aircraft ids you hold a rating for
+  yearsOfService: number;
+  hoursLogged: number; // total block hours — gates the next license
+  flightsCompleted: number;
+  skill: number; // 0..100, piloting skill — drives flight outcomes and promotion odds
+  safetyRating: number; // 0..100, drifts with clean vs. rough flights
+  incidents: number; // safety incidents; MAX_INCIDENTS suspends the license
+  rank: number; // while stage === 'captain': 0..3, see CAPTAIN_RANK_TITLES
+  licenseSuspended: boolean;
 }
 
 export interface CultMovement {

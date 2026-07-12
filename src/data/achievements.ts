@@ -269,4 +269,16 @@ export const ACHIEVEMENTS: Record<string, AchievementDef> = {
   // V57: 3D minigames — Kitchen Service + Courtroom Trial
   perfect_service: { label: 'Perfect Service', icon: '🔥' },
   flawless_argument: { label: 'Flawless Argument', icon: '⚖️' },
+  // V8.0: Aviation Career + playable 3D Flight minigame
+  first_wings: { label: 'First Wings', icon: '🛩️' },
+  airline_rated: { label: 'Airline Rated', icon: '🎖️' },
+  superjumbo_rated: { label: 'Superjumbo Captain', icon: '🦅' },
+  greaser_landing: { label: 'Greaser Landing', icon: '🛬' },
+  century_of_flights: { label: 'Century of Flights', icon: '💯' },
+  chief_pilot: { label: 'Chief Pilot', icon: '👨‍✈️' },
+  grounded: { label: 'Grounded', icon: '🚫' },
+  // V8.0: World Domination endgame
+  world_dominator: { label: 'World Dominator', icon: '🌍' },
+  first_conquest: { label: 'First Conquest', icon: '🚩' },
+  economic_hegemon: { label: 'Economic Hegemon', icon: '💰' },
 };
