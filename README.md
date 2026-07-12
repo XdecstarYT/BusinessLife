@@ -14,6 +14,19 @@ connection or choose not to sign in.
 
 ## Highlights
 
+- **V8.2 — 3D becomes your home base.** The walkable 3D City stops being a screen you visit and
+  becomes the place you *live*: new games and loaded saves now **spawn you directly in the City**
+  (unless a decision is waiting, which still surfaces first), and a one-tap toggle on the Explore
+  screen switches your home base between the City and the classic Life feed at any time — the choice
+  persists across sessions. You can now **drive the grid**: a Drive/Walk button (🚗/🚶) drops you
+  into a compact coupe that covers the streets at roughly **2.4× walking speed**, with a camera that
+  pulls back to keep more road in view, spinning wheels, and cars that turn more deliberately than a
+  person spins on the spot — all sharing the same joystick / WASD controls. And the buildings now do
+  **real work**: walk up to the courthouse to **take a case**, the restaurant to **cook a service**,
+  the hospital to **treat a patient**, or home to **work out** — each firing the same career
+  simulation the dedicated screens use, right there in the city, whenever your career makes the
+  action available.
+
 - **V8.1 — The 3D City is now a real street grid.** The walkable Explore hub, which used to arrange
   its buildings on concentric rings around a plaza, is now laid out as a proper **city grid**:
   square blocks separated by a network of asphalt avenues with dashed centre lines, pale sidewalks,

@@ -17,6 +17,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'V8.2',
+    title: '3D Becomes Your Home Base',
+    bullets: [
+      'New games and loaded saves now spawn you right in the 3D City — it is the game, not a side view',
+      'Drive the grid: tap 🚗 to hop in a car and cover the streets more than twice as fast',
+      'Real actions inside buildings — take a case, cook a service, treat a patient or work out, right in the city',
+      'A one-tap toggle switches your home base between the City and the classic Life feed',
+    ],
+  },
+  {
     version: 'V8.1',
     title: 'The City Becomes a Street Grid',
     bullets: [

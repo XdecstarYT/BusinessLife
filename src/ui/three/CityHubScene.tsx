@@ -50,6 +50,7 @@ interface CityHubSceneProps {
 const ENTER_RADIUS = 2.3;
 const EXIT_RADIUS = 2.8;
 const MOVE_SPEED = 5;
+const DRIVE_SPEED = 12; // V8.2: hop in a car and cover the grid roughly 2.4× faster than on foot
 
 // V8.1: the city is laid out as a real street grid rather than concentric rings. Every building
 // (system + company) sits on the centre of a block; roads run between the blocks. A building's
@@ -942,6 +943,8 @@ export function CityHubScene({ buildings, season, onEnter, onQuickAction }: City
   const ref = useRef<HTMLDivElement>(null);
   const inputRef = useRef({ x: 0, z: 0 });
   const nearbyRef = useRef<string | null>(null);
+  const drivingRef = useRef(false);
+  const [driving, setDriving] = useState(false);
   const [nearby, setNearby] = useState<string | null>(null);
   const [joyKnob, setJoyKnob] = useState<{ x: number; y: number } | null>(null);
   const joyBaseRef = useRef<HTMLDivElement>(null);
@@ -1311,16 +1314,55 @@ export function CityHubScene({ buildings, season, onEnter, onQuickAction }: City
         return ped;
       });
 
-      // Player avatar.
+      // Player avatar. `player` is the shared transform anchor (position + heading); its two
+      // children — an on-foot avatar and a car — swap visibility when the player toggles Drive
+      // (V8.2), so movement, camera-chase and proximity logic all stay identical either way.
       const player = new THREE.Group();
+
+      const avatar = new THREE.Group();
       const playerBody = new THREE.Mesh(new THREE.CapsuleGeometry(0.24, 0.5, 4, 12), new THREE.MeshStandardMaterial({ color: 0x337dff, roughness: 0.5 }));
       playerBody.position.y = 0.5;
-      player.add(playerBody);
+      avatar.add(playerBody);
       const nose = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.22, 8), new THREE.MeshStandardMaterial({ color: 0xffffff }));
       nose.rotation.x = Math.PI / 2;
       nose.position.set(0, 0.68, 0.28);
-      player.add(nose);
+      avatar.add(nose);
       if (castsShadows) { playerBody.castShadow = true; nose.castShadow = true; }
+      player.add(avatar);
+
+      // Car: a compact coupe pointing +Z (matching the avatar's forward), built from simple
+      // primitives so it stays cheap on mobile. Hidden until Drive is toggled on.
+      const car = new THREE.Group();
+      const carPaint = new THREE.MeshStandardMaterial({ color: 0xd9433a, roughness: 0.35, metalness: 0.5 });
+      const carChassis = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.34, 1.7), carPaint);
+      carChassis.position.y = 0.34;
+      car.add(carChassis);
+      const carCabin = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.32, 0.86), new THREE.MeshStandardMaterial({ color: 0x1b2735, roughness: 0.25, metalness: 0.3 }));
+      carCabin.position.set(0, 0.62, -0.02);
+      car.add(carCabin);
+      const headlightMat = new THREE.MeshStandardMaterial({ color: 0xfff6d0, emissive: 0xfff0b0, emissiveIntensity: 0.6 });
+      for (const sx of [-0.28, 0.28]) {
+        const hl = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.1, 0.05), headlightMat);
+        hl.position.set(sx, 0.36, 0.86);
+        car.add(hl);
+      }
+      const wheelGeo = new THREE.CylinderGeometry(0.18, 0.18, 0.14, 14);
+      const wheelMat = new THREE.MeshStandardMaterial({ color: 0x101418, roughness: 0.7 });
+      const carWheels: THREE.Mesh[] = [];
+      for (const wx of [-0.46, 0.46]) {
+        for (const wz of [0.55, -0.55]) {
+          const w = new THREE.Mesh(wheelGeo, wheelMat);
+          w.rotation.z = Math.PI / 2;
+          w.position.set(wx, 0.18, wz);
+          if (castsShadows) w.castShadow = true;
+          car.add(w);
+          carWheels.push(w);
+        }
+      }
+      if (castsShadows) { carChassis.castShadow = true; carCabin.castShadow = true; }
+      car.visible = false;
+      player.add(car);
+
       scene.add(player);
 
       // Night starfield: fades in as the sun sets, scaled to the plaza so it always sits
@@ -1359,22 +1401,28 @@ export function CityHubScene({ buildings, season, onEnter, onQuickAction }: City
         lastT = t;
 
         // --- movement ---
+        const drivingNow = drivingRef.current;
+        if (avatar.visible === drivingNow) { avatar.visible = !drivingNow; car.visible = drivingNow; }
+        const speed = drivingNow ? DRIVE_SPEED : MOVE_SPEED;
         const { x, z } = inputRef.current;
         const mag = Math.hypot(x, z);
         if (mag > 0.05) {
           const nx = x / Math.max(mag, 1);
           const nz = z / Math.max(mag, 1);
-          player.position.x += nx * MOVE_SPEED * dt * Math.min(mag, 1);
-          player.position.z += nz * MOVE_SPEED * dt * Math.min(mag, 1);
+          const moved = speed * dt * Math.min(mag, 1);
+          player.position.x += nx * moved;
+          player.position.z += nz * moved;
           // Rectangular walk bounds matching the grid footprint.
           player.position.x = THREE.MathUtils.clamp(player.position.x, -walkHalfX, walkHalfX);
           player.position.z = THREE.MathUtils.clamp(player.position.z, -walkHalfZ, walkHalfZ);
           const targetHeading = Math.atan2(nx, nz);
           let diff = targetHeading - heading;
           diff = Math.atan2(Math.sin(diff), Math.cos(diff));
-          heading += diff * 0.25;
+          // Cars turn more deliberately than a person spins on the spot.
+          heading += diff * (drivingNow ? 0.14 : 0.25);
           player.rotation.y = heading;
           playerBody.position.y = 0.5 + Math.sin(t * 10) * 0.02;
+          if (drivingNow) for (const w of carWheels) w.rotation.x += moved * 1.6;
         }
 
         // --- proximity / enter prompt ---
@@ -1392,9 +1440,12 @@ export function CityHubScene({ buildings, season, onEnter, onQuickAction }: City
         }
 
         // --- camera chase (fixed relative offset, no rotation math needed) ---
+        // Pull back and up a touch when driving so the faster car keeps more road in view.
+        const camBack = drivingNow ? 9.5 : 7.5;
+        const camHigh = drivingNow ? 6.2 : 5.2;
         camera.position.x += (player.position.x - camera.position.x) * 0.06;
-        camera.position.z += (player.position.z + 7.5 - camera.position.z) * 0.06;
-        camera.position.y = 5.2;
+        camera.position.z += (player.position.z + camBack - camera.position.z) * 0.06;
+        camera.position.y += (camHigh - camera.position.y) * 0.06;
         camera.lookAt(player.position.x, 1, player.position.z);
 
         // --- day / night ---
@@ -1536,8 +1587,19 @@ export function CityHubScene({ buildings, season, onEnter, onQuickAction }: City
         </div>
       )}
 
+      {/* Drive / walk toggle — mirrors the joystick on the opposite corner */}
+      <button
+        onClick={() => { const next = !drivingRef.current; drivingRef.current = next; setDriving(next); }}
+        className="absolute right-5 bottom-5 flex flex-col items-center justify-center w-16 h-16 rounded-full bg-white/15 border border-white/25 text-white active:scale-95 transition-transform"
+        style={{ touchAction: 'manipulation' }}
+        aria-pressed={driving}
+      >
+        <span className="text-2xl leading-none">{driving ? '🚶' : '🚗'}</span>
+        <span className="text-[9px] font-semibold mt-0.5">{driving ? 'Walk' : 'Drive'}</span>
+      </button>
+
       <div className="absolute top-3 left-1/2 -translate-x-1/2 text-[11px] text-white/70 bg-black/30 px-3 py-1 rounded-full">
-        Drag the stick or use WASD / arrow keys to walk
+        {driving ? 'Cruise the grid — tap 🚶 to get out and walk' : 'Drag the stick or use WASD / arrow keys — tap 🚗 to drive'}
       </div>
     </div>
   );

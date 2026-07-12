@@ -17,6 +17,9 @@ import { useGame, type Screen } from '../../store/gameStore';
 import { netWorth } from '../../sim/engine';
 import { playerProducts } from '../../sim/products';
 import { applyForPromotion, doActivity } from '../../sim/actions';
+import { takeCase } from '../../sim/legal';
+import { cookService } from '../../sim/culinary';
+import { treatPatient } from '../../sim/medical';
 import { isBuildingUnderConstruction, marketCap } from '../../sim/market';
 import { INDUSTRY_BY_ID } from '../../data/industries';
 import { SectionHeader } from '../components';
@@ -75,7 +78,7 @@ const SECTOR_ACCENT: Record<string, string> = {
 const MAX_COMPANY_BUILDINGS = 32;
 
 export function Explore() {
-  const { state, setScreen, run, toast } = useGame();
+  const { state, setScreen, run, toast, cityHome, toggleCityHome } = useGame();
   if (!state) return null;
   const p = state.player;
   const home = state.countries.find((c) => c.id === p.countryId)!;
@@ -132,7 +135,7 @@ export function Explore() {
   const homeBuilding: HubBuilding = {
     id: 'home', label: 'Home', sublabel: `Wellbeing ${Math.round(wellbeing)}`,
     archetype: 'house', tier: clampTier(wellbeing >= 75 ? 3 : wellbeing >= 50 ? 2 : wellbeing >= 25 ? 1 : 0),
-    accent: '#f59e0b',
+    accent: '#f59e0b', quickAction: { icon: '💪', label: 'Work out' },
   };
 
   // --- Career office: job rank + promotion quick action ---
@@ -175,6 +178,7 @@ export function Explore() {
     ? {
         id: 'courthouse', label: legal.stage === 'judge' ? 'The Bench' : 'Law Offices', sublabel: `${legal.stage.replace('_', ' ')} · rep ${Math.round(legal.reputation)}`,
         archetype: 'courthouse', tier: clampTier(legal.stage === 'judge' ? 3 : legal.rank >= 2 ? 2 : legal.rank >= 1 ? 1 : 0), accent: '#c9a227',
+        quickAction: (legal.stage === 'associate' || legal.stage === 'partner') && !legal.disbarred ? { icon: '⚖️', label: 'Take a case' } : undefined,
       }
     : { id: 'courthouse', label: 'Courthouse', sublabel: 'Start a legal career to open it', archetype: 'courthouse', tier: 0, accent: '#64748b', dormant: true };
 
@@ -185,6 +189,7 @@ export function Explore() {
         id: 'restaurant', label: culinary.workplaceName ?? 'The Kitchen', sublabel: `${culinary.stage.replace('_', ' ')} · ${culinary.michelinStars} ⭐`,
         archetype: 'restaurant', tier: clampTier(culinary.stage === 'restaurant_owner' ? 2 + Math.min(1, culinary.michelinStars) : culinary.rank),
         accent: '#e8734a',
+        quickAction: (culinary.stage === 'line_cook' || culinary.stage === 'sous_chef' || culinary.stage === 'head_chef') ? { icon: '🍳', label: 'Cook a service' } : undefined,
       }
     : { id: 'restaurant', label: 'Restaurant', sublabel: 'Start cooking to open it', archetype: 'restaurant', tier: 0, accent: '#64748b', dormant: true };
 
@@ -194,6 +199,7 @@ export function Explore() {
     ? {
         id: 'hospital', label: 'General Hospital', sublabel: `${medical.stage.replace('_', ' ')} · ${medical.patientsSaved} saved`,
         archetype: 'hospital', tier: clampTier(medical.rank), accent: '#e11d48',
+        quickAction: (medical.stage === 'residency' || medical.stage === 'attending') && !medical.licenseRevoked ? { icon: '🩺', label: 'Treat a patient' } : undefined,
       }
     : { id: 'hospital', label: 'Hospital', sublabel: 'Enroll in med school to open it', archetype: 'hospital', tier: 0, accent: '#64748b', dormant: true };
 
@@ -233,6 +239,10 @@ export function Explore() {
   const handleQuickAction = (id: string) => {
     if (id === 'office') { run(applyForPromotion); return; }
     if (id === 'park') { run(doActivity, 'meditate'); return; }
+    if (id === 'home') { run(doActivity, 'gym'); return; }
+    if (id === 'courthouse') { run(takeCase); return; }
+    if (id === 'restaurant') { run(cookService); return; }
+    if (id === 'hospital') { run(treatPatient); return; }
     if (id === 'newsstand' && latestNews) { toast(`📰 ${latestNews.outlet}: "${latestNews.headline}"`); return; }
   };
 
@@ -265,6 +275,12 @@ export function Explore() {
           </div>
         ))}
       </div>
+      <button
+        onClick={toggleCityHome}
+        className="mt-3 w-full rounded-xl bg-slate-100 dark:bg-ink-800 px-4 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-ink-700 transition-colors"
+      >
+        {cityHome ? '🏙️ Home base: the City (tap to land in the Life feed instead)' : '📖 Home base: the Life feed (tap to spawn in the City instead)'}
+      </button>
     </div>
   );
 }

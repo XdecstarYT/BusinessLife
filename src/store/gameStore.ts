@@ -109,6 +109,8 @@ interface GameStoreState {
   endStoryHere: () => void;
   dismissYearRecap: () => void;
   toggleDark: () => void;
+  cityHome: boolean; // V8.2: land in the walkable 3D city on start/continue instead of the Life feed
+  toggleCityHome: () => void;
   toast: (text: string, tone?: 'ok' | 'err') => void;
   toastAchievement: (icon: string, label: string) => void;
 
@@ -160,12 +162,14 @@ export const useGame = create<GameStoreState>((set, get) => ({
   activeEvent: null,
   eventResult: null,
   darkMode: true,
+  // V8.2: default to landing in the 3D city (persisted so the choice sticks across reloads).
+  cityHome: (() => { try { return localStorage.getItem('bl_city_home') !== '0'; } catch { return true; } })(),
   busy: false,
   seenAchievements: [],
 
   newGame: (config) => {
     const state = generateWorld(config);
-    set({ state, screen: 'life', eventQueue: [], activeEvent: null, eventResult: null });
+    set({ state, screen: get().cityHome ? 'explore' : 'life', eventQueue: [], activeEvent: null, eventResult: null });
     seedSeenAchievements(state, set);
     void saveGame(AUTOSAVE_ID, state, true);
   },
@@ -178,7 +182,10 @@ export const useGame = create<GameStoreState>((set, get) => ({
     const state = await loadGame(id);
     if (state) {
       const queue = state.pendingEvents ?? [];
-      set({ state, screen: 'life', eventQueue: queue.slice(1), activeEvent: queue[0] ?? null, eventResult: null });
+      // Land in the city if that's your home base — but only when there's no event waiting, so a
+      // pending decision still surfaces immediately rather than hiding behind the 3D hub.
+      const landing = get().cityHome && queue.length === 0 ? 'explore' : 'life';
+      set({ state, screen: landing, eventQueue: queue.slice(1), activeEvent: queue[0] ?? null, eventResult: null });
       seedSeenAchievements(state, set);
     } else {
       get().toast('Save not found.', 'err');
@@ -207,7 +214,8 @@ export const useGame = create<GameStoreState>((set, get) => ({
     try {
       const state = importSave(json);
       const queue = state.pendingEvents ?? [];
-      set({ state, screen: 'life', eventQueue: queue.slice(1), activeEvent: queue[0] ?? null, eventResult: null });
+      const landing = get().cityHome && queue.length === 0 ? 'explore' : 'life';
+      set({ state, screen: landing, eventQueue: queue.slice(1), activeEvent: queue[0] ?? null, eventResult: null });
       seedSeenAchievements(state, set);
       get().toast('Save imported.');
     } catch {
@@ -337,6 +345,12 @@ export const useGame = create<GameStoreState>((set, get) => ({
   },
 
   toggleDark: () => set({ darkMode: !get().darkMode }),
+
+  toggleCityHome: () => {
+    const next = !get().cityHome;
+    try { localStorage.setItem('bl_city_home', next ? '1' : '0'); } catch { /* storage unavailable */ }
+    set({ cityHome: next });
+  },
 
   dismissElectionResult: () => {
     const s = get().state;
