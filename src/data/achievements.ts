@@ -239,4 +239,22 @@ export const ACHIEVEMENTS: Record<string, AchievementDef> = {
   // V54: manufacturing capacity vs. demand
   supply_chain_master: { label: 'Supply Chain Master', icon: '🚂' },
   back_on_track: { label: 'Back on Track', icon: '📦' },
+  // V55: Rival Empires + Prestige Vault + Legal Career + Culinary Empire
+  lawyer_licensed: { label: 'Passed the Bar', icon: '⚖️' },
+  case_closer: { label: 'Case Closer', icon: '📁' },
+  legal_legend: { label: 'Legal Legend', icon: '🏆' },
+  litigation_ace: { label: 'Litigation Ace', icon: '📋' },
+  disbarred: { label: 'Disbarred', icon: '🚫' },
+  bar_survivor: { label: 'Bar Survivor', icon: '😰' },
+  named_partner: { label: 'Named Partner', icon: '🖋️' },
+  legal_scholar: { label: 'Legal Scholar', icon: '📚' },
+  appointed_judge: { label: 'Appointed to the Bench', icon: '👨‍⚖️' },
+  culinary_veteran: { label: 'Culinary Veteran', icon: '🍳' },
+  kitchen_legend: { label: 'Kitchen Legend', icon: '🔥' },
+  head_chef: { label: 'Head Chef', icon: '👨‍🍳' },
+  restaurant_owner: { label: 'Restaurant Owner', icon: '🏮' },
+  landmark_restaurant: { label: 'Landmark Restaurant', icon: '🏛️' },
+  first_michelin_star: { label: 'First Michelin Star', icon: '⭐' },
+  second_michelin_star: { label: 'Second Michelin Star', icon: '⭐' },
+  three_michelin_stars: { label: 'Three Michelin Stars', icon: '⭐' },
 };

@@ -4,6 +4,7 @@
  * then creates the 18-year-old player character inside it.
  */
 import type { City, Country, CountryState, CrimeFamily, Difficulty, GameState, Gender, NPC, NPCRole, Party, Player } from './types';
+import { clamp100 } from './types';
 import { RNG, hashSeed } from './rng';
 import { COUNTRY_SEEDS } from '../data/countries';
 import { initEconomy } from './economy';
@@ -91,6 +92,10 @@ export interface NewGameConfig {
   difficulty?: Difficulty;
   legacyBonus?: number; // starting money bonus carried over from a previous life's Legacy Score
   bornRoyal?: boolean; // spends a banked #1-leaderboard perk (see net/leaderboard.ts) on a royal start
+  // V55: Prestige Vault — ids of PERMANENT perks owned in the cross-playthrough vault (see
+  // net/prestige.ts), applied fresh to every new life unlike legacyBonus/bornRoyal above which
+  // are each spent/consumed once. Plain string ids so this file stays decoupled from net/.
+  prestigePerks?: string[];
 }
 
 export function generateWorld(config: NewGameConfig): GameState {
@@ -345,6 +350,17 @@ export function generateWorld(config: NewGameConfig): GameState {
   const royal = !!config.bornRoyal;
   const royalTreasury = royal ? rng.int(3_000_000, 12_000_000) : 0;
 
+  // V55: Prestige Vault — permanent, cross-playthrough perks (see net/prestige.ts) applied fresh
+  // to this new life exactly like the one-life royal bonuses above, just from a different,
+  // never-consumed source. Kept as plain string ids so this file stays decoupled from net/.
+  const perks = new Set(config.prestigePerks ?? []);
+  if (perks.has('prodigy')) {
+    for (let i = 0; i < 3; i++) {
+      const skillId = rng.pick(SKILLS).id;
+      skills[skillId] = Math.max(skills[skillId] ?? 0, rng.int(10, 30));
+    }
+  }
+
   const player: Player = {
     name: config.playerName,
     gender: config.gender,
@@ -352,18 +368,21 @@ export function generateWorld(config: NewGameConfig): GameState {
     alive: true,
     countryId: home.id,
     cityId: homeCity.id,
-    health: rng.int(80, 98),
+    health: clamp100(rng.int(80, 98) + (perks.has('strong_constitution') ? 12 : 0)),
     happiness: rng.int(65, 90),
     // A newborn has no real "smarts"/"charisma" yet — these read as innate temperament that
     // childhood events and schooling (see tickChildhood in engine.ts) will build up over time.
-    smarts: royal ? rng.int(8, 18) : rng.int(0, 8),
-    charisma: royal ? rng.int(8, 18) : rng.int(0, 8),
-    reputation: royal ? rng.int(20, 35) : 0,
-    popularity: royal ? rng.int(5, 15) : 0,
+    smarts: clamp100((royal ? rng.int(8, 18) : rng.int(0, 8)) + (perks.has('sharp_mind') ? 8 : 0)),
+    charisma: clamp100((royal ? rng.int(8, 18) : rng.int(0, 8)) + (perks.has('natural_charm') ? 8 : 0)),
+    reputation: clamp100((royal ? rng.int(20, 35) : 0) + (perks.has('old_money') ? 15 : 0)),
+    popularity: clamp100((royal ? rng.int(5, 15) : 0) + (perks.has('old_money') ? 5 : 0)),
     influence: 0,
-    karma: 50,
+    karma: clamp100(50 + (perks.has('iron_will') ? 10 : 0)),
     notoriety: 0,
-    money: rng.int(0, 200) + Math.max(0, config.legacyBonus ?? 0) + royalTreasury,
+    money: rng.int(0, 200) + Math.max(0, config.legacyBonus ?? 0) + royalTreasury
+      + (perks.has('family_savings') ? 25_000 : 0) + (perks.has('family_fortune') ? 150_000 : 0),
+    guardianAngelAvailable: perks.has('guardian_angel'),
+    guardianAngelUsed: false,
     criminalRecord: 0,
     inJailYears: 0,
     skills,
@@ -407,6 +426,8 @@ export function generateWorld(config: NewGameConfig): GameState {
     cult: null,
     astronaut: null,
     prisonLife: null,
+    legalCareer: null,
+    culinaryCareer: null,
     hasPrenup: false,
     lobbyingFirmHired: false,
     marginDebt: 0,

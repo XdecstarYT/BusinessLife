@@ -4,7 +4,7 @@
  * x laws in force x competition. Applies to both player-run companies and
  * the hundreds of NPC/public companies that populate the stock market.
  */
-import type { Company, Country, GameState, Industry } from './types';
+import type { Company, Country, GameState, Industry, RivalStrategy } from './types';
 import { clamp, clamp01, clamp100 } from './types';
 import { aggregateLawEffects, lawIndustryModifier } from './economy';
 import { INDUSTRY_BY_ID } from '../data/industries';
@@ -105,6 +105,7 @@ export function createCompany(opts: FoundCompanyOptions, rng: RNG): Company {
     activeCampaign: null,
     campaignsRun: 0,
     grudgeAgainstPlayer: 0,
+    rivalStrategy: null,
     manufacturingCapacity: 100,
     demandBacklog: 0,
     stockoutStreak: 0,
@@ -573,17 +574,55 @@ export function tickNpcIPOs(state: GameState, rng: RNG): string[] {
   return headlines;
 }
 
+/** V55: Rival Empires — the strategy a rival settles into the first time it actually attacks the
+ * player, derived from its own real stats rather than assigned randomly, so a rival plays true to
+ * character (an R&D-heavy firm keeps fighting with patents, not price cuts) for the rest of the
+ * game. Assigned once and never reassigned — see Company.rivalStrategy. */
+export function assignRivalStrategy(c: Company, rng: RNG): RivalStrategy {
+  const scores: Record<RivalStrategy, number> = {
+    aggressive_expander: c.marketShare * 100 + rng.range(0, 8),
+    price_warrior: (1.15 - c.priceLevel) * 40 + rng.range(0, 8),
+    tech_innovator: c.rdPct * 200 + rng.range(0, 8),
+    brand_builder: c.brand * 0.5 + c.marketingPct * 100 + rng.range(0, 8),
+    talent_raider: c.salaryLevel * 30 + c.morale * 0.3 + rng.range(0, 8),
+  };
+  return (Object.entries(scores) as [RivalStrategy, number][]).reduce((best, cur) => (cur[1] > best[1] ? cur : best))[0];
+}
+
+/** UI-facing label/icon/blurb per strategy — shared so the Business screen's rival cards read
+ * the same character the tick logic actually plays out (see STRATEGY_ATTACK_WEIGHTS below). */
+export const RIVAL_STRATEGY_INFO: Record<RivalStrategy, { label: string; icon: string; blurb: string }> = {
+  aggressive_expander: { label: 'Aggressive Expander', icon: '📈', blurb: 'Chasing market share fast, often at your expense.' },
+  price_warrior: { label: 'Price Warrior', icon: '🏷️', blurb: 'Wins on price, and isn\'t shy about starting a war over it.' },
+  tech_innovator: { label: 'Tech Innovator', icon: '🔬', blurb: 'Leans on R&D and patents to fight, not price cuts.' },
+  brand_builder: { label: 'Brand Builder', icon: '📣', blurb: 'Fights with marketing and reputation, not the courtroom.' },
+  talent_raider: { label: 'Talent Raider', icon: '🎯', blurb: 'Comes after your people before your product.' },
+};
+
+/** How strongly each strategy leans toward each attack kind — a weight of 1 is baseline (no
+ * lean); the pick below is still randomized, just skewed toward the rival's character. */
+const STRATEGY_ATTACK_WEIGHTS: Record<RivalStrategy, Record<'misinformation' | 'poaching' | 'undercutting' | 'legal_action', number>> = {
+  aggressive_expander: { misinformation: 1, poaching: 1, undercutting: 2.2, legal_action: 0.6 },
+  price_warrior: { misinformation: 0.6, poaching: 0.6, undercutting: 3, legal_action: 0.5 },
+  tech_innovator: { misinformation: 0.6, poaching: 0.8, undercutting: 0.6, legal_action: 2.8 },
+  brand_builder: { misinformation: 2.6, poaching: 0.6, undercutting: 0.7, legal_action: 0.8 },
+  talent_raider: { misinformation: 0.6, poaching: 2.8, undercutting: 0.6, legal_action: 0.7 },
+};
+
 /** NPC rivals occasionally take a shot at a player-owned company: smear campaigns, poaching,
  * price undercutting, or aggressive legal action. Purely emergent — the player doesn't trigger
  * this directly, but V51's grudge system (bumped by attemptHostileTakeover/startPriceWar/
  * filePatentLawsuit/spyOnCompany/protectionRacket in actions.ts) makes it targeted: a rival who
- * remembers being wronged is both more likely to strike and more likely to be the one who does. */
+ * remembers being wronged is both more likely to strike and more likely to be the one who does.
+ * V55 layers a settled RivalStrategy on top so which kind of attack a given rival favors is a
+ * consistent character trait, not a fresh coin flip every time. */
 export function tickCorporateSabotage(state: GameState, rng: RNG): string[] {
   const headlines: string[] = [];
   // Grudge decays on its own every year regardless of whether it boils over this time.
   for (const co of Object.values(state.companies)) {
     if (co.status !== 'active') continue;
     co.grudgeAgainstPlayer ??= 0;
+    co.rivalStrategy ??= null;
     if (co.grudgeAgainstPlayer >= 90 && !state.achievements.includes('arch_nemesis')) state.achievements.push('arch_nemesis');
     if (co.grudgeAgainstPlayer > 0) co.grudgeAgainstPlayer = Math.max(0, co.grudgeAgainstPlayer - 3);
   }
@@ -596,8 +635,13 @@ export function tickCorporateSabotage(state: GameState, rng: RNG): string[] {
     const maxGrudge = Math.max(0, ...rivals.map((r) => r.grudgeAgainstPlayer));
     if (!rng.chance(0.06 + maxGrudge * 0.0035)) continue;
     const rival = rng.weighted(rivals, (r) => 1 + r.grudgeAgainstPlayer * 0.2);
+    if (!rival.rivalStrategy) rival.rivalStrategy = assignRivalStrategy(rival, rng);
     const grudging = rival.grudgeAgainstPlayer > 40;
-    const kind = rng.pick(['misinformation', 'poaching', 'undercutting', 'legal_action'] as const);
+    const weights = STRATEGY_ATTACK_WEIGHTS[rival.rivalStrategy];
+    const kind = rng.weighted(
+      ['misinformation', 'poaching', 'undercutting', 'legal_action'] as const,
+      (k) => weights[k],
+    );
     const grudgeSuffix = grudging ? ` — still settling the score over your past dealings` : '';
     if (kind === 'misinformation') {
       c.brand = clamp100(c.brand - rng.range(4, 10) * (grudging ? 1.4 : 1));

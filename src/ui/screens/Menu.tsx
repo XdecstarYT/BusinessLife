@@ -2,11 +2,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { useGame } from '../../store/gameStore';
 import { AUTOSAVE_ID, type SaveSlotMeta } from '../../store/persistence';
-import { Button, Card, Field, Pill, TextInput } from '../components';
+import { Badge, Button, Card, Field, Modal, Pill, TextInput } from '../components';
 import { money } from '../format';
 import type { Difficulty, Gender } from '../../sim/types';
 import type { Scenario } from '../../sim/world';
 import { consumeRoyalty, getRoyaltySources } from '../../net/leaderboard';
+import { buyPrestigePerk, getOwnedPrestigePerks, getPrestigePoints, PRESTIGE_PERKS } from '../../net/prestige';
 import { getRibbonCabinet, RIBBONS } from '../../data/ribbons';
 import { AccountPanel } from '../AccountPanel';
 import { IconBusiness, IconSpark, IconTrophy } from '../icons';
@@ -25,7 +26,7 @@ const DIFFICULTIES: { id: Difficulty; label: string; blurb: string }[] = [
 ];
 
 export function Menu() {
-  const { saves, refreshSaves, newGame, load, remove, importFrom, darkMode, toggleDark } = useGame();
+  const { saves, refreshSaves, newGame, load, remove, importFrom, darkMode, toggleDark, toast } = useGame();
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
   const [gender, setGender] = useState<Gender>('male');
@@ -34,9 +35,15 @@ export function Menu() {
   const [difficulty, setDifficulty] = useState<Difficulty>('standard');
   const [useLegacyBonus, setUseLegacyBonus] = useState(false);
   const [useRoyalty, setUseRoyalty] = useState(false);
+  const [showPrestigeShop, setShowPrestigeShop] = useState(false);
+  // localStorage isn't reactive, so a purchase calls setPrestigeTick to force a re-render —
+  // that's the only thing this state is for, the reads below always pull fresh from localStorage.
+  const [, setPrestigeTick] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
   const royaltySources = getRoyaltySources();
   const ribbonCabinet = getRibbonCabinet();
+  const prestigePoints = getPrestigePoints();
+  const ownedPerks = getOwnedPrestigePerks();
 
   useEffect(() => {
     void refreshSaves();
@@ -57,6 +64,7 @@ export function Menu() {
       difficulty,
       legacyBonus: useLegacyBonus ? legacyBonusAmount : 0,
       bornRoyal: spendRoyalty,
+      prestigePerks: ownedPerks,
     });
     if (spendRoyalty) consumeRoyalty();
   };
@@ -246,6 +254,20 @@ export function Menu() {
                   </label>
                 </Field>
               )}
+              <Field label="Prestige Vault">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-sm">
+                    <span className="font-bold text-violet-500">🏆 {prestigePoints} Prestige</span>
+                    <span className="text-slate-500 dark:text-slate-400"> · {ownedPerks.length} perk{ownedPerks.length === 1 ? '' : 's'} owned</span>
+                    {ownedPerks.length > 0 && (
+                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        Owned perks apply automatically to this life and every future one.
+                      </div>
+                    )}
+                  </div>
+                  <Button size="sm" variant="soft" onClick={() => setShowPrestigeShop(true)}>Open Shop</Button>
+                </div>
+              </Field>
             </div>
             <div className="flex gap-3 mt-6">
               <Button variant="ghost" onClick={() => setCreating(false)}>
@@ -257,6 +279,58 @@ export function Menu() {
             </div>
           </Card>
         )}
+        <Modal open={showPrestigeShop} onClose={() => setShowPrestigeShop(false)} title="🏆 Prestige Vault">
+          <div className="p-5 space-y-3">
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Prestige Points carry over across every save and every life — earned once each life ends, from that
+              life's real accomplishments. Perks you buy here are permanent: once owned, they apply automatically
+              to every future new game, no toggling required.
+            </p>
+            <div className="text-center bg-violet-500/10 rounded-2xl py-3">
+              <span className="text-2xl font-black text-violet-500">{prestigePoints}</span>
+              <span className="text-sm text-slate-500 dark:text-slate-400 ml-1">Prestige available</span>
+            </div>
+            <div className="space-y-2">
+              {PRESTIGE_PERKS.map((perk) => {
+                const owned = ownedPerks.includes(perk.id);
+                const locked = !!perk.requires && !ownedPerks.includes(perk.requires);
+                const affordable = prestigePoints >= perk.cost;
+                return (
+                  <Card key={perk.id} className={`p-3 ${owned ? 'opacity-70' : ''}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-bold text-sm">{perk.icon} {perk.label}</div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400">{perk.blurb}</div>
+                        {locked && (
+                          <div className="text-[11px] text-amber-500 mt-1">
+                            🔒 Requires {PRESTIGE_PERKS.find((p) => p.id === perk.requires)?.label}
+                          </div>
+                        )}
+                      </div>
+                      <div className="shrink-0 text-right">
+                        {owned ? (
+                          <Badge tone="good">Owned</Badge>
+                        ) : (
+                          <Button
+                            size="sm"
+                            disabled={locked || !affordable}
+                            onClick={() => {
+                              const result = buyPrestigePerk(perk.id);
+                              setPrestigeTick((t) => t + 1);
+                              toast(result.message, result.ok ? 'ok' : 'err');
+                            }}
+                          >
+                            {perk.cost} 🏆
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        </Modal>
       </div>
     </div>
   );

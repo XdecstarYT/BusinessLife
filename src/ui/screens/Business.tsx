@@ -54,7 +54,7 @@ import {
   type BoardProposal,
   type CompanyLever,
 } from '../../sim/actions';
-import { companyValuation, isManufacturingIndustry } from '../../sim/business';
+import { companyValuation, isManufacturingIndustry, RIVAL_STRATEGY_INFO } from '../../sim/business';
 import { marketCap } from '../../sim/market';
 import {
   acquireCompany, buildFactory, exitVentureStake, foundVentureArm, launchAdCampaign,
@@ -125,6 +125,11 @@ export function Business() {
                     ) : c.grudgeAgainstPlayer > 30 ? (
                       <Badge tone="warn">😒 Grudge {Math.round(c.grudgeAgainstPlayer)}</Badge>
                     ) : null}
+                    {c.rivalStrategy && (
+                      <Badge title={RIVAL_STRATEGY_INFO[c.rivalStrategy].blurb}>
+                        {RIVAL_STRATEGY_INFO[c.rivalStrategy].icon} {RIVAL_STRATEGY_INFO[c.rivalStrategy].label}
+                      </Badge>
+                    )}
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2">

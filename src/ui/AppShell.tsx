@@ -48,6 +48,8 @@ const ACTIVITY_GROUPS: { title: string; items: ActivityEntry[] }[] = [
       { screen: 'medical', label: 'Medical Career', subtitle: 'Med school, residency, save lives', icon: '🩺' },
       { screen: 'cult', label: 'Movement', subtitle: 'Found a following, collect donations', icon: '🔮' },
       { screen: 'space', label: 'Space Program', subtitle: 'Train and fly real missions', icon: '🚀' },
+      { screen: 'legal', label: 'Legal Career', subtitle: 'Law school, cases, maybe the bench', icon: '⚖️' },
+      { screen: 'culinary', label: 'Culinary Empire', subtitle: 'Cook your way to your own restaurant', icon: '👨‍🍳' },
     ],
   },
   {

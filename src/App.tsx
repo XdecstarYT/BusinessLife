@@ -29,6 +29,8 @@ import { Entertainment } from './ui/screens/Entertainment';
 import { Medical } from './ui/screens/Medical';
 import { Cult } from './ui/screens/Cult';
 import { Space } from './ui/screens/Space';
+import { Legal } from './ui/screens/Legal';
+import { Culinary } from './ui/screens/Culinary';
 import { Leaderboard } from './ui/screens/Leaderboard';
 
 export default function App() {
@@ -72,6 +74,8 @@ export default function App() {
           {screen === 'medical' && <Medical />}
           {screen === 'cult' && <Cult />}
           {screen === 'space' && <Space />}
+          {screen === 'legal' && <Legal />}
+          {screen === 'culinary' && <Culinary />}
           {screen === 'leaderboard' && <Leaderboard />}
         </div>
       </AppShell>

@@ -14,6 +14,24 @@ connection or choose not to sign in.
 
 ## Highlights
 
+- **V55 — The biggest expansion yet: Rival Empires, the Prestige Vault, and two new life
+  paths.** Corporate rivals are no longer interchangeable — each grudge-holding competitor now
+  gets assigned one of five **rival strategies** (Aggressive Expander, Price Warrior, Tech
+  Innovator, Brand Builder, Talent Raider) based on how they actually run their company, shown as
+  a badge on the Business screen, and it biases which sabotage attacks they favor plus unlocks
+  five new strategy-flavored rival-clash events. A brand-new permanent meta-progression system,
+  the **Prestige Vault**, converts each life's Legacy Score (plus bonuses for major achievements
+  like Billionaire or holding office) into permanent Prestige Points banked across every future
+  save; spend them once in a new perk shop for lasting starting-life bonuses — sharper stats,
+  family savings, extra skill aptitudes, or a one-time **Guardian Angel** that survives an
+  otherwise-fatal health scare. Two full new life paths join Medicine and Academia: a **Legal
+  Career** (law school, joining a firm, taking cases, publishing law review articles, climbing to
+  Named Partner, and — for the elite few — appointment to the bench as a judge) with its own
+  ambient 3D **Courtroom** scene, and a **Culinary Empire** (starting as a line cook at 16,
+  working up to Head Chef, then opening and growing your own restaurant and chasing Michelin
+  stars across ten cuisines). Rounded out with six new daily flavor events and seventeen new
+  achievements spanning all of the above.
+
 - **V54 — Real manufacturing capacity vs. demand.** Physical-goods companies (retail,
   auto, consumer, industrial, food, agriculture, construction, defense, luxury, mining, energy,
   and other production-tagged industries — software, finance, and services are untouched) can no

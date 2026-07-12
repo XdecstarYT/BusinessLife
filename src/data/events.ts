@@ -2883,5 +2883,70 @@ ev({
   ],
 });
 
+// ---------------------------------------------------------------------------
+// V55: Rival Empires — themed "clash" events, one per settled RivalStrategy (see
+// assignRivalStrategy in business.ts). Each requires hasGrudgingRival:true so {company}
+// resolves to that same grudging rival, and further gates on the rival having actually
+// settled into the matching strategy — a price warrior always undercuts you, never smears you.
+// ---------------------------------------------------------------------------
+ev({
+  id: 'rival_expander_land_grab', category: 'business', weight: 4, conditions: { hasGrudgingRival: true, rivalStrategy: ['aggressive_expander'] },
+  text: '{company} is expanding fast and aggressively into every market you touch — it feels less like growth and more like a land grab aimed squarely at you.',
+  amount: { min: 3_000, max: 12_000 },
+  choices: [
+    { label: 'Match their expansion pace ({amount})', outcomes: [
+      { chance: 0.55, text: 'You held your ground and then some — they overextended a little.', effects: { moneyAmountMult: -1, companyGrudgeDelta: -10, notoriety: 2 } },
+      { chance: 0.45, text: 'It stretched you thin without slowing them down.', effects: { moneyAmountMult: -1, happiness: -3 } },
+    ] },
+    { label: 'Let them overextend — expansions this fast rarely last', effects: { karma: 2, smarts: 1 } },
+  ],
+});
+ev({
+  id: 'rival_price_war_squeeze', category: 'business', weight: 4, conditions: { hasGrudgingRival: true, rivalStrategy: ['price_warrior'] },
+  text: '{company} has slashed prices again — a war of attrition they clearly think they can win against you.',
+  amount: { min: 2_000, max: 9_000 },
+  choices: [
+    { label: 'Cut prices right back at them ({amount})', skillCheck: { skillId: SK.negotiation, bonusPerLevel: 0.005 }, outcomes: [
+      { chance: 0.5, text: 'You out-lasted them — they blinked first and quietly raised prices back up.', effects: { moneyAmountMult: -1, companyGrudgeDelta: -15, reputation: 2 } },
+      { chance: 0.5, text: 'It turned into a real margin bloodbath for both sides.', effects: { moneyAmountMult: -1, happiness: -3 } },
+    ] },
+    { label: 'Hold your price and lean on brand loyalty instead', effects: { karma: 1, smarts: 1 } },
+  ],
+});
+ev({
+  id: 'rival_tech_patent_barrage', category: 'business', weight: 4, conditions: { hasGrudgingRival: true, rivalStrategy: ['tech_innovator'] },
+  text: '{company}\'s legal team has been busy — another patent claim just landed, and it has their R&D fingerprints all over it.',
+  amount: { min: 4_000, max: 15_000 },
+  choices: [
+    { label: 'Fight it in court ({amount})', skillCheck: { skillId: SK.law, bonusPerLevel: 0.006 }, outcomes: [
+      { chance: 0.5, text: 'The claim got thrown out. Their legal strategy looks a little desperate now.', effects: { moneyAmountMult: -1, companyGrudgeDelta: -12, reputation: 2 } },
+      { chance: 0.5, text: 'You won on a technicality, but it cost more than expected.', effects: { moneyAmountMult: -1, happiness: -2 } },
+    ] },
+    { label: 'Quietly settle and move on', effects: { moneyAmountMult: -0.6, karma: -1 } },
+  ],
+});
+ev({
+  id: 'rival_brand_smear_campaign', category: 'business', weight: 4, conditions: { hasGrudgingRival: true, rivalStrategy: ['brand_builder'] },
+  text: '{company} has been running slick ads that draw an unmistakable, unflattering comparison to you.',
+  choices: [
+    { label: 'Respond with your own campaign', skillCheck: { skillId: SK.spin, bonusPerLevel: 0.005 }, outcomes: [
+      { chance: 0.5, text: 'Your response landed better than theirs did. Public opinion swung your way.', effects: { reputation: 5, companyGrudgeDelta: -10 } },
+      { chance: 0.5, text: 'It just kept the story in the news longer.', effects: { reputation: -2, notoriety: 3 } },
+    ] },
+    { label: 'Take the high road and say nothing', effects: { karma: 3, happiness: -1 } },
+  ],
+});
+ev({
+  id: 'rival_talent_raid_attempt', category: 'business', weight: 4, conditions: { hasGrudgingRival: true, rivalStrategy: ['talent_raider'] },
+  text: '{company} has been quietly calling your best people with offers that are hard to refuse.',
+  amount: { min: 3_000, max: 10_000 },
+  choices: [
+    { label: 'Get ahead of it with retention bonuses ({amount})', outcomes: [
+      { chance: 0.6, text: 'It worked — your people are staying put, and word got back to {company} that it was a waste of their time.', effects: { moneyAmountMult: -1, companyGrudgeDelta: -10, happiness: 2 } },
+      { chance: 0.4, text: 'A couple of people left anyway.', effects: { moneyAmountMult: -1, happiness: -2 } },
+    ] },
+    { label: 'Trust your culture to hold people better than a bigger paycheck', effects: { karma: 2, smarts: 1 } },
+  ],
+});
 
 export const EVENT_TEMPLATES: EventTemplate[] = E;

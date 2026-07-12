@@ -316,6 +316,13 @@ export interface Player {
   cult: CultMovement | null; // V49: founded religious/spiritual movement
   astronaut: AstronautCareer | null; // V49: space agency career
   prisonLife: PrisonLifeState | null; // V49: cellblock politics while incarcerated, reset on release
+  legalCareer: LegalCareer | null; // V55: lawyer -> partner -> (optional) judge career
+  culinaryCareer: CulinaryCareer | null; // V55: line cook -> celebrity chef career
+  // V55: Prestige Vault — the permanent "Guardian Angel" perk (see net/prestige.ts) grants one
+  // reprieve per life from the natural-mortality roll in engine.ts; guardianAngelUsed tracks
+  // whether this life has already spent it, resetting fresh on every new generateWorld() call.
+  guardianAngelAvailable: boolean;
+  guardianAngelUsed: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -365,6 +372,43 @@ export interface MedicalCareer {
   publications: number;
   rank: number; // 0 = student/resident, 1..4 = attending -> senior -> chief -> medical director
   licenseRevoked: boolean;
+}
+
+// V55: Legal Career — law school → associate → partner, and, uniquely among the career life
+// paths, an optional late-career judicial appointment (stage 'judge') once you've made partner
+// with real standing. Structurally parallel to MedicalCareer above.
+export interface LegalCareer {
+  active: boolean;
+  stage: 'law_school' | 'associate' | 'partner' | 'judge' | 'retired';
+  specialtyId: string | null;
+  firmId: string | null;
+  yearsOfService: number;
+  skill: number; // 0..100, case outcomes and promotion odds
+  reputation: number; // 0..100, firm/bar standing
+  casesWon: number;
+  casesLost: number;
+  barComplaints: number;
+  publications: number; // law review articles
+  rank: number; // while stage === 'partner': 0..3, see LEGAL_RANK_TITLES
+  disbarred: boolean;
+}
+
+// V55: Culinary Empire — line cook → sous chef → head chef, then an optional leap to opening
+// your own restaurant (tracked here directly rather than as a Company, to stay self-contained)
+// and chasing Michelin stars. Structurally parallel to MedicalCareer/LegalCareer above.
+export interface CulinaryCareer {
+  active: boolean;
+  stage: 'line_cook' | 'sous_chef' | 'head_chef' | 'restaurant_owner' | 'retired';
+  cuisineId: string | null;
+  workplaceName: string | null; // restaurant name, whether employed or self-owned
+  yearsOfService: number;
+  skill: number; // 0..100, dish quality and promotion odds
+  reputation: number; // 0..100, culinary-scene standing
+  dishesServed: number;
+  healthCodeViolations: number;
+  michelinStars: number; // 0..3, only earnable as restaurant_owner
+  rank: number; // while stage === 'restaurant_owner': 0..3 growth tier of the restaurant
+  restaurantClosed: boolean;
 }
 
 export interface CultMovement {
@@ -893,6 +937,10 @@ export interface CompanyHistoryPoint {
 
 export type CompanyStatus = 'active' | 'bankrupt' | 'sold' | 'acquired';
 
+// V55: Rival Empires — the character a grudging NPC rival settles into after its first real
+// attack on the player, derived from its own stats (see assignRivalStrategy in business.ts).
+export type RivalStrategy = 'aggressive_expander' | 'price_warrior' | 'tech_innovator' | 'brand_builder' | 'talent_raider';
+
 export interface Company {
   id: string;
   name: string;
@@ -985,6 +1033,13 @@ export interface Company {
   // (failed takeover bids, price wars, patent suits, espionage, shakedowns). Grows targeted, more
   // frequent retaliation via tickCorporateSabotage; decays slowly on its own.
   grudgeAgainstPlayer: number; // 0..100
+
+  // V55: Rival Empires — the first time a company actually attacks the player (see
+  // tickCorporateSabotage), it's typecast into a lasting strategy derived from its own real
+  // stats. The strategy biases which kind of attack it favors going forward and unlocks themed
+  // "clash" events (see rivalStrategy in EventConditions) so a grudging rival reads as a
+  // consistent character, not a random-flavor label reroll each time.
+  rivalStrategy: RivalStrategy | null;
 
   // V54: Manufacturing capacity vs. demand — for physical-goods industries (see
   // MANUFACTURING_TAGS in business.ts), this actually gates revenue growth, unlike the V50
@@ -1321,6 +1376,9 @@ export interface EventConditions {
   hasGrudgingRival?: boolean; // an active NPC company (any industry, same country) with real grudge built up
   minAchievements?: number;
   momentumState?: 'hot' | 'cold'; // gates on state.worldMomentum crossing a threshold either way
+  // V55: Rival Empires — requires hasGrudgingRival:true too; further gates on that grudging
+  // rival's own settled RivalStrategy so themed clash events only fire against a matching rival.
+  rivalStrategy?: RivalStrategy[];
 }
 
 export interface EventTemplate {

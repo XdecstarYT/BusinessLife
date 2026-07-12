@@ -26,6 +26,8 @@ import { tickDraft, tickMilitaryCareer } from './military';
 import { tickDrugOperation } from './drugs';
 import { tickEntertainmentCareer } from './entertainment';
 import { tickMedicalCareer } from './medical';
+import { tickLegalCareer } from './legal';
+import { tickCulinaryCareer } from './culinary';
 import { tickCult } from './cult';
 import { tickSpaceProgram } from './space';
 import { tickPrisonLife } from './prison';
@@ -316,6 +318,8 @@ function tickPlayerLife(state: GameState, rng: RNG): string[] {
     p.yearsServedThisSentence = 0;
   }
   p.sponsorshipDeal ??= null; // backfill for saves from before V52 side hustles
+  p.guardianAngelAvailable ??= false; // backfill for saves from before V55 Prestige Vault
+  p.guardianAngelUsed ??= false;
 
   // --- Jail ---------------------------------------------------------------
   if (p.inJailYears > 0) {
@@ -786,7 +790,17 @@ function tickPlayerLife(state: GameState, rng: RNG): string[] {
   const healthMult = p.health < 20 ? 4 : p.health < 40 ? 2 : 1;
   const difficultyMortalityMult = state.difficulty === 'casual' ? 0.6 : state.difficulty === 'ironman' ? 1.4 : 1;
   if (rng.chance(mortality * healthMult * (1 - home.healthcare / 300) * difficultyMortalityMult)) {
-    p.alive = false;
+    // V55: Prestige Vault's permanent Guardian Angel perk spares the player once per life from
+    // this specific roll — a real "otherwise-fatal health scare" reprieve, not combat/mission
+    // deaths elsewhere, which are opted-into risks rather than ambient mortality.
+    if (p.guardianAngelAvailable && !p.guardianAngelUsed) {
+      p.guardianAngelUsed = true;
+      p.health = clamp100(Math.max(p.health, 25));
+      headlines.push(`${p.name} had a brush with death this year — and pulled through against the odds`);
+      log(state, '👼 A health scare nearly took you this year, but you pulled through against the odds.', 'good');
+    } else {
+      p.alive = false;
+    }
   }
   return headlines;
 }
@@ -1195,11 +1209,15 @@ export function advanceYear(state: GameState): GameState {
   state.player.cult ??= null;
   state.player.astronaut ??= null;
   state.player.prisonLife ??= null;
+  state.player.legalCareer ??= null; // backfill for saves from before V55 Legal Career
+  state.player.culinaryCareer ??= null; // backfill for saves from before V55 Culinary Empire
   if (state.player.alive) for (const h of tickEntertainmentCareer(state, rng)) log(state, h, 'info');
   if (state.player.alive) for (const h of tickMedicalCareer(state, rng)) log(state, h, 'info');
   if (state.player.alive) for (const h of tickCult(state, rng)) log(state, h, 'bad');
   if (state.player.alive) for (const h of tickSpaceProgram(state, rng)) log(state, h, 'milestone');
   if (state.player.alive) for (const h of tickPrisonLife(state, rng)) log(state, h, 'bad');
+  if (state.player.alive) for (const h of tickLegalCareer(state, rng)) log(state, h, 'info');
+  if (state.player.alive) for (const h of tickCulinaryCareer(state, rng)) log(state, h, 'info');
 
   // 5. Player company income: dividends from private profitable companies
   const p = state.player;

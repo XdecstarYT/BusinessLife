@@ -3,7 +3,7 @@
  * fires a weighted random selection each year, resolves placeholders, and
  * applies choice effects (including skill-checked probabilistic outcomes).
  */
-import type { EffectSpec, EventChoice, EventTemplate, FiredEvent, GameState } from './types';
+import type { Company, EffectSpec, EventChoice, EventTemplate, FiredEvent, GameState } from './types';
 import { clamp, clamp100 } from './types';
 import { EVENT_TEMPLATES } from '../data/events';
 import { INDUSTRY_BY_ID } from '../data/industries';
@@ -70,12 +70,18 @@ function conditionsMet(t: EventTemplate, state: GameState): boolean {
   if (c.minAchievements !== undefined && state.achievements.length < c.minAchievements) return false;
   if (c.momentumState === 'hot' && state.worldMomentum < 50) return false;
   if (c.momentumState === 'cold' && state.worldMomentum > -50) return false;
+  // V55: Rival Empires — only fires against a grudging rival who has actually settled into one
+  // of the requested strategies (see assignRivalStrategy in business.ts).
+  if (c.rivalStrategy) {
+    const rival = findGrudgingRival(state);
+    if (!rival || !c.rivalStrategy.includes(rival.rivalStrategy!)) return false;
+  }
   return true;
 }
 
 /** Picks the NPC-owned company (any industry, player's own country) holding the most grudge
  * against the player, if any qualifies — the subject for hasGrudgingRival event templates. */
-function findGrudgingRival(state: GameState): { id: string } | null {
+function findGrudgingRival(state: GameState): Company | null {
   const p = state.player;
   const candidates = Object.values(state.companies).filter(
     (c) => c.status === 'active' && !c.playerOwned && c.countryId === p.countryId && c.grudgeAgainstPlayer > 35,

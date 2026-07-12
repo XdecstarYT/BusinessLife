@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useGame } from '../store/gameStore';
 import { checkRoyaltyFromTop, fetchTopLegacy, submitLegacyScore } from '../net/leaderboard';
+import { addPrestigePoints, computePrestigeEarned } from '../net/prestige';
 import { awardRibbonForLife, type RibbonDef } from '../data/ribbons';
 import { Button } from './components';
 import { Confetti } from './Confetti';
@@ -41,11 +42,17 @@ export function GameOver() {
   // Award this life's ribbon exactly once when the game-over screen first shows
   // (not per render, and not while a succession offer might still continue the run).
   const [ribbonAward, setRibbonAward] = useState<{ ribbon: RibbonDef; firstTime: boolean } | null>(null);
+  const [prestigeEarned, setPrestigeEarned] = useState<number | null>(null);
   const awardedFor = useRef<object | null>(null);
   useEffect(() => {
     if (state?.gameOver && !state.pendingSuccession && awardedFor.current !== state.gameOver) {
       awardedFor.current = state.gameOver;
       setRibbonAward(awardRibbonForLife(state));
+      // V55: Prestige Vault — every completed life banks permanent Prestige Points, unlike the
+      // ribbon above which is purely cosmetic. Computed once per game-over, same guard as ribbons.
+      const earned = computePrestigeEarned(state, state.gameOver.legacyScore);
+      addPrestigePoints(earned);
+      setPrestigeEarned(earned);
     }
   }, [state, state?.gameOver, state?.pendingSuccession]);
   if (!state?.gameOver || state.pendingSuccession) return null;
@@ -88,10 +95,23 @@ export function GameOver() {
             <div className="text-[11px] text-white/85">{ribbonAward.ribbon.description}</div>
           </div>
         )}
-        <div className="inline-flex flex-col items-center bg-brand-500/10 rounded-2xl px-5 py-3 mb-4">
-          <div className="text-[10px] uppercase font-bold text-brand-500 tracking-wide">Legacy Score</div>
-          <div className="text-3xl font-black text-brand-500">{go.legacyScore}<span className="text-base text-slate-400">/100</span></div>
+        <div className="flex items-center justify-center gap-3 mb-4">
+          <div className="inline-flex flex-col items-center bg-brand-500/10 rounded-2xl px-5 py-3">
+            <div className="text-[10px] uppercase font-bold text-brand-500 tracking-wide">Legacy Score</div>
+            <div className="text-3xl font-black text-brand-500">{go.legacyScore}<span className="text-base text-slate-400">/100</span></div>
+          </div>
+          {prestigeEarned !== null && (
+            <div className="inline-flex flex-col items-center bg-violet-500/10 rounded-2xl px-5 py-3">
+              <div className="text-[10px] uppercase font-bold text-violet-500 tracking-wide">Prestige Earned</div>
+              <div className="text-3xl font-black text-violet-500">+{prestigeEarned}</div>
+            </div>
+          )}
         </div>
+        {prestigeEarned !== null && (
+          <p className="text-xs text-slate-500 dark:text-slate-400 -mt-2 mb-4">
+            🏆 Banked to your Prestige Vault — spend it on permanent perks for every future life from the New Life screen.
+          </p>
+        )}
         <div className="bg-slate-100 dark:bg-ink-800 rounded-2xl p-4 space-y-1.5 text-left mb-6">
           {go.summary.map((line, i) => (
             <p key={i} className={`text-sm ${i === 1 ? 'font-bold text-emerald-500' : 'text-slate-600 dark:text-slate-300'}`}>{line}</p>

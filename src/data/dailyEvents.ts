@@ -198,4 +198,17 @@ export const DAILY_EVENTS: DailyEventTemplate[] = [
   { id: 'd_child_allowance', weight: 3, text: 'You got your weekly allowance.', effects: { money: 10, happiness: 1 }, conditions: { minAge: 6, maxAge: 17 } },
   { id: 'd_child_nightmare', weight: 3, text: 'A bad dream woke you up in the middle of the night.', effects: { happiness: -1, health: -1 }, conditions: { maxAge: 8 } },
   { id: 'd_child_playdate', weight: 4, text: 'A playdate with a friend was a blast.', effects: { happiness: 2 }, conditions: { maxAge: 10 } },
+  // V55: small adult-life flavor tied to the new Legal/Culinary/Rival Empires systems' themes.
+  { id: 'd_jury_duty', weight: 3, text: 'You got called in for jury duty. A whole day gone.', effects: { happiness: -1 }, conditions: { minAge: 18 } },
+  { id: 'd_courtroom_drama', weight: 4, text: 'You binged a courtroom drama series all evening.', effects: { happiness: 1 }, conditions: { minAge: 16 } },
+  { id: 'd_food_truck', weight: 5, text: 'A new food truck downtown was surprisingly great.', effects: { happiness: 1, health: 1 }, conditions: { minAge: 16 } },
+  { id: 'd_recipe_experiment', weight: 4, text: 'You tried cooking a new recipe at home — it actually worked.', effects: { happiness: 2 }, conditions: { minAge: 14 } },
+  {
+    id: 'd_rival_spotted', weight: 3, text: 'You spotted a rival executive at a restaurant, both pretending not to notice.',
+    effects: { happiness: -1 }, conditions: { hasBusiness: true },
+  },
+  {
+    id: 'd_legal_favor', weight: 3, text: 'A friend asked you for some quick legal advice.',
+    effects: { karma: 1, happiness: 1 }, conditions: { minAge: 20 },
+  },
 ];
