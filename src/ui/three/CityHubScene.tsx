@@ -47,17 +47,17 @@ interface CityHubSceneProps {
   onQuickAction?: (id: string) => void;
 }
 
-const PLAZA_RADIUS = 14;
-const RING_RADIUS = 10;
-const WALK_BOUND = 12.9;
 const ENTER_RADIUS = 2.3;
 const EXIT_RADIUS = 2.8;
 const MOVE_SPEED = 5;
-// Company buildings (one per IPO'd business) fill an outer skyline ring beyond the fixed system
-// ring, banded so an unbounded company count never crowds into an unreadable single circle.
-const COMPANIES_PER_BAND = 12;
-const COMPANY_BAND_GAP = 3.2;
-const COMPANY_RING_BASE = RING_RADIUS + 4.5;
+
+// V8.1: the city is laid out as a real street grid rather than concentric rings. Every building
+// (system + company) sits on the centre of a block; roads run between the blocks. A building's
+// HEIGHT still comes from its tier/level (see the build* archetypes), so a thriving empire visibly
+// towers over a fledgling one across the skyline.
+const CITY_BLOCK = 6.2; // world spacing between block centres (building + surrounding road)
+const ROAD_W = 2.6; // world width of a road running between blocks
+const CITY_MARGIN = 4; // grass/verge past the outermost road before the perimeter railway
 
 const SEASON_FOLIAGE: Record<HubSeason, { leaf: string; ground: string }> = {
   spring: { leaf: '#5fae5a', ground: '#3f8f52' },
@@ -68,34 +68,53 @@ const SEASON_FOLIAGE: Record<HubSeason, { leaf: string; ground: string }> = {
 
 // --------------------------------------------------------------------------- textures
 
-function plazaGroundTexture(): THREE.CanvasTexture {
-  return makeTexture(512, 512, (ctx, w, h) => {
-    const cx = w / 2, cy = h / 2;
-    ctx.fillStyle = '#2f5138';
+/** Top-down city map baked into the ground plane: grass verges, a grid of asphalt roads with
+ * dashed centre lines, pale sidewalks bordering each block, and a concrete pad under every block.
+ * `cols`/`rows` match the 3D building grid so roads always fall between the blocks. */
+function cityGridTexture(cols: number, rows: number, ground: string): THREE.CanvasTexture {
+  const RES = 1024;
+  return makeTexture(RES, RES, (ctx, w, h) => {
+    // grass base
+    ctx.fillStyle = ground;
     ctx.fillRect(0, 0, w, h);
-    ctx.fillStyle = '#9a9a92';
-    ctx.beginPath();
-    ctx.arc(cx, cy, w * 0.3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#83837a';
-    ctx.lineWidth = 3;
-    for (let r = 30; r < w * 0.3; r += 34) {
-      ctx.beginPath();
-      ctx.arc(cx, cy, r, 0, Math.PI * 2);
-      ctx.stroke();
+    const cellW = w / cols;
+    const cellH = h / rows;
+    const roadW = (ROAD_W / CITY_BLOCK) * cellW;
+    const sideW = roadW * 0.28;
+    // block pads (concrete) inset from the roads
+    ctx.fillStyle = '#8f9298';
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        ctx.fillRect(c * cellW + roadW / 2, r * cellH + roadW / 2, cellW - roadW, cellH - roadW);
+      }
     }
-    // outer road ring
-    ctx.strokeStyle = '#3a3f47';
-    ctx.lineWidth = 42;
-    ctx.beginPath();
-    ctx.arc(cx, cy, w * 0.44, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.setLineDash([14, 12]);
+    // sidewalks (lighter border just inside each road)
+    ctx.fillStyle = '#b9bcc2';
+    for (let i = 0; i <= cols; i++) {
+      const x = i * cellW;
+      ctx.fillRect(x - roadW / 2 - sideW, 0, sideW, h);
+      ctx.fillRect(x + roadW / 2, 0, sideW, h);
+    }
+    for (let i = 0; i <= rows; i++) {
+      const y = i * cellH;
+      ctx.fillRect(0, y - roadW / 2 - sideW, w, sideW);
+      ctx.fillRect(0, y + roadW / 2, w, sideW);
+    }
+    // asphalt roads on every grid line (including the perimeter)
+    ctx.fillStyle = '#33373e';
+    for (let i = 0; i <= cols; i++) ctx.fillRect(i * cellW - roadW / 2, 0, roadW, h);
+    for (let i = 0; i <= rows; i++) ctx.fillRect(0, i * cellH - roadW / 2, w, roadW);
+    // dashed yellow centre lines
     ctx.strokeStyle = '#e8c94a';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(cx, cy, w * 0.44, 0, Math.PI * 2);
-    ctx.stroke();
+    ctx.lineWidth = Math.max(2, roadW * 0.06);
+    ctx.setLineDash([16, 14]);
+    for (let i = 0; i <= cols; i++) {
+      ctx.beginPath(); ctx.moveTo(i * cellW, 0); ctx.lineTo(i * cellW, h); ctx.stroke();
+    }
+    for (let i = 0; i <= rows; i++) {
+      ctx.beginPath(); ctx.moveTo(0, i * cellH); ctx.lineTo(w, i * cellH); ctx.stroke();
+    }
+    ctx.setLineDash([]);
   });
 }
 
@@ -1002,14 +1021,50 @@ export function CityHubScene({ buildings, season, onEnter, onQuickAction }: City
     ({ scene, camera, makeLabel, quality }) => {
       const castsShadows = quality === 'desktop';
 
-      // System buildings keep their original fixed inner ring; company buildings (one per IPO'd
-      // business) fill an outer skyline ring banded so the plaza grows gracefully instead of
-      // packing an unbounded company count into one crowded circle.
+      // V8.1: lay the city out as a street grid. System buildings (the core life systems) fill the
+      // central blocks; company buildings spiral outward from there. One central block is left open
+      // for a plaza + fountain. A building's height still tracks its tier, so the skyline reads the
+      // player's real progress.
       const systemBuildings = buildings.filter((b) => b.kind !== 'company');
       const companyBuildings = buildings.filter((b) => b.kind === 'company');
-      const bandCount = companyBuildings.length ? Math.floor((companyBuildings.length - 1) / COMPANIES_PER_BAND) + 1 : 0;
-      const dynamicPlazaRadius = bandCount > 0 ? COMPANY_RING_BASE + (bandCount - 1) * COMPANY_BAND_GAP + 3 : PLAZA_RADIUS;
-      const dynamicWalkBound = Math.max(WALK_BOUND, dynamicPlazaRadius - 1.1);
+      const ordered = [...systemBuildings, ...companyBuildings];
+      const n = ordered.length;
+      const cols = Math.max(3, Math.ceil(Math.sqrt(n + 1)));
+      const rows = Math.max(3, Math.ceil((n + 1) / cols));
+
+      // All grid cells, sorted by distance from the centre so buildings fill inside-out and the
+      // very centre cell can be reserved for the plaza.
+      const cells: { r: number; c: number; dist: number }[] = [];
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          cells.push({ r, c, dist: Math.hypot(c - (cols - 1) / 2, r - (rows - 1) / 2) });
+        }
+      }
+      cells.sort((a, b) => a.dist - b.dist);
+      const cellToWorld = (r: number, c: number) => ({
+        x: (c - (cols - 1) / 2) * CITY_BLOCK,
+        z: (r - (rows - 1) / 2) * CITY_BLOCK,
+      });
+      const plazaCell = cells[0];
+      const plazaPos = cellToWorld(plazaCell.r, plazaCell.c);
+      const buildingCells = cells.slice(1, 1 + n);
+      // map each building to its cell
+      const placement = new Map<HubBuilding, { x: number; z: number; row: number }>();
+      ordered.forEach((b, i) => {
+        const cell = buildingCells[i];
+        if (!cell) return;
+        const { x, z } = cellToWorld(cell.r, cell.c);
+        placement.set(b, { x, z, row: cell.r });
+      });
+
+      const cityHalfX = (cols * CITY_BLOCK) / 2;
+      const cityHalfZ = (rows * CITY_BLOCK) / 2;
+      const walkHalfX = cityHalfX - 1.0;
+      const walkHalfZ = cityHalfZ - 1.0;
+      // Reused name: the circumscribing radius that encloses the whole rectangular grid (corners
+      // included) — fog / shadow camera / starfield / clouds / the perimeter railway all scale
+      // against it, so the railway rings the city instead of cutting through its corners.
+      const dynamicPlazaRadius = Math.hypot(cityHalfX, cityHalfZ) + CITY_MARGIN;
 
       scene.fog = new THREE.Fog(0x0b1220, 14, Math.max(40, dynamicPlazaRadius * 3));
       scene.background = new THREE.Color(0x0b1220);
@@ -1034,31 +1089,27 @@ export function CityHubScene({ buildings, season, onEnter, onQuickAction }: City
       scene.add(fill);
 
       const ground = new THREE.Mesh(
-        new THREE.CircleGeometry(dynamicPlazaRadius, 48),
-        new THREE.MeshStandardMaterial({ map: plazaGroundTexture(), roughness: 0.95 }),
+        new THREE.PlaneGeometry(cols * CITY_BLOCK, rows * CITY_BLOCK),
+        new THREE.MeshStandardMaterial({ map: cityGridTexture(cols, rows, foliage.ground), roughness: 0.95 }),
       );
       ground.rotation.x = -Math.PI / 2;
       ground.receiveShadow = castsShadows;
       scene.add(ground);
+      // A wider grass apron under the grid so the map doesn't end at a hard edge.
+      const apron = new THREE.Mesh(
+        new THREE.PlaneGeometry(dynamicPlazaRadius * 3, dynamicPlazaRadius * 3),
+        new THREE.MeshStandardMaterial({ color: foliage.ground, roughness: 1 }),
+      );
+      apron.rotation.x = -Math.PI / 2;
+      apron.position.y = -0.02;
+      scene.add(apron);
 
-      // Buildings: system ring + company skyline ring, each with a floating name label.
+      // Buildings: one per grid block, height driven by tier, each with a floating name label.
       const buildingMeshes: { id: string; group: THREE.Group; pos: { x: number; z: number } }[] = [];
-      let companyIndex = 0;
       buildings.forEach((b) => {
-        let x: number, z: number;
-        if (b.kind === 'company') {
-          const i = companyIndex++;
-          const band = Math.floor(i / COMPANIES_PER_BAND);
-          const idxInBand = i % COMPANIES_PER_BAND;
-          const countInBand = Math.min(COMPANIES_PER_BAND, companyBuildings.length - band * COMPANIES_PER_BAND);
-          const angle = (idxInBand / countInBand) * Math.PI * 2 + band * 0.35;
-          const radius = COMPANY_RING_BASE + band * COMPANY_BAND_GAP;
-          x = Math.cos(angle) * radius; z = Math.sin(angle) * radius;
-        } else {
-          const i = systemBuildings.indexOf(b);
-          const angle = (i / systemBuildings.length) * Math.PI * 2;
-          x = Math.cos(angle) * RING_RADIUS; z = Math.sin(angle) * RING_RADIUS;
-        }
+        const place = placement.get(b);
+        if (!place) return;
+        const { x, z, row } = place;
         const group = new THREE.Group();
         buildBuilding(group, b, foliage.leaf);
         if (castsShadows) {
@@ -1067,7 +1118,8 @@ export function CityHubScene({ buildings, season, onEnter, onQuickAction }: City
           });
         }
         group.position.set(x, 0, z);
-        group.lookAt(0, 0, 0);
+        // Alternate rows face opposite directions so buildings line both sides of each avenue.
+        group.rotation.y = row % 2 === 0 ? 0 : Math.PI;
         scene.add(group);
         const labelY = b.constructing ? 2.4 + b.tier * 0.4 : b.kind === 'company' ? 3.6 + b.tier * 0.9 : 3.6;
         const label = makeLabel(b.label, 0.5);
@@ -1088,52 +1140,57 @@ export function CityHubScene({ buildings, season, onEnter, onQuickAction }: City
         }
       });
 
-      // Plaza props: lamp posts (two rings on the bigger plaza), a fountain, trees.
+      // Street coordinates: the road lines sit on the block boundaries.
+      const streetXs: number[] = [];
+      for (let i = 0; i <= cols; i++) streetXs.push((i - cols / 2) * CITY_BLOCK);
+      const streetZs: number[] = [];
+      for (let i = 0; i <= rows; i++) streetZs.push((i - rows / 2) * CITY_BLOCK);
+
+      // Lamp posts at every street intersection.
       const lamps: THREE.Mesh[] = [];
-      const lampRings: [number, number][] = [[6, 4.2], [8, RING_RADIUS + 2.4]];
-      for (const [count, radius] of lampRings) {
-        for (let i = 0; i < count; i++) {
-          const a = (i / count) * Math.PI * 2 + Math.PI / count;
+      const lampMat = new THREE.MeshStandardMaterial({ color: 0x1c2027 });
+      for (const sx of streetXs) {
+        for (const sz of streetZs) {
           const lamp = new THREE.Group();
-          const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 1.4, 8), new THREE.MeshStandardMaterial({ color: 0x1c2027 }));
+          const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 1.4, 8), lampMat);
           pole.position.y = 0.7;
           lamp.add(pole);
           const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.08, 10, 10), new THREE.MeshStandardMaterial({ color: 0xfff2c8, emissive: 0xfff2c8, emissiveIntensity: 0.2 }));
           bulb.position.y = 1.42;
           lamp.add(bulb);
-          lamp.position.set(Math.cos(a) * radius, 0, Math.sin(a) * radius);
+          lamp.position.set(sx, 0, sz);
           lamps.push(bulb);
           scene.add(lamp);
         }
       }
 
-      // Zebra crossings over the ring road at the four compass points.
-      const roadRadius = dynamicPlazaRadius - 1.3;
+      // Zebra crossings striped across a few of the interior avenues.
       const stripeMat = new THREE.MeshStandardMaterial({ color: 0xe8e8e2, roughness: 0.85 });
-      const stripeGeo = new THREE.PlaneGeometry(0.18, 1.5);
-      for (let i = 0; i < 4; i++) {
-        const a = (i / 4) * Math.PI * 2;
+      const stripeGeo = new THREE.PlaneGeometry(0.18, ROAD_W * 0.8);
+      const addCrossing = (px: number, pz: number, vertical: boolean) => {
         const crossing = new THREE.Group();
         for (let s = -2; s <= 2; s++) {
           const stripe = new THREE.Mesh(stripeGeo, stripeMat);
           stripe.rotation.x = -Math.PI / 2;
-          stripe.position.set(s * 0.34, 0.012, 0);
+          if (vertical) stripe.rotation.z = Math.PI / 2;
+          stripe.position.set(vertical ? 0 : s * 0.34, 0.012, vertical ? s * 0.34 : 0);
           crossing.add(stripe);
         }
-        crossing.position.set(Math.cos(a) * roadRadius, 0, Math.sin(a) * roadRadius);
-        crossing.lookAt(0, 0, 0);
+        crossing.position.set(px, 0, pz);
         scene.add(crossing);
-      }
+      };
+      for (let i = 1; i < cols; i++) addCrossing(streetXs[i], streetZs[Math.floor(rows / 2)], false);
+      for (let i = 1; i < rows; i++) addCrossing(streetXs[Math.floor(cols / 2)], streetZs[i], true);
 
-      // A green belt of trees between the system ring and the company skyline,
-      // skipping gaps near the compass crossings so paths stay readable.
-      const beltRadius = RING_RADIUS + 3;
-      for (let i = 0; i < 14; i++) {
-        const a = (i / 14) * Math.PI * 2 + 0.22;
-        if (Math.abs(Math.sin(a * 2)) < 0.25) continue; // leave the crossing sightlines open
-        const tree = makeTree(foliage.leaf, 0.9 + (i % 3) * 0.25);
-        tree.position.set(Math.cos(a) * beltRadius, 0, Math.sin(a) * beltRadius);
-        scene.add(tree);
+      // Street trees dotted along the sidewalks at a subset of intersections.
+      for (let i = 0; i < streetXs.length; i++) {
+        for (let j = 0; j < streetZs.length; j++) {
+          if ((i + j) % 2 !== 0) continue; // thin them out so it doesn't crowd
+          if (i === 0 || j === 0 || i === streetXs.length - 1 || j === streetZs.length - 1) continue;
+          const tree = makeTree(foliage.leaf, 0.7 + ((i + j) % 3) * 0.18);
+          tree.position.set(streetXs[i] + CITY_BLOCK * 0.28, 0, streetZs[j] + CITY_BLOCK * 0.28);
+          scene.add(tree);
+        }
       }
 
       // Rail yard ring: a gravel apron just past the plaza's edge carrying a looping freight
@@ -1212,33 +1269,44 @@ export function CityHubScene({ buildings, season, onEnter, onQuickAction }: City
         birds.push(bird);
         scene.add(bird);
       }
+      // Central plaza fountain, sitting on the reserved open block.
       const fountainBase = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.2, 0.3, 24), new THREE.MeshStandardMaterial({ color: 0xcfd3d8, roughness: 0.4 }));
-      fountainBase.position.y = 0.15;
+      fountainBase.position.set(plazaPos.x, 0.15, plazaPos.z);
       fountainBase.castShadow = castsShadows;
       fountainBase.receiveShadow = castsShadows;
       scene.add(fountainBase);
       const water = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.85, 0.05, 24), new THREE.MeshStandardMaterial({ color: 0x3fa6c9, metalness: 0.3, roughness: 0.1, emissive: 0x1c4a5c, emissiveIntensity: 0.3 }));
-      water.position.y = 0.33;
+      water.position.set(plazaPos.x, 0.33, plazaPos.z);
       scene.add(water);
       const spray = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.6, 8), new THREE.MeshStandardMaterial({ color: 0xbfe8f2, transparent: true, opacity: 0.55 }));
-      spray.position.y = 0.75;
+      spray.position.set(plazaPos.x, 0.75, plazaPos.z);
       scene.add(spray);
 
-      // Ambient traffic: more cars for the longer ring road.
+      // Ambient traffic: cars drive along the grid streets. Each is assigned a fixed avenue (a
+      // vertical street at some x, or a horizontal one at some z) and a direction, wrapping from
+      // one edge to the other — real grid traffic rather than a single ring road.
+      type CarNav = { axis: 'x' | 'z'; line: number; dir: 1 | -1; t: number };
       const cars = [0xd4442a, 0x3a6fd8, 0xe8e2d6, 0x2b8a5c, 0x8a5cb8].map((c, i) => {
         const car = makeCar(c);
-        car.userData.angle = (i / 5) * Math.PI * 2;
-        car.userData.speed = 0.16 + i * 0.025;
+        const vertical = i % 2 === 0;
+        const nav: CarNav = vertical
+          ? { axis: 'z', line: streetXs[1 + (i % Math.max(1, cols - 1))], dir: i % 4 < 2 ? 1 : -1, t: (i / 5) * cityHalfZ }
+          : { axis: 'x', line: streetZs[1 + (i % Math.max(1, rows - 1))], dir: i % 4 < 2 ? 1 : -1, t: (i / 5) * cityHalfX };
+        car.userData.nav = nav;
+        car.userData.speed = 3.2 + i * 0.5;
         scene.add(car);
         return car;
       });
 
-      // Ambient pedestrians: plaza strollers plus a couple walking the green belt.
+      // Ambient pedestrians stroll the sidewalks along the grid streets, offset to one side.
       const peds = [0x8b5cf6, 0xf59e0b, 0x10b981, 0xef4444, 0x38bdf8, 0xf472b6].map((c, i) => {
         const ped = makePedestrian(c);
-        ped.userData.angle = (i / 6) * Math.PI * 2;
-        ped.userData.speed = i >= 4 ? 0.16 : 0.28 + i * 0.05;
-        ped.userData.radius = i >= 4 ? beltRadius - 0.8 : 2.6 + (i % 2) * 0.8;
+        const vertical = i % 2 === 1;
+        const nav: CarNav = vertical
+          ? { axis: 'z', line: streetXs[1 + (i % Math.max(1, cols - 1))] + ROAD_W * 0.4, dir: i % 3 === 0 ? -1 : 1, t: (i / 6) * cityHalfZ }
+          : { axis: 'x', line: streetZs[1 + (i % Math.max(1, rows - 1))] + ROAD_W * 0.4, dir: i % 3 === 0 ? -1 : 1, t: (i / 6) * cityHalfX };
+        ped.userData.nav = nav;
+        ped.userData.speed = 1.1 + (i % 3) * 0.35;
         scene.add(ped);
         return ped;
       });
@@ -1298,11 +1366,9 @@ export function CityHubScene({ buildings, season, onEnter, onQuickAction }: City
           const nz = z / Math.max(mag, 1);
           player.position.x += nx * MOVE_SPEED * dt * Math.min(mag, 1);
           player.position.z += nz * MOVE_SPEED * dt * Math.min(mag, 1);
-          const dist = Math.hypot(player.position.x, player.position.z);
-          if (dist > dynamicWalkBound) {
-            player.position.x = (player.position.x / dist) * dynamicWalkBound;
-            player.position.z = (player.position.z / dist) * dynamicWalkBound;
-          }
+          // Rectangular walk bounds matching the grid footprint.
+          player.position.x = THREE.MathUtils.clamp(player.position.x, -walkHalfX, walkHalfX);
+          player.position.z = THREE.MathUtils.clamp(player.position.z, -walkHalfZ, walkHalfZ);
           const targetHeading = Math.atan2(nx, nz);
           let diff = targetHeading - heading;
           diff = Math.atan2(Math.sin(diff), Math.cos(diff));
@@ -1350,12 +1416,15 @@ export function CityHubScene({ buildings, season, onEnter, onQuickAction }: City
         for (const bulb of lamps) (bulb.material as THREE.MeshStandardMaterial).emissiveIntensity = isNight ? 1.4 : 0.15;
         starMat.opacity = THREE.MathUtils.clamp(1 - Math.max(0, sunY) * 3.5, 0, 0.85);
 
-        // --- ambient traffic & pedestrians ---
+        // --- ambient traffic & pedestrians: driving/strolling the grid streets ---
         for (const car of cars) {
-          car.userData.angle += car.userData.speed * dt;
-          const a = car.userData.angle;
-          car.position.set(Math.cos(a) * roadRadius, 0.05, Math.sin(a) * roadRadius);
-          car.rotation.y = -a + Math.PI / 2;
+          const nav = car.userData.nav as CarNav;
+          nav.t += car.userData.speed * nav.dir * dt;
+          const half = nav.axis === 'z' ? cityHalfZ : cityHalfX;
+          if (nav.t > half) nav.t = -half;
+          if (nav.t < -half) nav.t = half;
+          if (nav.axis === 'z') { car.position.set(nav.line, 0.05, nav.t); car.rotation.y = nav.dir > 0 ? 0 : Math.PI; }
+          else { car.position.set(nav.t, 0.05, nav.line); car.rotation.y = nav.dir > 0 ? Math.PI / 2 : -Math.PI / 2; }
           // headlights flare after dark, taillights glow a touch hotter too
           (car.userData.headMat as THREE.MeshStandardMaterial).emissiveIntensity = isNight ? 2.4 : 0.4;
           (car.userData.tailMat as THREE.MeshStandardMaterial).emissiveIntensity = isNight ? 1.6 : 0.6;
@@ -1370,13 +1439,15 @@ export function CityHubScene({ buildings, season, onEnter, onQuickAction }: City
         });
         (train[0].userData.headMat as THREE.MeshStandardMaterial).emissiveIntensity = isNight ? 2.4 : 0.4;
         for (const ped of peds) {
-          ped.userData.angle += ped.userData.speed * dt;
-          const a = ped.userData.angle;
-          const r = ped.userData.radius;
-          ped.position.set(Math.cos(a) * r, Math.abs(Math.sin(t * 5.5 + a * 7)) * 0.02, Math.sin(a) * r);
-          ped.rotation.y = -a + Math.PI / 2;
+          const nav = ped.userData.nav as CarNav;
+          nav.t += ped.userData.speed * nav.dir * dt;
+          const half = nav.axis === 'z' ? cityHalfZ : cityHalfX;
+          if (nav.t > half) nav.t = -half;
+          if (nav.t < -half) nav.t = half;
+          if (nav.axis === 'z') { ped.position.set(nav.line, 0, nav.t); ped.rotation.y = nav.dir > 0 ? 0 : Math.PI; }
+          else { ped.position.set(nav.t, 0, nav.line); ped.rotation.y = nav.dir > 0 ? Math.PI / 2 : -Math.PI / 2; }
           // counter-phase limb swing: left arm forward with right leg, scaled by stride speed
-          const stride = t * 5.5 + a * 7;
+          const stride = t * 5.5 + nav.t * 2;
           const swing = Math.sin(stride) * 0.55;
           const limbs = ped.userData.limbs as Record<string, THREE.Group>;
           limbs.legL.rotation.x = swing;

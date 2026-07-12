@@ -17,6 +17,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'V8.1',
+    title: 'The City Becomes a Street Grid',
+    bullets: [
+      'The 3D City is now a real street grid — blocks, avenues, sidewalks and crossings',
+      'Buildings sit on blocks and rise by their level, so the skyline shows your progress',
+      'Traffic and pedestrians drive and stroll the grid; a central plaza anchors the map',
+    ],
+  },
+  {
     version: 'V8.0',
     title: 'Massive Expansion: Aviation, World Domination & a 3D Overhaul',
     bullets: [

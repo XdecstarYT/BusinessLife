@@ -14,6 +14,16 @@ connection or choose not to sign in.
 
 ## Highlights
 
+- **V8.1 — The 3D City is now a real street grid.** The walkable Explore hub, which used to arrange
+  its buildings on concentric rings around a plaza, is now laid out as a proper **city grid**:
+  square blocks separated by a network of asphalt avenues with dashed centre lines, pale sidewalks,
+  zebra crossings at the intersections, and a street lamp on every corner. Every building sits on
+  its own block, and its **height still rises with its level/tier** — so a thriving empire visibly
+  towers over a fledgling one across the skyline. The core life systems fill the central blocks and
+  companies spiral outward; a central block is left open for the plaza and fountain. Ambient traffic
+  now **drives the avenues** and pedestrians **stroll the sidewalks** (both wrapping along real grid
+  streets rather than circling a ring road), with a freight railway looping the city's perimeter.
+
 - **V8.0 — Massive expansion: a new playable career, a world-conquest endgame, and a 3D overhaul.**
   The biggest single update in a while, spanning four fronts. **Aviation** is a brand-new playable
   life path in the mould of the Athlete career: enroll in flight school, log hours toward your PPL,
