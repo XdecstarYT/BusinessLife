@@ -3328,4 +3328,500 @@ ev({
   ],
 });
 
+// ---------------------------------------------------------------------------
+// V8.3 — 50 new yearly event templates (several award the 20 new achievements)
+// ---------------------------------------------------------------------------
+ev({
+  id: 'v83_life_travel_bug', category: 'life', weight: 5, conditions: { minAge: 18, minMoney: 3000 },
+  text: 'You have the urge to see more of the world. A month-long trip across three continents would cost {amount}.',
+  amount: { min: 4000, max: 18000 },
+  choices: [
+    { label: 'Book the trip of a lifetime', effects: { moneyAmountMult: -1, happiness: 10, health: 2, skillXp: [SK.foreignLanguages, 6], achievement: 'world_traveler' } },
+    { label: 'A modest weekend away instead', effects: { money: -600, happiness: 3 } },
+    { label: 'Stay home and save', effects: {} },
+  ],
+});
+ev({
+  id: 'v83_life_lucky_week', category: 'life', weight: 3,
+  text: 'Everything is going your way lately — green lights, found money, good news.',
+  choices: [
+    { label: 'Ride the wave', outcomes: [
+      { chance: 0.6, text: 'The streak held all year. Uncanny.', effects: { happiness: 6, money: 2000, achievement: 'lucky_streak' } },
+      { chance: 0.4, text: 'It was nice while it lasted.', effects: { happiness: 3 } },
+    ] },
+    { label: 'Stay grounded', effects: { happiness: 2 } },
+  ],
+});
+ev({
+  id: 'v83_life_anon_gift', category: 'life', weight: 3, conditions: { minMoney: 50000 },
+  text: 'You could quietly cover a struggling family’s rent for a year — no credit, no announcement.',
+  amount: { min: 5000, max: 20000 },
+  choices: [
+    { label: 'Do it anonymously', effects: { moneyAmountMult: -1, karma: 8, happiness: 6, achievement: 'quiet_philanthropist' } },
+    { label: 'Give a little publicly', effects: { money: -2000, karma: 3, reputation: 2 } },
+    { label: 'Not this time', effects: {} },
+  ],
+});
+ev({
+  id: 'v83_life_neighborhood_flood', category: 'life', weight: 3,
+  text: 'A storm floods your neighborhood. People are scrambling to save what they can.',
+  choices: [
+    { label: 'Lead the sandbag brigade', effects: { karma: 6, happiness: 4, reputation: 2, health: -2, achievement: 'community_hero' } },
+    { label: 'Protect your own home', effects: { happiness: -1 } },
+  ],
+});
+ev({
+  id: 'v83_life_art_auction', category: 'life', weight: 3, conditions: { minMoney: 100000 },
+  text: 'A rising artist’s first collection is up for auction. Backing them now means something.',
+  amount: { min: 20000, max: 120000 },
+  choices: [
+    { label: 'Buy the centerpiece', effects: { moneyAmountMult: -1, happiness: 5, skillXp: [SK.artCollecting, 10], achievement: 'art_patron' } },
+    { label: 'Buy a small piece', effects: { money: -6000, happiness: 2, skillXp: [SK.artCollecting, 3] } },
+    { label: 'Admire and leave', effects: {} },
+  ],
+});
+ev({
+  id: 'v83_life_reunion', category: 'life', weight: 4, conditions: { minAge: 30 },
+  text: 'Your school reunion is coming up. You haven’t seen most of these people in years.',
+  choices: [
+    { label: 'Go and reconnect', effects: { happiness: 4, skillXp: [SK.charm, 3] } },
+    { label: 'Skip it', effects: { happiness: -1 } },
+  ],
+});
+ev({
+  id: 'v83_life_declutter_sale', category: 'life', weight: 4,
+  text: 'You finally clear out years of accumulated stuff and hold a big sale.',
+  choices: [
+    { label: 'Sell everything', effects: { money: 1500, happiness: 3 } },
+    { label: 'Donate it all', effects: { karma: 4, happiness: 2 } },
+  ],
+});
+ev({
+  id: 'v83_life_new_hobby', category: 'life', weight: 4,
+  text: 'A friend drags you to a pottery class. You’re surprisingly into it.',
+  choices: [
+    { label: 'Commit to the craft', effects: { happiness: 4, money: -400 } },
+    { label: 'One and done', effects: { happiness: 1 } },
+  ],
+});
+ev({
+  id: 'v83_health_marathon_push', category: 'health', weight: 4, conditions: { minAge: 18, maxAge: 65 },
+  text: 'You’ve been training for months. The city marathon is this weekend.',
+  choices: [
+    { label: 'Run the full 42km', skillCheck: { skillId: SK.fitness, bonusPerLevel: 0.005 }, outcomes: [
+      { chance: 0.55, text: 'You crossed the finish line, exhausted and elated.', effects: { health: 8, happiness: 10, skillXp: [SK.fitness, 12], achievement: 'marathoner' } },
+      { chance: 0.45, text: 'You had to stop at 30km, but you’ll be back.', effects: { health: 3, happiness: 2, skillXp: [SK.fitness, 6] } },
+    ] },
+    { label: 'Drop to the half', effects: { health: 4, happiness: 3, skillXp: [SK.fitness, 5] } },
+  ],
+});
+ev({
+  id: 'v83_health_wildfire', category: 'health', weight: 3, conditions: { minAge: 16 },
+  text: 'A wildfire forces an evacuation of your area. The air is thick with smoke.',
+  choices: [
+    { label: 'Evacuate early and calmly', outcomes: [
+      { chance: 0.8, text: 'You got out safely and helped others do the same.', effects: { happiness: 2, karma: 3, achievement: 'disaster_survivor' } },
+      { chance: 0.2, text: 'A stressful escape, but you made it.', effects: { health: -4, happiness: -2, achievement: 'disaster_survivor' } },
+    ] },
+    { label: 'Stay and defend your home', outcomes: [
+      { chance: 0.5, text: 'You saved the house.', effects: { happiness: 3, reputation: 1 } },
+      { chance: 0.5, text: 'Smoke inhalation put you in hospital.', effects: { health: -14, money: -6000 } },
+    ] },
+  ],
+});
+ev({
+  id: 'v83_health_wellness_retreat', category: 'health', weight: 3, conditions: { minMoney: 4000 },
+  text: 'A silent wellness retreat in the mountains promises a full reset.',
+  amount: { min: 2000, max: 9000 },
+  choices: [
+    { label: 'Go off-grid for a week', effects: { moneyAmountMult: -1, health: 6, happiness: 8 } },
+    { label: 'A day spa instead', effects: { money: -300, health: 2, happiness: 3 } },
+  ],
+});
+ev({
+  id: 'v83_career_report_fraud', category: 'career', weight: 4, conditions: { employed: true },
+  text: 'You’ve found clear evidence your employer is cooking the books.',
+  choices: [
+    { label: 'Report it to regulators', outcomes: [
+      { chance: 0.6, text: 'The truth came out and you were protected — and vindicated.', effects: { karma: 8, reputation: 4, money: 5000, achievement: 'whistle_blower' } },
+      { chance: 0.4, text: 'It got messy. You lost the job but kept your integrity.', effects: { loseJob: true, karma: 6, happiness: -4, achievement: 'whistle_blower' } },
+    ] },
+    { label: 'Stay quiet', effects: { happiness: -3, karma: -3 } },
+  ],
+});
+ev({
+  id: 'v83_career_big_negotiation', category: 'career', weight: 4, conditions: { employed: true },
+  text: 'A major client contract is on the table and you’re leading the negotiation.',
+  choices: [
+    { label: 'Push hard for the best terms', skillCheck: { skillId: SK.negotiation, bonusPerLevel: 0.006 }, outcomes: [
+      { chance: 0.5, text: 'You closed a landmark deal on your terms.', effects: { jobPerformance: 10, money: 8000, skillXp: [SK.negotiation, 10], achievement: 'master_negotiator' } },
+      { chance: 0.5, text: 'You met in the middle. Still a solid win.', effects: { jobPerformance: 4, money: 2000, skillXp: [SK.negotiation, 5] } },
+    ] },
+    { label: 'Accept their first offer', effects: { jobPerformance: 1 } },
+  ],
+});
+ev({
+  id: 'v83_career_comeback', category: 'career', weight: 3, conditions: { minAge: 25 },
+  text: 'After a rough stretch — a layoff, a failed venture — you get one more shot at a great role.',
+  choices: [
+    { label: 'Give it everything', skillCheck: { skillId: SK.leadership, bonusPerLevel: 0.005 }, outcomes: [
+      { chance: 0.55, text: 'You landed the job and silenced the doubters.', effects: { happiness: 8, reputation: 3, money: 4000, achievement: 'comeback_kid' } },
+      { chance: 0.45, text: 'Not this one — but you’re back in the game.', effects: { happiness: 2, skillXp: [SK.leadership, 5] } },
+    ] },
+    { label: 'Play it safe with a lesser role', effects: { happiness: 1, money: 1000 } },
+  ],
+});
+ev({
+  id: 'v83_career_mentorship', category: 'career', weight: 4, conditions: { employed: true, minAge: 30 },
+  text: 'A group of juniors have started coming to you for advice. You could make it official.',
+  choices: [
+    { label: 'Become a dedicated mentor', effects: { karma: 5, reputation: 3, happiness: 4, skillXp: [SK.teaching, 8], achievement: 'mentor_of_many' } },
+    { label: 'Help out casually', effects: { happiness: 2, karma: 1 } },
+  ],
+});
+ev({
+  id: 'v83_career_relocation_offer', category: 'career', weight: 3, conditions: { employed: true },
+  text: 'Your company offers you a big role — in another country.',
+  choices: [
+    { label: 'Take the leap abroad', effects: { money: 6000, happiness: 3, jobPerformance: 5, skillXp: [SK.foreignLanguages, 6] } },
+    { label: 'Stay put', effects: { jobPerformance: -1 } },
+  ],
+});
+ev({
+  id: 'v83_business_angel_invest', category: 'business', weight: 4, conditions: { hasBusiness: true, minMoney: 50000 },
+  text: 'A scrappy founder pitches you their startup. It’s early, risky, and genuinely exciting.',
+  amount: { min: 20000, max: 150000 },
+  choices: [
+    { label: 'Write the check', outcomes: [
+      { chance: 0.35, text: 'They took off — your early bet paid off enormously.', effects: { moneyAmountMult: 6, reputation: 4, achievement: 'angel_backer' } },
+      { chance: 0.4, text: 'Modest return, good relationship built.', effects: { moneyAmountMult: 1, achievement: 'angel_backer' } },
+      { chance: 0.25, text: 'It folded. That’s early-stage investing.', effects: { moneyAmountMult: -1, achievement: 'angel_backer' } },
+    ] },
+    { label: 'Pass', effects: {} },
+  ],
+});
+ev({
+  id: 'v83_business_turnaround', category: 'business', weight: 4, conditions: { hasBusiness: true },
+  text: 'One of your companies is bleeding cash. A hard restructuring could save it — or finish it.',
+  choices: [
+    { label: 'Lead the turnaround', skillCheck: { skillId: SK.strategy, bonusPerLevel: 0.006 }, outcomes: [
+      { chance: 0.5, text: 'You cut deep, refocused, and pulled it back from the brink.', effects: { companyCash: 500000, companyMorale: -6, reputation: 4, achievement: 'turnaround_artist' } },
+      { chance: 0.5, text: 'The cuts hurt morale and it kept sinking.', effects: { companyCash: -200000, companyMorale: -12 } },
+    ] },
+    { label: 'Wind it down', effects: { happiness: -4 } },
+  ],
+});
+ev({
+  id: 'v83_business_go_green', category: 'business', weight: 4, conditions: { hasBusiness: true, minMoney: 30000 },
+  text: 'You could convert your operations to run fully on renewables. Costly now, but a real statement.',
+  amount: { min: 30000, max: 200000 },
+  choices: [
+    { label: 'Invest in the transition', effects: { moneyAmountMult: -1, companyBrand: 12, reputation: 5, karma: 4, achievement: 'green_pioneer' } },
+    { label: 'Do the bare minimum', effects: { companyBrand: 2 } },
+  ],
+});
+ev({
+  id: 'v83_business_pr_crisis', category: 'business', weight: 4, conditions: { hasBusiness: true },
+  text: 'A product defect is trending online and reporters are calling your office.',
+  choices: [
+    { label: 'Front it head-on with a recall', skillCheck: { skillId: SK.pr, bonusPerLevel: 0.006 }, outcomes: [
+      { chance: 0.6, text: 'Your honesty turned the story around. Trust actually rose.', effects: { companyBrand: 6, reputation: 4, money: -30000, achievement: 'crisis_manager' } },
+      { chance: 0.4, text: 'It was rocky, but you contained the damage.', effects: { companyBrand: -4, money: -50000, achievement: 'crisis_manager' } },
+    ] },
+    { label: 'Deny everything', outcomes: [
+      { chance: 0.5, text: 'It blew over.', effects: { companyBrand: -2 } },
+      { chance: 0.5, text: 'The cover-up became the story.', effects: { companyBrand: -15, reputation: -6, notoriety: 4 } },
+    ] },
+  ],
+});
+ev({
+  id: 'v83_business_night_launch', category: 'business', weight: 3, conditions: { minAge: 18, maxAge: 45 },
+  text: 'You’ve been building a side project at night for a year. It’s ready to launch.',
+  choices: [
+    { label: 'Ship it and grind', outcomes: [
+      { chance: 0.5, text: 'The all-nighters paid off — it found real traction.', effects: { money: 12000, happiness: 6, skillXp: [SK.programming, 8], achievement: 'night_owl_founder' } },
+      { chance: 0.5, text: 'Quiet launch, but you learned a ton.', effects: { happiness: 2, skillXp: [SK.programming, 6], achievement: 'night_owl_founder' } },
+    ] },
+    { label: 'Shelve it', effects: { happiness: -2 } },
+  ],
+});
+ev({
+  id: 'v83_business_supplier_squeeze', category: 'business', weight: 4, conditions: { hasBusiness: true },
+  text: 'Your main supplier abruptly demands a 20% price increase.',
+  choices: [
+    { label: 'Negotiate hard', skillCheck: { skillId: SK.negotiation, bonusPerLevel: 0.005 }, outcomes: [
+      { chance: 0.55, text: 'You held the line and even locked in a longer contract.', effects: { companyCash: 80000, skillXp: [SK.negotiation, 6] } },
+      { chance: 0.45, text: 'You split the difference.', effects: { companyCash: -40000 } },
+    ] },
+    { label: 'Find a new supplier', effects: { companyCash: -20000, companyQuality: -3 } },
+  ],
+});
+ev({
+  id: 'v83_market_buy_the_dip', category: 'market', weight: 4, conditions: { hasStocks: true },
+  text: 'The market just cratered on panic selling. Your gut says it’s oversold.',
+  amount: { min: 5000, max: 60000, pctOfMoney: 0.2 },
+  choices: [
+    { label: 'Back up the truck', outcomes: [
+      { chance: 0.55, text: 'The rebound was sharp — perfectly timed.', effects: { moneyAmountMult: 2, skillXp: [SK.investing, 8], achievement: 'market_timer' } },
+      { chance: 0.45, text: 'It fell further before recovering. Nerve-wracking.', effects: { moneyAmountMult: -1, skillXp: [SK.investing, 4] } },
+    ] },
+    { label: 'Sit on your hands', effects: {} },
+  ],
+});
+ev({
+  id: 'v83_market_ipo_hype', category: 'market', weight: 3, conditions: { hasStocks: true },
+  text: 'A wildly hyped tech company is going public tomorrow. Everyone’s piling in.',
+  amount: { min: 3000, max: 40000 },
+  choices: [
+    { label: 'Buy on day one', outcomes: [
+      { chance: 0.4, text: 'It popped and you sold into strength.', effects: { moneyAmountMult: 1.5 } },
+      { chance: 0.6, text: 'It sank after the hype faded.', effects: { moneyAmountMult: -0.6 } },
+    ] },
+    { label: 'Wait for the dust to settle', effects: { skillXp: [SK.investing, 2] } },
+  ],
+});
+ev({
+  id: 'v83_market_bond_ladder', category: 'market', weight: 3, conditions: { minMoney: 20000 },
+  text: 'A financial advisor suggests building a bond ladder for steady, boring income.',
+  choices: [
+    { label: 'Set it up', effects: { money: -10000, skillXp: [SK.investing, 4], happiness: 1 } },
+    { label: 'Prefer to stay in stocks', effects: {} },
+  ],
+});
+ev({
+  id: 'v83_media_viral_clip', category: 'media', weight: 4, conditions: { minAge: 14 },
+  text: 'A casual video you posted is exploding — millions of views overnight.',
+  choices: [
+    { label: 'Lean into the moment', outcomes: [
+      { chance: 0.5, text: 'You parlayed it into a real following and some brand deals.', effects: { money: 15000, socialFollowersPct: 2.5, reputation: 2, achievement: 'viral_sensation' } },
+      { chance: 0.5, text: 'Fifteen minutes of fame, and then quiet.', effects: { socialFollowersPct: 0.8, happiness: 3, achievement: 'viral_sensation' } },
+    ] },
+    { label: 'Delete it, too much attention', effects: { happiness: -1 } },
+  ],
+});
+ev({
+  id: 'v83_media_trendsetter', category: 'media', weight: 3, conditions: { minFollowers: 5000 },
+  text: 'Something you championed early has become a full-blown cultural trend.',
+  choices: [
+    { label: 'Claim your role as a tastemaker', effects: { reputation: 4, socialFollowersPct: 0.6, happiness: 4, achievement: 'tastemaker' } },
+    { label: 'Stay humble about it', effects: { happiness: 2, karma: 1 } },
+  ],
+});
+ev({
+  id: 'v83_media_documentary', category: 'media', weight: 3, conditions: { minReputation: 40 },
+  text: 'A filmmaker wants to make a documentary about your life and work.',
+  choices: [
+    { label: 'Give full access', outcomes: [
+      { chance: 0.6, text: 'It was flattering and widely watched.', effects: { reputation: 5, popularity: 3 } },
+      { chance: 0.4, text: 'They found an unflattering angle.', effects: { reputation: -3, notoriety: 2 } },
+    ] },
+    { label: 'Decline politely', effects: {} },
+  ],
+});
+ev({
+  id: 'v83_family_teach_kid', category: 'family', weight: 4, conditions: { hasChildren: true },
+  text: 'Your child wants to learn something you’re good at.',
+  choices: [
+    { label: 'Spend the year teaching them', effects: { happiness: 6, karma: 3, skillXp: [SK.teaching, 5] } },
+    { label: 'Sign them up for lessons instead', effects: { money: -1500, happiness: 2 } },
+  ],
+});
+ev({
+  id: 'v83_family_block_party', category: 'family', weight: 3,
+  text: 'The neighborhood wants someone to organize the annual block party.',
+  choices: [
+    { label: 'Take charge and make it great', effects: { karma: 4, reputation: 2, happiness: 4, money: -300, achievement: 'people_person' } },
+    { label: 'Just bring a dish', effects: { happiness: 2 } },
+  ],
+});
+ev({
+  id: 'v83_family_elderly_parent', category: 'family', weight: 3, conditions: { minAge: 35 },
+  text: 'An aging parent needs more help than they’ll admit.',
+  choices: [
+    { label: 'Move them closer and care for them', effects: { money: -8000, happiness: 3, karma: 5, health: -1 } },
+    { label: 'Arrange professional care', effects: { money: -15000, happiness: 1, karma: 2 } },
+  ],
+});
+ev({
+  id: 'v83_family_heirloom', category: 'family', weight: 3, conditions: { minAge: 30 },
+  text: 'You inherit a box of family heirlooms and old letters.',
+  choices: [
+    { label: 'Preserve and archive them', effects: { happiness: 4, karma: 1 } },
+    { label: 'Sell the valuable pieces', effects: { money: 4000, happiness: -1 } },
+  ],
+});
+ev({
+  id: 'v83_politics_town_hall', category: 'politics', weight: 4, conditions: { inOffice: 'any' },
+  text: 'An angry town hall awaits you over a controversial local issue.',
+  choices: [
+    { label: 'Face the crowd honestly', skillCheck: { skillId: SK.publicSpeaking, bonusPerLevel: 0.006 }, outcomes: [
+      { chance: 0.55, text: 'You won them over with candor.', effects: { popularity: 5, approvalOfGovernment: 3 } },
+      { chance: 0.45, text: 'It got heated and clips went viral.', effects: { popularity: -3, notoriety: 2 } },
+    ] },
+    { label: 'Send a deputy', effects: { popularity: -2 } },
+  ],
+});
+ev({
+  id: 'v83_politics_grassroots', category: 'politics', weight: 3, conditions: { inParty: true },
+  text: 'A grassroots movement wants your backing on a bold reform.',
+  choices: [
+    { label: 'Champion their cause', effects: { influence: 4, popularity: 3, politicalCapital: -3 } },
+    { label: 'Offer quiet support', effects: { influence: 1 } },
+  ],
+});
+ev({
+  id: 'v83_politics_ethics_test', category: 'politics', weight: 3, conditions: { inOffice: 'any' },
+  text: 'A donor offers a large, perfectly legal contribution — with unspoken expectations.',
+  choices: [
+    { label: 'Refuse it publicly', effects: { reputation: 4, popularity: 2, karma: 3, politicalCapital: -2 } },
+    { label: 'Take it quietly', effects: { money: 20000, notoriety: 2, karma: -3 } },
+  ],
+});
+ev({
+  id: 'v83_world_pandemic_scare', category: 'world', weight: 3,
+  text: 'A new virus is spreading abroad and your country is bracing for it.',
+  choices: [
+    { label: 'Prepare early and stock up', effects: { money: -500, health: 1, happiness: -1 } },
+    { label: 'Carry on as normal', outcomes: [
+      { chance: 0.6, text: 'It stayed contained.', effects: {} },
+      { chance: 0.4, text: 'You caught it and were laid up for weeks.', effects: { health: -8, happiness: -3 } },
+    ] },
+  ],
+});
+ev({
+  id: 'v83_world_boom_town', category: 'world', weight: 3, conditions: { hasProperty: true },
+  text: 'Your area is suddenly booming — a big employer is moving in and property is soaring.',
+  choices: [
+    { label: 'Sell into the boom', effects: { propertyValuePct: 0.15, money: 20000, happiness: 2 } },
+    { label: 'Hold and ride it', effects: { propertyValuePct: 0.25 } },
+  ],
+});
+ev({
+  id: 'v83_world_charity_gala', category: 'world', weight: 3, conditions: { minMoney: 30000 },
+  text: 'A high-profile charity gala is raising money for disaster relief.',
+  choices: [
+    { label: 'Pledge generously', effects: { money: -15000, karma: 6, reputation: 3, popularity: 2 } },
+    { label: 'A modest donation', effects: { money: -2000, karma: 2 } },
+  ],
+});
+ev({
+  id: 'v83_crime_witness', category: 'crime', weight: 3,
+  text: 'You witness a mugging in progress on a quiet street.',
+  choices: [
+    { label: 'Intervene', outcomes: [
+      { chance: 0.55, text: 'You scared them off and helped the victim.', effects: { karma: 6, reputation: 2, happiness: 2 } },
+      { chance: 0.45, text: 'You got hurt in the scuffle.', effects: { health: -10, karma: 5 } },
+    ] },
+    { label: 'Call the police and observe', effects: { karma: 2 } },
+  ],
+});
+ev({
+  id: 'v83_crime_scam_target', category: 'crime', weight: 4,
+  text: 'A convincing scam email is trying to drain your accounts.',
+  choices: [
+    { label: 'Spot it and report it', effects: { skillXp: [SK.cybersecurity, 4], karma: 1 } },
+    { label: 'Almost fall for it', outcomes: [
+      { chance: 0.5, text: 'Your bank caught it just in time.', effects: { happiness: -1 } },
+      { chance: 0.5, text: 'They got you for a chunk.', effects: { money: -4000, happiness: -4 } },
+    ] },
+  ],
+});
+ev({
+  id: 'v83_life_language_challenge', category: 'life', weight: 3, conditions: { minAge: 16 },
+  text: 'You set yourself a goal: become conversational in a new language this year.',
+  choices: [
+    { label: 'Study daily', skillCheck: { skillId: SK.foreignLanguages, bonusPerLevel: 0.004 }, outcomes: [
+      { chance: 0.6, text: 'You did it — you can hold a real conversation now.', effects: { skillXp: [SK.foreignLanguages, 15], happiness: 5, smarts: 3 } },
+      { chance: 0.4, text: 'You made solid progress.', effects: { skillXp: [SK.foreignLanguages, 8], happiness: 2 } },
+    ] },
+    { label: 'Give up after a month', effects: { happiness: -1 } },
+  ],
+});
+ev({
+  id: 'v83_life_side_charity', category: 'life', weight: 3,
+  text: 'You start volunteering weekly at a food bank.',
+  choices: [
+    { label: 'Make it a real commitment', effects: { karma: 6, happiness: 4, health: -1 } },
+    { label: 'Help during the holidays only', effects: { karma: 2, happiness: 2 } },
+  ],
+});
+ev({
+  id: 'v83_health_quit_habit', category: 'health', weight: 3, conditions: { minAge: 20 },
+  text: 'You decide this is the year you finally drop a bad habit for good.',
+  choices: [
+    { label: 'Go all in', outcomes: [
+      { chance: 0.55, text: 'You kicked it. You feel like a new person.', effects: { health: 8, happiness: 5 } },
+      { chance: 0.45, text: 'You slipped, but you’re trying.', effects: { health: 2, happiness: 1 } },
+    ] },
+    { label: 'Maybe next year', effects: { happiness: -1 } },
+  ],
+});
+ev({
+  id: 'v83_career_public_speaking', category: 'career', weight: 3, conditions: { employed: true },
+  text: 'You’re asked to give the keynote at a big industry conference.',
+  choices: [
+    { label: 'Take the stage', skillCheck: { skillId: SK.publicSpeaking, bonusPerLevel: 0.006 }, outcomes: [
+      { chance: 0.6, text: 'You nailed it — standing ovation.', effects: { reputation: 5, jobPerformance: 6, skillXp: [SK.publicSpeaking, 10] } },
+      { chance: 0.4, text: 'Nervy, but you got through it.', effects: { skillXp: [SK.publicSpeaking, 6] } },
+    ] },
+    { label: 'Recommend a colleague', effects: { jobPerformance: -1 } },
+  ],
+});
+ev({
+  id: 'v83_business_franchise_offer', category: 'business', weight: 3, conditions: { hasBusiness: true, minMoney: 100000 },
+  text: 'Someone wants to franchise your successful concept in another city.',
+  amount: { min: 50000, max: 250000 },
+  choices: [
+    { label: 'License the franchise', effects: { moneyAmountMult: 1, companyBrand: 5, reputation: 2 } },
+    { label: 'Keep it exclusive', effects: { companyBrand: 1 } },
+  ],
+});
+ev({
+  id: 'v83_market_crypto_swing', category: 'market', weight: 3, conditions: { minMoney: 5000 },
+  text: 'A volatile crypto coin is swinging wildly. Friends are getting rich (on paper).',
+  amount: { min: 2000, max: 25000 },
+  choices: [
+    { label: 'Take a small position', outcomes: [
+      { chance: 0.45, text: 'You rode it up and cashed out.', effects: { moneyAmountMult: 1.8 } },
+      { chance: 0.55, text: 'It crashed. Lesson learned.', effects: { moneyAmountMult: -0.7 } },
+    ] },
+    { label: 'Stay well clear', effects: { skillXp: [SK.investing, 2] } },
+  ],
+});
+ev({
+  id: 'v83_world_climate_summit', category: 'world', weight: 3, conditions: { minInfluence: 30 },
+  text: 'You’re invited to speak at a global climate summit.',
+  choices: [
+    { label: 'Make a bold pledge', effects: { reputation: 4, influence: 3, karma: 3, money: -5000 } },
+    { label: 'Attend quietly', effects: { influence: 1 } },
+  ],
+});
+ev({
+  id: 'v83_life_open_mic', category: 'life', weight: 3, conditions: { minAge: 16 },
+  text: 'There’s an open mic night at a local bar. You’ve always wanted to try stand-up.',
+  choices: [
+    { label: 'Get on stage', skillCheck: { skillId: SK.charm, bonusPerLevel: 0.005 }, outcomes: [
+      { chance: 0.5, text: 'You killed it — the room was roaring.', effects: { happiness: 6, charisma: 3, skillXp: [SK.charm, 6] } },
+      { chance: 0.5, text: 'Tough crowd, but you survived.', effects: { happiness: 1, skillXp: [SK.charm, 3] } },
+    ] },
+    { label: 'Just watch', effects: { happiness: 1 } },
+  ],
+});
+ev({
+  id: 'v83_career_side_consulting', category: 'career', weight: 3, conditions: { employed: true, minAge: 28 },
+  text: 'A former colleague offers you well-paid weekend consulting work.',
+  choices: [
+    { label: 'Take the extra work', effects: { money: 6000, health: -2, happiness: -1, skillXp: [SK.strategy, 4] } },
+    { label: 'Protect your free time', effects: { happiness: 2 } },
+  ],
+});
+ev({
+  id: 'v83_family_family_business', category: 'family', weight: 3, conditions: { hasChildren: true, hasBusiness: true },
+  text: 'Your grown child wants to join the family business.',
+  choices: [
+    { label: 'Bring them in and train them', effects: { happiness: 5, companyMorale: 3, karma: 2 } },
+    { label: 'Tell them to earn it elsewhere first', effects: { happiness: -1, karma: 1 } },
+  ],
+});
+
 export const EVENT_TEMPLATES: EventTemplate[] = E;

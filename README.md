@@ -14,6 +14,18 @@ connection or choose not to sign in.
 
 ## Highlights
 
+- **V8.3 — 300 new features.** A big content batch across every catalog the simulation draws
+  from. **92 new industries** join the business catalog (now 515 strong), spanning fusion power,
+  green hydrogen, eVTOL aircraft, esports leagues, data-center REITs, quant hedge funds, lab-grown
+  meat and more — each with its own distinct economics. **70 new laws** are available in the
+  legislature, covering a four-day work week, a digital services tax, right-to-repair, AI safety
+  audits, universal healthcare, high-speed rail and dozens of other real policy levers with proper
+  bloc support and industry effects. **70 new daily flavor moments** make fast-forwarding feel even
+  more alive, and **50 new yearly life events** add fresh dilemmas — from running a marathon to
+  leading a corporate turnaround to blowing the whistle on fraud. Woven through those events are
+  **20 new achievements** (Angel Backer, Turnaround Artist, Marathoner, Whistleblower, Comeback Kid
+  and more), each earnable by making the right call when the moment comes.
+
 - **V8.2 — 3D becomes your home base.** The walkable 3D City stops being a screen you visit and
   becomes the place you *live*: new games and loaded saves now **spawn you directly in the City**
   (unless a decision is waiting, which still surfaces first), and a one-tap toggle on the Explore

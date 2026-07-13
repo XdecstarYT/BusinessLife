@@ -16,6 +16,15 @@ const M = 1_000_000;
 
 const SECTORS: Record<string, Row[]> = {
   Retail: [
+    // V8.3
+    ['Athleisure Apparel Chain', 120 * K, 0.15, 0.3, 0.5, 0.3, 0.5, 0.15, 0.2, SK.marketing, ['consumer', 'retail', 'luxury']],
+    ['Refurbished Electronics Store', 80 * K, 0.11, 0.25, 0.5, 0.25, 0.5, 0.4, 0.3, SK.sales, ['consumer', 'retail', 'tech']],
+    ['Bulk Warehouse Club', 3 * M, 0.05, 0.1, 0.2, 0.5, 0.7, 0.2, 0.3, SK.operations, ['consumer', 'retail']],
+    ['Artisan Cheese & Deli', 30 * K, 0.16, 0.2, 0.3, 0.2, 0.6, 0.05, 0.3, SK.sales, ['consumer', 'retail', 'food']],
+    ['Musical Instrument Shop', 45 * K, 0.14, 0.25, 0.5, 0.25, 0.5, 0.1, 0.1, SK.sales, ['consumer', 'retail']],
+    ['Camping & Outdoor Outfitter', 90 * K, 0.13, 0.25, 0.5, 0.3, 0.5, 0.1, 0.2, SK.sales, ['consumer', 'retail']],
+    ['Luxury Handbag Resale House', 220 * K, 0.22, 0.35, 0.7, 0.3, 0.4, 0.2, 0.3, SK.sales, ['consumer', 'luxury']],
+    ['Party Supplies Superstore', 55 * K, 0.1, 0.2, 0.4, 0.3, 0.6, 0.1, 0.2, SK.sales, ['consumer', 'retail']],
     ['Convenience Stores', 40 * K, 0.06, 0.15, 0.3, 0.3, 0.7, 0.1, 0.3, SK.sales, ['consumer', 'retail']],
     ['Supermarket Chain', 900 * K, 0.04, 0.1, 0.2, 0.5, 0.8, 0.2, 0.4, SK.operations, ['consumer', 'retail', 'food']],
     ['Fashion Boutique', 60 * K, 0.12, 0.35, 0.6, 0.2, 0.6, 0.1, 0.2, SK.marketing, ['consumer', 'retail', 'luxury']],
@@ -52,6 +61,15 @@ const SECTORS: Record<string, Row[]> = {
     ['Specialty Coffee Roaster Retail', 40 * K, 0.15, 0.2, 0.3, 0.2, 0.5, 0.1, 0.2, SK.sales, ['consumer', 'retail', 'food']],
   ],
   Food: [
+    // V8.3
+    ['Plant-Based Protein Maker', 700 * K, 0.1, 0.3, 0.4, 0.5, 0.5, 0.4, 0.5, SK.manufacturing, ['food', 'tech', 'green']],
+    ['Artisan Chocolate Factory', 200 * K, 0.17, 0.25, 0.5, 0.5, 0.5, 0.15, 0.3, SK.manufacturing, ['food', 'luxury', 'export']],
+    ['Cloud Kitchen Network', 250 * K, 0.09, 0.3, 0.4, 0.3, 0.6, 0.4, 0.3, SK.logistics, ['food', 'tech', 'consumer']],
+    ['Specialty Tea Importer', 120 * K, 0.15, 0.25, 0.4, 0.4, 0.4, 0.1, 0.4, SK.sales, ['food', 'consumer', 'export']],
+    ['Hot Sauce & Condiments Brand', 90 * K, 0.16, 0.25, 0.3, 0.4, 0.5, 0.15, 0.3, SK.marketing, ['food', 'consumer', 'export']],
+    ['Ghost-Pepper Snack Company', 110 * K, 0.14, 0.3, 0.4, 0.4, 0.5, 0.2, 0.3, SK.marketing, ['food', 'consumer']],
+    ['Oyster & Shellfish Farm', 320 * K, 0.13, 0.4, 0.4, 0.7, 0.6, 0.1, 0.6, SK.farming, ['agriculture', 'food', 'export']],
+    ['Cold-Pressed Juice Chain', 70 * K, 0.12, 0.3, 0.4, 0.3, 0.6, 0.1, 0.3, SK.operations, ['food', 'consumer', 'health']],
     ['Food Truck', 25 * K, 0.12, 0.3, 0.3, 0.2, 0.7, 0.05, 0.3, SK.operations, ['food', 'consumer']],
     ['Coffee Shop', 45 * K, 0.11, 0.2, 0.3, 0.25, 0.7, 0.05, 0.2, SK.sales, ['food', 'consumer']],
     ['Casual Restaurant', 90 * K, 0.1, 0.25, 0.4, 0.3, 0.8, 0.05, 0.4, SK.operations, ['food', 'consumer']],
@@ -87,6 +105,14 @@ const SECTORS: Record<string, Row[]> = {
     ['Cold Brew Beverage Startup', 80 * K, 0.16, 0.3, 0.4, 0.2, 0.5, 0.2, 0.2, SK.marketing, ['food', 'consumer']],
   ],
   Technology: [
+    // V8.3
+    ['Edge Computing Provider', 8 * M, 0.22, 0.4, 0.4, 0.7, 0.3, 0.9, 0.4, SK.programming, ['tech', 'software', 'platform']],
+    ['No-Code App Platform', 400 * K, 0.24, 0.45, 0.4, 0.15, 0.3, 0.9, 0.3, SK.programming, ['tech', 'software', 'platform']],
+    ['Developer Tools Startup', 200 * K, 0.26, 0.45, 0.4, 0.1, 0.4, 0.95, 0.2, SK.programming, ['tech', 'software']],
+    ['Digital Identity & KYC Vendor', 1.2 * M, 0.23, 0.4, 0.4, 0.3, 0.4, 0.85, 0.7, SK.cybersecurity, ['tech', 'software', 'finance']],
+    ['AR Glasses Maker', 6 * M, 0.14, 0.55, 0.6, 0.7, 0.4, 0.85, 0.4, SK.robotics, ['tech', 'consumer']],
+    ['Speech AI Company', 900 * K, 0.2, 0.5, 0.4, 0.3, 0.3, 0.95, 0.4, SK.ai, ['tech', 'ai', 'software']],
+    ['Open-Source Support Business', 300 * K, 0.19, 0.35, 0.4, 0.1, 0.5, 0.85, 0.2, SK.programming, ['tech', 'software', 'services']],
     ['SaaS Startup', 30 * K, 0.2, 0.4, 0.4, 0.1, 0.4, 0.9, 0.3, SK.programming, ['tech', 'software']],
     ['Mobile App Studio', 25 * K, 0.18, 0.5, 0.4, 0.1, 0.4, 0.9, 0.2, SK.programming, ['tech', 'software', 'consumer']],
     ['AI Research Lab', 500 * K, 0.15, 0.5, 0.3, 0.3, 0.3, 1.0, 0.6, SK.ai, ['tech', 'ai', 'software']],
@@ -123,6 +149,14 @@ const SECTORS: Record<string, Row[]> = {
     ['Agricultural Data Analytics Firm', 250 * K, 0.18, 0.3, 0.3, 0.2, 0.4, 0.85, 0.3, SK.programming, ['tech', 'agriculture', 'software']],
   ],
   Finance: [
+    // V8.3
+    ['Buy-Now-Pay-Later Lender', 2 * M, 0.14, 0.45, 0.7, 0.3, 0.4, 0.7, 0.8, SK.banking, ['finance', 'banking', 'tech']],
+    ['Carbon Credit Exchange', 3 * M, 0.2, 0.5, 0.5, 0.3, 0.3, 0.6, 0.7, SK.trading, ['finance', 'green', 'platform']],
+    ['Trade Finance House', 6 * M, 0.18, 0.35, 0.7, 0.4, 0.4, 0.4, 0.7, SK.banking, ['finance', 'banking', 'export']],
+    ['Quant Hedge Fund', 8 * M, 0.35, 0.65, 0.8, 0.2, 0.3, 0.9, 0.6, SK.trading, ['finance', 'tech']],
+    ['Micro-Lending Network', 900 * K, 0.16, 0.35, 0.5, 0.3, 0.6, 0.5, 0.7, SK.banking, ['finance', 'banking']],
+    ['Reinsurance Company', 20 * M, 0.22, 0.4, 0.6, 0.5, 0.3, 0.4, 0.8, SK.riskManagement, ['finance', 'insurance']],
+    ['Digital Wealth Manager', 1.5 * M, 0.19, 0.4, 0.6, 0.2, 0.3, 0.85, 0.6, SK.investing, ['finance', 'tech', 'platform']],
     ['Retail Bank', 10 * M, 0.25, 0.25, 0.7, 0.4, 0.5, 0.4, 0.9, SK.banking, ['finance', 'banking']],
     ['Investment Bank', 15 * M, 0.3, 0.45, 0.9, 0.3, 0.4, 0.5, 0.9, SK.banking, ['finance', 'banking']],
     ['Insurance Company', 5 * M, 0.12, 0.3, 0.5, 0.3, 0.5, 0.4, 0.8, SK.riskManagement, ['finance', 'insurance']],
@@ -159,6 +193,14 @@ const SECTORS: Record<string, Row[]> = {
     ['Digital Asset Custody Provider', 1.5 * M, 0.22, 0.4, 0.4, 0.2, 0.3, 0.85, 0.7, SK.banking, ['finance', 'tech', 'crypto']],
   ],
   Energy: [
+    // V8.3
+    ['Grid-Scale Battery Storage', 12 * M, 0.14, 0.35, 0.4, 0.9, 0.3, 0.6, 0.6, SK.engineering, ['energy', 'green', 'tech']],
+    ['Green Hydrogen Producer', 30 * M, 0.1, 0.45, 0.5, 1.0, 0.3, 0.6, 0.6, SK.engineering, ['energy', 'green', 'export']],
+    ['Offshore Wind Developer', 40 * M, 0.13, 0.35, 0.5, 1.0, 0.3, 0.5, 0.7, SK.engineering, ['energy', 'green']],
+    ['EV Charging Network', 8 * M, 0.11, 0.35, 0.5, 0.8, 0.4, 0.6, 0.5, SK.operations, ['energy', 'green', 'auto']],
+    ['Geothermal Power Plant', 25 * M, 0.15, 0.3, 0.3, 1.0, 0.3, 0.5, 0.6, SK.engineering, ['energy', 'green']],
+    ['Next-Gen Biofuel Refinery', 15 * M, 0.12, 0.45, 0.5, 0.9, 0.4, 0.4, 0.6, SK.manufacturing, ['energy', 'green', 'agriculture']],
+    ['Nuclear Services Contractor', 18 * M, 0.16, 0.3, 0.4, 0.7, 0.5, 0.5, 0.9, SK.engineering, ['energy', 'industrial']],
     ['Oil Exploration', 25 * M, 0.2, 0.6, 0.7, 1.0, 0.4, 0.5, 0.8, SK.mining, ['energy', 'oil', 'commodity_oil', 'export']],
     ['Gas Utility', 12 * M, 0.15, 0.25, 0.3, 0.9, 0.4, 0.3, 0.9, SK.operations, ['energy', 'gas', 'commodity_gas', 'utility']],
     ['Solar Farm Developer', 2 * M, 0.14, 0.25, 0.3, 0.9, 0.2, 0.6, 0.6, SK.engineering, ['energy', 'green', 'solar']],
@@ -195,6 +237,14 @@ const SECTORS: Record<string, Row[]> = {
     ['Industrial Energy Efficiency Consultancy', 400 * K, 0.22, 0.2, 0.3, 0.1, 0.6, 0.4, 0.3, SK.engineering, ['energy', 'services', 'green']],
   ],
   Industrial: [
+    // V8.3
+    ['3D-Printing Factory', 3 * M, 0.14, 0.35, 0.5, 0.7, 0.4, 0.7, 0.4, SK.manufacturing, ['industrial', 'tech']],
+    ['Industrial Robotics Integrator', 5 * M, 0.16, 0.3, 0.6, 0.6, 0.5, 0.7, 0.4, SK.robotics, ['industrial', 'tech']],
+    ['Precision Bearings Maker', 8 * M, 0.13, 0.3, 0.7, 0.8, 0.6, 0.4, 0.5, SK.manufacturing, ['industrial', 'export']],
+    ['Recycling & Materials Recovery', 6 * M, 0.11, 0.3, 0.5, 0.7, 0.6, 0.3, 0.6, SK.operations, ['industrial', 'green']],
+    ['Modular Housing Factory', 10 * M, 0.12, 0.35, 0.8, 0.8, 0.6, 0.3, 0.5, SK.manufacturing, ['industrial', 'housing', 'construction']],
+    ['Packaging & Corrugate Plant', 7 * M, 0.1, 0.2, 0.5, 0.7, 0.6, 0.3, 0.5, SK.manufacturing, ['industrial', 'export']],
+    ['Wind Turbine Blade Maker', 14 * M, 0.11, 0.35, 0.6, 0.9, 0.6, 0.4, 0.6, SK.manufacturing, ['industrial', 'green', 'export']],
     ['Steel Mill', 25 * M, 0.1, 0.35, 0.8, 1.0, 0.7, 0.3, 0.7, SK.manufacturing, ['industrial', 'commodity_metals', 'export']],
     ['Auto Manufacturer', 35 * M, 0.08, 0.3, 0.9, 1.0, 0.7, 0.6, 0.6, SK.manufacturing, ['industrial', 'auto', 'export']],
     ['EV Manufacturer', 20 * M, 0.06, 0.45, 0.7, 1.0, 0.6, 0.9, 0.5, SK.engineering, ['industrial', 'auto', 'green', 'tech']],
@@ -231,6 +281,14 @@ const SECTORS: Record<string, Row[]> = {
     ['Precision Optics Manufacturer', 5 * M, 0.17, 0.3, 0.5, 0.6, 0.5, 0.6, 0.4, SK.engineering, ['industrial', 'tech', 'export']],
   ],
   Property: [
+    // V8.3
+    ['Data Center REIT', 30 * M, 0.28, 0.25, 0.5, 0.9, 0.2, 0.6, 0.5, SK.realEstate, ['property', 'tech']],
+    ['University Housing Operator', 8 * M, 0.22, 0.2, 0.5, 0.8, 0.3, 0.1, 0.5, SK.realEstate, ['property', 'housing']],
+    ['Cold Storage Warehousing', 12 * M, 0.2, 0.2, 0.4, 0.8, 0.4, 0.3, 0.5, SK.realEstate, ['property', 'logistics', 'food']],
+    ['Co-Working Space Chain', 4 * M, 0.14, 0.4, 0.8, 0.6, 0.4, 0.3, 0.4, SK.realEstate, ['property', 'services']],
+    ['Retirement Community Operator', 15 * M, 0.19, 0.2, 0.4, 0.8, 0.6, 0.2, 0.7, SK.realEstate, ['property', 'health']],
+    ['Self-Storage Facility Operator', 5 * M, 0.3, 0.15, 0.4, 0.8, 0.2, 0.2, 0.4, SK.realEstate, ['property']],
+    ['Vacation Rental Management', 900 * K, 0.16, 0.4, 0.8, 0.4, 0.5, 0.4, 0.4, SK.realEstate, ['property', 'tourism', 'tech']],
     ['Residential Developer', 3 * M, 0.16, 0.4, 0.9, 0.8, 0.5, 0.2, 0.8, SK.realEstate, ['property', 'housing', 'construction']],
     ['Commercial Developer', 6 * M, 0.18, 0.4, 0.9, 0.8, 0.4, 0.2, 0.8, SK.realEstate, ['property', 'construction']],
     ['Construction Contractor', 400 * K, 0.08, 0.3, 0.8, 0.5, 0.9, 0.2, 0.7, SK.construction, ['construction', 'housing', 'infrastructure']],
@@ -267,6 +325,14 @@ const SECTORS: Record<string, Row[]> = {
     ['Rural Land Investment Trust', 3 * M, 0.24, 0.3, 0.6, 0.8, 0.2, 0.1, 0.4, SK.realEstate, ['property', 'agriculture']],
   ],
   Transport: [
+    // V8.3
+    ['Last-Mile Delivery Startup', 1.2 * M, 0.07, 0.35, 0.6, 0.4, 0.7, 0.5, 0.4, SK.logistics, ['transport', 'logistics', 'tech']],
+    ['Electric Scooter Sharing', 2 * M, 0.06, 0.45, 0.6, 0.5, 0.5, 0.6, 0.5, SK.operations, ['transport', 'green', 'tech']],
+    ['Regional Ferry Operator', 8 * M, 0.12, 0.3, 0.6, 0.8, 0.6, 0.2, 0.6, SK.operations, ['transport', 'tourism']],
+    ['Drone Logistics Company', 3 * M, 0.09, 0.5, 0.5, 0.6, 0.4, 0.8, 0.6, SK.robotics, ['transport', 'logistics', 'tech']],
+    ['Cold-Chain Freight Line', 5 * M, 0.11, 0.3, 0.6, 0.7, 0.6, 0.3, 0.5, SK.logistics, ['transport', 'logistics', 'food']],
+    ['Bike Courier Cooperative', 120 * K, 0.09, 0.3, 0.5, 0.2, 0.8, 0.3, 0.3, SK.logistics, ['transport', 'green', 'services']],
+    ['High-Speed Rail Concession', 60 * M, 0.14, 0.25, 0.6, 1.0, 0.5, 0.4, 0.8, SK.operations, ['transport', 'infrastructure']],
     ['Trucking Fleet', 600 * K, 0.08, 0.25, 0.7, 0.7, 0.8, 0.2, 0.6, SK.logistics, ['transport', 'logistics', 'oil']],
     ['Regional Airline', 20 * M, 0.05, 0.5, 0.9, 1.0, 0.6, 0.4, 0.9, SK.operations, ['transport', 'airline', 'tourism', 'oil']],
     ['International Airline', 60 * M, 0.06, 0.5, 0.9, 1.0, 0.6, 0.4, 0.9, SK.operations, ['transport', 'airline', 'tourism', 'export', 'oil']],
@@ -303,6 +369,14 @@ const SECTORS: Record<string, Row[]> = {
     ['Airship Cargo Venture', 25 * M, 0.05, 0.6, 0.4, 0.9, 0.3, 0.8, 0.5, SK.aerospace, ['transport', 'tech', 'logistics']],
   ],
   Media: [
+    // V8.3
+    ['Audio Show Network', 200 * K, 0.15, 0.4, 0.5, 0.15, 0.5, 0.4, 0.2, SK.socialMedia, ['media', 'entertainment']],
+    ['Esports Team & League', 3 * M, 0.09, 0.55, 0.6, 0.3, 0.5, 0.5, 0.3, SK.marketing, ['media', 'entertainment', 'tech']],
+    ['Creator Talent Agency', 400 * K, 0.2, 0.4, 0.5, 0.1, 0.6, 0.4, 0.2, SK.pr, ['media', 'services']],
+    ['Streaming Studio', 5 * M, 0.12, 0.5, 0.6, 0.5, 0.5, 0.5, 0.3, SK.film, ['media', 'entertainment']],
+    ['Newsletter Media House', 150 * K, 0.18, 0.4, 0.5, 0.1, 0.5, 0.5, 0.3, SK.journalism, ['media', 'news']],
+    ['Mobile Game Studio', 800 * K, 0.16, 0.55, 0.6, 0.3, 0.4, 0.8, 0.2, SK.programming, ['media', 'tech', 'entertainment']],
+    ['Music Rights Fund', 6 * M, 0.22, 0.35, 0.5, 0.4, 0.2, 0.4, 0.3, SK.investing, ['media', 'entertainment', 'finance']],
     ['Local Newspaper', 80 * K, 0.06, 0.3, 0.5, 0.2, 0.8, 0.2, 0.4, SK.journalism, ['media', 'news']],
     ['National News Network', 10 * M, 0.12, 0.3, 0.5, 0.5, 0.6, 0.4, 0.6, SK.journalism, ['media', 'news', 'influence']],
     ['Streaming Platform', 5 * M, 0.1, 0.4, 0.4, 0.4, 0.3, 0.9, 0.4, SK.programming, ['media', 'entertainment', 'tech', 'platform']],
@@ -339,6 +413,14 @@ const SECTORS: Record<string, Row[]> = {
     ['Independent Film Distributor', 400 * K, 0.13, 0.45, 0.5, 0.2, 0.5, 0.3, 0.2, SK.film, ['media', 'entertainment']],
   ],
   Health: [
+    // V8.3
+    ['Telehealth Platform', 2 * M, 0.14, 0.35, 0.3, 0.3, 0.5, 0.8, 0.8, SK.medicine, ['health', 'tech', 'services']],
+    ['Genomics Testing Lab', 6 * M, 0.16, 0.4, 0.4, 0.7, 0.4, 0.8, 0.8, SK.biotech, ['health', 'tech', 'research']],
+    ['Medical Devices Maker', 8 * M, 0.2, 0.3, 0.4, 0.6, 0.5, 0.7, 0.9, SK.engineering, ['health', 'industrial', 'export']],
+    ['Dental Clinic Group', 700 * K, 0.19, 0.15, 0.2, 0.4, 0.7, 0.3, 0.7, SK.medicine, ['health', 'services']],
+    ['Physical Therapy Chain', 400 * K, 0.16, 0.15, 0.3, 0.3, 0.8, 0.2, 0.6, SK.medicine, ['health', 'services']],
+    ['Mental Health App', 900 * K, 0.13, 0.45, 0.4, 0.2, 0.4, 0.8, 0.6, SK.programming, ['health', 'tech']],
+    ['Clinical Research Network', 12 * M, 0.15, 0.3, 0.4, 0.6, 0.6, 0.7, 0.8, SK.research, ['health', 'research', 'services']],
     ['Private Clinic', 300 * K, 0.15, 0.15, 0.2, 0.4, 0.8, 0.4, 0.8, SK.medicine, ['health', 'services']],
     ['Hospital Group', 20 * M, 0.08, 0.1, 0.1, 0.8, 0.8, 0.5, 0.9, SK.medicine, ['health', 'services']],
     ['Pharmaceutical Company', 15 * M, 0.22, 0.4, 0.2, 0.6, 0.4, 0.9, 1.0, SK.biotech, ['health', 'research', 'export']],
@@ -375,6 +457,14 @@ const SECTORS: Record<string, Row[]> = {
     ['Occupational Health Consultancy', 90 * K, 0.2, 0.15, 0.3, 0.1, 0.8, 0.2, 0.5, SK.medicine, ['health', 'services']],
   ],
   Services: [
+    // V8.3
+    ['Boutique Strategy Advisory', 300 * K, 0.32, 0.3, 0.6, 0.05, 0.9, 0.3, 0.3, SK.strategy, ['services']],
+    ['Cybersecurity Consultancy', 400 * K, 0.28, 0.35, 0.5, 0.1, 0.7, 0.8, 0.4, SK.cybersecurity, ['services', 'tech']],
+    ['Staffing & Recruiting Agency', 150 * K, 0.16, 0.35, 0.7, 0.1, 0.8, 0.3, 0.4, SK.negotiation, ['services']],
+    ['Facilities Management Company', 500 * K, 0.1, 0.2, 0.5, 0.3, 0.9, 0.2, 0.4, SK.operations, ['services']],
+    ['Translation & Localization Firm', 90 * K, 0.19, 0.25, 0.4, 0.05, 0.8, 0.4, 0.2, SK.foreignLanguages, ['services']],
+    ['Event Management Company', 120 * K, 0.15, 0.4, 0.7, 0.2, 0.8, 0.2, 0.3, SK.marketing, ['services', 'entertainment']],
+    ['Waste Management Services', 4 * M, 0.14, 0.2, 0.4, 0.6, 0.7, 0.2, 0.6, SK.operations, ['services', 'green']],
     ['Law Firm', 120 * K, 0.3, 0.2, 0.4, 0.05, 0.9, 0.2, 0.4, SK.law, ['services', 'legal']],
     ['Management Consultancy', 90 * K, 0.28, 0.3, 0.7, 0.05, 0.9, 0.4, 0.2, SK.strategy, ['services']],
     ['Security Services', 150 * K, 0.14, 0.15, 0.3, 0.2, 0.9, 0.3, 0.6, SK.operations, ['services', 'defense']],
@@ -411,6 +501,14 @@ const SECTORS: Record<string, Row[]> = {
     ['Home Inspection Franchise', 30 * K, 0.22, 0.15, 0.4, 0.1, 0.9, 0.1, 0.3, SK.construction, ['services', 'housing', 'franchise']],
   ],
   Emerging: [
+    // V8.3
+    ['Fusion Power Venture', 40 * M, 0.02, 0.7, 0.3, 1.0, 0.3, 1.0, 0.5, SK.research, ['tech', 'research', 'energy', 'green']],
+    ['Neural Implant Lab', 25 * M, 0.04, 0.7, 0.3, 0.7, 0.3, 1.0, 0.6, SK.biotech, ['tech', 'research', 'health']],
+    ['Synthetic Biology Foundry', 18 * M, 0.06, 0.6, 0.3, 0.7, 0.4, 0.95, 0.6, SK.biotech, ['tech', 'research', 'health']],
+    ['Autonomous Vehicle Startup', 30 * M, 0.03, 0.65, 0.4, 0.8, 0.4, 1.0, 0.5, SK.ai, ['tech', 'research', 'auto', 'ai']],
+    ['Space Tourism Venture', 50 * M, 0.05, 0.7, 0.5, 1.0, 0.4, 0.9, 0.6, SK.aerospace, ['tech', 'research', 'tourism']],
+    ['Vertical-Takeoff Aircraft (eVTOL)', 35 * M, 0.04, 0.65, 0.5, 0.9, 0.4, 0.95, 0.6, SK.aerospace, ['tech', 'research', 'transport', 'green']],
+    ['Lab-Grown Meat Startup', 20 * M, 0.05, 0.6, 0.3, 0.8, 0.4, 0.9, 0.6, SK.biotech, ['tech', 'research', 'food', 'green']],
     ['Quantum Computing Lab', 20 * M, 0.05, 0.6, 0.3, 0.8, 0.3, 1.0, 0.3, SK.research, ['tech', 'research', 'ai']],
     ['Carbon Capture Facility', 25 * M, 0.08, 0.4, 0.3, 0.9, 0.3, 0.7, 0.6, SK.engineering, ['industrial', 'green', 'energy']],
     ['Vertical Farming Operation', 3 * M, 0.1, 0.3, 0.2, 0.6, 0.4, 0.6, 0.3, SK.farming, ['agriculture', 'food', 'tech', 'green']],
@@ -447,6 +545,13 @@ const SECTORS: Record<string, Row[]> = {
     ['Neurotech Wellness Devices', 5 * M, 0.12, 0.5, 0.3, 0.4, 0.3, 0.85, 0.6, SK.biotech, ['tech', 'health']],
   ],
   Defense: [
+    // V8.3
+    ['Military Drone Manufacturer', 12 * M, 0.19, 0.35, 0.3, 0.7, 0.4, 0.85, 0.95, SK.aerospace, ['industrial', 'defense', 'tech', 'controversial']],
+    ['Satellite Reconnaissance Firm', 20 * M, 0.2, 0.35, 0.3, 0.8, 0.3, 0.9, 0.9, SK.aerospace, ['defense', 'tech', 'research']],
+    ['Naval Shipbuilder', 40 * M, 0.13, 0.3, 0.4, 1.0, 0.6, 0.4, 0.9, SK.manufacturing, ['industrial', 'defense', 'export']],
+    ['Defense Cybersecurity Contractor', 8 * M, 0.24, 0.3, 0.3, 0.4, 0.6, 0.9, 0.9, SK.cybersecurity, ['defense', 'tech']],
+    ['Body Armor & Protective Gear', 3 * M, 0.17, 0.25, 0.3, 0.5, 0.6, 0.4, 0.85, SK.manufacturing, ['industrial', 'defense']],
+    ['Missile Defense Systems', 50 * M, 0.18, 0.35, 0.3, 0.9, 0.4, 0.85, 0.98, SK.aerospace, ['defense', 'tech', 'controversial']],
     ['Small Arms Manufacturer', 4 * M, 0.16, 0.25, 0.2, 0.6, 0.6, 0.4, 0.9, SK.manufacturing, ['industrial', 'defense', 'controversial']],
     ['Ammunition Plant', 3 * M, 0.15, 0.2, 0.2, 0.6, 0.6, 0.3, 0.9, SK.manufacturing, ['industrial', 'defense']],
     ['Body Armor & Tactical Gear', 800 * K, 0.18, 0.2, 0.2, 0.4, 0.6, 0.3, 0.7, SK.manufacturing, ['industrial', 'defense']],
