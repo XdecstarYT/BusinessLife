@@ -14,6 +14,15 @@ connection or choose not to sign in.
 
 ## Highlights
 
+- **V8.4 — 200 more features.** Another broad content batch on top of V8.3. **60 new industries**
+  join the catalog (now 575 strong) — semiconductor fabs, longevity biotech, air taxis, carbon
+  capture, deep-space mining, humanoid robotics and more. **50 new laws** cover a living wage, a
+  land-value tax, an automation levy, universal childcare, rent stabilization, a space defense
+  command and dozens more, each with real bloc support and industry effects. **50 new daily flavor
+  moments** and **30 new yearly life events** add fresh texture and dilemmas — brokering peace,
+  patenting an invention, reading 100 books, chasing a storm to help — and woven through them are
+  **10 new achievements** (Deal Maker, Risk Taker, Inventor, Peacemaker, Globe Trotter and more).
+
 - **V8.3 — 300 new features.** A big content batch across every catalog the simulation draws
   from. **92 new industries** join the business catalog (now 515 strong), spanning fusion power,
   green hydrogen, eVTOL aircraft, esports leagues, data-center REITs, quant hedge funds, lab-grown

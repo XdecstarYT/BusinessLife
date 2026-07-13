@@ -302,4 +302,15 @@ export const ACHIEVEMENTS: Record<string, AchievementDef> = {
   people_person: { label: 'People Person', icon: '🫂' },
   lucky_streak: { label: 'Lucky Streak', icon: '🍀' },
   quiet_philanthropist: { label: 'Quiet Philanthropist', icon: '🤲' },
+  // V8.4: 10 new achievements (awarded via event outcomes)
+  deal_maker: { label: 'Deal Maker', icon: '📝' },
+  risk_taker: { label: 'Risk Taker', icon: '🎲' },
+  master_gardener: { label: 'Master Gardener', icon: '🌿' },
+  bookworm: { label: 'Bookworm', icon: '📚' },
+  festival_founder: { label: 'Festival Founder', icon: '🎪' },
+  storm_chaser: { label: 'Storm Chaser', icon: '⛈️' },
+  peacemaker: { label: 'Peacemaker', icon: '☮️' },
+  inventor: { label: 'Inventor', icon: '💡' },
+  globe_trotter: { label: 'Globe Trotter', icon: '🌏' },
+  good_samaritan: { label: 'Good Samaritan', icon: '🙏' },
 };

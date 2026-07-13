@@ -17,6 +17,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'V8.4',
+    title: '200 More Features',
+    bullets: [
+      '60 new industries — semiconductors, longevity biotech, air taxis, deep-space mining and more',
+      '50 new laws, from a living wage and land-value tax to a space defense command',
+      '50 new daily moments while fast-forwarding through life',
+      '30 new yearly life events with real choices — and 10 new achievements to unlock',
+    ],
+  },
+  {
     version: 'V8.3',
     title: '300 New Features',
     bullets: [
