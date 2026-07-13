@@ -37,6 +37,10 @@ export interface ThreeSceneHandle {
   addStars: (count?: number) => void;
   /** Creates a small floating text label as a sprite; caller positions and adds it. */
   makeLabel: (text: string, scale?: number) => THREE.Sprite;
+  /** V57: marks an object (and its subtree) as a tap/click target for `options.onPick`. A tap
+   * that hits nothing registered, or moves/holds too long to read as a tap rather than a
+   * drag-to-rotate gesture, is silently ignored. */
+  registerClickable: (obj: THREE.Object3D, id: string) => void;
 }
 
 function makeTextSprite(text: string, scale: number): THREE.Sprite {
@@ -70,6 +74,11 @@ export interface ThreeSceneOptions {
   /** 'orbit' (default) attaches drag-to-rotate + wheel/pinch zoom. 'none' skips them so the
    * scene can implement its own input (e.g. a walkable hub driving a player character). */
   controls?: 'orbit' | 'none';
+  /** V57: called with the id passed to `handle.registerClickable` for whatever registered
+   * object a tap hits (nearest hit wins). Coexists with drag-to-rotate: a pointer that moves
+   * more than a few pixels or is held past a quarter-second reads as a drag/long-press, not
+   * a tap, so rotating the scene never misfires an interaction. */
+  onPick?: (id: string) => void;
 }
 
 export function useThreeScene(
@@ -116,7 +125,10 @@ export function useThreeScene(
     const pmrem = new THREE.PMREMGenerator(renderer);
     const envTexture = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     scene.environment = envTexture;
-    scene.environmentIntensity = 0.4;
+    // V8.0 graphics pass: a touch more IBL so metal/glass across every scene picks up richer
+    // reflections. Kept a small step (0.4 → 0.46) so it enriches PBR surfaces without blowing
+    // out the pale ground planes each scene's direct lights were tuned against.
+    scene.environmentIntensity = 0.46;
     pmrem.dispose();
 
     // Bloom + a final output pass (correct tone mapping/color space through the composer)
@@ -140,9 +152,12 @@ export function useThreeScene(
       // against the ground, a seat against its neighbor) — the single biggest cue that grounds
       // objects in a real space instead of having them float, cheap-looking, over a flat plane.
       const aoPass = new GTAOPass(scene, camera, 1, 1);
-      aoPass.blendIntensity = 0.6;
+      aoPass.blendIntensity = 0.7;
       composer.addPass(aoPass);
-      bloomPass = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.4, 0.55, 0.82);
+      // V8.0 graphics pass: a slightly stronger but higher-threshold bloom — only genuinely bright
+      // emissives (windows, screens, beacons, the globe's markers) bloom, and they bloom a little
+      // harder, for a cleaner, more cinematic glow than the previous wash.
+      bloomPass = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.5, 0.6, 0.85);
       composer.addPass(bloomPass);
       composer.addPass(new OutputPass());
     }
@@ -177,6 +192,35 @@ export function useThreeScene(
     };
 
     const makeLabel = (text: string, scale = 0.7) => makeTextSprite(text, scale);
+
+    // V57: tap-to-interact registry, independent of the drag-to-rotate/zoom listeners below so
+    // scenes can offer both at once (drag to look around, tap a specific object to act on it).
+    const pickables = new Map<THREE.Object3D, string>();
+    const registerClickable = (obj: THREE.Object3D, id: string) => { pickables.set(obj, id); };
+    const raycaster = new THREE.Raycaster();
+    let pickDownX = 0;
+    let pickDownY = 0;
+    let pickDownT = 0;
+    const onPickDown = (e: PointerEvent) => { pickDownX = e.clientX; pickDownY = e.clientY; pickDownT = performance.now(); };
+    const onPickUp = (e: PointerEvent) => {
+      if (!options?.onPick) return;
+      const dx = e.clientX - pickDownX;
+      const dy = e.clientY - pickDownY;
+      if (Math.hypot(dx, dy) > 6 || performance.now() - pickDownT > 400) return;
+      const rect = el.getBoundingClientRect();
+      const ndc = new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
+      raycaster.setFromCamera(ndc, camera);
+      const hits = raycaster.intersectObjects(Array.from(pickables.keys()), true);
+      for (const hit of hits) {
+        let o: THREE.Object3D | null = hit.object;
+        while (o && !pickables.has(o)) o = o.parent;
+        if (o) { options.onPick(pickables.get(o)!); break; }
+      }
+    };
+    if (options?.onPick) {
+      el.addEventListener('pointerdown', onPickDown);
+      el.addEventListener('pointerup', onPickUp);
+    }
 
     // Drag-to-rotate (whole scene) + wheel/pinch zoom (camera.zoom). Scene-level
     // rotation composes cleanly with each scene's own camera orbit animation.
@@ -219,7 +263,7 @@ export function useThreeScene(
       el.style.touchAction = 'none';
     }
 
-    const onFrame = setup({ scene, camera, renderer, quality, addStars, makeLabel });
+    const onFrame = setup({ scene, camera, renderer, quality, addStars, makeLabel, registerClickable });
 
     let raf = 0;
     let contextLost = false;
@@ -253,6 +297,10 @@ export function useThreeScene(
       cancelAnimationFrame(raf);
       el.removeEventListener('webglcontextlost', onContextLost);
       el.removeEventListener('webglcontextrestored', onContextRestored);
+      if (options?.onPick) {
+        el.removeEventListener('pointerdown', onPickDown);
+        el.removeEventListener('pointerup', onPickUp);
+      }
       ro.disconnect();
       if (orbitControls) {
         el.removeEventListener('pointerdown', onPointerDown);

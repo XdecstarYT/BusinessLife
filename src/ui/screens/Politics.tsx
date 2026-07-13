@@ -7,6 +7,7 @@ import {
   cabinetCandidates,
   callNoConfidenceVote,
   campaignAction,
+  chooseRunningMate,
   deliverBudgetSpeech,
   dismissMinister,
   donateToPoliticalParty,
@@ -25,6 +26,7 @@ import {
   proposedLaws,
   repealLaw,
   respondToProtests,
+  runningMateCandidates,
   seekCelebrityEndorsement,
 } from '../../sim/actions';
 import { campaignWinChance, promiseFulfillment, publicOpinionBreakdown } from '../../sim/politics';
@@ -48,6 +50,7 @@ const PROMISE_LABELS: Record<ManifestoPromise, string> = {
 export function Politics() {
   const { state, run } = useGame();
   const [tab, setTab] = useState<'status' | 'office' | 'laws' | 'party' | 'cabinet'>('status');
+  const [pickingMate, setPickingMate] = useState(false);
   if (!state) return null;
   const p = state.player;
   const home = state.countries.find((c) => c.id === p.countryId)!;
@@ -77,8 +80,18 @@ export function Politics() {
                 filled: !!home.cabinet[portfolio],
                 byPlayer: home.cabinet[portfolio] === 'player',
               }))}
+              onSelectParty={(partyId) => {
+                if (partyId === p.partyId) { setTab('party'); return; }
+                run(donateToPoliticalParty, partyId, 10_000);
+              }}
+              onSelectPortfolio={(portfolio) => {
+                const npcId = home.cabinet[portfolio as CabinetPortfolio];
+                if (npcId && npcId !== 'player') run(investigateOfficial, npcId);
+                else setTab('cabinet');
+              }}
             />
           </Suspense>
+          <div className="text-xs text-slate-400 mt-1 px-1">Tap a party's benches to donate; tap a cabinet podium to investigate its minister (or jump to Cabinet to appoint one).</div>
         </div>
       )}
 
@@ -95,6 +108,9 @@ export function Politics() {
               </div>
               {isLeader && <Badge tone="brand">🏛️ Head of State</Badge>}
             </div>
+            {isLeader && p.vicePresidentId && state.npcs[p.vicePresidentId] && (
+              <div className="text-xs text-slate-500 dark:text-slate-400 mb-2">🤵 Vice {home.leaderTitle}: {state.npcs[p.vicePresidentId].name}</div>
+            )}
             <div className="space-y-3">
               <StatBar label="Popularity" value={p.popularity} />
               <StatBar label="Influence" value={p.influence} />
@@ -124,6 +140,15 @@ export function Politics() {
               {p.campaign.promises.length > 0 && (
                 <div className="flex flex-wrap gap-1 mb-3">
                   {p.campaign.promises.map((pr) => <Badge key={pr}>{PROMISE_LABELS[pr]}</Badge>)}
+                </div>
+              )}
+              {p.campaign.officeKind === 'head_of_state' && (
+                <div className="mb-3">
+                  {p.campaign.runningMateId ? (
+                    <Badge tone="good">🤵 Running mate: {state.npcs[p.campaign.runningMateId]?.name ?? 'chosen'}</Badge>
+                  ) : (
+                    <Button size="sm" variant="soft" className="w-full" onClick={() => setPickingMate(true)}>🤵 Choose Running Mate</Button>
+                  )}
                 </div>
               )}
               <div className="grid grid-cols-2 gap-2">
@@ -235,6 +260,24 @@ export function Politics() {
       {tab === 'laws' && <LawsTab />}
       {tab === 'party' && <PartyTab party={party} />}
       {tab === 'cabinet' && <CabinetTab />}
+
+      {pickingMate && (
+        <Modal open onClose={() => setPickingMate(false)} title="Choose a Running Mate">
+          <div className="space-y-2 max-h-[50vh] overflow-y-auto">
+            {runningMateCandidates(state).length === 0 && <p className="text-center text-slate-400 py-6">No eligible running mates right now.</p>}
+            {runningMateCandidates(state).map((n) => (
+              <button
+                key={n.id}
+                onClick={() => { run(chooseRunningMate, n.id); setPickingMate(false); }}
+                className="w-full text-left p-3 rounded-2xl bg-slate-100 dark:bg-ink-800 hover:bg-slate-200 dark:hover:bg-ink-700"
+              >
+                <div className="font-semibold">{n.name}</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Popularity {Math.round(n.popularity)} · Competence {n.competence}</div>
+              </button>
+            ))}
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

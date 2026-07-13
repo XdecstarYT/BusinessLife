@@ -29,6 +29,10 @@ interface PoliticalChamberSceneProps {
   totalSeats: number;
   isLeader: boolean;
   portfolios: ChamberPortfolio[];
+  // V57: tap a party's bench block to act on that party; tap a cabinet podium to appoint
+  // (if vacant) or investigate (if filled) that portfolio's minister.
+  onSelectParty?: (partyId: string) => void;
+  onSelectPortfolio?: (portfolioName: string) => void;
 }
 
 function ideologyColor(ideology: number): THREE.Color {
@@ -36,12 +40,12 @@ function ideologyColor(ideology: number): THREE.Color {
   return new THREE.Color(0x3b82f6).lerp(new THREE.Color(0xef4444), t);
 }
 
-export function PoliticalChamberScene({ parties, totalSeats, isLeader, portfolios }: PoliticalChamberSceneProps) {
+export function PoliticalChamberScene({ parties, totalSeats, isLeader, portfolios, onSelectParty, onSelectPortfolio }: PoliticalChamberSceneProps) {
   const ref = useRef<HTMLDivElement>(null);
 
   useThreeScene(
     ref,
-    ({ scene, camera, makeLabel }) => {
+    ({ scene, camera, makeLabel, registerClickable }) => {
       scene.fog = new THREE.Fog(0x0b1220, 10, 34);
       scene.background = new THREE.Color(0x0b1220);
       scene.add(new THREE.AmbientLight(0xffffff, 0.55));
@@ -72,6 +76,7 @@ export function PoliticalChamberScene({ parties, totalSeats, isLeader, portfolio
         const shareEnd = seatCursor / seatUnit;
         const color = ideologyColor(party.ideology);
         const blockCount = Math.max(1, Math.round((party.seats / seatUnit) * 24));
+        const partyGroup = new THREE.Group();
         for (let i = 0; i < blockCount; i++) {
           const frac = shareStart + ((shareEnd - shareStart) * (i + 0.5)) / blockCount;
           const angle = arcStart + frac * arcSpan;
@@ -100,8 +105,10 @@ export function PoliticalChamberScene({ parties, totalSeats, isLeader, portfolio
           unit.add(desk);
           unit.position.set(x, 0.16 + row * 0.05, z);
           unit.lookAt(0, 0.16 + row * 0.05, 2);
-          scene.add(unit);
+          partyGroup.add(unit);
         }
+        scene.add(partyGroup);
+        if (onSelectParty) registerClickable(partyGroup, `party:${party.id}`);
         const midAngle = arcStart + ((shareStart + shareEnd) / 2) * arcSpan;
         const label = makeLabel(`${party.name} · ${party.seats}`, 0.4);
         label.position.set(Math.cos(midAngle) * 5.6, 2.1, -Math.sin(midAngle) * 5.6 - 1);
@@ -123,9 +130,10 @@ export function PoliticalChamberScene({ parties, totalSeats, isLeader, portfolio
         const n = portfolios.length;
         const x = (i - (n - 1) / 2) * 1.05;
         const z = 3.2;
+        const podiumGroup = new THREE.Group();
         const stand = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.9, 0.32), new THREE.MeshStandardMaterial({ color: 0x232a38, roughness: 0.6 }));
         stand.position.set(x, 0.45, z);
-        scene.add(stand);
+        podiumGroup.add(stand);
         const lamp = new THREE.Mesh(
           new THREE.SphereGeometry(0.09, 12, 10),
           new THREE.MeshStandardMaterial({
@@ -135,11 +143,13 @@ export function PoliticalChamberScene({ parties, totalSeats, isLeader, portfolio
           }),
         );
         lamp.position.set(x, 0.95, z);
-        scene.add(lamp);
+        podiumGroup.add(lamp);
         podiums.push({ mesh: lamp, filled: port.filled });
         const label = makeLabel(port.name, 0.32);
         label.position.set(x, 1.35, z);
-        scene.add(label);
+        podiumGroup.add(label);
+        scene.add(podiumGroup);
+        if (onSelectPortfolio) registerClickable(podiumGroup, `portfolio:${port.name}`);
       });
 
       camera.position.set(0, 6.4, 9.5);
@@ -154,6 +164,12 @@ export function PoliticalChamberScene({ parties, totalSeats, isLeader, portfolio
       };
     },
     [parties.map((p) => `${p.id}:${p.seats}:${p.ideology}:${p.isPlayerParty}`).join(','), totalSeats, isLeader, portfolios.map((p) => `${p.name}:${p.filled}:${p.byPlayer}`).join(',')],
+    {
+      onPick: (id) => {
+        if (id.startsWith('party:')) onSelectParty?.(id.slice(6));
+        else if (id.startsWith('portfolio:')) onSelectPortfolio?.(id.slice(10));
+      },
+    },
   );
 
   return <div ref={ref} className="w-full h-56 rounded-2xl overflow-hidden bg-slate-950" />;

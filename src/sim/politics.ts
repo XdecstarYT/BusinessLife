@@ -4,7 +4,7 @@
  * sanctions, wars). NPC politicians pursue their own careers; national
  * elections happen with or without the player.
  */
-import type { CabinetPortfolio, Country, GameState, InfrastructureKind, LawDef, ManifestoPromise, Office, OfficeKind } from './types';
+import type { CabinetPortfolio, Country, GameState, InfrastructureKind, Justice, LawDef, ManifestoPromise, Office, OfficeKind } from './types';
 import { clamp, clamp100 } from './types';
 import { LAW_BY_ID } from '../data/laws';
 import { SK } from '../data/skills';
@@ -84,6 +84,12 @@ export function campaignWinChance(state: GameState, rng?: RNG): number {
   score += ((p.skills[SK.campaigning] ?? 0) + (p.skills[SK.publicSpeaking] ?? 0)) * 0.15;
   score += Math.min(25, Math.sqrt(c.warChest / Math.max(1, spec.campaignCostBase)) * 12);
   if (party) score += (party.support - 100 / home.parties.length) * 0.6;
+  // V56: a running mate (head_of_state campaigns only) adds a real, if modest, ticket bonus
+  // scaled by their own standing — see chooseRunningMate in actions.ts.
+  if (c.runningMateId) {
+    const mate = state.npcs[c.runningMateId];
+    if (mate?.alive) score += (mate.popularity - 40) * 0.15 + (mate.competence - 50) * 0.08;
+  }
   // Anti-incumbent sentiment when the government is unpopular helps challengers
   if (spec.kind === 'head_of_state' || spec.kind === 'legislator') {
     score += (45 - home.approvalOfGovernment) * 0.35;
@@ -127,6 +133,47 @@ export function estimateLawVote(state: GameState, country: Country, law: LawDef)
 
 function clamp01(v: number): number {
   return clamp(v, 0, 1);
+}
+
+/** V56: how a hypothetical bloc at a given point on the -100..100 ideology scale (the same scale
+ * Party.ideology and Justice.ideology use) would feel about a law, reusing exactly the per-party
+ * stance math estimateLawVote already applies — so a Supreme Court's lean can be compared against
+ * a law the same way a legislature's parties are. Positive = favors the law, negative = opposes it. */
+export function ideologyStance(ideology: number, law: LawDef): number {
+  const leftW = clamp01((50 - ideology) / 100);
+  const rightW = 1 - leftW;
+  return law.support.left * leftW + law.support.right * rightW +
+    law.support.business * (rightW - 0.5) * 0.4 + law.support.workers * (leftW - 0.5) * 0.4;
+}
+
+/** V56: average ideology of a country's sitting Supreme Court, 0 (dead center) if the bench is
+ * empty. Shared by the auto judicial-review roll and petitionSupremeCourt. */
+export function courtIdeologyLean(country: Country): number {
+  if (!country.supremeCourt.length) return 0;
+  return country.supremeCourt.reduce((s, j) => s + j.ideology, 0) / country.supremeCourt.length;
+}
+
+/** V56: mutual-defense teeth for alliances (previously membership-only cosmetics — see
+ * foundAlliance/joinAlliance in actions.ts). Called whenever a war actually starts, whether
+ * player-declared or the automatic tick roll below; drags in any ally of the initiator who isn't
+ * already at war with the target. */
+export function dragInAllies(state: GameState, initiatorId: string, enemyId: string): string[] {
+  const headlines: string[] = [];
+  const initiator = state.countries.find((c) => c.id === initiatorId);
+  if (!initiator?.allianceId) return headlines;
+  const allyIds = state.alliances.find((a) => a.id === initiator.allianceId)?.memberCountryIds ?? [];
+  for (const allyId of allyIds) {
+    if (allyId === initiatorId || allyId === enemyId) continue;
+    const ally = state.countries.find((c) => c.id === allyId);
+    const enemy = state.countries.find((c) => c.id === enemyId);
+    if (!ally || !enemy || ally.atWarWith.includes(enemyId)) continue;
+    ally.atWarWith.push(enemyId);
+    enemy.atWarWith.push(allyId);
+    ally.relations[enemyId] = -90;
+    enemy.relations[allyId] = -90;
+    headlines.push(`🤝⚔️ ${ally.name} honors its mutual-defense pact and joins the war against ${enemy.name}.`);
+  }
+  return headlines;
 }
 
 const PROMISE_LOWER_IS_BETTER: Record<ManifestoPromise, boolean> = {
@@ -238,6 +285,8 @@ export function tickPolitics(state: GameState, country: Country, rng: RNG): stri
     country.warExhaustion = 0;
     country.warCasualtiesTotal = 0;
   }
+  country.supremeCourt ??= []; // backfill for saves from before V56's Supreme Court
+  country.tradeAgreementIds ??= []; // backfill for saves from before V56's trade agreements
   // Military readiness drifts toward what the Defense budget share can sustain — chronically
   // under-funding it (below the ~16.7% even-split baseline) lets it decay; over-funding slowly
   // builds it. Distinct from the raw militaryPower score, which cabinet meetings/laws move directly.
@@ -309,6 +358,14 @@ export function tickPolitics(state: GameState, country: Country, rng: RNG): stri
     }
   } else if (country.oppositionLeaderId) {
     country.oppositionLeaderId = null;
+  }
+
+  // V56: a Vice head-of-state quietly builds the player's influence while both are alive and in
+  // office — see chooseRunningMate/vicePresidentId.
+  if (playerIsLeader && state.player.vicePresidentId) {
+    const vp = state.npcs[state.player.vicePresidentId];
+    if (vp?.alive) state.player.influence = clamp100(state.player.influence + 0.5);
+    else state.player.vicePresidentId = null;
   }
 
   // Cabinet ministers (player-led governments only) nudge their portfolio's stat each year.
@@ -462,12 +519,49 @@ export function tickPolitics(state: GameState, country: Country, rng: RNG): stri
     }
   }
 
-  // Judicial review: a low-integrity court can arbitrarily strike down a law in force.
-  if (country.lawsInForce.length && rng.chance(clamp(0.05 * (1 - country.judicialIntegrity / 130), 0.005, 0.08))) {
+  // Judicial review: a low-integrity court can arbitrarily strike down a law in force. V56: once
+  // a real Supreme Court sits (see supremeCourt/nominateJustice), the odds skew toward laws that
+  // ideologically clash with the bench's lean, using the same stance math as estimateLawVote.
+  if (country.lawsInForce.length) {
     const lawId = rng.pick(country.lawsInForce);
     const law = LAW_BY_ID[lawId];
-    country.lawsInForce = country.lawsInForce.filter((id) => id !== lawId);
-    headlines.push(`⚖️ ${country.name}'s courts struck down the ${law?.name ?? 'law'}`);
+    const baseChance = clamp(0.05 * (1 - country.judicialIntegrity / 130), 0.005, 0.08);
+    const conflict = law && country.supremeCourt.length ? Math.max(0, -ideologyStance(courtIdeologyLean(country), law)) : 0;
+    if (rng.chance(clamp(baseChance * (1 + conflict * 1.8), 0.002, 0.16))) {
+      country.lawsInForce = country.lawsInForce.filter((id) => id !== lawId);
+      headlines.push(`⚖️ ${country.name}'s courts struck down the ${law?.name ?? 'law'}`);
+    }
+  }
+
+  // V56: Supreme Court composition ages, retires and (rarely) dies each year, opening vacancies
+  // that nominateJustice fills; chiefJusticeId tracks the most senior sitting justice for the
+  // pre-existing flavor field's displays.
+  if (country.supremeCourt.length) {
+    const remaining: Justice[] = [];
+    for (const j of country.supremeCourt) {
+      j.age++;
+      const leaveChance = j.age > 85 ? 0.2 : j.age > 75 ? 0.06 : 0.015;
+      if (rng.chance(leaveChance)) {
+        const died = j.age > 80 && rng.chance(0.4);
+        headlines.push(`⚖️ Justice ${j.name} ${died ? 'passes away' : 'retires'} from the ${country.name} Supreme Court, opening a vacancy.`);
+        continue;
+      }
+      remaining.push(j);
+    }
+    country.supremeCourt = remaining;
+    country.chiefJusticeId = remaining.length
+      ? [...remaining].sort((a, b) => a.appointedYear - b.appointedYear)[0].id
+      : null;
+  }
+
+  // V56: trade agreements are a real ongoing GDP/relations tailwind, not a one-off nudge —
+  // capped implicitly since each partner only contributes a small slice.
+  if (country.tradeAgreementIds.length) {
+    for (const partnerId of country.tradeAgreementIds) {
+      if (!state.countries.some((k) => k.id === partnerId)) continue;
+      country.economy.gdpGrowth += 0.0008;
+      country.relations[partnerId] = clamp((country.relations[partnerId] ?? 0) + 1, -100, 100);
+    }
   }
 
   // Geopolitics: relations drift; sanctions and (rare) wars.
@@ -489,6 +583,8 @@ export function tickPolitics(state: GameState, country: Country, rng: RNG): stri
       country.atWarWith.push(other.id);
       other.atWarWith.push(country.id);
       headlines.push(`⚔️ WAR: ${country.name} and ${other.name} enter open conflict`);
+      headlines.push(...dragInAllies(state, country.id, other.id));
+      headlines.push(...dragInAllies(state, other.id, country.id));
     }
     if (country.atWarWith.includes(other.id)) {
       // A war strategy chosen via declareWar() differentiates the yearly toll and peace odds.

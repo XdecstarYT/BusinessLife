@@ -92,6 +92,14 @@ export interface Memoir {
   royaltyPerYear: number;
 }
 
+// V52: a multi-year personal brand deal, paid out the same way as Memoir royalties (see
+// tickPersonalFinance) — signed via signSponsorshipDeal() once socialFollowers is high enough.
+export interface SponsorshipDeal {
+  brand: string;
+  yearsLeft: number;
+  incomePerYear: number;
+}
+
 export interface Bond {
   id: string;
   countryId: string;
@@ -280,6 +288,7 @@ export interface Player {
   freelanceGigsCompleted: number;
   unemployedYears: number; // consecutive years without a job or company; drives skill decay and safety-net support
   memoir: Memoir | null; // published autobiography paying royalties for a few years
+  sponsorshipDeal: SponsorshipDeal | null; // V52: multi-year personal brand deal, paid like memoir royalties
   socialFollowers: number; // social-media audience size
   cancelledUntilYear: number | null; // a viral backlash is actively depressing reputation/popularity until this year
   lastSocialPostYear: number | null; // cooldown so posting can't be spammed for free rolls
@@ -292,10 +301,402 @@ export interface Player {
     yearsToElection: number;
     consultantHired: boolean; // boosts momentum gains from campaign actions
     promises: ManifestoPromise[]; // manifesto pledges made at launch, tracked for fulfillment in office
+    runningMateId: string | null; // V56: NPC id; only meaningful for a head_of_state campaign
   };
+  vicePresidentId: string | null; // V56: set once a head_of_state campaign with a running mate wins
   lastElectionResult: ElectionResult | null; // transient: set on resolution, cleared once the UI shows it
   casinoTotalWagered: number; // lifetime stake across all casino games, for the Stats screen
   casinoBiggestWin: number; // single largest payout ever collected (any casino game, including a jackpot)
+  pets: Pet[]; // adopted companions — they age, bond, and eventually pass on
+  lotteryTicketsThisYear: number; // spam guard, resets each year
+  scratchCardsThisYear: number; // spam guard, resets each year
+  athlete: AthleteCareer | null; // V35: soccer/football/running career, independent of the office job/company paths
+  military: MilitaryCareer | null; // V44: enlisted service career, independent of the job/company/athlete paths
+  drugOperation: DrugOperation | null; // V47: Drug Empire — independent of crimeFamilyId, though membership boosts it
+  entertainmentCareer: EntertainmentCareer | null; // V49: actor/musician fame career
+  medicalCareer: MedicalCareer | null; // V49: doctor/surgeon career
+  cult: CultMovement | null; // V49: founded religious/spiritual movement
+  astronaut: AstronautCareer | null; // V49: space agency career
+  prisonLife: PrisonLifeState | null; // V49: cellblock politics while incarcerated, reset on release
+  legalCareer: LegalCareer | null; // V55: lawyer -> partner -> (optional) judge career
+  culinaryCareer: CulinaryCareer | null; // V55: line cook -> celebrity chef career
+  aviation: AviationCareer | null; // V8.0: student pilot -> first officer -> airline captain, with a playable 3D flight minigame
+  // V55: Prestige Vault — the permanent "Guardian Angel" perk (see net/prestige.ts) grants one
+  // reprieve per life from the natural-mortality roll in engine.ts; guardianAngelUsed tracks
+  // whether this life has already spent it, resetting fresh on every new generateWorld() call.
+  guardianAngelAvailable: boolean;
+  guardianAngelUsed: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// V49: five mega features — Entertainment, Medical, Cult, Space, Prison Life
+// ---------------------------------------------------------------------------
+
+export type EntertainmentTrack = 'actor' | 'musician';
+
+export interface EntertainmentProject {
+  id: string;
+  title: string;
+  kind: 'film' | 'album' | 'tour' | 'single' | 'show';
+  yearReleased: number;
+  budgetOrBudgetTier: number;
+  performanceScore: number; // 0..100, box office / chart performance
+  awardsWon: string[]; // award ids
+}
+
+export interface EntertainmentCareer {
+  active: boolean;
+  track: EntertainmentTrack;
+  fame: number; // 0..100
+  talent: number; // 0..100, grows with training/roles
+  wealth: number; // lifetime entertainment earnings, informational
+  hasAgent: boolean;
+  agentCut: number; // 0..1, share of earnings taken
+  labelOrStudioId: string | null; // name of the label/studio currently signed to, if any
+  projects: EntertainmentProject[];
+  scandalsCount: number;
+  feudTargetName: string | null;
+  retired: boolean;
+}
+
+export type MedicalSpecialty = string; // id into data/medical.ts MEDICAL_SPECIALTIES
+
+export interface MedicalCareer {
+  active: boolean;
+  stage: 'med_school' | 'residency' | 'attending' | 'retired';
+  specialtyId: string | null;
+  hospitalId: string | null;
+  yearsOfService: number;
+  skill: number; // 0..100, patient outcomes and promotion odds
+  reputation: number; // 0..100, hospital standing
+  patientsSaved: number;
+  patientsLost: number;
+  malpracticeSuits: number;
+  publications: number;
+  rank: number; // 0 = student/resident, 1..4 = attending -> senior -> chief -> medical director
+  licenseRevoked: boolean;
+}
+
+// V55: Legal Career — law school → associate → partner, and, uniquely among the career life
+// paths, an optional late-career judicial appointment (stage 'judge') once you've made partner
+// with real standing. Structurally parallel to MedicalCareer above.
+export interface LegalCareer {
+  active: boolean;
+  stage: 'law_school' | 'associate' | 'partner' | 'judge' | 'retired';
+  specialtyId: string | null;
+  firmId: string | null;
+  yearsOfService: number;
+  skill: number; // 0..100, case outcomes and promotion odds
+  reputation: number; // 0..100, firm/bar standing
+  casesWon: number;
+  casesLost: number;
+  barComplaints: number;
+  publications: number; // law review articles
+  rank: number; // while stage === 'partner': 0..3, see LEGAL_RANK_TITLES
+  disbarred: boolean;
+}
+
+// V55: Culinary Empire — line cook → sous chef → head chef, then an optional leap to opening
+// your own restaurant (tracked here directly rather than as a Company, to stay self-contained)
+// and chasing Michelin stars. Structurally parallel to MedicalCareer/LegalCareer above.
+export interface CulinaryCareer {
+  active: boolean;
+  stage: 'line_cook' | 'sous_chef' | 'head_chef' | 'restaurant_owner' | 'retired';
+  cuisineId: string | null;
+  workplaceName: string | null; // restaurant name, whether employed or self-owned
+  yearsOfService: number;
+  skill: number; // 0..100, dish quality and promotion odds
+  reputation: number; // 0..100, culinary-scene standing
+  dishesServed: number;
+  healthCodeViolations: number;
+  michelinStars: number; // 0..3, only earnable as restaurant_owner
+  rank: number; // while stage === 'restaurant_owner': 0..3 growth tier of the restaurant
+  restaurantClosed: boolean;
+}
+
+// V8.0: Aviation Career — student pilot → first officer → airline captain. You log flight hours
+// (partly by flying the real 3D FlightScene minigame), earn PPL/CPL/ATPL licenses that gate which
+// aircraft you can fly, and climb a captain rank ladder. Safety incidents work like legal.ts's bar
+// complaints: too many and your license is suspended for good. Structurally parallel to LegalCareer.
+export interface AviationCareer {
+  active: boolean;
+  stage: 'flight_school' | 'first_officer' | 'captain' | 'retired';
+  licenseId: string | null; // highest license held: 'ppl' | 'cpl' | 'atpl'
+  airlineName: string | null;
+  aircraftId: string | null; // current type rating being flown
+  typeRatings: string[]; // aircraft ids you hold a rating for
+  yearsOfService: number;
+  hoursLogged: number; // total block hours — gates the next license
+  flightsCompleted: number;
+  skill: number; // 0..100, piloting skill — drives flight outcomes and promotion odds
+  safetyRating: number; // 0..100, drifts with clean vs. rough flights
+  incidents: number; // safety incidents; MAX_INCIDENTS suspends the license
+  rank: number; // while stage === 'captain': 0..3, see CAPTAIN_RANK_TITLES
+  licenseSuspended: boolean;
+}
+
+export interface CultMovement {
+  active: boolean;
+  name: string;
+  founded: number; // year founded
+  followers: number;
+  funds: number; // donations collected, separate from player.money until extracted
+  charisma: number; // 0..100, drives recruitment and donation size
+  suspicion: number; // 0..100, law-enforcement/media attention
+  compoundLevel: number; // 0..5
+  raidsSurvived: number;
+  disbanded: boolean;
+  disbandedReason: 'raided' | 'collapsed' | 'voluntary' | null;
+}
+
+export interface AstronautCareer {
+  active: boolean;
+  agencyId: string | null; // national space agency (by countryId) or 'private'
+  rank: number; // 0 = candidate, 1..4 = pilot -> commander -> veteran -> chief astronaut
+  trainingScore: number; // 0..100
+  missionsFlown: number;
+  hoursInSpace: number;
+  walkedOnMoon: boolean;
+  walkedOnMars: boolean;
+  fatalityRisk: number; // 0..1, current mission risk, informational
+  activeMission: SpaceMission | null;
+}
+
+export interface SpaceMission {
+  id: string;
+  name: string;
+  kind: 'orbital' | 'station' | 'moon' | 'mars';
+  startYear: number;
+  durationYears: number;
+  danger: number; // 0..1
+}
+
+export interface PrisonLifeState {
+  gangId: string | null; // prison gang name, distinct from outside CrimeFamily
+  respect: number; // 0..100, standing in the yard
+  contraband: number; // units of smuggled goods held
+  cellblockHeat: number; // 0..100, guard attention on the player specifically
+  timesInSolitary: number;
+  riotsParticipated: number;
+  snitched: boolean;
+}
+
+/**
+ * A drug-dealing operation: independent of joining a CrimeFamily (you can run corners solo), but
+ * synergizes with it. Three upgrade tracks (storage/grow/lab) are independently levelled 0..5;
+ * `heat` is this operation's own law-enforcement attention, separate from (but feeding into)
+ * Player.investigationHeat.
+ */
+export interface DrugOperation {
+  active: boolean;
+  storageLevel: number; // 0..5 — stash capacity
+  growLevel: number; // 0..5 — free weed production per year
+  labLevel: number; // 0..5 — free meth production per year; labLevel>=3 unlocks tier-4 sourcing
+  stash: Record<string, number>; // drug id -> units held
+  reputation: number; // 0..100 — street cred; drives demand, dealer recruitment, and tier gating
+  turf: number; // 0..100 — corners controlled, independent of CrimeFamily.turf
+  heat: number; // 0..100 — this operation's own law-enforcement attention
+  dealersHired: number; // street crew selling passively on the player's behalf
+  busts: number; // lifetime raid count
+  lifetimeRevenue: number; // for Stats/achievements
+  odIncidents: number; // customers who overdosed on the player's product
+}
+
+export type PetKind = 'dog' | 'cat' | 'parrot' | 'horse' | 'snake' | 'goldfish';
+
+export interface Pet {
+  id: string;
+  kind: PetKind;
+  name: string;
+  ageYears: number;
+  health: number; // 0..100, decays late in life and with illness
+  bond: number; // 0..100, built by playing; scales the yearly happiness boost and the grief at the end
+}
+
+/** One entry on the player's per-life bucket list. `description` is resolved at
+ * generation time so saves and the UI never need the definition table. */
+export interface BucketGoal {
+  defId: string;
+  description: string;
+  target: number;
+  done: boolean;
+  rewardMoney: number;
+  rewardHappiness: number;
+}
+
+// ---------------------------------------------------------------------------
+// V35: Athlete career (soccer, football, running)
+// ---------------------------------------------------------------------------
+
+export type AthleteSport = 'soccer' | 'football' | 'running';
+
+/** Soccer/football positions and running specializations are all just string ids defined in
+ * data/athletics.ts (same "content is data" pattern as skills/industries) — the type layer only
+ * needs to know which sport a career belongs to, not enumerate every position by name. */
+export type AthleteLevel = 'youth' | 'academy' | 'college' | 'semipro' | 'pro' | 'elite' | 'retired';
+
+export interface AthleteInjury {
+  kind: string; // e.g. 'hamstring_strain', 'ACL_tear' — id into data/athletics.ts INJURY_TYPES
+  name: string;
+  severity: number; // 1..10, higher = worse
+  weeksOut: number; // remaining recovery time in-season, decremented on advance
+  startYear: number;
+  reinjuryRisk: number; // 0..100, elevated for the rest of the season after returning
+}
+
+export interface AthleteContract {
+  teamId: string | null; // null = free agent / unsigned amateur
+  salary: number; // per year
+  signingBonus: number;
+  yearsLeft: number;
+  performanceBonusPerGoalOrWin: number; // small per-goal (soccer) / per-win (football) kicker
+}
+
+export interface AthleteEndorsement {
+  brand: string;
+  annualValue: number;
+  yearsLeft: number;
+}
+
+export interface AthleteCareerStats {
+  seasonsPlayed: number;
+  matchesPlayed: number;
+  goals: number; // soccer
+  assists: number; // soccer
+  cleanSheets: number; // soccer goalkeepers
+  passingYards: number; // football
+  rushingYards: number; // football
+  receivingYards: number; // football
+  touchdowns: number; // football
+  tackles: number; // football
+  interceptions: number; // football
+  racesRun: number; // running
+  racesWon: number; // running
+  medalsGold: number;
+  medalsSilver: number;
+  medalsBronze: number;
+  mvpAwards: number;
+}
+
+export interface AthleteCareer {
+  sport: AthleteSport;
+  position: string; // id into data/athletics.ts SOCCER_POSITIONS / FOOTBALL_POSITIONS
+  event: string | null; // running only: id into data/athletics.ts RUNNING_EVENTS, e.g. '100m', 'marathon'
+  level: AthleteLevel;
+  attributes: Record<string, number>; // attribute id -> 0..100, ids from data/athletics.ts per sport
+  overallRating: number; // derived 0..100 composite, recomputed after training/aging/injury
+  potentialCeiling: number; // 0..100, rolled at career start; overallRating asymptotes toward it
+  fitness: number; // 0..100, match-day readiness; drained by playing/training, restored by rest
+  form: number; // 0..100, hot/cold streak, drifts toward 50 and nudged by recent results
+  morale: number; // 0..100, affects training gains and injury risk
+  teamId: string | null; // references a team id in data/athletics.ts (soccer/football only)
+  leagueId: string | null;
+  contract: AthleteContract | null;
+  injuries: AthleteInjury[]; // history
+  currentInjury: AthleteInjury | null;
+  trainingFocus: string | null; // attribute id being emphasized this year
+  seasonStats: AthleteCareerStats;
+  careerStats: AthleteCareerStats;
+  personalBests: Partial<Record<string, number>>; // running: event id -> seconds (lower is better)
+  endorsements: AthleteEndorsement[];
+  yearsPro: number;
+  retired: boolean;
+  hallOfFame: boolean;
+  startedYear: number;
+  fixtures: AthleteMatchFixture[]; // this season's schedule, soccer/football only
+  nextMeetId: string | null; // running only: next meet on the calendar
+  seasonYear: number; // the year `fixtures` covers; regenerated when it falls behind state.year
+}
+
+/** One scheduled game in a soccer/football season — the player can play it out in the 3D
+ * match scene or quick-simulate it; either way it resolves into `resultSummary`. */
+export interface AthleteMatchFixture {
+  id: string;
+  opponentTeamId: string;
+  week: number; // 1-based position in the season schedule
+  played: boolean;
+  resultSummary: string | null; // e.g. "W 3-1" once played
+  playerRatingThisMatch: number | null; // 0..10 match rating once played
+}
+
+/** Dynamic per-season standing for a team defined statically in data/athletics.ts —
+ * mirrors the Industry (static) / Company (dynamic) split used elsewhere. */
+export interface AthleteTeamState {
+  teamId: string;
+  wins: number;
+  losses: number;
+  draws: number; // soccer only
+  points: number; // league table points
+  goalsFor: number; // soccer
+  goalsAgainst: number; // soccer
+  seasonYear: number; // the year this record covers; reset (along with wins/losses/etc above) when it
+  // falls behind state.year — prestige and currentLeagueId below intentionally persist across that reset.
+  prestige: number; // 0..100, dynamic team strength: seeded from the static catalog, then evolves every
+  // year with results (win big, gain prestige) and random transfer-market swings — see tickAthleteWorld.
+  currentLeagueId: string; // may differ from the static catalog's leagueId after a promotion/relegation
+}
+
+// ---------------------------------------------------------------------------
+// V44: Military Service career
+// ---------------------------------------------------------------------------
+
+export type MilitaryBranch = 'army' | 'navy' | 'air_force' | 'marines' | 'coast_guard' | 'space_force';
+
+/** null while still serving; set the moment the career ends, one way or another. */
+export type MilitaryDischargeType = 'honorable' | 'general' | 'medical' | 'dishonorable' | 'kia' | null;
+
+export interface MilitaryInjury {
+  kind: string; // id into data/military.ts MILITARY_INJURY_TYPES
+  name: string;
+  severity: number; // 1..10
+  permanent: boolean; // permanent injuries add to disabilityRating and never fully heal
+  yearSustained: number;
+}
+
+/** One tour: a posting to a base/theater, optionally against a specific enemy nation if the
+ * home country is at war when the tour starts. Ends on rotation home, a wound serious enough to
+ * evacuate, or death. */
+export interface MilitaryDeployment {
+  id: string;
+  baseId: string; // id into data/military.ts MILITARY_BASES — the posting/theater
+  conflictCountryId: string | null; // the enemy nation this tour was fought against, if any (peacetime postings have none)
+  startYear: number;
+  endYear: number | null; // null while still deployed
+  missionsCompleted: number;
+  outcome: 'ongoing' | 'completed' | 'wounded' | 'kia' | 'medically_evacuated';
+}
+
+export interface MilitaryMedal {
+  id: string; // id into data/military.ts MILITARY_MEDALS
+  name: string;
+  yearAwarded: number;
+  citation: string; // flavor text for why it was awarded
+}
+
+export interface MilitaryCareer {
+  branch: MilitaryBranch;
+  specialtyId: string; // id into data/military.ts MILITARY_SPECIALTIES (MOS/rating), fixed at enlistment
+  rankIndex: number; // 0-based index into data/military.ts RANKS_BY_BRANCH[branch]
+  yearsOfService: number;
+  enlistedYear: number;
+  discipline: number; // 0..100 — promotion odds, court-martial risk when it slips low
+  combatSkill: number; // 0..100 — mission success/survival odds; grows with deployments and training
+  leadership: number; // 0..100 — command-billet eligibility and promotion speed; grows with rank/time
+  fitness: number; // 0..100 — drained on deployment, restored by garrison time/training
+  disabilityRating: number; // 0..100 cumulative, from permanent injuries — sets VA compensation after discharge
+  currentDeployment: MilitaryDeployment | null;
+  deployments: MilitaryDeployment[]; // completed tour history
+  injuries: MilitaryInjury[];
+  medals: MilitaryMedal[];
+  warCrimesCommitted: number; // dark-path counter — tanks karma/reputation and raises court-martial risk
+  heroicActsCount: number; // light-path counter — feeds medal odds and reputation
+  courtMartialed: boolean;
+  dischargeType: MilitaryDischargeType;
+  dischargeYear: number | null;
+  veteranPensionPerYear: number; // set on an honorable/medical/general discharge; paid out yearly like a civilian pension
+  reenlistedCount: number; // how many times this life has signed on for another term
+  drafted: boolean; // conscripted rather than volunteered — skipped boot camp, sent straight to training
+  bootCampPassed: boolean; // volunteers must clear the 3D obstacle course; drafted service members are exempt
 }
 
 export interface ElectionResult {
@@ -497,6 +898,27 @@ export interface Country {
   warCasualtiesTotal: number; // cumulative population lost to war across this playthrough (flavor + real population drag)
 
   lastNoConfidenceYear: number | null; // gates automatic legislative no-confidence risk to at most one attempt per year
+
+  // V56: a real multi-seat Supreme Court alongside the existing single chiefJusticeId/
+  // judicialIntegrity flavor fields — chiefJusticeId is kept in sync with the senior justice
+  // on this bench so old displays of it stay meaningful.
+  supremeCourt: Justice[];
+  // V56: bilateral trade agreements with real ongoing GDP/relations effects, distinct from the
+  // one-off relations bump signTradeAgreement used to give; symmetric (each side lists the other).
+  tradeAgreementIds: string[];
+}
+
+export const SUPREME_COURT_SEATS = 9;
+
+/** V56: one seat on a national Supreme Court. `ideology` uses the same -100..100 scale as
+ * Party.ideology so court composition can be compared against a law's support blocs with the
+ * same math estimateLawVote already uses per-party. */
+export interface Justice {
+  id: string; // underlying NPC id
+  name: string;
+  ideology: number; // -100..100
+  age: number;
+  appointedYear: number;
 }
 
 export const CABINET_PORTFOLIOS = ['Finance', 'Foreign Affairs', 'Defense', 'Health', 'Education', 'Justice'] as const;
@@ -560,6 +982,10 @@ export interface CompanyHistoryPoint {
 
 export type CompanyStatus = 'active' | 'bankrupt' | 'sold' | 'acquired';
 
+// V55: Rival Empires — the character a grudging NPC rival settles into after its first real
+// attack on the player, derived from its own stats (see assignRivalStrategy in business.ts).
+export type RivalStrategy = 'aggressive_expander' | 'price_warrior' | 'tech_innovator' | 'brand_builder' | 'talent_raider';
+
 export interface Company {
   id: string;
   name: string;
@@ -596,6 +1022,7 @@ export interface Company {
   rdPct: number; // fraction of revenue spent on R&D
 
   isPublic: boolean;
+  ipoYear: number | null; // year doIPO() ran; building is "under construction" through the following year
   sharesOutstanding: number;
   sharePrice: number;
   dividendPayoutPct: number; // fraction of profit paid out
@@ -637,13 +1064,107 @@ export interface Company {
   jointVentureYearsLeft: number;
   jointVentureInvestment: number;
 
+  // V50: Corporate Empire expansion — physical manufacturing capacity, international
+  // subsidiaries, an in-house venture capital arm, and structured advertising campaigns.
+  // All additive/orthogonal to the core tickCompany() financial model (see corpExpansion.ts).
+  factories: Factory[];
+  internationalOffices: ForeignOffice[];
+  hasVentureArm: boolean;
+  ventureInvestments: VentureInvestment[];
+  activeCampaign: AdCampaign | null;
+  campaignsRun: number; // lifetime count, informational
+
+  // V51: Dynamic World Engine — an NPC rival's memory of specific player actions against it
+  // (failed takeover bids, price wars, patent suits, espionage, shakedowns). Grows targeted, more
+  // frequent retaliation via tickCorporateSabotage; decays slowly on its own.
+  grudgeAgainstPlayer: number; // 0..100
+
+  // V55: Rival Empires — the first time a company actually attacks the player (see
+  // tickCorporateSabotage), it's typecast into a lasting strategy derived from its own real
+  // stats. The strategy biases which kind of attack it favors going forward and unlocks themed
+  // "clash" events (see rivalStrategy in EventConditions) so a grudging rival reads as a
+  // consistent character, not a random-flavor label reroll each time.
+  rivalStrategy: RivalStrategy | null;
+
+  // V54: Manufacturing capacity vs. demand — for physical-goods industries (see
+  // MANUFACTURING_TAGS in business.ts), this actually gates revenue growth, unlike the V50
+  // factories' pure cash dividend. manufacturingCapacity is computed each tick from factories
+  // (see corpExpansion.ts) relative to the company's current scale; when demand growth outstrips
+  // it, the shortfall is banked as demandBacklog (lost sales the company is failing to fulfill)
+  // instead of silently vanishing, and can be recovered once capacity catches up. Non-physical
+  // industries (software, finance, services, ...) are never gated by this at all.
+  manufacturingCapacity: number; // 0..~200; 100 = comfortably meeting current demand
+  demandBacklog: number; // $ of unmet demand carried forward, revenue-equivalent
+  stockoutStreak: number; // consecutive years capacity failed to keep up with demand
+
+  // V56: Credit Rating Agency — computed each tick from leverage/profitability/cash runway (see
+  // computeCreditRating in business.ts); feeds into new-debt pricing (debtRate, corporate bonds).
+  creditRating: CreditRating;
+
+  // V56: Antitrust regulation — sustained dominant market share opens a real case the player
+  // must resolve (settle for a fine, or fight and risk a forced divestiture), not just flavor text.
+  antitrustScrutinyYears: number;
+  antitrustCaseOpen: boolean;
+
+  // V56: Shareholder activism — an activist investor campaign against a public player-owned
+  // company demanding a specific change; the player concedes (auto-executes the demand) or
+  // resists (a contested roll that can backfire).
+  activistCampaign: ActivistCampaign | null;
+
   status: CompanyStatus;
   history: CompanyHistoryPoint[];
+}
+
+export type CreditRating = 'AAA' | 'AA' | 'A' | 'BBB' | 'BB' | 'B' | 'CCC' | 'D';
+
+export type ActivistDemand = 'dividend' | 'buyback' | 'ceo_change' | 'spinoff';
+
+export interface ActivistCampaign {
+  investorName: string;
+  demand: ActivistDemand;
+  strength: number; // 0..100, resistance difficulty
+  yearsActive: number;
 }
 
 export interface Moonshot {
   yearsLeft: number;
   invested: number; // total committed; burned over the project's life
+}
+
+// V50: Corporate Empire expansion sub-types (see Company.factories/internationalOffices/
+// ventureInvestments/activeCampaign above, and sim/corpExpansion.ts for the behavior).
+export interface Factory {
+  id: string;
+  countryId: string; // domestic (== Company.countryId) or foreign (requires an office there first)
+  capacityUnits: number; // production capacity; grants an ongoing output dividend in the tick
+  automationLevel: number; // 0..5, raises the dividend and is itself upgradeable
+  condition: number; // 0..100, decays slowly and dents the dividend when low
+  builtYear: number;
+}
+
+export interface ForeignOffice {
+  id: string;
+  countryId: string;
+  openedYear: number;
+  strength: number; // 0..100, ramps up over time and scales the international revenue contribution
+}
+
+export interface VentureInvestment {
+  id: string;
+  targetCompanyId: string;
+  investedYear: number;
+  amountInvested: number;
+  equityPct: number; // 0..1 stake in the target, fixed at investment time
+}
+
+export type AdChannel = 'tv' | 'social' | 'influencer' | 'billboard' | 'guerrilla';
+
+export interface AdCampaign {
+  channel: AdChannel;
+  totalBudget: number; // charged upfront from company cash when launched
+  totalYears: number;
+  yearsLeft: number;
+  startYear: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -655,7 +1176,8 @@ export type ProductCategory =
   | 'appliance' | 'smart_home' | 'furniture' | 'fashion' | 'shoes' | 'jewelry'
   | 'cosmetics' | 'automotive' | 'food_beverage' | 'medical' | 'industrial'
   | 'toys' | 'sports' | 'luxury'
-  | 'drone' | 'camera' | 'tv' | 'bicycle' | 'eyewear' | 'instrument' | 'kitchenware' | 'powertool';
+  | 'drone' | 'camera' | 'tv' | 'bicycle' | 'eyewear' | 'instrument' | 'kitchenware' | 'powertool'
+  | 'pet_tech' | 'baby_gear' | 'outdoor_gear' | 'stationery';
 
 export type ProductMaterialId =
   | 'aluminum' | 'titanium' | 'steel' | 'carbon_fiber' | 'glass' | 'leather'
@@ -873,6 +1395,7 @@ export interface EffectSpec {
   achievement?: string; // unlocks this achievement id if not already held
   socialFollowersPct?: number; // fraction change to social-media follower count
   cancelledYears?: number; // sets/extends a social-media backlash window this many years out
+  companyGrudgeDelta?: number; // V51: adjusts the subject company's grudgeAgainstPlayer
 }
 
 export interface EventOutcome {
@@ -919,6 +1442,13 @@ export interface EventConditions {
   hasRival?: boolean;
   minFollowers?: number;
   cancelled?: boolean; // is currently in the middle of a social-media backlash
+  // V51: Dynamic World Engine
+  hasGrudgingRival?: boolean; // an active NPC company (any industry, same country) with real grudge built up
+  minAchievements?: number;
+  momentumState?: 'hot' | 'cold'; // gates on state.worldMomentum crossing a threshold either way
+  // V55: Rival Empires — requires hasGrudgingRival:true too; further gates on that grudging
+  // rival's own settled RivalStrategy so themed clash events only fire against a matching rival.
+  rivalStrategy?: RivalStrategy[];
 }
 
 export interface EventTemplate {
@@ -937,7 +1467,8 @@ export interface EventTemplate {
   weight: number;
   once?: boolean;
   conditions?: EventConditions;
-  /** Text supports placeholders: {name} {city} {country} {company} {npc} {amount} {industry} {year} */
+  /** Text supports placeholders: {name} {city} {country} {company} {npc} {amount} {industry} {year}
+   * {achievementCount} — {company} resolves to the grudging rival when hasGrudgingRival is set. */
   text: string;
   /** Resolved once when the event fires; referenced by {amount} and moneyAmountMult. */
   amount?: { min: number; max: number; pctOfMoney?: number };
@@ -975,7 +1506,7 @@ export interface DailyEventTemplate {
 
 export interface NewsItem {
   year: number;
-  category: 'economy' | 'business' | 'politics' | 'world' | 'markets' | 'society' | 'player';
+  category: 'economy' | 'business' | 'politics' | 'world' | 'markets' | 'society' | 'player' | 'sports';
   subtype?: 'breaking' | 'editorial' | 'investigative' | 'interview' | 'election';
   headline: string;
   outlet: string;
@@ -1042,6 +1573,10 @@ export interface GameState {
   achievements: string[];
   netWorthHistory: NetWorthPoint[];
   gameOver: GameOverInfo | null;
+  /** Set by any code path that kills the player outside the yearly tick (suicide, KIA in a
+   * playable mission) so gameOverCheck can report the real cause instead of guessing from
+   * age/health. Cleared once consumed. */
+  pendingDeathReason: string | null;
   worldEvent: WorldEvent | null;
   generation: number; // dynasty counter; increments when an heir inherits and play continues
   calendarDay: number; // 0..364, days elapsed in the current year via daily/weekly advancement
@@ -1071,6 +1606,42 @@ export interface GameState {
   // Casino: sparse machineId -> current progressive jackpot pool. World-persistent (not reset per
   // player action) so the pot really does grow between spins and pays out big when it finally hits.
   casinoJackpots: Record<string, number>;
+
+  // Bucket list: a handful of personal goals rolled at birth, checked each year, each paying a
+  // real reward on completion. Finishing the whole list is its own achievement.
+  bucketList: BucketGoal[];
+
+  // V35: Athlete career — dynamic per-season state for every soccer/football team defined
+  // statically in data/athletics.ts, keyed by team id. Populated lazily the first time any team
+  // is referenced (tryout, standings view, AI-vs-AI season sim) rather than for all teams up front.
+  athleteTeams: Record<string, AthleteTeamState>;
+
+  // V51: Dynamic World Engine — self-relative momentum (dynamic difficulty/pacing) and a
+  // persistent per-industry record of how much the player's own companies have shaped it, which
+  // outlives the player exiting that industry (see business.ts's tickIndustryEra).
+  worldMomentum: number; // -100..100, recent net-worth growth vs. the player's own longer-run trend
+  industryDisruptionLegacy: Record<string, number>; // sparse industryId -> cumulative player impact, decays slowly
+
+  // V8.0: World Domination — the endgame meta-layer. Once you're powerful enough (a billionaire,
+  // a head of state, or hugely influential) you can open a campaign to bring every foreign nation
+  // under your sway via economic, political and soft power, visualized on a 3D globe. Null until
+  // launched.
+  domination: WorldDomination | null;
+}
+
+export interface DominationTarget {
+  countryId: string;
+  influence: number; // 0..100, your sway over this nation
+  hostility: number; // 0..100, resistance — slows influence gains and can spark setbacks
+  controlled: boolean; // influence crossed the control threshold and you consolidated it
+}
+
+export interface WorldDomination {
+  active: boolean;
+  founded: number; // year the campaign began
+  doctrine: 'economic' | 'political' | 'soft' | null; // your strongest lever (set at launch)
+  targets: DominationTarget[]; // one per foreign country (home is your auto-controlled base)
+  won: boolean;
 }
 
 export interface CrimeFamily {

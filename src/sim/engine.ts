@@ -8,8 +8,8 @@ import type { Country, GameState, LifeLogEntry, MaintenanceLevel, Player, Proper
 import { clamp, clamp100 } from './types';
 import { RNG } from './rng';
 import { tickCommodities, tickEconomy } from './economy';
-import { npcManageCompany, tickCompany, tickMergers, tickCorporateSabotage, tickIndustryEra, companyValuation } from './business';
-import { tickStock, portfolioValue, checkLimitOrders, tickMargin } from './market';
+import { npcManageCompany, tickCompany, tickMergers, tickCorporateSabotage, tickIndustryEra, tickNpcIPOs, companyValuation } from './business';
+import { tickStock, portfolioValue, checkLimitOrders, tickMargin, tickStockLifecycle } from './market';
 import { campaignWinChance, electionRegionalBreakdown, OFFICE_SPEC_BY_KIND, promiseFulfillment, promiseMetricValue, tickNPCs, tickPolitics } from './politics';
 import { tickCrimeFamilies } from './crime';
 import { fireEvents } from './events';
@@ -20,11 +20,40 @@ import { tickWorldEvents } from './worldEvents';
 import { tryFireDailyEvent } from './dailyEvents';
 import { tickLifestyleAssets } from './lifestyle';
 import { tickProducts } from './products';
+import { tickPets } from './pets';
+import { tickAthleteSeason, tickAthleteWorld } from './athletics';
+import { tickDraft, tickMilitaryCareer } from './military';
+import { tickDrugOperation } from './drugs';
+import { tickEntertainmentCareer } from './entertainment';
+import { tickMedicalCareer } from './medical';
+import { tickLegalCareer } from './legal';
+import { tickCulinaryCareer } from './culinary';
+import { tickAviation } from './aviation';
+import { tickDomination } from './domination';
+import { tickCult } from './cult';
+import { tickSpaceProgram } from './space';
+import { tickPrisonLife } from './prison';
+import { tickCorpExpansion } from './corpExpansion';
+import { GOAL_DEF_BY_ID, generateBucketList } from '../data/goals';
 import { SK } from '../data/skills';
 import { CAREER_LADDER, COWORKER_PERSONALITIES, COWORKER_PERSONALITY_BY_ID, rankIndex, titleForRank, WORK_STYLE_BY_ID, WORKPLACE_EVENTS } from '../data/careers';
 import { makePersonName } from '../data/names';
 
 const SPECIAL_BIRTHDAYS = new Set([18, 21, 25, 30, 40, 50, 60, 65, 70, 75, 80, 90, 100]);
+
+// Childhood milestones: guaranteed narrative beats for ages 0-17 (distinct from the random
+// weighted childhood-flavored entries in data/dailyEvents.ts and data/events.ts, which are
+// chance-of-firing colour on top of this guaranteed skeleton).
+const CHILDHOOD_MILESTONES: Record<number, string> = {
+  1: '👣 You took your first steps.',
+  2: '🗣️ You said your first real words.',
+  4: '🖍️ You started preschool — and immediately ate a crayon.',
+  5: '🎒 You started kindergarten.',
+  6: '🦷 You lost your first tooth.',
+  11: '🏫 You started middle school.',
+  14: '🎓 You started high school.',
+  17: "🚗 You got your learner's permit.",
+};
 
 // Building realism: upkeep spend trades cost for condition; neglected, uninsured
 // buildings risk a costly structural incident, and low condition dents both
@@ -149,12 +178,25 @@ function tickPersonalFinance(state: GameState, rng: RNG): void {
     p.money += p.pensionIncome;
   }
 
+  if (p.military && p.military.dischargeType !== null && p.military.dischargeType !== 'kia' && p.military.veteranPensionPerYear > 0 && p.alive) {
+    p.money += p.military.veteranPensionPerYear;
+  }
+
   if (p.memoir) {
     p.money += p.memoir.royaltyPerYear;
     p.memoir.yearsLeft--;
     if (p.memoir.yearsLeft <= 0) {
       log(state, `Royalties from "${p.memoir.title}" have run their course.`, 'info');
       p.memoir = null;
+    }
+  }
+
+  if (p.sponsorshipDeal) {
+    p.money += p.sponsorshipDeal.incomePerYear;
+    p.sponsorshipDeal.yearsLeft--;
+    if (p.sponsorshipDeal.yearsLeft <= 0) {
+      log(state, `Your sponsorship deal with ${p.sponsorshipDeal.brand} has run its course.`, 'info');
+      p.sponsorshipDeal = null;
     }
   }
 }
@@ -277,6 +319,10 @@ function tickPlayerLife(state: GameState, rng: RNG): string[] {
     p.investigationHeat = 0;
     p.yearsServedThisSentence = 0;
   }
+  p.sponsorshipDeal ??= null; // backfill for saves from before V52 side hustles
+  p.guardianAngelAvailable ??= false; // backfill for saves from before V55 Prestige Vault
+  p.guardianAngelUsed ??= false;
+  p.vicePresidentId ??= null; // backfill for saves from before V56's Running Mate system
 
   // --- Jail ---------------------------------------------------------------
   if (p.inJailYears > 0) {
@@ -568,6 +614,7 @@ function tickPlayerLife(state: GameState, rng: RNG): string[] {
 
   // --- Campaign -----------------------------------------------------------
   if (p.campaign) {
+    p.campaign.runningMateId ??= null; // backfill for saves from before V56's Running Mate system
     p.campaign.yearsToElection--;
     p.campaign.momentum = clamp(p.campaign.momentum * 0.8, -50, 50);
     if (p.campaign.yearsToElection <= 0) {
@@ -602,6 +649,13 @@ function tickPlayerLife(state: GameState, rng: RNG): string[] {
           home.leaderId = 'player';
           home.approvalOfGovernment = clamp100(52 + rng.range(-4, 8));
           log(state, `You are now the ${home.leaderTitle} of ${home.name}.`, 'milestone');
+          // V56: a running mate chosen via chooseRunningMate is sworn in as VP alongside the win.
+          if (p.campaign.runningMateId) {
+            p.vicePresidentId = p.campaign.runningMateId;
+            const mateName = state.npcs[p.vicePresidentId]?.name ?? 'Your running mate';
+            log(state, `${mateName} is sworn in as Vice ${home.leaderTitle}.`, 'milestone');
+            if (!state.achievements.includes('winning_ticket')) state.achievements.push('winning_ticket');
+          }
         }
         if (spec.kind === 'party_leader' && p.partyId) {
           const party = home.parties.find((x) => x.id === p.partyId);
@@ -747,7 +801,17 @@ function tickPlayerLife(state: GameState, rng: RNG): string[] {
   const healthMult = p.health < 20 ? 4 : p.health < 40 ? 2 : 1;
   const difficultyMortalityMult = state.difficulty === 'casual' ? 0.6 : state.difficulty === 'ironman' ? 1.4 : 1;
   if (rng.chance(mortality * healthMult * (1 - home.healthcare / 300) * difficultyMortalityMult)) {
-    p.alive = false;
+    // V55: Prestige Vault's permanent Guardian Angel perk spares the player once per life from
+    // this specific roll — a real "otherwise-fatal health scare" reprieve, not combat/mission
+    // deaths elsewhere, which are opted-into risks rather than ambient mortality.
+    if (p.guardianAngelAvailable && !p.guardianAngelUsed) {
+      p.guardianAngelUsed = true;
+      p.health = clamp100(Math.max(p.health, 25));
+      headlines.push(`${p.name} had a brush with death this year — and pulled through against the odds`);
+      log(state, '👼 A health scare nearly took you this year, but you pulled through against the odds.', 'good');
+    } else {
+      p.alive = false;
+    }
   }
   return headlines;
 }
@@ -767,9 +831,48 @@ function computeLegacyScore(state: GameState, worth: number): number {
   return Math.round(clamp(score, 0, 100));
 }
 
-function gameOverCheck(state: GameState): void {
+/** V51: Dynamic World Engine — a self-relative "hot streak vs. cold streak" score (-100..100)
+ * comparing the player's recent net-worth growth rate to their own longer-run trend, rather than
+ * needing a global leaderboard. Used to pace event frequency (fireEvents) and drives a couple of
+ * edge-triggered callback headlines/events. Deliberately noisy-resistant: needs real history and
+ * moves gradually, not a single good/bad year. */
+function computeWorldMomentum(state: GameState): number {
+  const hist = state.netWorthHistory;
+  const n = hist.length;
+  if (n < 6) return 0;
+  const recentSpan = Math.min(4, n - 1);
+  const longerSpan = Math.min(19, n - 1);
+  const recentRate = (hist[n - 1].value - hist[n - 1 - recentSpan].value) / recentSpan;
+  const longerRate = (hist[n - 1].value - hist[n - 1 - longerSpan].value) / longerSpan;
+  const scale = Math.abs(longerRate) + Math.abs(hist[n - 1].value) * 0.02 + 20_000;
+  const relative = (recentRate - longerRate) / scale;
+  return Math.round(clamp(relative * 250, -100, 100));
+}
+
+/** Yearly bucket-list pass: pay out any goal whose progress crossed the line. */
+function tickBucketList(state: GameState): void {
+  if (!state.bucketList?.length) return;
+  for (const goal of state.bucketList) {
+    if (goal.done) continue;
+    const def = GOAL_DEF_BY_ID[goal.defId];
+    if (!def) continue;
+    let progress = 0;
+    try { progress = def.progress(state, goal.target); } catch { continue; }
+    if (progress < 1) continue;
+    goal.done = true;
+    state.player.money += goal.rewardMoney;
+    state.player.happiness = clamp100(state.player.happiness + goal.rewardHappiness);
+    log(state, `🎯 Bucket list: "${goal.description}" — DONE. Reward: $${goal.rewardMoney.toLocaleString()}.`, 'milestone');
+    if (state.bucketList.every((g) => g.done) && !state.achievements.includes('bucket_lister')) {
+      state.achievements.push('bucket_lister');
+      log(state, '🏆 Every item on your bucket list is checked off. What a life.', 'milestone');
+    }
+  }
+}
+
+export function gameOverCheck(state: GameState): void {
   const p = state.player;
-  if (p.alive) return;
+  if (p.alive || state.gameOver) return;
   const worth = netWorth(state);
   const summary: string[] = [
     `Died at age ${p.age} in ${state.year}.`,
@@ -782,13 +885,15 @@ function gameOverCheck(state: GameState): void {
   const estateNotes = distributeEstate(state);
   if (estateNotes.length) summary.push(...estateNotes);
   const reason =
-    p.health <= 5
+    state.pendingDeathReason ??
+    (p.health <= 5
       ? 'Your health gave out.'
       : p.age >= 75
         ? 'You died of old age.'
         : p.age >= 50
           ? 'An unexpected illness took you before your time.'
-          : 'Tragedy struck — your life was cut short unexpectedly.';
+          : 'Tragedy struck — your life was cut short unexpectedly.');
+  state.pendingDeathReason = null;
   const legacyScore = computeLegacyScore(state, worth);
   state.gameOver = {
     reason,
@@ -952,6 +1057,9 @@ export function advanceYear(state: GameState): GameState {
   if (state.casinoJackpots === undefined) state.casinoJackpots = {}; // backfill for saves from before the Casino
   if (state.player.casinoTotalWagered === undefined) state.player.casinoTotalWagered = 0;
   if (state.player.casinoBiggestWin === undefined) state.player.casinoBiggestWin = 0;
+  // V51: Dynamic World Engine. Saves from before it migrate here.
+  state.worldMomentum ??= 0;
+  state.industryDisruptionLegacy ??= {};
   const rng = new RNG(state.seed);
   rng.state = state.rngState;
   const netWorthStart = netWorth(state);
@@ -962,6 +1070,17 @@ export function advanceYear(state: GameState): GameState {
   state.calendarDay = 0;
   if (SPECIAL_BIRTHDAYS.has(state.player.age) && state.player.alive) {
     log(state, `🎂 You turn ${state.player.age} today.`, 'milestone');
+  }
+  if (state.player.alive && state.player.age < 18) {
+    const milestone = CHILDHOOD_MILESTONES[state.player.age];
+    if (milestone) log(state, milestone, 'milestone');
+    // Growing up: smarts/charisma build from near-zero through school and social life instead
+    // of innate adult-level stats; health/happiness take a light random walk through an
+    // ordinary childhood. School-age years (5+) get a bigger smarts bump than infancy.
+    state.player.smarts = clamp100(state.player.smarts + rng.range(1, 3) + (state.player.age >= 5 ? rng.range(0.5, 1.5) : 0));
+    state.player.charisma = clamp100(state.player.charisma + rng.range(1, 3));
+    state.player.health = clamp100(state.player.health + rng.range(-2, 3));
+    state.player.happiness = clamp100(state.player.happiness + rng.range(-3, 3));
   }
 
   // 1. World economy
@@ -979,12 +1098,31 @@ export function advanceYear(state: GameState): GameState {
     : rng.range(-0.15, 0.15);
   state.culturalProgressivism = clamp(state.culturalProgressivism + culturalDrift, 0, 100);
   const politicalHeadlines: string[] = [...worldEventHeadlines];
+  // V42: the rest of the world's economies keep cycling through booms, recessions and crises
+  // every year whether or not the player is watching — this collects that so it can surface as
+  // real 'economy' news instead of silently happening off-screen for every non-home country.
+  const worldEconomyHeadlines: string[] = [];
   for (const country of state.countries) {
     const res = tickEconomy(state, country, rng);
-    if (res.crisis === 'crash' && country.isPlayerHome) politicalHeadlines.push(`Stock market crash wipes billions off ${country.name} shares`);
-    if (res.crisis === 'debt' && country.isPlayerHome) politicalHeadlines.push(`${country.name} debt crisis: bond yields spike as investors flee`);
-    if (res.crisis === 'disaster' && country.isPlayerHome) politicalHeadlines.push(`🌪️ Climate disaster strikes ${country.name}: property damaged, confidence shaken`);
-    if (res.weatherHeadline && country.isPlayerHome) politicalHeadlines.push(res.weatherHeadline);
+    if (country.isPlayerHome) {
+      if (res.crisis === 'crash') politicalHeadlines.push(`Stock market crash wipes billions off ${country.name} shares`);
+      if (res.crisis === 'debt') politicalHeadlines.push(`${country.name} debt crisis: bond yields spike as investors flee`);
+      if (res.crisis === 'housing') politicalHeadlines.push(`Housing market slump deepens across ${country.name}`);
+      if (res.crisis === 'disaster') politicalHeadlines.push(`🌪️ Climate disaster strikes ${country.name}: property damaged, confidence shaken`);
+      if (res.weatherHeadline) politicalHeadlines.push(res.weatherHeadline);
+      continue;
+    }
+    if (res.regimeChanged) {
+      const regime = country.economy.regime;
+      if (regime === 'boom') worldEconomyHeadlines.push(`${country.flag} ${country.name}'s economy roars into a boom`);
+      else if (regime === 'depression') worldEconomyHeadlines.push(`${country.flag} ${country.name} plunges into a full depression`);
+      else if (regime === 'recession' && (res.prevRegime === 'expansion' || res.prevRegime === 'boom')) worldEconomyHeadlines.push(`${country.flag} ${country.name} tips into recession`);
+      else if (regime === 'expansion' && (res.prevRegime === 'recession' || res.prevRegime === 'depression')) worldEconomyHeadlines.push(`${country.flag} ${country.name}'s economy turns a corner into recovery`);
+    }
+    if (res.crisis === 'crash') worldEconomyHeadlines.push(`${country.flag} Stock market crash wipes billions off ${country.name} shares`);
+    if (res.crisis === 'debt') worldEconomyHeadlines.push(`${country.flag} ${country.name} debt crisis: bond yields spike as investors flee`);
+    if (res.crisis === 'disaster') worldEconomyHeadlines.push(`${country.flag} 🌪️ Climate disaster strikes ${country.name}: property damaged, confidence shaken`);
+    if (res.weatherHeadline) worldEconomyHeadlines.push(`${country.flag} ${res.weatherHeadline}`);
   }
 
   // 2. Politics & NPCs
@@ -1009,20 +1147,39 @@ export function advanceYear(state: GameState): GameState {
     npcManageCompany(company, rng);
     const res = tickCompany(company, { state, country, rng });
     if (res.headline && (company.playerOwned || company.isPublic)) businessHeadlines.push(res.headline);
+    // V42: an NPC-only private company going under is a real "the world moves without you" event —
+    // worth a headline even though its routine day-to-day headlines (patents, breaches, etc.) stay
+    // gated to companies the player actually has a stake in, to avoid flooding news with noise.
+    else if (res.headline && res.wentBankrupt) businessHeadlines.push(res.headline);
     if (res.wentBankrupt && company.playerOwned) {
       log(state, `💥 ${company.name} went bankrupt. Your equity is worthless.`, 'bad');
       state.player.happiness = clamp100(state.player.happiness - 10);
       state.player.reputation = clamp100(state.player.reputation - 5);
     }
+    // V50: Corporate Empire expansion — factory dividends, foreign office ramp-up, campaign
+    // resolution, venture portfolio auto-resolution. Additive to tickCompany() above.
+    if (!res.wentBankrupt) businessHeadlines.push(...tickCorpExpansion(company, state, rng));
+    // V51: a player company that's genuinely moving the needle in its industry (real share,
+    // real patents) leaves a permanent mark on that industry's long-run trajectory — see
+    // tickIndustryEra's legacy bias, which outlives the player exiting the industry entirely.
+    if (!res.wentBankrupt && company.playerOwned) {
+      const legacyGain = company.marketShare * 0.6 + company.patents * 0.03;
+      if (legacyGain > 0) {
+        const key = company.industryId;
+        state.industryDisruptionLegacy[key] = Math.min(20, (state.industryDisruptionLegacy[key] ?? 0) + legacyGain);
+      }
+    }
     tickStock(company, state, rng);
   }
   businessHeadlines.push(...tickMergers(state, rng));
+  businessHeadlines.push(...tickNpcIPOs(state, rng));
   businessHeadlines.push(...tickCorporateSabotage(state, rng));
   businessHeadlines.push(...tickIndustryAwards(state, rng));
   businessHeadlines.push(...tickProducts(state, rng));
   tickMoonshots(state, rng);
   tickCEOs(state, rng);
   tickCrypto(state, rng);
+  for (const l of tickStockLifecycle(state, rng)) log(state, l, 'money');
   for (const l of checkLimitOrders(state)) log(state, l, 'money');
   for (const l of tickMargin(state)) log(state, l, 'bad');
 
@@ -1032,6 +1189,48 @@ export function advanceYear(state: GameState): GameState {
   if (state.player.alive) tickChallenge(state, rng);
   if (state.player.alive) for (const h of tickLifestyleAssets(state, rng)) log(state, h, 'money');
   if (state.player.alive) tickPersonalFinance(state, rng);
+  // V33 fun systems: pets, bucket-list goals, gambling counters. Saves from before
+  // these systems existed migrate here (old lives even get a bucket list rolled).
+  state.player.pets ??= [];
+  if (!state.bucketList) state.bucketList = generateBucketList(rng);
+  state.player.lotteryTicketsThisYear = 0;
+  state.player.scratchCardsThisYear = 0;
+  if (state.player.alive) for (const l of tickPets(state, rng)) log(state, l, 'info');
+  if (state.player.alive) tickBucketList(state);
+  // V35: athlete career. Saves from before this system existed migrate here.
+  state.player.athlete ??= null;
+  state.athleteTeams ??= {};
+  if (state.player.alive) for (const h of tickAthleteSeason(state, rng)) log(state, h, 'info');
+  // V41: the athlete world (results, prestige, transfers, promotion/relegation) evolves on its
+  // own every year regardless of whether the player has ever picked up a ball this life — these
+  // are world headlines, not personal ones, so they go to news (below), not the life log.
+  const athleteHeadlines = tickAthleteWorld(state, rng);
+  // V44: military service career. Runs after tickPolitics (step 2, above) has already updated
+  // every country's atWarWith for this year, so a deployment reads this year's real war state.
+  state.player.military ??= null;
+  if (state.player.alive) for (const h of tickMilitaryCareer(state, rng)) log(state, h, 'info');
+  // V46: wartime draft — only rolls while not already serving, so it can't clobber an active tour.
+  if (state.player.alive) for (const h of tickDraft(state, rng)) log(state, h, 'bad');
+  // V47: Drug Empire — production, passive dealer sales, heat decay, raids.
+  state.player.drugOperation ??= null;
+  if (state.player.alive) for (const h of tickDrugOperation(state, rng)) log(state, h, 'bad');
+  // V49: five mega features — Entertainment, Medical, Cult, Space, Prison Life.
+  state.player.entertainmentCareer ??= null;
+  state.player.medicalCareer ??= null;
+  state.player.cult ??= null;
+  state.player.astronaut ??= null;
+  state.player.prisonLife ??= null;
+  state.player.legalCareer ??= null; // backfill for saves from before V55 Legal Career
+  state.player.culinaryCareer ??= null; // backfill for saves from before V55 Culinary Empire
+  if (state.player.alive) for (const h of tickEntertainmentCareer(state, rng)) log(state, h, 'info');
+  if (state.player.alive) for (const h of tickMedicalCareer(state, rng)) log(state, h, 'info');
+  if (state.player.alive) for (const h of tickCult(state, rng)) log(state, h, 'bad');
+  if (state.player.alive) for (const h of tickSpaceProgram(state, rng)) log(state, h, 'milestone');
+  if (state.player.alive) for (const h of tickPrisonLife(state, rng)) log(state, h, 'bad');
+  if (state.player.alive) for (const h of tickLegalCareer(state, rng)) log(state, h, 'info');
+  if (state.player.alive) for (const h of tickCulinaryCareer(state, rng)) log(state, h, 'info');
+  if (state.player.alive) for (const h of tickAviation(state, rng)) log(state, h, 'info');
+  if (state.player.alive) for (const h of tickDomination(state, rng)) log(state, h, 'bad');
 
   // 5. Player company income: dividends from private profitable companies
   const p = state.player;
@@ -1049,13 +1248,23 @@ export function advanceYear(state: GameState): GameState {
   state.pendingEvents = p.alive ? fireEvents(state, rng) : [];
 
   // 7. News
-  const news = generateNews(state, rng, politicalHeadlines.slice(0, 6), businessHeadlines.slice(0, 4), playerHeadlines);
+  const news = generateNews(state, rng, politicalHeadlines.slice(0, 6), businessHeadlines.slice(0, 4), playerHeadlines, athleteHeadlines.slice(0, 5), worldEconomyHeadlines.slice(0, 4));
   state.news.push(...news);
   if (state.news.length > 400) state.news.splice(0, state.news.length - 400);
 
   // 8. Records & endings
   const netWorthEnd = netWorth(state);
   state.netWorthHistory.push({ year: state.year, value: netWorthEnd });
+  // V51: world momentum — lags one tick behind by design (this year's fireEvents() pacing above
+  // used last year's value), which reads as "recent momentum shapes what happens next," not a
+  // same-year feedback loop.
+  const momentumBefore = state.worldMomentum;
+  state.worldMomentum = computeWorldMomentum(state);
+  if (p.alive && momentumBefore < 60 && state.worldMomentum >= 60) {
+    log(state, `📈 Everything is clicking lately — you're on the hottest streak of your life.`, 'good');
+  } else if (p.alive && momentumBefore > -60 && state.worldMomentum <= -60) {
+    log(state, `📉 The tide has turned — it feels like nothing's going your way lately.`, 'bad');
+  }
   state.yearRecap = {
     year: yearBefore,
     netWorthStart,
@@ -1108,6 +1317,28 @@ export function advanceYear(state: GameState): GameState {
     ['jetsetter', p.luxuryAssets.some((a) => a.kind === 'private_jet')],
     ['island_life', p.luxuryAssets.some((a) => a.kind === 'island')],
     ['crypto_millionaire', p.cryptoUnits * state.cryptoPrice >= 1e6],
+    ['high_stakes_gambler', p.casinoBiggestWin >= 100_000],
+    ['casino_whale', p.casinoTotalWagered >= 1_000_000],
+    ['foundation_titan', !!p.foundation && p.foundation.totalGiven >= 10_000_000],
+    ['memoirist', !!p.memoir],
+    ['retired_in_style', p.retired && worth >= 5_000_000],
+    ['crypto_whale', p.cryptoUnits * state.cryptoPrice >= 1e7],
+    ['savings_fortress', p.savingsBalance + p.termDeposits.reduce((s, d) => s + d.principal, 0) >= 1_000_000],
+    ['bond_baron', p.bonds.length >= 5],
+    ['forex_master', p.forexPositions.length >= 3],
+    ['social_media_icon', p.socialFollowers >= 1_000_000],
+    ['freelance_legend', p.freelanceGigsCompleted >= 20],
+    ['well_advised', p.advisors.length >= 5],
+    ['alliance_founder', state.alliances.some((a) => a.founderCountryId === p.countryId)],
+    ['franchise_mogul', ownedCompanies.reduce((s, c) => s + c.franchiseCount, 0) >= 20],
+    ['loyalty_program_champion', ownedCompanies.some((c) => c.loyaltyProgram)],
+    ['turf_lord', p.turfControl >= 90],
+    ['luxury_lifestyle_icon', p.luxuryAssets.length >= 6],
+    ['crime_family_kingpin', p.crimeRank >= 5],
+    ['election_landslide', !!p.lastElectionResult && p.lastElectionResult.won && p.lastElectionResult.playerSharePct >= 65],
+    ['stock_market_legend', portfolioValue(state) >= 1e8],
+    ['momentum_rider', state.worldMomentum >= 75],
+    ['industry_legend_legacy', Object.values(state.industryDisruptionLegacy).some((v) => v >= 15)],
   ];
   const MILESTONE_LOG: Record<string, string> = {
     millionaire: '🏆 You are a millionaire!',
@@ -1150,6 +1381,28 @@ export function advanceYear(state: GameState): GameState {
     jetsetter: '🏆 You own a private jet.',
     island_life: '🏆 You own a private island.',
     crypto_millionaire: '🏆 Your crypto holdings passed $1 million.',
+    high_stakes_gambler: '🏆 A single casino win over $100,000.',
+    casino_whale: '🏆 Lifetime casino wagers passed $1 million.',
+    foundation_titan: '🏆 Your foundation has given away $10 million or more.',
+    memoirist: '🏆 Published your memoir.',
+    retired_in_style: '🏆 Retired with $5 million or more to your name.',
+    crypto_whale: '🏆 Your crypto holdings passed $10 million.',
+    savings_fortress: '🏆 Over $1 million sitting safely in savings and term deposits.',
+    bond_baron: '🏆 Holding five or more bonds at once.',
+    forex_master: '🏆 Running three or more open forex positions.',
+    social_media_icon: '🏆 Your social following passed one million.',
+    freelance_legend: '🏆 Completed twenty or more freelance gigs.',
+    well_advised: '🏆 A full bench of five or more advisors.',
+    alliance_founder: '🏆 Founded an international alliance.',
+    franchise_mogul: '🏆 Twenty or more franchised locations across your companies.',
+    loyalty_program_champion: '🏆 Launched a loyalty program that keeps customers coming back.',
+    turf_lord: '🏆 Your crime family\'s turf control is nearly absolute.',
+    luxury_lifestyle_icon: '🏆 Assembled six or more luxury assets.',
+    crime_family_kingpin: '🏆 Climbed to the top rank of your crime family.',
+    election_landslide: '🏆 Won an election in a landslide.',
+    stock_market_legend: '🏆 Your stock portfolio passed $100 million.',
+    momentum_rider: '🏆 Riding the hottest streak of your life.',
+    industry_legend_legacy: '🏆 Your mark on an entire industry will outlast you.',
   };
   for (const [key, hit] of milestones) {
     if (hit && !state.achievements.includes(key)) {

@@ -2,15 +2,442 @@
 
 A deep, replayable life-simulation game about **business, politics and economics**, inspired by
 BitLife, Democracy 4, Capitalism Lab and Victoria 3 — but designed to be easy to pick up and play on
-your phone. Start at 18, take decisions, and advance time at your own pace: **Day**, **Week**, or a
-full **Year**, letting a living world simulate forward around you. Build a business empire, get rich
-on the markets, climb the political ladder to run the country — or all three.
+your phone. Start at birth, grow up, take decisions, and advance time at your own pace: **Day**,
+**Week**, or a full **Year**, letting a living world simulate forward around you. Build a business
+empire, get rich on the markets, climb the political ladder to run the country — or all three.
 
-Everything runs **entirely in your browser**. No backend, no accounts, fully offline, and every save is
-plain JSON you can export and re-import.
+Everything runs **entirely in your browser** by default, and every save is plain JSON you can export
+and re-import — no account required to play. The simulation itself is fully offline; the two optional
+online features (a global Leaderboard and real cloud-backed accounts, see Highlights below) are backed
+by Supabase and degrade to a friendly "offline" state instead of affecting anything else if you have no
+connection or choose not to sign in.
 
 ## Highlights
 
+- **V8.4 — 200 more features.** Another broad content batch on top of V8.3. **60 new industries**
+  join the catalog (now 575 strong) — semiconductor fabs, longevity biotech, air taxis, carbon
+  capture, deep-space mining, humanoid robotics and more. **50 new laws** cover a living wage, a
+  land-value tax, an automation levy, universal childcare, rent stabilization, a space defense
+  command and dozens more, each with real bloc support and industry effects. **50 new daily flavor
+  moments** and **30 new yearly life events** add fresh texture and dilemmas — brokering peace,
+  patenting an invention, reading 100 books, chasing a storm to help — and woven through them are
+  **10 new achievements** (Deal Maker, Risk Taker, Inventor, Peacemaker, Globe Trotter and more).
+
+- **V8.3 — 300 new features.** A big content batch across every catalog the simulation draws
+  from. **92 new industries** join the business catalog (now 515 strong), spanning fusion power,
+  green hydrogen, eVTOL aircraft, esports leagues, data-center REITs, quant hedge funds, lab-grown
+  meat and more — each with its own distinct economics. **70 new laws** are available in the
+  legislature, covering a four-day work week, a digital services tax, right-to-repair, AI safety
+  audits, universal healthcare, high-speed rail and dozens of other real policy levers with proper
+  bloc support and industry effects. **70 new daily flavor moments** make fast-forwarding feel even
+  more alive, and **50 new yearly life events** add fresh dilemmas — from running a marathon to
+  leading a corporate turnaround to blowing the whistle on fraud. Woven through those events are
+  **20 new achievements** (Angel Backer, Turnaround Artist, Marathoner, Whistleblower, Comeback Kid
+  and more), each earnable by making the right call when the moment comes.
+
+- **V8.2 — 3D becomes your home base.** The walkable 3D City stops being a screen you visit and
+  becomes the place you *live*: new games and loaded saves now **spawn you directly in the City**
+  (unless a decision is waiting, which still surfaces first), and a one-tap toggle on the Explore
+  screen switches your home base between the City and the classic Life feed at any time — the choice
+  persists across sessions. You can now **drive the grid**: a Drive/Walk button (🚗/🚶) drops you
+  into a compact coupe that covers the streets at roughly **2.4× walking speed**, with a camera that
+  pulls back to keep more road in view, spinning wheels, and cars that turn more deliberately than a
+  person spins on the spot — all sharing the same joystick / WASD controls. And the buildings now do
+  **real work**: walk up to the courthouse to **take a case**, the restaurant to **cook a service**,
+  the hospital to **treat a patient**, or home to **work out** — each firing the same career
+  simulation the dedicated screens use, right there in the city, whenever your career makes the
+  action available.
+
+- **V8.1 — The 3D City is now a real street grid.** The walkable Explore hub, which used to arrange
+  its buildings on concentric rings around a plaza, is now laid out as a proper **city grid**:
+  square blocks separated by a network of asphalt avenues with dashed centre lines, pale sidewalks,
+  zebra crossings at the intersections, and a street lamp on every corner. Every building sits on
+  its own block, and its **height still rises with its level/tier** — so a thriving empire visibly
+  towers over a fledgling one across the skyline. The core life systems fill the central blocks and
+  companies spiral outward; a central block is left open for the plaza and fountain. Ambient traffic
+  now **drives the avenues** and pedestrians **stroll the sidewalks** (both wrapping along real grid
+  streets rather than circling a ring road), with a freight railway looping the city's perimeter.
+
+- **V8.0 — Massive expansion: a new playable career, a world-conquest endgame, and a 3D overhaul.**
+  The biggest single update in a while, spanning four fronts. **Aviation** is a brand-new playable
+  life path in the mould of the Athlete career: enroll in flight school, log hours toward your PPL,
+  CPL and ATPL licenses, earn type ratings on six aircraft from a Cessna 172 up to an A380
+  superjumbo, and climb from first officer to Chief Pilot — flying your routes yourself in a real
+  playable 3D cockpit (`FlightScene`) where you take off, thread a course of waypoint rings through
+  the sky, and grease the landing, with your performance feeding the sim (block hours, pay, and a
+  three-strike safety-incident system that grounds you for good). **World Domination** is a true
+  endgame meta-layer, unlocked once you're a billionaire, a head of state, or hugely influential:
+  a live, interactive **3D globe** (`GlobeScene`) ringed with a glowing beacon per nation, where
+  you project economic, political and soft power under a chosen doctrine to build influence against
+  each nation's hostility, consolidate control, and win by bringing every country on Earth under
+  your rule — and conquered nations pay **yearly tribute** into your fortune, wiring world power
+  straight back into the economic empire. Under the hood, a **graphics pass on the shared 3D
+  pipeline** (richer image-based lighting for metal/glass reflections, and a cleaner,
+  higher-threshold bloom) lifts the look of every existing scene at once. Ten new achievements
+  across the two systems.
+
+- **V61 — The in-game Update Log switches to Major.Minor version numbers.** Instead of a flat
+  per-session counter, `data/changelog.ts` entries are now versioned like `V1.0`, `V1.1`, `V2.0`
+  — a minor update (content batch, polish, one extension to an existing system) bumps the decimal
+  by 0.1, and a major update (a brand-new life path, a new core system, a fundamental UI/engine
+  change) rounds up to the next whole number, decimal reset to 0. The existing 15 entries were
+  renumbered under the new scheme, starting from `V1.0` at Drug Empire; every future entry follows
+  the same rule from here on.
+
+- **V60 — An in-game Update Log.** A new player-facing changelog (`data/changelog.ts`), condensed
+  into scannable patch notes rather than developer prose, covering everything since V47 (Drug
+  Empire) through the current version. Reachable two ways: a "🆕 What's New" button on the main
+  menu opens it in a modal before you've even started a life, and an "Update Log" entry in the
+  in-game Activities sheet's **You** group opens the same content as a full screen. Every future
+  version adds one entry here, the same way it already adds one to this README's Highlights.
+
+- **V59 — 200 new content features across the simulation.** 60 new industries spread across 12
+  sectors (from craft marketplaces and vertical air taxis to direct air capture startups), each
+  with its own startup cost, margin, volatility and skill tie-in; 50 new laws spanning Taxation,
+  Labor, Environment, Business, Tech/Media, Social, Migration, Justice, Defense/Foreign,
+  Infrastructure, Governance, Consumer, Trade and Agriculture, each with real effects on the
+  economy and party-bloc support; 50 new daily flavor events for the fast-forward day/week
+  advancement; and 40 new yearly event templates (life, career, business, market, politics,
+  crime, world, media, family, health) with genuine choices, skill checks and branching outcomes
+  — none of it special-cased by the engine, all of it drawn from the same catalogues every
+  existing screen already reads from.
+
+- **V58 — Complete UI overhaul: minimal, editorial, easy to navigate.** The entire visual
+  language changed. The BitLife-green gradients, glow shadows, and rainbow icon tiles are gone,
+  replaced by a monochrome surface with one sharp accent color (a single indigo, `--color-brand-*`
+  in `index.css`) and a true-neutral gray/near-black scale for dark mode — flat cards, hairline
+  borders, restrained typography, generous whitespace, in both light and dark themes. Because the
+  whole app draws from the same CSS custom properties and the same shared primitives
+  (`Card`/`Button`/`Pill`/`ListRow`/`CircleTile`/etc. in `components.tsx`), this cascaded to
+  essentially every one of the ~30 screens without hand-editing each one. Navigation was
+  restructured, not just restyled: on wider viewports (`lg:` and up) a persistent left sidebar
+  lists every screen — pinned tabs plus all grouped activities, with its own search — so nothing
+  is ever more than one click away and the old "open a sheet to find a screen" pattern disappears
+  entirely on desktop. On narrower viewports the classic bottom tab bar and searchable, grouped
+  Activities sheet remain, now with a localStorage-backed **Recents** section pinned above the
+  groups so getting back to whatever you were just doing takes one tap instead of a search.
+
+- **V57 — 3D becomes a core part of the game, not a backdrop.** A shared tap-to-interact
+  facility landed in the 3D pipeline itself (`registerClickable`/`onPick` in the reusable scene
+  hook — real raycasting that coexists with drag-to-rotate, distinguishing a tap from a rotate
+  gesture) and now powers real gameplay in three previously-ambient scenes: the **HQ Tour**
+  grows four clickable department kiosks (Marketing, R&D, Operations, Workforce) that pull the
+  matching company lever directly from the 3D view; the **Political Chamber**'s cabinet podiums
+  open a minister investigation or the appointment flow, and tapping a party's benches sends a
+  quick donation; the **Exchange Floor**'s ticker booths jump straight into trading that stock.
+  The walkable **City Hub** — the game's primary navigation surface — gained four new buildings
+  (Courthouse, Restaurant, Hospital, Casino) so Legal, Culinary, Medical and Casino all now have
+  real physical presence in the plaza, bringing it to fourteen system buildings plus the public
+  company skyline. And two life-path systems got genuine 3D minigames: a **Kitchen Service**
+  reaction game (tap the lit station — Prep, Grill, Plate — before it goes cold) and an upgraded
+  **Courtroom Trial** (tap the witness stand or counsel tables as each lights up) — both feed a
+  real accuracy score into a bonus success chance for that year's cook-service or case roll, so
+  playing them well is a genuine shortcut, not just a score for its own sake. Two new
+  achievements for a flawless round of either.
+
+- **V56 — The biggest politics and business expansion yet.** Six substantial new systems, three
+  per domain. In politics: a real multi-seat **Supreme Court** (up to nine justices with their own
+  ideology and tenure) replaces the old single-Chief-Justice flavor field — nominate justices
+  through a genuine confirmation vote, petition the bench to strike down a specific law, and watch
+  judicial review itself skew toward whichever laws clash with the court's makeup as justices age,
+  retire, and die over the years. Head-of-state campaigns can now name a **running mate**, whose
+  own standing feeds a real bonus into the race and who's sworn in as VP (quietly building
+  influence) on a win. Alliances finally have teeth: a **mutual-defense** clause automatically
+  drags allied nations into a war the moment one member enters it, and bilateral **trade
+  agreements** are now persistent pacts with an ongoing GDP and relations tailwind instead of a
+  one-off nudge. In business: a **Credit Rating Agency** grades every company AAA through D from
+  real leverage, profitability and cash runway, and that rating now prices new debt and corporate
+  bonds. Sustained market dominance draws real **antitrust** scrutiny — settle for a fine or fight
+  in court and risk a forced divestiture. And public companies can now face **shareholder
+  activism**: an investor campaign demanding a dividend hike, buyback, CEO change or spin-off,
+  which the player can concede to or resist in a contested proxy fight. Eight new achievements
+  round it out.
+
+- **V55 — The biggest expansion yet: Rival Empires, the Prestige Vault, and two new life
+  paths.** Corporate rivals are no longer interchangeable — each grudge-holding competitor now
+  gets assigned one of five **rival strategies** (Aggressive Expander, Price Warrior, Tech
+  Innovator, Brand Builder, Talent Raider) based on how they actually run their company, shown as
+  a badge on the Business screen, and it biases which sabotage attacks they favor plus unlocks
+  five new strategy-flavored rival-clash events. A brand-new permanent meta-progression system,
+  the **Prestige Vault**, converts each life's Legacy Score (plus bonuses for major achievements
+  like Billionaire or holding office) into permanent Prestige Points banked across every future
+  save; spend them once in a new perk shop for lasting starting-life bonuses — sharper stats,
+  family savings, extra skill aptitudes, or a one-time **Guardian Angel** that survives an
+  otherwise-fatal health scare. Two full new life paths join Medicine and Academia: a **Legal
+  Career** (law school, joining a firm, taking cases, publishing law review articles, climbing to
+  Named Partner, and — for the elite few — appointment to the bench as a judge) with its own
+  ambient 3D **Courtroom** scene, and a **Culinary Empire** (starting as a line cook at 16,
+  working up to Head Chef, then opening and growing your own restaurant and chasing Michelin
+  stars across ten cuisines). Rounded out with six new daily flavor events and seventeen new
+  achievements spanning all of the above.
+
+- **V54 — Real manufacturing capacity vs. demand.** Physical-goods companies (retail,
+  auto, consumer, industrial, food, agriculture, construction, defense, luxury, mining, energy,
+  and other production-tagged industries — software, finance, and services are untouched) can no
+  longer just will their revenue up to whatever the growth formula wants: a new
+  **Manufacturing Capacity** stat, computed from real factories (V50's Corporate Empire) relative
+  to the company's current scale, actually gates how much of a year's demand growth converts into
+  revenue. Run hot without building capacity and the shortfall banks as a **demand backlog** — real
+  unmet demand, shown in dollars, that decays as frustrated customers buy elsewhere, with a
+  "customers are waiting on backorders" warning once it bites for two years running, and a
+  reputation hit if it drags on for three or more. Build or automate factories and spare capacity
+  first fulfills that year's growth, then chips away at any backlog — a factory investment finally
+  showing up as recovered sales, not just a cash dividend. Two new achievements (Supply Chain
+  Master, Back on Track) track keeping comfortably ahead of demand and recovering from a serious
+  shortfall. Fully additive: non-physical industries and old saves behave exactly as before.
+
+- **V53 — Supply-train buildings.** The "supply train" idea now has a real physical presence in
+  both 3D scenes that touch supply chains. The ambient **Supply Chain Visualizer** (each company's
+  detail screen) swaps its abstract primitives for small building silhouettes at every stage — a
+  silo cluster, a smoking factory, a loading-dock warehouse, a port crane, a storefront, a house —
+  and the flowing particles are now boxy little freight wagons riding the resilience-colored rail
+  instead of glowing orbs. The walkable **City Hub** gains a rail-yard ring circling just past the
+  plaza's edge: a gravel apron, a looping double rail on wooden ties, a trackside grain-silo cluster
+  and freight warehouse with its own loading crane, and a four-car freight train (locomotive plus
+  three liveried cargo cars) that continuously loops the track, headlight flaring after dark like
+  the ambient traffic. The Docks building also picked up a stack of shipping containers to tie the
+  theme together.
+
+- **V52 — Better 3D, mandatory deployment, more hustles, and a deeper BitLife look.** Two of the
+  weakest 3D scenes got a full quality pass: **Supply Chain** now casts real shadows off a grounded
+  plane, glows from emissive pedestals under each stage, and routes goods through tube-geometry pipes
+  colored live by supply-chain resilience (red → amber → green); **Election Map** swapped its flat bar
+  chart for tapered spire monuments with glowing base rings around a central podium whose orb reflects
+  your overall vote share. **Military deployment is no longer optional** — once you're deployed with a
+  playable mission (ground, air, or armor), the year can't end via +1 Day/Week/Year until you fly it;
+  the store gates all three time-advance actions and routes you straight to the Military screen with a
+  clear warning, while the underlying yearly risk resolution still runs automatically for support
+  roles and headless saves so nothing soft-locks. **Four new side hustles** round out the ways to make
+  money outside a formal career or company: monetize your following, sign a multi-year sponsorship
+  deal (a recurring income stream alongside memoirs), hold a garage sale, or busk for tips — plus a
+  new Content Mogul achievement. And the UI leans further into its BitLife roots: stat bars now show a
+  **reactive face** that swaps emoji by value (😭→😄 for Happiness, 💀→💪 for Health) instead of one
+  static icon, and every activity-list row gets a colored icon badge in a deterministic per-item hue
+  instead of a bare flat emoji.
+
+- **V51 — The Dynamic World Engine: the world remembers you, adapts to you, and outlasts you.**
+  Rival companies now hold a real, visible **grudge** (surfaced right on their card in Business →
+  Rivals) driven by your actual history with them — a failed hostile takeover, a price war, a
+  patent suit, corporate espionage, or a mob shakedown all leave a mark. A grudging rival is both
+  more likely to retaliate and specifically the one who does, with headlines and personalized
+  events (`{company}` resolves to the actual rival) calling out the beef by name — and you can
+  buy peace or provoke it further from inside those events. **World Momentum** is a new
+  self-relative score comparing your recent net-worth trajectory to your own longer-run trend —
+  a real hot streak makes life more eventful (and riskier), a cold streak eases off — with its own
+  edge-triggered headlines and callback events when the tide turns. **Industry Legacy** makes
+  your economic footprint permanent: dominate an industry with real market share and patents and
+  it keeps trending in your favor for years after you've sold up and moved on, gutting one leaves
+  it depressed just as long. Three new achievements (Arch Nemesis, Momentum Rider, Industry
+  Legend) track all of it.
+- **V50 — The biggest business expansion yet: a Corporate Empire layer on top of every
+  company.** **Friendly Acquisitions** let you buy out any private rival outright at a fair-value
+  premium — no board vote, no contest, distinct from the existing hostile-takeover bid which stays
+  reserved for public companies. An in-house **Venture Capital Arm** (once a company reaches
+  Campus-tier HQ) turns company cash into a real startup portfolio: back small private rivals for
+  a minority stake, watch them rise or fail alongside the rest of the simulated economy, and exit
+  for a payout — or get auto-cashed-out if a portfolio company is later acquired or wiped out in
+  bankruptcy. **International Expansion** opens foreign offices abroad that ramp up over several
+  years into a genuine second revenue stream, riding that country's own GDP growth. **Manufacturing**
+  adds physical factories — domestic or, once an office is open there, foreign — with upgradeable
+  automation (5 levels) that raises their ongoing output dividend. And structured **Advertising
+  Campaigns** across 5 channels (TV, Social, Influencer, Billboards, Guerrilla) commit a real
+  multi-year budget for a brand payoff, with a genuine chance of going viral or backfiring into a
+  PR disaster depending on the channel. All five systems are additive to the existing financial
+  model — they layer new revenue/cost streams on top of tickCompany() rather than touching its
+  tuning — and come with 9 new achievements, from Acquisition King to Mega Corp.
+- **V49 — A massive expansion: 5 new mega features.** **Entertainment Career** lets you chase
+  fame as an actor or musician — train your craft, audition for roles or pitch albums at
+  budget tiers gated by fame (Indie through Franchise Tentpole), sign an agent who takes a cut,
+  go on tour, court controversy for a risky publicity spike, and win real awards (Best Picture,
+  Album of the Year, Lifetime Achievement) at a yearly ceremony. **Medical Career** takes you
+  through med school, a residency match into one of 10 specialties (General Practice through
+  Surgery, each with its own difficulty and malpractice risk), and a full attending career
+  treating patients, publishing research, and climbing from Attending Physician to Medical
+  Director — a bad outcome risks a real malpractice suit, and three strikes costs you your
+  license. **Cult/Movement Founder** lets you found your own following: recruit believers, hold
+  gatherings, collect donations, and expand a compound — or embezzle the collection plate
+  straight into dirty money, at the cost of rising suspicion that can end in an authorities raid.
+  **Space Program** puts you through astronaut training at a national or private agency, flying
+  orbital, station, lunar, and Mars missions that carry genuine fatality risk — a failed mission
+  ends the game for real, the same permadeath pattern established by V46's combat deaths.
+  **Prison Life** deepens incarceration itself: join a cellblock gang, fight for yard respect,
+  smuggle and trade contraband, start a riot, bribe a guard, or snitch for time off — all folded
+  directly into the existing "In Prison" card rather than a separate screen, since jail is a
+  state you're in, not a career you navigate to. 39 new achievements track all five arcs.
+- **V48 — A major UI upgrade and a business expansion: a new Defense sector and 4 new product
+  categories.** The Life screen — which had grown into one enormous scroll as system after system
+  landed on it — is now a real dashboard: a sticky **Story / Activities / Underworld / Legacy**
+  tab bar groups bucket list & social media, lifestyle activities & pets & lottery, crime family &
+  Drug Empire & Casino, and legacy & Mind & Body into focused views instead of one endless feed.
+  The Activities sheet (every other screen) now has a live **search box** that filters across all
+  groups instantly, and the vice-heavy screens (Athlete, Military, Drug Empire, Casino) got pulled
+  into their own **Play** category instead of being mixed in with core navigation. On the business
+  side, a brand-new **Defense & Aerospace** industry sector arrives with 16 named businesses —
+  from a Small Arms Manufacturer and Ammunition Plant up through a Naval Shipyard, Submarine
+  Manufacturer, and Fighter Jet Manufacturer — a natural fit alongside the Military Service career.
+  The Studio also gains **4 new product categories** you can design and launch: Pet Tech &
+  Accessories, Baby & Kids Gear, Outdoor & Camping Gear, and Office & Stationery, each with their
+  own parts, materials, and component supply chain, fully playable in the 3D design viewport.
+- **V47 — Drug Empire: a full narcotics operation, independent of the mafia.** Start slinging on
+  the corner and build a real business across 8 named products (weed through fentanyl, each with
+  its own wholesale cost, street price, addictiveness, and overdose risk) gated by street
+  reputation. Three independently upgradeable facility tracks — a Stash House for capacity, a
+  Grow House that produces free weed every year, and a Meth Lab that produces free meth and
+  unlocks sourcing the hardest tier — turn a one-man hustle into a real operation. Hire a street
+  crew to move product passively while you're doing other things, fight rival dealers for turf,
+  cut a batch to stretch your supply at real risk, and bribe a cop when the heat gets too high.
+  It's real independent of joining a CrimeFamily (see below) but synergizes with one if you're in
+  it. Every sale is genuine risk: undercover buy-busts and stings can end in real prison time, a
+  bad batch can overdose a customer and blow up your reputation overnight, and a raid can gut your
+  stash, your facilities, and your crew in one year — dirty proceeds land in the same
+  launder-before-you-spend pipeline as heists and rackets. 11 new achievements track the whole
+  arc, from your first sale to walking away a made narco baron.
+- **V46 — Suicide, the wartime draft, real permadeath in combat, boot camp, a third war engine,
+  and battlefield terrain.** A somber but real BitLife-standard feature: a confirm-gated
+  **Suicide** button under Mind & Body that ends the life immediately, with its own honest cause
+  of death on the game-over screen. War now reaches out and grabs you even if you never enlist —
+  while your country is at war, especially under a National Service Act, you have a real yearly
+  chance of being **drafted**, sent straight into uniform without a choice (and without boot
+  camp — you don't get one when you're conscripted). Combat is now genuinely lethal: getting
+  overrun in a playable mission carries a real death chance that scales against your combat
+  skill, not just an injury, and that death is reported immediately — the game ends right then,
+  not on the next Age Up. Volunteers, by contrast, have to earn their spot: enlisting now routes
+  through a real playable 3D **Boot Camp obstacle course** — clear a hurdle, climb a wall, crawl
+  under netting, and hold your balance on a beam — and washing out sends you back to try again
+  instead of guaranteeing a spot. The Military career also gets a third playable **war engine**,
+  **Armor Combat** — traverse a tank turret and fire on advancing enemy vehicles with a slow,
+  weighty main-gun reload — alongside real **war terrain**: Ground, Air, and Armor missions now
+  render desert, urban, jungle, or arctic battlefields depending on which theater you're actually
+  deployed to.
+- **V45 — Two playable 3D combat engines: Ground Combat and Air Combat.** Deployed soldiers with a
+  combat specialty no longer just resolve missions on a menu — they fight them. Infantry, armor,
+  artillery, special forces, combat medics, snipers and more drop into a real 3D **Ground Combat**
+  mission: aim a reticle across three lanes with a draggable joystick or A/D keys, fire on hostiles
+  closing in on your position before they overrun you, and take real damage for every enemy left
+  unengaged. Pilots and naval aviators instead fly a full 3D **Air Combat** dogfight: a two-axis
+  joystick (or WASD) tracks incoming bogeys against an open sky, with the same fire-and-survive
+  loop. Both engines feed their outcome — hostiles eliminated, damage taken, survival — straight
+  into the existing military sim: accuracy drives combat-skill growth, a clean sweep has a real
+  chance at heroism and a medal, and a bad mission can mean a wound, a permanent disability rating,
+  or worse. Built on the same shared three.js pipeline as the game's other playable sports scenes,
+  with full mobile joystick support, landscape-lock fullscreen, and a live in-mission HUD.
+- **V44 — Military Service: a whole new career, enlist to discharge.** A brand-new life path with
+  ~150 new pieces of content: pick from 6 branches (Army, Navy, Air Force, Marines, Coast Guard,
+  Space Force) and 20 specialties from Infantry to Special Forces to Cyber Operations, climb a
+  9-rank enlisted ladder with real pay at each grade, and train across 12 real programs (Ranger
+  School, Officer Candidate School, SERE, and more). Deployment ties directly into the game's real
+  geopolitical war system — you can only deploy while your country is actually at war, and against
+  whichever nation that really is. Once deployed, missions are resolved with genuine risk: 12 injury
+  types (some permanent, driving a VA disability rating), a real death chance, and a stack of 20
+  medals and decorations up to the Medal of Honor. And there's a real moral choice every deployed
+  year — **Act Heroically** risks yourself for reputation, karma and a shot at a medal; **Cross the
+  Line** trades your discipline and karma for a payout, with mounting court-martial risk that can end
+  in a dishonorable discharge. Discharge (honorable, medical, general, or dishonorable) pays a real
+  veteran's pension based on years served and disability rating. 20 new achievements track the arc,
+  from first enlistment to Medal of Honor to Fallen Hero.
+- **V43 — juice: every action feels like it landed.** A whole pass of moment-to-moment feedback on
+  top of existing systems, not new content: achievements now unlock with a genuine **gold "Achievement
+  Unlocked" toast** and a confetti burst the instant they happen — 130+ of them were unlockable
+  silently before, discoverable only by digging into the Stats screen. The Year in Review modal now
+  **counts your net worth up** from where the year started instead of snapping to the final number,
+  and bursts confetti of its own on a genuinely big year. The AGE button gets a satisfying tap ripple,
+  and your bank balance in the header **flashes green or red** for a beat whenever it moves. Small,
+  but it's the difference between a spreadsheet updating and a game reacting to you.
+- **V35-39 — Athlete Career: real playable 3D soccer, football and running.** A whole new life
+  path alongside Career/Business/Politics: pick soccer, (American) football or running, train up a
+  full attribute set, sign with one of 22 named teams across 3 leagues (or chase a calendar of
+  running meets up to the Games), earn contracts and endorsement deals, and manage real injuries,
+  fitness, form and morale across a full career arc through retirement (and a Hall of Fame ribbon
+  for the best of them). The matches and races aren't simulated for you — they're genuinely
+  **playable, real-time 3D minigames**: a 4-a-side soccer match with WASD/joystick movement and a
+  charge-and-release pass/shoot button against AI teammates and opponents; a down-by-down football
+  drive where you call Run or Pass and then execute it yourself, throwing to receivers running real
+  routes against a real pass rush; and a running race where pacing — when to burn your stamina
+  sprinting versus conserving it — is the actual skill, not button-mashing. Every match/race result
+  feeds real career stats, league standings, and money back into the life sim.
+- **V41 — the athlete world evolves on its own.** The soccer/football league world is no longer a
+  static backdrop: every year, regardless of whether you've ever picked up a ball this life, all 22
+  teams' results are simulated, team **prestige** drifts toward how they actually performed (a big
+  season nudges it up, a bad one drags it down), and a transfer window occasionally swings a team's
+  fortunes with a marquee signing or a lost star player. Soccer's two tiers now **promote and
+  relegate** at each season's end based on real final standings — and if your own team goes up or
+  down, your career follows it, with a fresh schedule against the new tier's opponents. All of it
+  generates real headlines in a new **Sports** category on the News screen, so the league feels alive
+  even when you're not the one playing in it.
+- **V42 — the wider world was already alive, now you can actually see it.** Every one of the 12
+  countries' economies has always cycled through real boom/recession/depression regimes on its own,
+  and NPC companies have always merged, IPO'd and gone bankrupt without your involvement — but almost
+  none of it ever reached the News feed unless it happened to your home country or your own company.
+  Now a foreign nation tipping into recession, roaring into a boom, or getting hit by a climate
+  disaster or a debt crisis shows up as a flagged **Economy** headline the moment it happens, and an
+  NPC-only company going under generates a real bankruptcy headline too — so the rest of the world
+  visibly keeps moving, growing and occasionally collapsing, whether or not you're watching it.
+- **V34 — real accounts, a life that starts at birth, and a bigger, more BitLife life.** Sign up with
+  email + password (Supabase Auth) to back your life up to the cloud — up to 5 named cloud saves per
+  account, managed from a new account panel on the main menu — entirely optional; local play needs no
+  account at all. New games now start at **age 0** instead of 18: a newborn's stats begin near zero and
+  build up through a guaranteed skeleton of childhood milestones (first steps, first words,
+  kindergarten, losing teeth, starting school) plus dozens of new age-gated childhood flavor events and
+  daily vignettes, while grown-up-only actions (founding a company, marrying, the casino floor, taking
+  out a loan, joining a crime family, and more) are cleanly locked until the right age. The Activities
+  sheet was rebuilt as a proper BitLife-style grouped list — navy header, gray category dividers,
+  icon + bold title + subtitle rows — and six new activities/actions arrived: the **Zoo** and **Movie
+  Theater** (all-ages lifestyle outings), **Nightlife** (18+ clubbing with real upside/downside
+  outcomes), a **Fertility Clinic** (a real, sometimes-unsuccessful single-parent path to a child, no
+  spouse required), a personal **lawsuit** system (sue anyone in your relationship register for a real
+  settlement or a real loss), and a **legal Identity** panel to change your name or gender marker.
+- **V33 — the fun-and-addictive update: ribbons, bucket lists, pets, and the lottery.** Every
+  completed life now ends with a **ribbon** — one of 24 BitLife-style life-summary awards (Legend,
+  Kingpin, Centenarian, Saint, Jailbird, Best Friend…) picked by priority from how you actually
+  lived — and the collection persists across lives in a Ribbon Cabinet on the main menu, with
+  unearned ribbons shown as ??? mystery slots. Every new life rolls a six-goal **bucket list**
+  (from a 14-goal pool with random difficulty tiers) checked yearly with real cash/happiness
+  payouts, an achievement for clearing the whole list, and a dedicated ribbon. **Pets** are now a
+  real system: adopt up to four (dog, cat, parrot, horse, snake, goldfish), play yearly to build
+  bond, pay upkeep and surprise vet bills — companionship boosts happiness in proportion to bond,
+  loyal pets occasionally come through with heroics or found treasure, and when they die the grief
+  scales with how close you were. And the **lottery**: instant-result tickets and scratch cards
+  with realistic terrible odds, yearly purchase caps against spam, and a $2M jackpot that feeds a
+  Jackpot Winner achievement and ribbon.
+- **V32 — the BitLife look.** The app chrome now mirrors the BitLife layout it was always inspired
+  by: a flat signature-green header banner (identity left, bank balance right), a persistent
+  😊❤️🧠😎 Happiness/Health/Smarts/Charisma stat strip pinned above the tab bar, and a five-slot
+  bottom bar whose center is the big raised circular **+AGE** button that advances the year from
+  anywhere (Job · Assets · AGE · Relations · Activities, with the Activities sheet holding every
+  other screen two taps away). The Life screen was rebuilt as the classic chronological life-log
+  feed — plain text entries grouped under bold "Age N" headers, newest chapter first — with
+  day/week time controls in a compact age ribbon. The whole brand palette swapped from blue to
+  BitLife green in one token change.
+- **V31 — design-system overhaul + a bigger, livelier city.** The whole UI moved to a layered
+  design language in one pass by overhauling the shared primitives every screen is built from:
+  two-level ambient/contact elevation on cards with hover lift, gradient primary/danger buttons with
+  glow shadows and press-scale feedback, spring bottom-sheet modals with grab handles and close
+  buttons, one-shot sheen sweeps on stat bars, accent-tick section headers, a glass top bar and
+  bottom nav with a springy floating active-tab indicator, per-screen entrance transitions, tabular
+  numerals everywhere, and `prefers-reduced-motion` support. The 3D city grew ~27% in radius (with a
+  faster walk speed to match) and got a realism pass: articulated pedestrians with counter-phase
+  arm/leg walk cycles, construction cranes that slowly slew over their sites with a swinging load,
+  car headlights that flare after dark, drifting clouds, circling birds with flapping wings, zebra
+  crossings at the compass points, a tree green-belt between the plaza and the skyline, and a second
+  lamp ring — plus the skyline cap raised to 32 public companies.
+- **V30 — the city is alive: every public company gets a real skyline building.** Explore's plaza now
+  renders a second, outer skyline ring beyond the ten fixed system buildings — one procedurally-built
+  tower per publicly-listed company in your home country (banded and capped so the ring stays readable
+  even with hundreds of companies in the world), tinted by sector and sized by the company's real
+  `hqTier`. IPO a company (yours or an NPC's — public companies now IPO on their own over time, not just
+  when the player triggers it) and it spends its first year behind scaffolding, a crane and a "COMING
+  SOON" sign before the real tower opens; upgrade the HQ afterward and the building updates live. The
+  plaza itself got a pass too: a three-stop day → dusk → night sky gradient and a fading starfield.
+  Alongside the city work: stock splits and NPC share buybacks in the market, a build-to-suit action that
+  turns vacant land into a house/apartment block/commercial property, and continued verification that the
+  existing spin-off, buyback and hostile-takeover systems already cover the deep-business-and-stocks ask.
+- **V29 content pass — ~400 new features, all data-driven.** 108 new industries across every one of the
+  12 sectors (347 total), 70 new laws across 17 categories (185 total), 92 new daily flavor events (139
+  total), 105 new yearly event templates across all ten categories (257 total), and 20 new milestone
+  achievements (casino high-rollers, crypto/savings/bond/forex thresholds, franchise and loyalty-program
+  empires, crime-family kingpins, election landslides, and more) wired into the same generic
+  threshold-check the existing achievement system already used — no new engine logic required, since the
+  whole point of this codebase's data/engine split is that content is just rows in an array.
 - **✨ The Studio: a full Product Design & Commerce pillar** — walk into an innovation lab (a live 3D
   environment with a reflective glass floor, holographic rings, ambient particles and a robotic assembly
   arm) and take products from a spark of an idea to global launch. Design in a real-time parametric 3D
@@ -69,7 +496,7 @@ plain JSON you can export and re-import.
   year, whether you jump straight there or accumulate days/weeks into it.
 - **Deterministic living world** — 12 fictional nations, dozens of states, ~150 cities, 400+ notable
   NPCs and 170+ companies, all generated from a seed so the same seed reproduces the same world exactly.
-- **239 industries** across 12 sectors, each with distinct economics (margins, cyclicality, capital and
+- **347 industries** across 12 sectors, each with distinct economics (margins, cyclicality, capital and
   labour intensity, tech and regulation sensitivity, commodity exposure).
 - **Full company simulation** — revenue emerges from the business cycle x your pricing, marketing, R&D,
   wages, automation, cyber-defense and brand x the laws in force x competition. IPO, pay dividends,
@@ -129,7 +556,7 @@ plain JSON you can export and re-import.
   you actually have a relationship with, where it's felt.)
 - **Deep politics** — join or found a party, campaign for eight tiers of office (councillor to head of
   state) with rallies/ads/fundraising/consultants/polling, negotiate coalitions, appoint a cabinet, and
-  pass or repeal **115 laws** whose effects continuously reshape the economy. As head of state, conduct
+  pass or repeal **185 laws** whose effects continuously reshape the economy. As head of state, conduct
   real foreign policy: declare war, sign peace treaties, impose or lift sanctions, send foreign aid, and
   sign trade agreements — on top of the elections, coups, sanctions and wars that unfold on their own.
 - **War has real weight, win or lose** — militaries now have a Readiness score, separate from raw
@@ -342,7 +769,7 @@ only moves when you tell it to, using the three buttons on the Life hub:
 
 - **Career** — study for degrees (15 options), take jobs from a live market, and grow skills (120 of them
   across 10 categories). Performance drives raises, promotions and layoffs.
-- **Business** — found companies in any of 239 industries, then tune strategy (marketing, R&D, pricing,
+- **Business** — found companies in any of 347 industries, then tune strategy (marketing, R&D, pricing,
   wages, automation, cyber-defense, dividends), invest or draw capital, IPO, or sell. Upgrade your HQ tier,
   pick a corporate culture, and hire a CFO/COO/CMO. Run one-off initiatives (brand deals, tiered training
   programs, supply-chain diversification, quality audits, trademark filings, proactive recalls), issue
@@ -389,18 +816,42 @@ only moves when you tell it to, using the three buttons on the Life hub:
   or declare war on a specific named rival family, and if your family gets crushed or wiped out you lose your
   standing with it (this is a family-level strength/turf/heat state machine, not a simulation of individual
   soldiers or a literal open-world crime map).
-- **Casino** — a real 3D casino floor (see the Casino tab, expandable to fullscreen for an immersive view — an
-  enclosed room with a patterned carpet, flanking columns, two hanging chandeliers, and a fully playable bet
-  panel even while fullscreen) with six named, distinct slot machines — each its own theme, stakes and
-  volatility, a reel-window symbol strip and coin tray, and a real progressive jackpot pool that grows every
-  spin and resets when someone finally hits it — plus blackjack, high-stakes poker with chip stacks on the
-  felt, a genuine European roulette wheel (37 pockets, a numbered felt betting layout, straight-number or
-  red/black/odd/even/high/low outside bets, real payouts), and a fair 50/50 heads-or-tails coin toss on a
-  spinning stand. Every game keeps a genuine house edge: skill narrows it (poker skill on the card tables)
-  but can never flip it into the player's favor, the same principle a real casino runs on. A VIP room
-  (Diamond Royale) unlocks once you're liquid enough.
+- **Casino — a real walkable 3D floor, not an orbit-camera diorama** — walk your own avatar around an
+  enclosed room (patterned carpet, flanking columns, two hanging chandeliers) with WASD/arrow keys or a
+  virtual joystick, exactly the same walking-camera system as the Explore city hub. Walk up to any of six
+  named, distinct slot machines (each its own theme, stakes, volatility, a reel-window symbol strip and
+  coin tray, and a real progressive jackpot pool that grows every spin and resets when someone finally hits
+  it), blackjack, high-stakes poker, a fair 50/50 heads-or-tails coin toss, or the sports book kiosk, and a
+  "▶ Play" prompt surfaces automatically — the bet panel then opens as a fixed overlay inside the same
+  scene box (never pushed into page scroll), pausing movement while it's open. **Roulette is genuine 3D
+  betting**: the wheel and ball spin down and land on the real winning number from the actual spin result
+  (37 pockets, straight-number or red/black/odd/even/high/low outside bets, real payouts), and a bright chip
+  marker shows exactly where your current bet sits on the felt. **New: a Sports Book** — a fresh weekly
+  slate of 5 matches across football, basketball, soccer and boxing, each team with a real win probability
+  and moneyline odds priced with a genuine ~7% vig shaved off both sides (not a coin flip dressed up — the
+  book keeps its edge on the bet either way). Every game keeps a genuine house edge: skill narrows it (poker
+  skill on the card tables) but can never flip it into the player's favor, the same principle a real casino
+  runs on. A VIP room (Diamond Royale) unlocks once you're liquid enough. Fullscreen requests real landscape
+  orientation on browsers that support it (with a rotate-your-device hint where they don't, mainly iOS
+  Safari), filling the viewport with the same walkable scene and overlay UI; the room itself is deliberately
+  lighter on phones — fewer real-time lights and decorative meshes — since a phone GPU pays full price for
+  every light with no shadow map to hide behind.
 - **Lifestyle** — 20+ quick activities on the Life hub, from the gym and charity to book clubs, therapy,
   adopting a pet, art collecting, wine tasting, poker nights, blogging and learning a language.
+- **🏆 Global Leaderboard — the one online feature in the game.** Two public, no-login rankings backed by
+  a real Supabase Postgres backend: a live **Net Worth** board you can resubmit any time your run is
+  going, and a **Legacy Score** board that only updates when a completed life actually beats your
+  device's previous best (submitted right from the death screen). Each device holds exactly one row per
+  board — a locally-generated ID, not a real account — so resubmitting updates your own entry instead of
+  spamming new ones; this is an honest honor-system board with no server authority over the client-side
+  sim, not a certified ranking. Every leaderboard call is timeout-bounded and fails soft: no connection
+  (or the board being genuinely empty) just shows a clear, distinct state and a Retry button — it never
+  touches the rest of the offline game. **Reach #1 on either board and you bank a "Royal Bloodline" perk**
+  for your next life — a real starting advantage on the new-game screen, not just a title: several million
+  in inherited wealth, an elite upbringing's boost to smarts and charisma, and starting reputation,
+  popularity and influence an 18-year-old couldn't otherwise have. The perk is banked the moment you're
+  seen at #1 (checked on the Leaderboard screen and right after a Legacy submission) and stays available
+  until you actually spend it starting a new life, so a later drop in rank doesn't take it away.
 
 Life ends when you do — from old age, illness, or misfortune — with a Legacy Score summarizing your wealth,
 dynasty, office and achievements. If a spouse, child, or grandchild survives you, choose to continue playing
@@ -421,8 +872,8 @@ src/
     types.ts           All game types; GameState is the single source of truth
     world.ts           World generation from country seeds + the player
     economy.ts         Macro cycle, rates, inflation, assets, commodities, demographics
-    business.ts        Company simulation, valuation, HQ tiers/culture, NPC merger consolidation
-    market.ts          Stock exchange, trading, shorting, dividends
+    business.ts        Company simulation, valuation, HQ tiers/culture, NPC merger consolidation, NPC IPOs
+    market.ts          Stock exchange, trading, shorting, dividends, splits, buybacks, IPO construction lifecycle
     politics.ts        Office ladder, elections, legislation, cabinet, coalitions, geopolitics, NPC lives,
                        budget allocation, infrastructure projects, manifesto promise tracking
     family.ts          Dating, marriage, children, succession planning (business + political), estate
@@ -434,14 +885,17 @@ src/
     actions.ts         The player "verbs" the UI calls between years
     engine.ts          advanceYear()/advanceDay()/advanceWeek(): orchestrate simulated time
   data/                Data-driven content (the game is authored here)
-    industries.ts      239 industries across 12 sectors
-    laws.ts            115 laws with economic effects and bloc support
+    industries.ts      347 industries across 12 sectors
+    laws.ts            185 laws with economic effects and bloc support
     events.ts          Event templates -> thousands of scenarios
     dailyEvents.ts     22 lightweight flavor events for day/week advancement
     skills.ts          120 skills; countries.ts, names.ts, ...
   store/
     gameStore.ts       Zustand store wrapping engine + actions
     persistence.ts     IndexedDB saves (localStorage fallback), export/import
+  net/                 The one online surface: Supabase-backed global leaderboard
+    supabaseClient.ts  Supabase client (publishable key — safe to ship, RLS-gated)
+    leaderboard.ts     Timeout-bounded, fail-soft reads/writes against leaderboard_entries
   ui/                  Mobile-first React UI (light + dark, desktop breakpoints, safe-area aware)
     components.tsx     Cards, pills, circular tiles, stat bars, canvas charts
     AppShell.tsx       Top bar + bottom tab navigation + "More" sheet
@@ -451,7 +905,7 @@ src/
     TutorialOverlay.tsx      Light first-launch walkthrough (shown once per browser)
     three/             Ambient three.js visualizations (lazy-loaded, code-split from the main bundle):
                        HQTourScene, SupplyChainScene, ElectionMapScene, TradeNetworkScene
-    screens/           Life, Career, Business, Market, Assets, Politics, Family, World, News, Stats
+    screens/           Life, Career, Business, Market, Assets, Politics, Family, World, News, Stats, Leaderboard
 ```
 
 ### Modding
@@ -462,7 +916,8 @@ a row — the engine never hard-codes individual content, so mods and expansions
 ## Tech
 
 React + TypeScript (strict) · Vite · Tailwind CSS v4 · Zustand · IndexedDB · HTML Canvas charts ·
-three.js (lazy-loaded, code-split) for ambient 3D visualizations.
+three.js (lazy-loaded, code-split) for ambient 3D visualizations · Supabase (Postgres + RLS) for the
+one online feature, the global Leaderboard — everything else needs no network at all.
 
 ## Development
 

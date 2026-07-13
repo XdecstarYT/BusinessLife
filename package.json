@@ -17,6 +17,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@supabase/supabase-js": "^2.110.2",
     "@types/three": "^0.185.0",
     "framer-motion": "^12.42.2",
     "react": "^19.2.7",

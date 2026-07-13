@@ -12,17 +12,33 @@ import { buyLuxuryAsset, sellLuxuryAsset, investInCelebrityBrand, divestCelebrit
 import * as P from '../src/sim/products';
 import { publicOpinionBreakdown } from '../src/sim/politics';
 import { playerCrimeFamily } from '../src/sim/crime';
-import { spinSlotMachine, playTableGame, spinRoulette, playCoinFlip } from '../src/sim/casino';
+import { spinSlotMachine, playTableGame, spinRoulette, playCoinFlip, sportsMatches, placeSportsBet } from '../src/sim/casino';
 import { SLOT_MACHINES } from '../src/data/casino';
 import { INDUSTRIES } from '../src/data/industries';
 import { LAW_BY_ID } from '../src/data/laws';
 import { SK } from '../src/data/skills';
+import * as ATH from '../src/sim/athletics';
+import { ATHLETE_TEAMS, RUNNING_MEETS } from '../src/data/athletics';
 
 // --- V6: scenario presets + difficulty + legacy bonus sanity check (no full sim) ---
 {
   const boomWorld = generateWorld({ playerName: 'Boom Test', gender: 'female', seedText: 'boom-check', scenario: 'boom', difficulty: 'ironman', legacyBonus: 50_000 });
   const home = boomWorld.countries.find((c) => c.isPlayerHome)!;
   console.log('Scenario/difficulty check: regime =', home.economy.regime, '· difficulty =', boomWorld.difficulty, '· starting money >= 50000:', boomWorld.player.money >= 50_000);
+}
+
+// --- Leaderboard "born into royalty" perk: starting stats/money should be far above normal, and
+// the achievement + a flavor life-log entry should be present.
+{
+  const normalWorld = generateWorld({ playerName: 'Commoner Test', gender: 'male', seedText: 'royal-check-normal' });
+  const royalWorld = generateWorld({ playerName: 'Royal Test', gender: 'male', seedText: 'royal-check-royal', bornRoyal: true });
+  console.log(
+    'Royalty check: normal money =', Math.round(normalWorld.player.money),
+    '· royal money =', Math.round(royalWorld.player.money),
+    '· royal reputation =', royalWorld.player.reputation,
+    '· achievement present =', royalWorld.achievements.includes('born_royal'),
+    '· royal money > normal:', royalWorld.player.money > normalWorld.player.money,
+  );
 }
 
 /** Resolve any pending yearly choice events by auto-picking the first choice. */
@@ -46,6 +62,19 @@ console.log('  npcs:', Object.keys(state.npcs).length);
 console.log('  industries:', state.industries.length);
 console.log('  public cos:', Object.values(state.companies).filter((c) => c.isPublic).length);
 
+let errors = 0;
+let events = 0;
+let dailyFlavorCount = 0;
+
+// Games now start at birth (age 0) — fast-forward through childhood first, since every
+// `y === N` milestone below was written assuming a starting age of 18 and still expects that
+// spacing. This keeps the rest of the file (and its exact simulated ages) unchanged.
+for (let y0 = 0; y0 < 18 && state.player.alive; y0++) {
+  state = advanceYear(state);
+  resolvePending();
+}
+console.log('Childhood fast-forward: age =', state.player.age, '· smarts =', Math.round(state.player.smarts), '· charisma =', Math.round(state.player.charisma), '· alive =', state.player.alive);
+
 // Give the player capital to exercise expensive actions.
 state.player.money = 5_000_000;
 A.enroll(state, 1);
@@ -53,14 +82,23 @@ const cheapInd = INDUSTRIES.filter((i) => i.startupCost < 200_000)[0];
 A.startCompany(state, cheapInd.id, 'Test Co', 150_000);
 A.joinParty(state, state.countries[0].parties[0]?.id ?? 'x');
 
-let errors = 0;
-let events = 0;
-let dailyFlavorCount = 0;
-
 // Exercise the new lifestyle actions once, early.
 for (const kind of ['book_club', 'therapy', 'adopt_pet', 'road_trip', 'volunteer', 'seminar', 'spa_day', 'blog'] as const) {
   A.doActivity(state, kind);
 }
+
+// V33: adopt pets, play, and gamble on the lottery/scratchers.
+A.adoptPet(state, 'dog');
+A.adoptPet(state, 'cat');
+if (state.player.pets[0]) A.playWithPet(state, state.player.pets[0].id);
+for (let i = 0; i < 25; i++) A.buyLotteryTicket(state);
+for (let i = 0; i < 35; i++) A.buyScratchCard(state);
+console.log(
+  'V33 setup: pets =', state.player.pets.length,
+  '· bucket goals =', state.bucketList.length,
+  '· lottery tickets used =', state.player.lotteryTicketsThisYear, '(cap 20)',
+  '· scratch cards used =', state.player.scratchCardsThisYear, '(cap 30)',
+);
 
 for (let y = 0; y < 82 && state.player.alive; y++) {
   try {
@@ -84,6 +122,44 @@ for (let y = 0; y < 82 && state.player.alive; y++) {
       state = advanceYear(state);
     }
     resolvePending();
+
+    // --- V35: athlete career (soccer/football/running) ---
+    if (y === 0) {
+      ATH.startAthleteCareer(state, 'soccer', 'ST');
+    }
+    if (y === 1 && state.player.athlete) {
+      ATH.trainAthlete(state, 'train_soccer_0');
+    }
+    if (y >= 1 && y <= 5 && state.player.athlete && !state.player.athlete.teamId) {
+      for (const t of ATHLETE_TEAMS.filter((tm) => tm.sport === 'soccer')) {
+        if (state.player.athlete?.teamId) break;
+        ATH.tryoutForTeam(state, t.id);
+      }
+    }
+    if (state.player.athlete?.teamId && state.player.athlete.fixtures.some((f) => !f.played)) {
+      const fx = state.player.athlete.fixtures.find((f) => !f.played)!;
+      ATH.quickSimFixture(state, fx.id);
+    }
+    if (y === 6 && state.player.athlete?.contract) {
+      ATH.negotiateContract(state);
+    }
+    if (y === 8 && state.player.athlete?.teamId) {
+      const other = ATHLETE_TEAMS.find((t) => t.sport === 'soccer' && t.id !== state.player.athlete?.teamId);
+      if (other) ATH.requestTrade(state, other.id);
+    }
+    if (y === 10 && state.player.athlete && state.player.athlete.overallRating >= 55) {
+      ATH.signEndorsement(state, 'end_apex_gear');
+    }
+    if (y === 40 && state.player.athlete && !state.player.athlete.retired) {
+      ATH.retireAthlete(state);
+    }
+    if (y === 50) {
+      ATH.startAthleteCareer(state, 'running', '100m');
+    }
+    if (y === 51 && state.player.athlete?.sport === 'running') {
+      ATH.trainAthlete(state, 'train_running_0');
+      ATH.resolveRace(state, { meetId: RUNNING_MEETS[0].id, playerTimeSeconds: 11.2 });
+    }
 
     // --- V16: career & work-life realism ---
     if (y === 4 && !state.player.job) {
@@ -442,6 +518,11 @@ for (let y = 0; y < 82 && state.player.alive; y++) {
       spinRoulette(state, { kind: 'red' }, 200);
       spinRoulette(state, { kind: 'straight', number: 17 }, 50);
       playCoinFlip(state, 'heads', 100);
+      const slate = sportsMatches(state);
+      if (slate.length) {
+        placeSportsBet(state, slate[0].id, 'home', 300);
+        placeSportsBet(state, slate[1].id, 'away', 150);
+      }
       if (state.player.money > 300_000) A.foundCharityFoundation(state, 'Smoke Test Foundation');
       A.writeMemoir(state, 'Smoke: A Life');
     }
@@ -615,6 +696,19 @@ console.log('  education:', state.player.education.map((e) => `${e.degree}/${e.f
 console.log('  stress:', Math.round(state.player.stress), '· burnout until:', state.player.burnoutUntilYear ?? 'n/a', '· investigation heat:', Math.round(state.player.investigationHeat), '· years served this sentence:', state.player.yearsServedThisSentence);
 const jvActive = Object.values(state.companies).filter((c) => c.jointVenturePartnerId).length;
 console.log('  joint ventures active:', jvActive, '· total lawsuits across all companies:', Object.values(state.companies).reduce((s, c) => s + c.lawsuits, 0));
+console.log('  pets alive at end:', state.player.pets.length, '· bucket goals done:', state.bucketList.filter((g) => g.done).length, 'of', state.bucketList.length);
+if (state.player.athlete) {
+  const ath = state.player.athlete;
+  console.log(
+    '  athlete:', ath.sport, ath.position || ath.event, '· overall', ath.overallRating,
+    '· level', ath.level, '· retired', ath.retired, '· HOF', ath.hallOfFame,
+    '· career goals/TDs:', ath.careerStats.goals + ath.careerStats.touchdowns,
+    '· races won:', ath.careerStats.racesWon, '· PBs:', Object.keys(ath.personalBests).length,
+  );
+} else {
+  console.log('  athlete: none');
+}
+console.log('  athlete teams tracked:', Object.keys(state.athleteTeams).length);
 console.log('  errors:', errors);
 
 // Invariant checks

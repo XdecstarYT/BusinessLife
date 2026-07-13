@@ -12,10 +12,11 @@ const CATS: { key: NewsItem['category'] | 'all'; label: string }[] = [
   { key: 'politics', label: 'Politics' },
   { key: 'world', label: 'World' },
   { key: 'society', label: 'Society' },
+  { key: 'sports', label: 'Sports' },
 ];
 
 const CAT_EMOJI: Record<string, string> = {
-  economy: '📊', markets: '📈', business: '🏢', politics: '🏛️', world: '🌍', society: '👥', player: '⭐',
+  economy: '📊', markets: '📈', business: '🏢', politics: '🏛️', world: '🌍', society: '👥', player: '⭐', sports: '🏟️',
 };
 
 const SUBTYPE_LABEL: Record<NonNullable<NewsItem['subtype']>, string> = {

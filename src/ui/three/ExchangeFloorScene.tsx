@@ -20,6 +20,8 @@ interface ExchangeFloorSceneProps {
   indexValue: number;
   indexChangePct: number;
   movers: FloorMover[];
+  // V57: tap a ticker booth to jump straight into trading that mover.
+  onSelectMover?: (name: string) => void;
 }
 
 function makeTexture(w: number, h: number, draw: (ctx: CanvasRenderingContext2D, w: number, h: number) => void): THREE.CanvasTexture {
@@ -80,12 +82,12 @@ function makeTrader(color: number): THREE.Group {
   return g;
 }
 
-export function ExchangeFloorScene({ indexValue, indexChangePct, movers }: ExchangeFloorSceneProps) {
+export function ExchangeFloorScene({ indexValue, indexChangePct, movers, onSelectMover }: ExchangeFloorSceneProps) {
   const ref = useRef<HTMLDivElement>(null);
 
   useThreeScene(
     ref,
-    ({ scene, camera, makeLabel }) => {
+    ({ scene, camera, makeLabel, registerClickable }) => {
       scene.fog = new THREE.Fog(0x0b1220, 9, 34);
       scene.background = new THREE.Color(0x0b1220);
       scene.add(new THREE.AmbientLight(0xffffff, 0.55));
@@ -119,19 +121,22 @@ export function ExchangeFloorScene({ indexValue, indexChangePct, movers }: Excha
         const x = Math.sin(angle) * radius;
         const z = -Math.cos(angle) * radius * 0.6 - 1;
         const barH = 0.4 + Math.min(1.6, Math.abs(m.gainPct) * 6);
+        const booth = new THREE.Group();
         const bar = new THREE.Mesh(
           new THREE.BoxGeometry(0.5, barH, 0.5),
           new THREE.MeshStandardMaterial({ color: m.gainPct >= 0 ? 0x34d399 : 0xf43f5e, emissive: m.gainPct >= 0 ? 0x34d399 : 0xf43f5e, emissiveIntensity: 0.25 }),
         );
         bar.position.set(x, barH / 2, z);
-        scene.add(bar);
+        booth.add(bar);
         const screen = new THREE.Mesh(
           new THREE.PlaneGeometry(0.85, 0.34),
           new THREE.MeshStandardMaterial({ map: tickerTexture(m.name, m.price, m.gainPct), emissive: 0xffffff, emissiveMap: tickerTexture(m.name, m.price, m.gainPct), emissiveIntensity: 0.8 }),
         );
         screen.position.set(x, barH + 0.35, z);
         screen.lookAt(0, barH + 0.35, 0);
-        scene.add(screen);
+        booth.add(screen);
+        scene.add(booth);
+        if (onSelectMover) registerClickable(booth, m.name);
       });
 
       // Trading floor crowd — speed reacts to overall volatility.
@@ -165,6 +170,7 @@ export function ExchangeFloorScene({ indexValue, indexChangePct, movers }: Excha
       };
     },
     [indexValue, indexChangePct, movers.map((m) => `${m.name}:${m.price}:${m.gainPct}`).join(',')],
+    { onPick: (id) => onSelectMover?.(id) },
   );
 
   return <div ref={ref} className="w-full h-56 rounded-2xl overflow-hidden bg-slate-950" />;

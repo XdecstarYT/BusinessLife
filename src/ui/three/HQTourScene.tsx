@@ -11,7 +11,20 @@ interface HQTourSceneProps {
   employees: number;
   morale: number; // 0..100
   culture: 'traditional' | 'flexible' | 'remote' | 'startup';
+  // V57: four department kiosks ring the tower, each a real clickable lever-pull.
+  marketingPct: number; // 0..0.25
+  rdPct: number; // 0..0.25
+  automation: number; // 0..100
+  salaryLevel: number; // 0.85..1.4
+  onDepartmentClick?: (dept: 'marketing' | 'rd' | 'automation' | 'salary') => void;
 }
+
+const DEPARTMENTS: { id: 'marketing' | 'rd' | 'automation' | 'salary'; label: string; color: number; angle: number }[] = [
+  { id: 'marketing', label: 'Marketing', color: 0xf5a623, angle: Math.PI * 0.25 },
+  { id: 'rd', label: 'R&D', color: 0x5b8def, angle: Math.PI * 0.75 },
+  { id: 'automation', label: 'Operations', color: 0x8a95a5, angle: Math.PI * 1.25 },
+  { id: 'salary', label: 'Workforce', color: 0x9b6bd6, angle: Math.PI * 1.75 },
+];
 
 const CULTURE_TINT: Record<HQTourSceneProps['culture'], number> = {
   traditional: 0x8a95a5,
@@ -54,12 +67,18 @@ function makeEmployee(color: THREE.Color): THREE.Group {
   return g;
 }
 
-export function HQTourScene({ hqTier, employees, morale, culture }: HQTourSceneProps) {
+export function HQTourScene({ hqTier, employees, morale, culture, marketingPct, rdPct, automation, salaryLevel, onDepartmentClick }: HQTourSceneProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const levelFor = (dept: (typeof DEPARTMENTS)[number]['id']): number => {
+    if (dept === 'marketing') return Math.max(0, Math.min(1, marketingPct / 0.25));
+    if (dept === 'rd') return Math.max(0, Math.min(1, rdPct / 0.25));
+    if (dept === 'automation') return Math.max(0, Math.min(1, automation / 100));
+    return Math.max(0, Math.min(1, (salaryLevel - 0.85) / (1.4 - 0.85)));
+  };
 
   useThreeScene(
     ref,
-    ({ scene, camera, addStars, quality }) => {
+    ({ scene, camera, addStars, quality, makeLabel, registerClickable }) => {
       const castsShadows = quality === 'desktop';
       scene.background = null;
       scene.fog = new THREE.Fog(0x0b1220, 12, 45);
@@ -154,6 +173,33 @@ export function HQTourScene({ hqTier, employees, morale, culture }: HQTourSceneP
         people.push({ mesh, radius, speed: 0.15 + Math.random() * 0.25, offset, y });
       }
 
+      // V57: department kiosks — small clickable pavilions ringing the tower, always present
+      // regardless of HQ tier, each a direct lever-pull into setCompanyLever (see onDepartmentClick).
+      const kioskRadius = footprint * 0.9 + 1.8;
+      for (const dept of DEPARTMENTS) {
+        const level = levelFor(dept.id);
+        const kioskGroup = new THREE.Group();
+        const baseH = 0.25 + level * 0.55;
+        const base = new THREE.Mesh(
+          new THREE.BoxGeometry(0.55, baseH, 0.55),
+          new THREE.MeshStandardMaterial({ color: dept.color, roughness: 0.45, metalness: 0.2, emissive: dept.color, emissiveIntensity: 0.12 }),
+        );
+        base.position.y = baseH / 2;
+        base.castShadow = castsShadows;
+        base.receiveShadow = castsShadows;
+        kioskGroup.add(base);
+        const pad = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.06, 16), new THREE.MeshStandardMaterial({ color: 0x1a2028, roughness: 0.7 }));
+        pad.position.y = 0.03;
+        pad.receiveShadow = castsShadows;
+        kioskGroup.add(pad);
+        const label = makeLabel(dept.label, 0.5);
+        label.position.y = baseH + 0.35;
+        kioskGroup.add(label);
+        kioskGroup.position.set(Math.cos(dept.angle) * kioskRadius, 0, Math.sin(dept.angle) * kioskRadius);
+        scene.add(kioskGroup);
+        registerClickable(kioskGroup, dept.id);
+      }
+
       camera.position.set(6, 5.5, 6);
       camera.lookAt(0, floors * 0.5, 0);
 
@@ -172,7 +218,8 @@ export function HQTourScene({ hqTier, employees, morale, culture }: HQTourSceneP
         }
       };
     },
-    [hqTier, employees, morale, culture],
+    [hqTier, employees, morale, culture, marketingPct, rdPct, automation, salaryLevel],
+    { onPick: (id) => onDepartmentClick?.(id as 'marketing' | 'rd' | 'automation' | 'salary') },
   );
 
   return <div ref={ref} className="w-full h-52 rounded-2xl overflow-hidden bg-slate-950" />;

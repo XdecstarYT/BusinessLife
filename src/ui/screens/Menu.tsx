@@ -2,10 +2,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { useGame } from '../../store/gameStore';
 import { AUTOSAVE_ID, type SaveSlotMeta } from '../../store/persistence';
-import { Button, Card, Field, Pill, TextInput } from '../components';
+import { Badge, Button, Card, Field, Modal, Pill, TextInput } from '../components';
 import { money } from '../format';
 import type { Difficulty, Gender } from '../../sim/types';
 import type { Scenario } from '../../sim/world';
+import { consumeRoyalty, getRoyaltySources } from '../../net/leaderboard';
+import { buyPrestigePerk, getOwnedPrestigePerks, getPrestigePoints, PRESTIGE_PERKS } from '../../net/prestige';
+import { getRibbonCabinet, RIBBONS } from '../../data/ribbons';
+import { CHANGELOG } from '../../data/changelog';
+import { AccountPanel } from '../AccountPanel';
 import { IconBusiness, IconSpark, IconTrophy } from '../icons';
 
 const SCENARIOS: { id: Scenario; label: string; blurb: string }[] = [
@@ -22,7 +27,7 @@ const DIFFICULTIES: { id: Difficulty; label: string; blurb: string }[] = [
 ];
 
 export function Menu() {
-  const { saves, refreshSaves, newGame, load, remove, importFrom, darkMode, toggleDark } = useGame();
+  const { saves, refreshSaves, newGame, load, remove, importFrom, darkMode, toggleDark, toast } = useGame();
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
   const [gender, setGender] = useState<Gender>('male');
@@ -30,7 +35,17 @@ export function Menu() {
   const [scenario, setScenario] = useState<Scenario>('modern');
   const [difficulty, setDifficulty] = useState<Difficulty>('standard');
   const [useLegacyBonus, setUseLegacyBonus] = useState(false);
+  const [useRoyalty, setUseRoyalty] = useState(false);
+  const [showPrestigeShop, setShowPrestigeShop] = useState(false);
+  const [showChangelog, setShowChangelog] = useState(false);
+  // localStorage isn't reactive, so a purchase calls setPrestigeTick to force a re-render —
+  // that's the only thing this state is for, the reads below always pull fresh from localStorage.
+  const [, setPrestigeTick] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
+  const royaltySources = getRoyaltySources();
+  const ribbonCabinet = getRibbonCabinet();
+  const prestigePoints = getPrestigePoints();
+  const ownedPerks = getOwnedPrestigePerks();
 
   useEffect(() => {
     void refreshSaves();
@@ -42,6 +57,7 @@ export function Menu() {
   const legacyBonusAmount = bestLegacyScore * 10_000;
 
   const start = () => {
+    const spendRoyalty = useRoyalty && royaltySources.length > 0;
     newGame({
       playerName: name.trim() || 'Alex Morgan',
       gender,
@@ -49,7 +65,10 @@ export function Menu() {
       scenario,
       difficulty,
       legacyBonus: useLegacyBonus ? legacyBonusAmount : 0,
+      bornRoyal: spendRoyalty,
+      prestigePerks: ownedPerks,
     });
+    if (spendRoyalty) consumeRoyalty();
   };
 
   const onImport = (file: File) => {
@@ -63,7 +82,7 @@ export function Menu() {
       <div className="max-w-2xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-brand-500 to-violet-500 flex items-center justify-center text-white">
+            <div className="w-12 h-12 rounded-2xl bg-brand-500 flex items-center justify-center text-white">
               <IconBusiness className="w-7 h-7" />
             </div>
             <div>
@@ -71,9 +90,14 @@ export function Menu() {
               <p className="text-xs text-slate-500 dark:text-slate-400">Business &amp; Politics Life Simulator</p>
             </div>
           </div>
-          <button onClick={toggleDark} className="text-sm font-semibold text-slate-500 dark:text-slate-400">
-            {darkMode ? '☀️ Light' : '🌙 Dark'}
-          </button>
+          <div className="flex items-center gap-3 shrink-0">
+            <button onClick={() => setShowChangelog(true)} className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+              🆕 What's New
+            </button>
+            <button onClick={toggleDark} className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+              {darkMode ? '☀️ Light' : '🌙 Dark'}
+            </button>
+          </div>
         </div>
 
         {!creating ? (
@@ -121,13 +145,45 @@ export function Menu() {
               />
             </div>
 
-            <Card className="p-5 mt-8">
+            <AccountPanel />
+
+            {/* Ribbon cabinet: every life ends with a ribbon; the collection persists across lives */}
+            <Card className="p-5 mt-4">
+              <div className="flex items-center justify-between mb-3">
+                <span className="font-bold">🎗️ Ribbon Cabinet</span>
+                <span className="text-xs font-bold text-brand-500">
+                  {RIBBONS.filter((r) => ribbonCabinet[r.id]).length} / {RIBBONS.length} collected
+                </span>
+              </div>
+              <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                {RIBBONS.map((r) => {
+                  const count = ribbonCabinet[r.id] ?? 0;
+                  return (
+                    <div
+                      key={r.id}
+                      title={count > 0 ? `${r.name} ×${count} — ${r.description}` : '??? — keep living lives to discover this ribbon'}
+                      className={`rounded-xl px-1 py-2 text-center ${
+                        count > 0 ? 'bg-brand-500/10' : 'bg-slate-100 dark:bg-ink-800 opacity-50'
+                      }`}
+                    >
+                      <div className="text-xl leading-none">{count > 0 ? r.icon : '❔'}</div>
+                      <div className={`text-[9px] font-bold truncate mt-1 ${count > 0 ? 'text-brand-600 dark:text-brand-400' : 'text-slate-400'}`}>
+                        {count > 0 ? r.name : '???'}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-slate-400 mt-3">Every life ends with a ribbon. Which ones haven't you earned yet?</p>
+            </Card>
+
+            <Card className="p-5 mt-4">
               <div className="flex items-center gap-2 mb-2 text-brand-500">
                 <IconTrophy className="w-5 h-5" />
                 <span className="font-bold">How to play</span>
               </div>
               <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-                You start at 18. Each year, act — study, take a job, found companies, trade stocks, buy property,
+                You start at birth. Grow up, then act — study, take a job, found companies, trade stocks, buy property,
                 join or found a party, campaign for office, and pass laws — then press <b>Advance Year</b> to let the
                 world simulate forward. Build a business empire, run the country, or both. The economy, markets,
                 elections and rival tycoons all evolve whether you act or not.
@@ -194,6 +250,31 @@ export function Menu() {
                   </label>
                 </Field>
               )}
+              {royaltySources.length > 0 && (
+                <Field label="Royal Bloodline">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={useRoyalty} onChange={(e) => setUseRoyalty(e.target.checked)} />
+                    👑 You hit #1 on the {royaltySources.includes('networth') && royaltySources.includes('legacy')
+                      ? 'Net Worth and Legacy Score'
+                      : royaltySources.includes('networth') ? 'Net Worth' : 'Legacy Score'} leaderboard — spend it to be
+                    born into royalty this life (a fortune, elite tutors, and standing before you've done a thing).
+                  </label>
+                </Field>
+              )}
+              <Field label="Prestige Vault">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-sm">
+                    <span className="font-bold text-violet-500">🏆 {prestigePoints} Prestige</span>
+                    <span className="text-slate-500 dark:text-slate-400"> · {ownedPerks.length} perk{ownedPerks.length === 1 ? '' : 's'} owned</span>
+                    {ownedPerks.length > 0 && (
+                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        Owned perks apply automatically to this life and every future one.
+                      </div>
+                    )}
+                  </div>
+                  <Button size="sm" variant="soft" onClick={() => setShowPrestigeShop(true)}>Open Shop</Button>
+                </div>
+              </Field>
             </div>
             <div className="flex gap-3 mt-6">
               <Button variant="ghost" onClick={() => setCreating(false)}>
@@ -205,6 +286,79 @@ export function Menu() {
             </div>
           </Card>
         )}
+        <Modal open={showPrestigeShop} onClose={() => setShowPrestigeShop(false)} title="🏆 Prestige Vault">
+          <div className="p-5 space-y-3">
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Prestige Points carry over across every save and every life — earned once each life ends, from that
+              life's real accomplishments. Perks you buy here are permanent: once owned, they apply automatically
+              to every future new game, no toggling required.
+            </p>
+            <div className="text-center bg-violet-500/10 rounded-2xl py-3">
+              <span className="text-2xl font-black text-violet-500">{prestigePoints}</span>
+              <span className="text-sm text-slate-500 dark:text-slate-400 ml-1">Prestige available</span>
+            </div>
+            <div className="space-y-2">
+              {PRESTIGE_PERKS.map((perk) => {
+                const owned = ownedPerks.includes(perk.id);
+                const locked = !!perk.requires && !ownedPerks.includes(perk.requires);
+                const affordable = prestigePoints >= perk.cost;
+                return (
+                  <Card key={perk.id} className={`p-3 ${owned ? 'opacity-70' : ''}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-bold text-sm">{perk.icon} {perk.label}</div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400">{perk.blurb}</div>
+                        {locked && (
+                          <div className="text-[11px] text-amber-500 mt-1">
+                            🔒 Requires {PRESTIGE_PERKS.find((p) => p.id === perk.requires)?.label}
+                          </div>
+                        )}
+                      </div>
+                      <div className="shrink-0 text-right">
+                        {owned ? (
+                          <Badge tone="good">Owned</Badge>
+                        ) : (
+                          <Button
+                            size="sm"
+                            disabled={locked || !affordable}
+                            onClick={() => {
+                              const result = buyPrestigePerk(perk.id);
+                              setPrestigeTick((t) => t + 1);
+                              toast(result.message, result.ok ? 'ok' : 'err');
+                            }}
+                          >
+                            {perk.cost} 🏆
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        </Modal>
+
+        <Modal open={showChangelog} onClose={() => setShowChangelog(false)} title="🆕 Update Log">
+          <div className="p-5 space-y-3">
+            {CHANGELOG.map((entry) => (
+              <Card key={entry.version} className="p-4">
+                <div className="flex items-baseline gap-2 mb-2">
+                  <span className="text-xs font-bold text-brand-500 uppercase tracking-wide shrink-0">{entry.version}</span>
+                  <span className="font-bold text-sm text-slate-900 dark:text-white">{entry.title}</span>
+                </div>
+                <ul className="space-y-1">
+                  {entry.bullets.map((b, i) => (
+                    <li key={i} className="text-sm text-slate-600 dark:text-slate-300 flex gap-2">
+                      <span className="text-slate-300 dark:text-slate-600 shrink-0">•</span>
+                      <span>{b}</span>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            ))}
+          </div>
+        </Modal>
       </div>
     </div>
   );

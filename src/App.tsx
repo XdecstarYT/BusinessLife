@@ -22,6 +22,19 @@ import { Stats } from './ui/screens/Stats';
 import { Family } from './ui/screens/Family';
 import { Studio } from './ui/screens/Studio';
 import { Casino } from './ui/screens/Casino';
+import { Athlete } from './ui/screens/Athlete';
+import { Military } from './ui/screens/Military';
+import { Drugs } from './ui/screens/Drugs';
+import { Entertainment } from './ui/screens/Entertainment';
+import { Medical } from './ui/screens/Medical';
+import { Cult } from './ui/screens/Cult';
+import { Space } from './ui/screens/Space';
+import { Legal } from './ui/screens/Legal';
+import { Culinary } from './ui/screens/Culinary';
+import { Aviation } from './ui/screens/Aviation';
+import { Domination } from './ui/screens/Domination';
+import { Leaderboard } from './ui/screens/Leaderboard';
+import { Updates } from './ui/screens/Updates';
 
 export default function App() {
   const { state, screen, darkMode } = useGame();
@@ -57,6 +70,19 @@ export default function App() {
           {screen === 'stats' && <Stats />}
           {screen === 'family' && <Family />}
           {screen === 'casino' && <Casino />}
+          {screen === 'athlete' && <Athlete />}
+          {screen === 'military' && <Military />}
+          {screen === 'drugs' && <Drugs />}
+          {screen === 'entertainment' && <Entertainment />}
+          {screen === 'medical' && <Medical />}
+          {screen === 'cult' && <Cult />}
+          {screen === 'space' && <Space />}
+          {screen === 'legal' && <Legal />}
+          {screen === 'culinary' && <Culinary />}
+          {screen === 'aviation' && <Aviation />}
+          {screen === 'domination' && <Domination />}
+          {screen === 'leaderboard' && <Leaderboard />}
+          {screen === 'updates' && <Updates />}
         </div>
       </AppShell>
       <YearRecapModal />

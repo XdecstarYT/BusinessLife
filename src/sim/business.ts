@@ -4,10 +4,11 @@
  * x laws in force x competition. Applies to both player-run companies and
  * the hundreds of NPC/public companies that populate the stock market.
  */
-import type { Company, Country, GameState, Industry } from './types';
+import type { ActivistDemand, Company, Country, CreditRating, GameState, Industry, RivalStrategy } from './types';
 import { clamp, clamp01, clamp100 } from './types';
 import { aggregateLawEffects, lawIndustryModifier } from './economy';
 import { INDUSTRY_BY_ID } from '../data/industries';
+import { doIPO } from './market';
 import type { RNG } from './rng';
 
 let companyCounter = 0;
@@ -64,6 +65,7 @@ export function createCompany(opts: FoundCompanyOptions, rng: RNG): Company {
     marketingPct: 0.05,
     rdPct: industry.techIntensity * 0.06,
     isPublic: false,
+    ipoYear: null,
     sharesOutstanding: 1_000_000 * Math.max(1, Math.round(scale)),
     sharePrice: 0,
     dividendPayoutPct: 0,
@@ -96,9 +98,53 @@ export function createCompany(opts: FoundCompanyOptions, rng: RNG): Company {
     jointVenturePartnerId: null,
     jointVentureYearsLeft: 0,
     jointVentureInvestment: 0,
+    factories: [],
+    internationalOffices: [],
+    hasVentureArm: false,
+    ventureInvestments: [],
+    activeCampaign: null,
+    campaignsRun: 0,
+    grudgeAgainstPlayer: 0,
+    rivalStrategy: null,
+    manufacturingCapacity: 100,
+    demandBacklog: 0,
+    stockoutStreak: 0,
+    creditRating: 'BBB',
+    antitrustScrutinyYears: 0,
+    antitrustCaseOpen: false,
+    activistCampaign: null,
     status: 'active',
     history: [],
   };
+}
+
+/** Physical-goods industries whose revenue growth is actually gated by production capacity (see
+ * Company.manufacturingCapacity below) — software, finance, media and other non-physical
+ * industries are exempt and behave exactly as before this system existed. */
+const MANUFACTURING_TAGS = new Set([
+  'manufacturing', 'industrial', 'auto', 'consumer', 'retail', 'food', 'agriculture',
+  'construction', 'defense', 'luxury', 'mining', 'energy', 'oil', 'gas', 'coal', 'solar',
+  'nuclear', 'housing',
+]);
+
+export function isManufacturingIndustry(ind: Industry): boolean {
+  return ind.tags.some((t) => MANUFACTURING_TAGS.has(t));
+}
+
+/** V54: recompute manufacturingCapacity toward its target each tick (smoothed, not snapped, so
+ * building/losing a factory shows up as a trend rather than an instant jump). Two sources:
+ * a small organic baseline from automation/workforce (artisanal-scale output with no dedicated
+ * factories), and the real payoff from V50's factories — normalized against the company's current
+ * revenue so bigger companies genuinely need more factories to stay at 100, not just one. */
+function tickManufacturingCapacity(c: Company): void {
+  const factoryScore = c.factories.reduce(
+    (sum, f) => sum + f.capacityUnits * (0.7 + f.automationLevel * 0.15) * (f.condition / 100),
+    0,
+  );
+  const capacityFromFactories = (factoryScore / Math.max(1, c.revenue / 40_000)) * 100;
+  const organicCapacity = 55 + Math.min(25, c.automation * 0.25);
+  const targetCapacity = clamp(organicCapacity + capacityFromFactories, 10, 220);
+  c.manufacturingCapacity += (targetCapacity - c.manufacturingCapacity) * 0.35;
 }
 
 /** Fair-value estimate used for sales, acquisitions and IPO pricing. */
@@ -110,14 +156,49 @@ export function companyValuation(c: Company): number {
   return Math.max(0, Math.round(value));
 }
 
+/** V56: Credit Rating Agency — a pure function of leverage, profitability and cash runway, so it
+ * can be recomputed cheaply every tick without any persisted history. Feeds into the interest
+ * rate charged on new debt (see debtRate below and issueCorporateBond in actions.ts); it does
+ * NOT retroactively reprice debt already on the books. */
+const CREDIT_RATING_ORDER: CreditRating[] = ['D', 'CCC', 'B', 'BB', 'BBB', 'A', 'AA', 'AAA'];
+export const CREDIT_RATING_SPREAD: Record<CreditRating, number> = {
+  AAA: -0.012, AA: -0.006, A: -0.002, BBB: 0.004, BB: 0.014, B: 0.03, CCC: 0.06, D: 0.1,
+};
+
+export function computeCreditRating(c: Company): CreditRating {
+  const totalDebt = c.debt + c.bondDebt;
+  const leverage = totalDebt / Math.max(1, c.assets + c.cash);
+  const margin = c.revenue > 0 ? c.profit / c.revenue : -1;
+  const cashRunwayMonths = c.expenses > 0 ? c.cash / (c.expenses / 12) : 12;
+  let score = 100;
+  score -= leverage * 120;
+  score -= Math.max(0, -margin) * 200;
+  score += clamp(margin, -0.1, 0.2) * 100;
+  score -= Math.max(0, 6 - cashRunwayMonths) * 5;
+  if (score >= 90) return 'AAA';
+  if (score >= 78) return 'AA';
+  if (score >= 65) return 'A';
+  if (score >= 50) return 'BBB';
+  if (score >= 35) return 'BB';
+  if (score >= 20) return 'B';
+  if (score >= 5) return 'CCC';
+  return 'D';
+}
+
 /** Secular industry rise/decline across decades: tech-driven, lightly-regulated industries
  * trend up over time; capital-heavy, high-regulation, low-tech ones trend down. Cheap flat
  * pass over the (static) industry catalogue, called once a year from advanceYear. */
 export function tickIndustryEra(state: GameState, rng: RNG): void {
   for (const ind of state.industries) {
     const prev = state.industryEraMultiplier[ind.id] ?? 1;
-    const drift = (ind.techIntensity - 0.4) * 0.006 - (ind.regulationSensitivity - 0.5) * 0.002 + rng.range(-0.003, 0.003);
+    // V51: a persistent, permanent-outlasting-the-player nudge from how much the player's own
+    // companies have historically shaped this industry (see the legacy-accumulation hook in
+    // engine.ts's per-company loop) — an industry you dominated keeps trending your way for
+    // years after you've moved on, and one you gutted keeps sagging.
+    const legacy = state.industryDisruptionLegacy[ind.id] ?? 0;
+    const drift = (ind.techIntensity - 0.4) * 0.006 - (ind.regulationSensitivity - 0.5) * 0.002 + legacy * 0.0015 + rng.range(-0.003, 0.003);
     state.industryEraMultiplier[ind.id] = clamp(prev + drift, 0.55, 1.85);
+    if (legacy !== 0) state.industryDisruptionLegacy[ind.id] = legacy * 0.985;
   }
 }
 
@@ -139,6 +220,10 @@ export function tickCompany(c: Company, ctx: CompanyTickContext): CompanyTickRes
   const e = country.economy;
   const law = aggregateLawEffects(country);
   let headline: string | null = null;
+  // Backfill for saves from before V54's manufacturing-capacity system.
+  c.manufacturingCapacity ??= 100;
+  c.demandBacklog ??= 0;
+  c.stockoutStreak ??= 0;
 
   // --- Demand ------------------------------------------------------------
   const cycle = 1 + e.gdpGrowth * (1 + ind.cyclicality * 3);
@@ -238,7 +323,56 @@ export function tickCompany(c: Company, ctx: CompanyTickContext): CompanyTickRes
 
   const growthPotential = cycle * confidence * lawMult * priceFit * marketingPower * qualityPull * managerMult * moraleMult * commodityMult * worldEventMult * climateMult * eraMult * noise;
   const cappedGrowth = 1 + (clamp(growthPotential, 0.4, 2.2) - 1) * saturation;
-  c.revenue = Math.max(1000, c.revenue * cappedGrowth);
+  const desiredRevenue = Math.max(1000, c.revenue * cappedGrowth);
+
+  // --- Manufacturing capacity vs. demand (V54) ----------------------------
+  // Physical-goods companies can't just will their revenue up to what the formula above wants —
+  // they need real production capacity (factories) to fulfill it. Service/software/finance
+  // industries are untouched: desiredRevenue applies exactly as before this system existed.
+  if (isManufacturingIndustry(ind)) {
+    tickManufacturingCapacity(c);
+    const capacityRatio = clamp(c.manufacturingCapacity / 100, 0.15, 2.5);
+    const desiredGrowth = desiredRevenue - c.revenue;
+    const prevStockoutStreak = c.stockoutStreak;
+    if (desiredGrowth > 0) {
+      const fulfillableGrowth = desiredGrowth * Math.min(1, capacityRatio);
+      const unmet = desiredGrowth - fulfillableGrowth;
+      c.revenue += fulfillableGrowth;
+      // Backlog accumulates unmet demand but also bleeds away (customers who can't wait buy
+      // from a competitor instead), and spare capacity beyond this year's growth chips into
+      // any existing backlog — a factory investment finally showing results.
+      c.demandBacklog = Math.max(0, c.demandBacklog * 0.6 + unmet);
+      if (capacityRatio > 1 && c.demandBacklog > 0) {
+        const spare = c.revenue * (capacityRatio - 1) * 0.2;
+        const recovered = Math.min(c.demandBacklog, spare);
+        c.revenue += recovered;
+        c.demandBacklog -= recovered;
+      }
+      c.stockoutStreak = unmet > desiredGrowth * 0.1 ? c.stockoutStreak + 1 : Math.max(0, c.stockoutStreak - 1);
+    } else {
+      c.revenue = desiredRevenue;
+      c.demandBacklog *= 0.7;
+      c.stockoutStreak = Math.max(0, c.stockoutStreak - 1);
+    }
+    // Sustained stockouts finally cost real customers, not just this year's growth.
+    if (c.stockoutStreak >= 3) {
+      c.revenue *= 0.97;
+      c.customerSatisfaction = clamp100(c.customerSatisfaction - 2);
+    }
+    if (c.playerOwned && c.stockoutStreak === 2) {
+      headline = headline ?? `${c.name} can't keep up with demand — customers are waiting on backorders`;
+    }
+    if (c.playerOwned) {
+      if (capacityRatio >= 1.5 && c.stockoutStreak === 0 && !state.achievements.includes('supply_chain_master')) {
+        state.achievements.push('supply_chain_master');
+      }
+      if (prevStockoutStreak >= 3 && c.stockoutStreak === 0 && !state.achievements.includes('back_on_track')) {
+        state.achievements.push('back_on_track');
+      }
+    }
+  } else {
+    c.revenue = desiredRevenue;
+  }
 
   // Retail theft & security: unprotected retail-tagged businesses lose a slice of revenue to
   // shrinkage, scaled by the country's average crime rate; security investment eliminates it
@@ -380,8 +514,66 @@ export function tickCompany(c: Company, ctx: CompanyTickContext): CompanyTickRes
     headline = headline ?? `${c.name} discloses a data breach`;
   }
 
+  // --- Credit rating (V56) -------------------------------------------------------
+  c.creditRating ??= 'BBB';
+  const newRating = computeCreditRating(c);
+  if (newRating !== c.creditRating) {
+    const upgraded = CREDIT_RATING_ORDER.indexOf(newRating) > CREDIT_RATING_ORDER.indexOf(c.creditRating);
+    if (c.playerOwned) {
+      headline = headline ?? `${c.name}'s credit rating was ${upgraded ? 'upgraded' : 'downgraded'} to ${newRating}`;
+      if (newRating === 'AAA' && !state.achievements.includes('aaa_rated')) state.achievements.push('aaa_rated');
+    }
+    c.creditRating = newRating;
+  }
+
+  // --- Antitrust regulation (V56) -------------------------------------------------
+  // Sustained market dominance draws real regulatory scrutiny — ignoring it too long forces an
+  // automatic settlement; the player can instead proactively settleAntitrustCase or gamble on
+  // fightAntitrustCase (see actions.ts) once a case is open.
+  if (c.playerOwned) {
+    c.antitrustScrutinyYears ??= 0;
+    c.antitrustCaseOpen ??= false;
+    if (c.marketShare > 0.35) c.antitrustScrutinyYears++;
+    else c.antitrustScrutinyYears = Math.max(0, c.antitrustScrutinyYears - 1);
+    if (!c.antitrustCaseOpen && c.antitrustScrutinyYears >= 3) {
+      c.antitrustCaseOpen = true;
+      headline = headline ?? `Regulators open an antitrust investigation into ${c.name}'s dominant market position`;
+    } else if (c.antitrustCaseOpen && c.antitrustScrutinyYears >= 6) {
+      c.marketShare *= 0.6;
+      c.revenue *= 0.9;
+      c.cash = Math.max(0, c.cash - Math.max(20_000, c.revenue * 0.02));
+      c.antitrustCaseOpen = false;
+      c.antitrustScrutinyYears = 0;
+      headline = `Regulators forced a breakup of ${c.name} after its antitrust case went unresolved too long`;
+    }
+  }
+
+  // --- Shareholder activism (V56) -------------------------------------------------
+  c.activistCampaign ??= null;
+  if (c.playerOwned && c.isPublic && !c.activistCampaign) {
+    const margin = c.revenue > 0 ? c.profit / c.revenue : 0;
+    const underperforming = margin < 0.03 || c.brand < 35;
+    const triggerChance = underperforming ? 0.05 + c.institutionalOwnPct * 0.001 : 0.005;
+    if (rng.chance(triggerChance)) {
+      const demandPool: ActivistDemand[] = c.revenue > 5_000_000
+        ? ['dividend', 'buyback', 'ceo_change', 'spinoff']
+        : ['dividend', 'buyback', 'ceo_change'];
+      const demand = rng.pick(demandPool);
+      const investorName = `${rng.pick(['Ironclad', 'Vanguard Point', 'Blackridge', 'Harbor Peak', 'Meridian', 'Northbridge'])} Capital`;
+      c.activistCampaign = {
+        investorName,
+        demand,
+        strength: clamp(40 + c.institutionalOwnPct * 0.4 + rng.range(-10, 15), 20, 95),
+        yearsActive: 0,
+      };
+      headline = headline ?? `${investorName} builds a stake in ${c.name} and demands changes`;
+    }
+  } else if (c.activistCampaign) {
+    c.activistCampaign.yearsActive++;
+  }
+
   // --- Debt & bankruptcy ---------------------------------------------------------
-  c.debtRate = e.interestRate + 0.03 + (c.debt > c.assets ? 0.04 : 0);
+  c.debtRate = Math.max(0.01, e.interestRate + 0.03 + (c.debt > c.assets ? 0.04 : 0) + (CREDIT_RATING_SPREAD[c.creditRating] ?? 0));
   if (c.cash < 0) {
     // Auto-borrow to cover shortfalls while creditworthy.
     const need = -c.cash;
@@ -458,34 +650,108 @@ export function tickMergers(state: GameState, rng: RNG): string[] {
   return headlines;
 }
 
+/** Strong private NPC companies occasionally go public on their own, keeping the stock market —
+ * and the city skyline (see CityHubScene's IPO construction lifecycle) — growing over time even
+ * when the player never triggers an IPO themselves. */
+export function tickNpcIPOs(state: GameState, rng: RNG): string[] {
+  const headlines: string[] = [];
+  for (const c of Object.values(state.companies)) {
+    if (c.status !== 'active' || c.playerOwned || c.isPublic) continue;
+    if (c.revenue < 8_000_000 || c.profit <= 0) continue;
+    if (!rng.chance(0.04)) continue;
+    const raised = doIPO(c, rng, state.year);
+    headlines.push(`${c.name} goes public, raising $${Math.round(raised).toLocaleString()} on the exchange.`);
+  }
+  return headlines;
+}
+
+/** V55: Rival Empires — the strategy a rival settles into the first time it actually attacks the
+ * player, derived from its own real stats rather than assigned randomly, so a rival plays true to
+ * character (an R&D-heavy firm keeps fighting with patents, not price cuts) for the rest of the
+ * game. Assigned once and never reassigned — see Company.rivalStrategy. */
+export function assignRivalStrategy(c: Company, rng: RNG): RivalStrategy {
+  const scores: Record<RivalStrategy, number> = {
+    aggressive_expander: c.marketShare * 100 + rng.range(0, 8),
+    price_warrior: (1.15 - c.priceLevel) * 40 + rng.range(0, 8),
+    tech_innovator: c.rdPct * 200 + rng.range(0, 8),
+    brand_builder: c.brand * 0.5 + c.marketingPct * 100 + rng.range(0, 8),
+    talent_raider: c.salaryLevel * 30 + c.morale * 0.3 + rng.range(0, 8),
+  };
+  return (Object.entries(scores) as [RivalStrategy, number][]).reduce((best, cur) => (cur[1] > best[1] ? cur : best))[0];
+}
+
+/** UI-facing label/icon/blurb per strategy — shared so the Business screen's rival cards read
+ * the same character the tick logic actually plays out (see STRATEGY_ATTACK_WEIGHTS below). */
+export const RIVAL_STRATEGY_INFO: Record<RivalStrategy, { label: string; icon: string; blurb: string }> = {
+  aggressive_expander: { label: 'Aggressive Expander', icon: '📈', blurb: 'Chasing market share fast, often at your expense.' },
+  price_warrior: { label: 'Price Warrior', icon: '🏷️', blurb: 'Wins on price, and isn\'t shy about starting a war over it.' },
+  tech_innovator: { label: 'Tech Innovator', icon: '🔬', blurb: 'Leans on R&D and patents to fight, not price cuts.' },
+  brand_builder: { label: 'Brand Builder', icon: '📣', blurb: 'Fights with marketing and reputation, not the courtroom.' },
+  talent_raider: { label: 'Talent Raider', icon: '🎯', blurb: 'Comes after your people before your product.' },
+};
+
+/** How strongly each strategy leans toward each attack kind — a weight of 1 is baseline (no
+ * lean); the pick below is still randomized, just skewed toward the rival's character. */
+const STRATEGY_ATTACK_WEIGHTS: Record<RivalStrategy, Record<'misinformation' | 'poaching' | 'undercutting' | 'legal_action', number>> = {
+  aggressive_expander: { misinformation: 1, poaching: 1, undercutting: 2.2, legal_action: 0.6 },
+  price_warrior: { misinformation: 0.6, poaching: 0.6, undercutting: 3, legal_action: 0.5 },
+  tech_innovator: { misinformation: 0.6, poaching: 0.8, undercutting: 0.6, legal_action: 2.8 },
+  brand_builder: { misinformation: 2.6, poaching: 0.6, undercutting: 0.7, legal_action: 0.8 },
+  talent_raider: { misinformation: 0.6, poaching: 2.8, undercutting: 0.6, legal_action: 0.7 },
+};
+
 /** NPC rivals occasionally take a shot at a player-owned company: smear campaigns, poaching,
- * price undercutting, or aggressive legal action. Purely emergent — the player doesn't trigger this. */
+ * price undercutting, or aggressive legal action. Purely emergent — the player doesn't trigger
+ * this directly, but V51's grudge system (bumped by attemptHostileTakeover/startPriceWar/
+ * filePatentLawsuit/spyOnCompany/protectionRacket in actions.ts) makes it targeted: a rival who
+ * remembers being wronged is both more likely to strike and more likely to be the one who does.
+ * V55 layers a settled RivalStrategy on top so which kind of attack a given rival favors is a
+ * consistent character trait, not a fresh coin flip every time. */
 export function tickCorporateSabotage(state: GameState, rng: RNG): string[] {
   const headlines: string[] = [];
+  // Grudge decays on its own every year regardless of whether it boils over this time.
+  for (const co of Object.values(state.companies)) {
+    if (co.status !== 'active') continue;
+    co.grudgeAgainstPlayer ??= 0;
+    co.rivalStrategy ??= null;
+    if (co.grudgeAgainstPlayer >= 90 && !state.achievements.includes('arch_nemesis')) state.achievements.push('arch_nemesis');
+    if (co.grudgeAgainstPlayer > 0) co.grudgeAgainstPlayer = Math.max(0, co.grudgeAgainstPlayer - 3);
+  }
   for (const c of Object.values(state.companies)) {
     if (c.status !== 'active' || !c.playerOwned) continue;
     const rivals = Object.values(state.companies).filter(
       (r) => r.status === 'active' && !r.playerOwned && r.industryId === c.industryId && r.countryId === c.countryId && r.revenue > c.revenue * 0.3,
     );
-    if (!rivals.length || !rng.chance(0.06)) continue;
-    const rival = rng.pick(rivals);
-    const kind = rng.pick(['misinformation', 'poaching', 'undercutting', 'legal_action'] as const);
+    if (!rivals.length) continue;
+    const maxGrudge = Math.max(0, ...rivals.map((r) => r.grudgeAgainstPlayer));
+    if (!rng.chance(0.06 + maxGrudge * 0.0035)) continue;
+    const rival = rng.weighted(rivals, (r) => 1 + r.grudgeAgainstPlayer * 0.2);
+    if (!rival.rivalStrategy) rival.rivalStrategy = assignRivalStrategy(rival, rng);
+    const grudging = rival.grudgeAgainstPlayer > 40;
+    const weights = STRATEGY_ATTACK_WEIGHTS[rival.rivalStrategy];
+    const kind = rng.weighted(
+      ['misinformation', 'poaching', 'undercutting', 'legal_action'] as const,
+      (k) => weights[k],
+    );
+    const grudgeSuffix = grudging ? ` — still settling the score over your past dealings` : '';
     if (kind === 'misinformation') {
-      c.brand = clamp100(c.brand - rng.range(4, 10));
-      headlines.push(`${rival.name} is spreading misinformation about ${c.name} online.`);
+      c.brand = clamp100(c.brand - rng.range(4, 10) * (grudging ? 1.4 : 1));
+      headlines.push(`${rival.name} is spreading misinformation about ${c.name} online${grudgeSuffix}.`);
     } else if (kind === 'poaching') {
       c.managerQuality = clamp100(c.managerQuality - rng.range(3, 8));
       c.morale = clamp100(c.morale - rng.range(2, 6));
-      headlines.push(`${rival.name} poached several key staff from ${c.name}.`);
+      headlines.push(`${rival.name} poached several key staff from ${c.name}${grudgeSuffix}.`);
     } else if (kind === 'undercutting') {
-      c.revenue = Math.max(1000, c.revenue * (1 - rng.range(0.03, 0.08)));
-      headlines.push(`${rival.name} is aggressively undercutting ${c.name} on price.`);
+      c.revenue = Math.max(1000, c.revenue * (1 - rng.range(0.03, 0.08) * (grudging ? 1.3 : 1)));
+      headlines.push(`${rival.name} is aggressively undercutting ${c.name} on price${grudgeSuffix}.`);
     } else {
       const legalCost = Math.min(c.cash, Math.max(5_000, c.revenue * 0.02));
       c.cash -= legalCost;
       c.brand = clamp100(c.brand - rng.range(1, 4));
-      headlines.push(`${c.name} is fighting off a nuisance lawsuit filed by ${rival.name}.`);
+      headlines.push(`${c.name} is fighting off a nuisance lawsuit filed by ${rival.name}${grudgeSuffix}.`);
     }
+    // Acting on the grudge is cathartic — it doesn't erase the history, but it takes the edge off.
+    rival.grudgeAgainstPlayer = clamp(rival.grudgeAgainstPlayer * 0.5, 0, 100);
   }
   return headlines;
 }

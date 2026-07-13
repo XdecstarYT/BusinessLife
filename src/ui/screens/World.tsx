@@ -10,6 +10,7 @@ import {
   advisorRecommendation,
   attendSummit,
   bidToHostGlobalGames,
+  breakTradeAgreement,
   cabinetCandidates,
   callReferendum,
   cancelLobbyingFirm,
@@ -30,10 +31,13 @@ import {
   investInHealthcare,
   issueGovernmentBonds,
   joinAlliance,
+  judiciaryCandidates,
   launchInfrastructureProject,
   leaveAlliance,
   liftSanctions,
   nominateChiefJustice,
+  nominateJustice,
+  petitionSupremeCourt,
   sendForeignAid,
   setBudgetAllocation,
   setEnergyMix,
@@ -47,6 +51,14 @@ import { LAW_BY_ID } from '../../data/laws';
 
 const INFRA_KINDS: InfrastructureKind[] = ['roads', 'rail', 'airport', 'power', 'internet', 'space_program', 'bridge', 'tunnel', 'bullet_train', 'stadium', 'dam'];
 const ADVISOR_SPECIALTIES: AdvisorSpecialty[] = ['economy', 'military', 'diplomacy'];
+
+function ideologyLabel(v: number): string {
+  if (v < -60) return 'Far Left';
+  if (v < -20) return 'Center-Left';
+  if (v < 20) return 'Centrist';
+  if (v < 60) return 'Center-Right';
+  return 'Far Right';
+}
 
 const WORLD_EVENT_INFO: Record<WorldEvent['type'], { emoji: string; label: string; desc: string; tone: 'bad' | 'good' }> = {
   pandemic: { emoji: '🦠', label: 'Global Pandemic', desc: 'Tourism, airlines and entertainment are hit hard; health and remote-work industries are up.', tone: 'bad' },
@@ -240,7 +252,11 @@ function CountryModal({ country, onClose }: { country: Country; onClose: () => v
                 <Button size="sm" variant="soft" onClick={() => run(imposeSanctions, country.id)}>🚫 Sanction</Button>
               )}
               <Button size="sm" variant="soft" onClick={() => run(sendForeignAid, country.id)}>🤲 Send Aid (10 PC)</Button>
-              <Button size="sm" variant="soft" onClick={() => run(signTradeAgreement, country.id)}>🤝 Trade Deal (10 PC)</Button>
+              {home.tradeAgreementIds?.includes(country.id) ? (
+                <Button size="sm" variant="ghost" onClick={() => run(breakTradeAgreement, country.id)}>🤝 Trade Deal Active — Break</Button>
+              ) : (
+                <Button size="sm" variant="soft" onClick={() => run(signTradeAgreement, country.id)}>🤝 Trade Deal (10 PC)</Button>
+              )}
               <Button size="sm" variant="soft" className="col-span-2" onClick={() => run(gatherIntelligence, country.id)}>🕵️ Gather Intelligence</Button>
               {country.allianceId && !home.allianceId && (
                 <Button size="sm" variant="soft" className="col-span-2" onClick={() => run(joinAlliance, country.allianceId!)}>
@@ -272,6 +288,8 @@ function GovernmentTools({ country }: { country: Country }) {
   const [immigrationDraft, setImmigrationDraft] = useState<number | null>(null);
   const [energyDraft, setEnergyDraft] = useState<number | null>(null);
   const [nominating, setNominating] = useState(false);
+  const [nominatingJustice, setNominatingJustice] = useState(false);
+  const [petitioning, setPetitioning] = useState(false);
   const [referendumPicker, setReferendumPicker] = useState(false);
   const [allianceNamer, setAllianceNamer] = useState(false);
   const [allianceName, setAllianceName] = useState('');
@@ -484,6 +502,26 @@ function GovernmentTools({ country }: { country: Country }) {
         <Button size="sm" variant="soft" className="w-full" onClick={() => setNominating(true)}>Nominate Chief Justice</Button>
       </Card>
 
+      <div className="font-bold mb-2 text-sm">Supreme Court ({(country.supremeCourt ?? []).length}/9 seats)</div>
+      <Card className="p-3 mb-4">
+        {(country.supremeCourt ?? []).length === 0 ? (
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-2">No sitting justices. A bench of confirmed justices sways which laws judicial review targets — nominate justices who share your ideology to protect your legislative agenda.</div>
+        ) : (
+          <div className="space-y-1 mb-2">
+            {country.supremeCourt.map((j) => (
+              <div key={j.id} className="flex justify-between text-xs bg-slate-100 dark:bg-ink-800 rounded-xl px-3 py-2">
+                <span className="font-semibold truncate pr-2">{j.name}{j.id === country.chiefJusticeId ? ' (Chief)' : ''}</span>
+                <span className="text-slate-500 dark:text-slate-400 shrink-0">{ideologyLabel(j.ideology)} · age {j.age}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="grid grid-cols-2 gap-2">
+          <Button size="sm" variant="soft" disabled={(country.supremeCourt ?? []).length >= 9} onClick={() => setNominatingJustice(true)}>Nominate Justice (12 PC)</Button>
+          <Button size="sm" variant="soft" disabled={country.lawsInForce.length === 0} onClick={() => setPetitioning(true)}>Petition Court (15 PC)</Button>
+        </div>
+      </Card>
+
       <div className="font-bold mb-2 text-sm">Referendum</div>
       <Card className="p-3 mb-4">
         <div className="text-xs text-slate-500 dark:text-slate-400 mb-2">
@@ -514,6 +552,7 @@ function GovernmentTools({ country }: { country: Country }) {
 
       <div className="font-bold mb-2 text-sm">Alliance</div>
       <Card className="p-3">
+        <div className="text-xs text-slate-500 dark:text-slate-400 mb-2">Mutual defense: if any member goes to war, the rest are automatically dragged in on their side.</div>
         {alliance ? (
           <div className="flex items-center justify-between">
             <div className="text-xs">
@@ -559,6 +598,46 @@ function GovernmentTools({ country }: { country: Country }) {
                 <div className="text-xs text-slate-500 dark:text-slate-400">Integrity {n.integrity}</div>
               </button>
             ))}
+          </div>
+        </Modal>
+      )}
+
+      {nominatingJustice && (
+        <Modal open onClose={() => setNominatingJustice(false)} title="Nominate a Justice">
+          <div className="space-y-2 max-h-[50vh] overflow-y-auto">
+            {judiciaryCandidates(state).length === 0 && <p className="text-center text-slate-400 py-6">No eligible nominees right now.</p>}
+            {judiciaryCandidates(state).map((n) => (
+              <button
+                key={n.id}
+                onClick={() => { run(nominateJustice, n.id); setNominatingJustice(false); }}
+                className="w-full text-left p-3 rounded-2xl bg-slate-100 dark:bg-ink-800 hover:bg-slate-200 dark:hover:bg-ink-700"
+              >
+                <div className="font-semibold">{n.name}</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Integrity {n.integrity} · Competence {n.competence}</div>
+              </button>
+            ))}
+          </div>
+        </Modal>
+      )}
+
+      {petitioning && (
+        <Modal open onClose={() => setPetitioning(false)} title="Petition the Supreme Court">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Ask the court to review and strike down a law in force. Odds favor laws that clash with the bench's ideological lean.</p>
+          <div className="space-y-2 max-h-[50vh] overflow-y-auto">
+            {country.lawsInForce.map((lawId) => {
+              const l = LAW_BY_ID[lawId];
+              if (!l) return null;
+              return (
+                <button
+                  key={lawId}
+                  onClick={() => { run(petitionSupremeCourt, lawId); setPetitioning(false); }}
+                  className="w-full text-left p-3 rounded-2xl bg-slate-100 dark:bg-ink-800 hover:bg-slate-200 dark:hover:bg-ink-700"
+                >
+                  <div className="font-semibold">{l.name}</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">{l.description}</div>
+                </button>
+              );
+            })}
           </div>
         </Modal>
       )}

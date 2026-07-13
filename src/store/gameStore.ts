@@ -6,11 +6,13 @@
 import { create } from 'zustand';
 import type { EventChoice, FiredEvent, GameState } from '../sim/types';
 import { generateWorld, type NewGameConfig } from '../sim/world';
-import { advanceDay, advanceWeek, advanceYear, continueAsHeir as continueAsHeirEngine } from '../sim/engine';
+import { advanceDay, advanceWeek, advanceYear, continueAsHeir as continueAsHeirEngine, gameOverCheck } from '../sim/engine';
 import { resolveChoice } from '../sim/events';
 import { RNG } from '../sim/rng';
 import * as actions from '../sim/actions';
 import * as market from '../sim/market';
+import { ACHIEVEMENTS } from '../data/achievements';
+import { SPECIALTY_BY_ID, missionTypeFor } from '../data/military';
 import {
   AUTOSAVE_ID,
   deleteSave,
@@ -21,6 +23,19 @@ import {
   saveGame,
   type SaveSlotMeta,
 } from './persistence';
+
+/** V52: true while deployed with a combat-role specialty that has a real playable mission and
+ * hasn't played it this year — used by nextYear/nextDay/nextWeek to block advancing time (day/week
+ * ticks can silently roll a full year over at day 365 via advanceDay/advanceWeek, so they need the
+ * same gate as nextYear or a player could dodge the mission by spamming +1 Day). */
+function blockedByMandatoryDeployment(s: GameState): boolean {
+  const career = s.player.military;
+  if (!career?.currentDeployment) return false;
+  const specialty = SPECIALTY_BY_ID[career.specialtyId];
+  const missionType = specialty ? missionTypeFor(career.specialtyId, specialty.combatRole) : null;
+  if (!missionType) return false;
+  return s.player.actionCooldowns['military_mission'] !== s.year;
+}
 
 export type Screen =
   | 'menu'
@@ -36,12 +51,26 @@ export type Screen =
   | 'news'
   | 'stats'
   | 'family'
-  | 'casino';
+  | 'casino'
+  | 'athlete'
+  | 'military'
+  | 'drugs'
+  | 'entertainment'
+  | 'medical'
+  | 'cult'
+  | 'space'
+  | 'legal'
+  | 'culinary'
+  | 'aviation'
+  | 'domination'
+  | 'leaderboard'
+  | 'updates';
 
 interface Toast {
   id: number;
   text: string;
-  tone: 'ok' | 'err';
+  tone: 'ok' | 'err' | 'achievement';
+  icon?: string;
 }
 
 interface GameStoreState {
@@ -54,6 +83,9 @@ interface GameStoreState {
   eventResult: { text: string | null; logs: string[] } | null;
   darkMode: boolean;
   busy: boolean;
+  // Achievement keys already celebrated this session — lets us diff `state.achievements` after
+  // every mutation and toast only the ones that are genuinely new, not ones a loaded save already had.
+  seenAchievements: string[];
 
   // lifecycle
   newGame: (config: NewGameConfig) => void;
@@ -77,7 +109,10 @@ interface GameStoreState {
   endStoryHere: () => void;
   dismissYearRecap: () => void;
   toggleDark: () => void;
+  cityHome: boolean; // V8.2: land in the walkable 3D city on start/continue instead of the Life feed
+  toggleCityHome: () => void;
   toast: (text: string, tone?: 'ok' | 'err') => void;
+  toastAchievement: (icon: string, label: string) => void;
 
   // action dispatch — returns the ActionResult and applies re-render
   run: <T extends unknown[]>(fn: (state: GameState, ...args: T) => actions.ActionResult, ...args: T) => actions.ActionResult;
@@ -87,6 +122,27 @@ interface GameStoreState {
 
 let toastId = 0;
 
+/** Marks every achievement a state already has as "seen" without celebrating them — for a
+ * freshly loaded/imported/inherited game, where they're old news, not something to toast. */
+function seedSeenAchievements(state: GameState, set: (p: Partial<GameStoreState>) => void): void {
+  set({ seenAchievements: [...state.achievements] });
+}
+
+/** Diffs `state.achievements` against what's already been celebrated this session and fires a
+ * gold achievement toast (with confetti, via Toasts) for each genuinely new one. Achievements can
+ * unlock from a year tick, a daily/weekly tick, or a direct player action, so this is called from
+ * every one of those paths rather than just nextYear. */
+function announceNewAchievements(state: GameState, get: () => GameStoreState, set: (p: Partial<GameStoreState>) => void): void {
+  const seen = new Set(get().seenAchievements);
+  const fresh = state.achievements.filter((a) => !seen.has(a));
+  if (fresh.length === 0) return;
+  set({ seenAchievements: [...state.achievements] });
+  for (const key of fresh) {
+    const def = ACHIEVEMENTS[key];
+    if (def) get().toastAchievement(def.icon, def.label);
+  }
+}
+
 /** Re-wrap the mutated state object into a new reference so React updates. */
 function commit(get: () => GameStoreState, set: (p: Partial<GameStoreState>) => void): void {
   const s = get().state;
@@ -94,6 +150,7 @@ function commit(get: () => GameStoreState, set: (p: Partial<GameStoreState>) => 
   set({ state: { ...s } });
   // Fire-and-forget autosave.
   void saveGame(AUTOSAVE_ID, s, true);
+  announceNewAchievements(s, get, set);
 }
 
 export const useGame = create<GameStoreState>((set, get) => ({
@@ -105,11 +162,15 @@ export const useGame = create<GameStoreState>((set, get) => ({
   activeEvent: null,
   eventResult: null,
   darkMode: true,
+  // V8.2: default to landing in the 3D city (persisted so the choice sticks across reloads).
+  cityHome: (() => { try { return localStorage.getItem('bl_city_home') !== '0'; } catch { return true; } })(),
   busy: false,
+  seenAchievements: [],
 
   newGame: (config) => {
     const state = generateWorld(config);
-    set({ state, screen: 'life', eventQueue: [], activeEvent: null, eventResult: null });
+    set({ state, screen: get().cityHome ? 'explore' : 'life', eventQueue: [], activeEvent: null, eventResult: null });
+    seedSeenAchievements(state, set);
     void saveGame(AUTOSAVE_ID, state, true);
   },
 
@@ -121,7 +182,11 @@ export const useGame = create<GameStoreState>((set, get) => ({
     const state = await loadGame(id);
     if (state) {
       const queue = state.pendingEvents ?? [];
-      set({ state, screen: 'life', eventQueue: queue.slice(1), activeEvent: queue[0] ?? null, eventResult: null });
+      // Land in the city if that's your home base — but only when there's no event waiting, so a
+      // pending decision still surfaces immediately rather than hiding behind the 3D hub.
+      const landing = get().cityHome && queue.length === 0 ? 'explore' : 'life';
+      set({ state, screen: landing, eventQueue: queue.slice(1), activeEvent: queue[0] ?? null, eventResult: null });
+      seedSeenAchievements(state, set);
     } else {
       get().toast('Save not found.', 'err');
     }
@@ -149,7 +214,9 @@ export const useGame = create<GameStoreState>((set, get) => ({
     try {
       const state = importSave(json);
       const queue = state.pendingEvents ?? [];
-      set({ state, screen: 'life', eventQueue: queue.slice(1), activeEvent: queue[0] ?? null, eventResult: null });
+      const landing = get().cityHome && queue.length === 0 ? 'explore' : 'life';
+      set({ state, screen: landing, eventQueue: queue.slice(1), activeEvent: queue[0] ?? null, eventResult: null });
+      seedSeenAchievements(state, set);
       get().toast('Save imported.');
     } catch {
       get().toast('Invalid save file.', 'err');
@@ -171,6 +238,14 @@ export const useGame = create<GameStoreState>((set, get) => ({
       get().toast('Resolve your current event first.', 'err');
       return;
     }
+    // V52: while deployed with a combat-role specialty that has a real playable mission, time
+    // cannot advance until that mission is actually played this year — "actual war" means
+    // reporting for duty, not letting the tick resolve it silently in the background.
+    if (blockedByMandatoryDeployment(s)) {
+      get().toast('You are deployed — report for your mission before the year can end.', 'err');
+      set({ screen: 'military' });
+      return;
+    }
     const next = advanceYear(s);
     const queue = next.pendingEvents ?? [];
     set({
@@ -180,6 +255,7 @@ export const useGame = create<GameStoreState>((set, get) => ({
       screen: 'life',
     });
     void saveGame(AUTOSAVE_ID, next, true);
+    announceNewAchievements(next, get, set);
   },
 
   nextDay: () => {
@@ -187,6 +263,11 @@ export const useGame = create<GameStoreState>((set, get) => ({
     if (!s || s.gameOver) return;
     if (get().eventQueue.length > 0 || get().activeEvent) {
       get().toast('Resolve your current event first.', 'err');
+      return;
+    }
+    if (blockedByMandatoryDeployment(s)) {
+      get().toast('You are deployed — report for your mission before time can pass.', 'err');
+      set({ screen: 'military' });
       return;
     }
     const res = advanceDay(s);
@@ -198,6 +279,7 @@ export const useGame = create<GameStoreState>((set, get) => ({
     });
     for (const h of res.headlines) get().toast(h);
     void saveGame(AUTOSAVE_ID, res.state, true);
+    announceNewAchievements(res.state, get, set);
   },
 
   nextWeek: () => {
@@ -205,6 +287,11 @@ export const useGame = create<GameStoreState>((set, get) => ({
     if (!s || s.gameOver) return;
     if (get().eventQueue.length > 0 || get().activeEvent) {
       get().toast('Resolve your current event first.', 'err');
+      return;
+    }
+    if (blockedByMandatoryDeployment(s)) {
+      get().toast('You are deployed — report for your mission before time can pass.', 'err');
+      set({ screen: 'military' });
       return;
     }
     const res = advanceWeek(s);
@@ -217,6 +304,7 @@ export const useGame = create<GameStoreState>((set, get) => ({
     for (const h of res.headlines.slice(0, 3)) get().toast(h);
     if (res.headlines.length > 3) get().toast(`+${res.headlines.length - 3} more small moments this week`);
     void saveGame(AUTOSAVE_ID, res.state, true);
+    announceNewAchievements(res.state, get, set);
   },
 
   chooseEvent: (choice) => {
@@ -238,6 +326,7 @@ export const useGame = create<GameStoreState>((set, get) => ({
     s.pendingEvents = get().eventQueue;
     set({ state: { ...s }, eventResult: result, activeEvent: null });
     void saveGame(AUTOSAVE_ID, s, true);
+    announceNewAchievements(s, get, set);
   },
 
   dismissEventResult: () => {
@@ -257,6 +346,12 @@ export const useGame = create<GameStoreState>((set, get) => ({
 
   toggleDark: () => set({ darkMode: !get().darkMode }),
 
+  toggleCityHome: () => {
+    const next = !get().cityHome;
+    try { localStorage.setItem('bl_city_home', next ? '1' : '0'); } catch { /* storage unavailable */ }
+    set({ cityHome: next });
+  },
+
   dismissElectionResult: () => {
     const s = get().state;
     if (!s) return;
@@ -269,6 +364,7 @@ export const useGame = create<GameStoreState>((set, get) => ({
     if (!s) return;
     const next = continueAsHeirEngine(s, npcId);
     set({ state: { ...next }, screen: 'life' });
+    seedSeenAchievements(next, set);
     void saveGame(AUTOSAVE_ID, next, true);
   },
 
@@ -292,10 +388,17 @@ export const useGame = create<GameStoreState>((set, get) => ({
     setTimeout(() => set({ toasts: get().toasts.filter((t) => t.id !== id) }), 3200);
   },
 
+  toastAchievement: (icon, label) => {
+    const id = ++toastId;
+    set({ toasts: [...get().toasts, { id, text: label, tone: 'achievement', icon }] });
+    setTimeout(() => set({ toasts: get().toasts.filter((t) => t.id !== id) }), 4200);
+  },
+
   run: (fn, ...args) => {
     const s = get().state;
     if (!s) return { ok: false, message: 'No game in progress.' };
     const res = fn(s, ...args);
+    if (!s.player.alive) gameOverCheck(s);
     commit(get, set);
     get().toast(res.message, res.ok ? 'ok' : 'err');
     return res;

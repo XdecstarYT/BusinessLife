@@ -7,9 +7,11 @@ import {
   attemptHostileTakeover,
   bidOnGovernmentContract,
   buybackShares,
+  concedeToActivist,
   consultantRecommendation,
   CULTURE_INFO,
   diversifySupplyChain,
+  fightAntitrustCase,
   fileTrademark,
   filePatentLawsuit,
   fireCEO,
@@ -32,6 +34,7 @@ import {
   qualityAudit,
   raceForInnovation,
   renameCompany,
+  resistActivist,
   runClinicalTrial,
   runFavorableCoverage,
   runRecruitmentDrive,
@@ -39,6 +42,7 @@ import {
   runLeadershipProgram,
   runTrainingProgram,
   sellCompany,
+  settleAntitrustCase,
   setCompanyCulture,
   setCompanyLever,
   sponsorLocalSportsTeam,
@@ -54,12 +58,25 @@ import {
   type BoardProposal,
   type CompanyLever,
 } from '../../sim/actions';
-import { companyValuation } from '../../sim/business';
+import { companyValuation, isManufacturingIndustry, RIVAL_STRATEGY_INFO } from '../../sim/business';
 import { marketCap } from '../../sim/market';
-import { Badge, Button, Card, LineChart, Modal, Pill, PillRow, SectionHeader, StatBar, TextInput } from '../components';
+import {
+  acquireCompany, buildFactory, exitVentureStake, foundVentureArm, launchAdCampaign,
+  openForeignOffice, upgradeFactoryAutomation, ventureInvest,
+} from '../../sim/corpExpansion';
+import { ACQUISITION_PREMIUM, AD_CAMPAIGN_MAX_YEARS, AD_CAMPAIGN_MIN_BUDGET, AD_CHANNELS, automationUpgradeCost, factoryCost, foreignOfficeCost, VENTURE_ARM_COST, VENTURE_ARM_MIN_HQ_TIER, VENTURE_MIN_INVESTMENT, VENTURE_TARGET_VALUATION_CEILING } from '../../data/corpExpansion';
+import { Badge, Button, Card, Field, LineChart, Modal, Pill, PillRow, SectionHeader, StatBar, TextInput } from '../components';
 import { money, moneyFull, pct } from '../format';
 import { INDUSTRIES, INDUSTRY_BY_ID } from '../../data/industries';
-import type { Company, ExecutiveRole } from '../../sim/types';
+import type { ActivistDemand, AdChannel, Company, CreditRating, ExecutiveRole } from '../../sim/types';
+import { clamp100 } from '../../sim/types';
+
+const CREDIT_RATING_TONE: Record<CreditRating, 'good' | 'neutral' | 'warn' | 'bad'> = {
+  AAA: 'good', AA: 'good', A: 'good', BBB: 'neutral', BB: 'warn', B: 'warn', CCC: 'bad', D: 'bad',
+};
+const ACTIVIST_DEMAND_LABEL: Record<ActivistDemand, string> = {
+  dividend: 'a bigger dividend payout', buyback: 'a share buyback', ceo_change: 'a CEO change', spinoff: 'a spin-off',
+};
 
 const HQTourScene = lazy(() => import('../three/HQTourScene').then((m) => ({ default: m.HQTourScene })));
 const SupplyChainScene = lazy(() => import('../three/SupplyChainScene').then((m) => ({ default: m.SupplyChainScene })));
@@ -112,11 +129,29 @@ export function Business() {
                       {ind?.name} · cap {money(marketCap(c))} · price {c.priceLevel < 0.9 ? 'discount' : c.priceLevel > 1.1 ? 'premium' : 'mid-market'} · {Math.round(c.marketShare * 100)}% share
                     </div>
                   </div>
-                  {c.isPublic ? <Badge tone="brand">Public</Badge> : <Badge>Private</Badge>}
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    {c.isPublic ? <Badge tone="brand">Public</Badge> : <Badge>Private</Badge>}
+                    {c.grudgeAgainstPlayer > 60 ? (
+                      <Badge tone="bad">😤 Grudge {Math.round(c.grudgeAgainstPlayer)}</Badge>
+                    ) : c.grudgeAgainstPlayer > 30 ? (
+                      <Badge tone="warn">😒 Grudge {Math.round(c.grudgeAgainstPlayer)}</Badge>
+                    ) : null}
+                    {c.rivalStrategy && (
+                      <Badge title={RIVAL_STRATEGY_INFO[c.rivalStrategy].blurb}>
+                        {RIVAL_STRATEGY_INFO[c.rivalStrategy].icon} {RIVAL_STRATEGY_INFO[c.rivalStrategy].label}
+                      </Badge>
+                    )}
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <Button size="sm" variant="soft" onClick={() => run(spyOnCompany, c.id)}>🕵️ Espionage</Button>
-                  <Button size="sm" disabled={!c.isPublic} onClick={() => setTakeoverTarget(c.id)}>🏴 Takeover</Button>
+                  {c.isPublic ? (
+                    <Button size="sm" onClick={() => setTakeoverTarget(c.id)}>🏴 Takeover</Button>
+                  ) : (
+                    <Button size="sm" disabled={companyValuation(c) * ACQUISITION_PREMIUM > state.player.money} onClick={() => run(acquireCompany, c.id)}>
+                      🤝 Acquire ({money(Math.round(companyValuation(c) * ACQUISITION_PREMIUM))})
+                    </Button>
+                  )}
                   {myRival && (
                     <Button size="sm" variant="soft" className="col-span-2" onClick={() => run(startPriceWar, myRival.id, c.id)}>
                       ⚔️ Price War (with {myRival.name})
@@ -334,6 +369,7 @@ function ManageModal({ companyId, onClose }: { companyId: string; onClose: () =>
   const [amount, setAmount] = useState(0);
   const [renaming, setRenaming] = useState(false);
   const [renameDraft, setRenameDraft] = useState('');
+  const [expansionModal, setExpansionModal] = useState<'factory' | 'office' | 'venture' | 'campaign' | null>(null);
   if (!state) return null;
   const c = state.companies[companyId];
   if (!c) return null;
@@ -358,6 +394,7 @@ function ManageModal({ companyId, onClose }: { companyId: string; onClose: () =>
   );
 
   return (
+    <>
     <Modal open onClose={onClose} title={c.name}>
       {renaming ? (
         <div className="flex items-center gap-2 mb-3">
@@ -370,12 +407,41 @@ function ManageModal({ companyId, onClose }: { companyId: string; onClose: () =>
           ✏️ Rename company
         </button>
       )}
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
         <Badge tone="brand">{ind?.name}</Badge>
         {c.isPublic && <Badge tone="good">Public · {money(c.sharePrice)}/sh</Badge>}
         {c.unionized && <Badge tone="warn">Unionized</Badge>}
         <Badge>{pct(c.playerSharePct, 0)} owned</Badge>
+        <Badge tone={CREDIT_RATING_TONE[c.creditRating]} title="Credit rating: drives the interest rate on new debt and bonds.">
+          {c.creditRating} Rated
+        </Badge>
       </div>
+
+      {c.antitrustCaseOpen && (
+        <Card className="p-4 mb-4 border-2 border-rose-400">
+          <div className="font-bold text-rose-500 mb-1">⚖️ Antitrust Investigation</div>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+            Regulators have opened a case over {c.name}'s dominant market position. Settle now for a fine, or fight it in court and risk a forced divestiture.
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <Button size="sm" variant="soft" onClick={() => run(settleAntitrustCase, c.id)}>Settle (pay fine)</Button>
+            <Button size="sm" variant="danger" onClick={() => run(fightAntitrustCase, c.id)}>Fight in Court</Button>
+          </div>
+        </Card>
+      )}
+
+      {c.activistCampaign && (
+        <Card className="p-4 mb-4 border-2 border-amber-400">
+          <div className="font-bold text-amber-500 mb-1">📣 Activist Investor Campaign</div>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+            {c.activistCampaign.investorName} is demanding {ACTIVIST_DEMAND_LABEL[c.activistCampaign.demand]} (active {c.activistCampaign.yearsActive}yr, strength {Math.round(c.activistCampaign.strength)}).
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <Button size="sm" variant="soft" onClick={() => run(concedeToActivist, c.id)}>Concede</Button>
+            <Button size="sm" variant="danger" onClick={() => run(resistActivist, c.id)}>Resist</Button>
+          </div>
+        </Card>
+      )}
 
       <div className="h-24 mb-3">
         <LineChart data={c.history.map((h) => h.revenue)} height={96} color="#337dff" />
@@ -437,8 +503,24 @@ function ManageModal({ companyId, onClose }: { companyId: string; onClose: () =>
         </div>
       </Card>
       <Suspense fallback={SceneFallback}>
-        <HQTourScene hqTier={c.hqTier} employees={c.employees} morale={c.morale} culture={c.culture} />
+        <HQTourScene
+          hqTier={c.hqTier}
+          employees={c.employees}
+          morale={c.morale}
+          culture={c.culture}
+          marketingPct={c.marketingPct}
+          rdPct={c.rdPct}
+          automation={c.automation}
+          salaryLevel={c.salaryLevel}
+          onDepartmentClick={(dept) => {
+            if (dept === 'marketing') run(setCompanyLever, companyId, 'marketingPct', Math.min(0.25, c.marketingPct + 0.01));
+            else if (dept === 'rd') run(setCompanyLever, companyId, 'rdPct', Math.min(0.25, c.rdPct + 0.01));
+            else if (dept === 'automation') run(setCompanyLever, companyId, 'automation', Math.min(100, c.automation + 5));
+            else run(setCompanyLever, companyId, 'salaryLevel', Math.min(1.4, c.salaryLevel + 0.05));
+          }}
+        />
       </Suspense>
+      <div className="text-xs text-slate-400 -mt-1 mb-2">Tap a department kiosk to invest in it directly.</div>
       <div className="font-bold mb-2 mt-3">Culture</div>
       <div className="grid grid-cols-2 gap-2 mb-1">
         {(Object.keys(CULTURE_INFO) as Company['culture'][]).map((k) => (
@@ -594,6 +676,129 @@ function ManageModal({ companyId, onClose }: { companyId: string; onClose: () =>
         </>
       )}
 
+      <div className="font-bold mt-5 mb-2">🌍 Corporate Empire</div>
+      <div className="space-y-2 mb-2">
+        {isManufacturingIndustry(ind) && (
+          <Card className="p-3">
+            <div className="flex items-center justify-between mb-1">
+              <div className="text-xs font-bold">🏗️ Manufacturing Capacity</div>
+              <span className={`text-xs font-bold ${c.manufacturingCapacity >= 100 ? 'text-emerald-500' : c.manufacturingCapacity >= 70 ? 'text-amber-500' : 'text-rose-500'}`}>
+                {Math.round(c.manufacturingCapacity)}% of demand
+              </span>
+            </div>
+            <StatBar label="Capacity vs. demand" value={clamp100(c.manufacturingCapacity)} />
+            {c.demandBacklog > c.revenue * 0.01 && (
+              <div className="text-[11px] text-rose-500 mt-1">
+                ⚠️ {money(c.demandBacklog)} in unmet demand — customers are waiting on backorders
+                {c.stockoutStreak >= 1 ? ` (${c.stockoutStreak} year${c.stockoutStreak === 1 ? '' : 's'} running short)` : ''}
+              </div>
+            )}
+            {c.manufacturingCapacity < 100 && c.demandBacklog <= c.revenue * 0.01 && (
+              <div className="text-[11px] text-amber-500 mt-1">Build or upgrade factories to keep growth from outrunning production.</div>
+            )}
+            {c.manufacturingCapacity >= 100 && (
+              <div className="text-[11px] text-emerald-500 mt-1">Production is comfortably keeping up with demand.</div>
+            )}
+          </Card>
+        )}
+        <Card className="p-3">
+          <div className="flex items-center justify-between mb-1">
+            <div className="text-xs font-bold">🏭 Factories ({c.factories.length})</div>
+            <Button size="sm" variant="soft" onClick={() => setExpansionModal('factory')}>Build</Button>
+          </div>
+          {c.factories.length > 0 ? (
+            <div className="space-y-1 mt-1">
+              {c.factories.map((f) => {
+                const country = state.countries.find((x) => x.id === f.countryId);
+                return (
+                  <div key={f.id} className="flex items-center justify-between text-[11px] bg-slate-100 dark:bg-ink-800 rounded-lg px-2 py-1.5">
+                    <span>{country?.flag} Automation {f.automationLevel}/5 · Condition {Math.round(f.condition)}%</span>
+                    {f.automationLevel < 5 && (
+                      <button className="text-brand-500 font-semibold" onClick={() => run(upgradeFactoryAutomation, c.id, f.id)}>
+                        Upgrade ({money(automationUpgradeCost(f.automationLevel))})
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-[11px] text-slate-400">
+              Build a factory for ongoing production capacity and an output dividend
+              {isManufacturingIndustry(ind) ? ' — and to keep growth from outrunning demand (see Manufacturing Capacity above).' : '.'}
+            </div>
+          )}
+        </Card>
+
+        <Card className="p-3">
+          <div className="flex items-center justify-between mb-1">
+            <div className="text-xs font-bold">🌐 Foreign Offices ({c.internationalOffices.length})</div>
+            <Button size="sm" variant="soft" onClick={() => setExpansionModal('office')}>Open</Button>
+          </div>
+          {c.internationalOffices.length > 0 ? (
+            <div className="space-y-1 mt-1">
+              {c.internationalOffices.map((o) => {
+                const country = state.countries.find((x) => x.id === o.countryId);
+                return (
+                  <div key={o.id} className="text-[11px] bg-slate-100 dark:bg-ink-800 rounded-lg px-2 py-1.5">
+                    {country?.flag} {country?.name} · Strength {Math.round(o.strength)}%
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-[11px] text-slate-400">Open an office abroad for a new international revenue stream.</div>
+          )}
+        </Card>
+
+        <Card className="p-3">
+          <div className="flex items-center justify-between mb-1">
+            <div className="text-xs font-bold">💰 Venture Capital Arm</div>
+            {c.hasVentureArm ? (
+              <Button size="sm" variant="soft" onClick={() => setExpansionModal('venture')}>Invest</Button>
+            ) : (
+              <Button size="sm" variant="soft" disabled={c.hqTier < VENTURE_ARM_MIN_HQ_TIER || c.cash < VENTURE_ARM_COST} onClick={() => run(foundVentureArm, c.id)}>
+                Found ({money(VENTURE_ARM_COST)})
+              </Button>
+            )}
+          </div>
+          {c.hasVentureArm ? (
+            c.ventureInvestments.length > 0 ? (
+              <div className="space-y-1 mt-1">
+                {c.ventureInvestments.map((v) => {
+                  const target = state.companies[v.targetCompanyId];
+                  return (
+                    <div key={v.id} className="flex items-center justify-between text-[11px] bg-slate-100 dark:bg-ink-800 rounded-lg px-2 py-1.5">
+                      <span>{target?.name ?? 'Unknown'} · {(v.equityPct * 100).toFixed(1)}% stake</span>
+                      <button className="text-brand-500 font-semibold" onClick={() => run(exitVentureStake, c.id, v.id)}>Exit</button>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-[11px] text-slate-400">No stakes yet — invest company cash in a small private rival for equity.</div>
+            )
+          ) : (
+            <div className="text-[11px] text-slate-400">Needs {HQ_TIERS[VENTURE_ARM_MIN_HQ_TIER].name}+ HQ. Builds a startup portfolio funded by company cash.</div>
+          )}
+        </Card>
+
+        <Card className="p-3">
+          <div className="flex items-center justify-between mb-1">
+            <div className="text-xs font-bold">📢 Marketing Campaign</div>
+            {!c.activeCampaign && <Button size="sm" variant="soft" onClick={() => setExpansionModal('campaign')}>Launch</Button>}
+          </div>
+          {c.activeCampaign ? (
+            <div className="text-[11px] text-slate-500 dark:text-slate-400">
+              {AD_CHANNELS.find((a) => a.id === c.activeCampaign!.channel)?.icon} {AD_CHANNELS.find((a) => a.id === c.activeCampaign!.channel)?.name} ·
+              {' '}{c.activeCampaign.yearsLeft}/{c.activeCampaign.totalYears} yr left · {money(c.activeCampaign.totalBudget)} committed
+            </div>
+          ) : (
+            <div className="text-[11px] text-slate-400">{c.campaignsRun} campaign{c.campaignsRun === 1 ? '' : 's'} run lifetime.</div>
+          )}
+        </Card>
+      </div>
+
       <div className="font-bold mt-5 mb-2">Capital</div>
       <input
         type="range"
@@ -624,6 +829,11 @@ function ManageModal({ companyId, onClose }: { companyId: string; onClose: () =>
         </Button>
       </div>
     </Modal>
+    {expansionModal === 'factory' && <FactoryModal companyId={c.id} onClose={() => setExpansionModal(null)} />}
+    {expansionModal === 'office' && <OfficeModal companyId={c.id} onClose={() => setExpansionModal(null)} />}
+    {expansionModal === 'venture' && <VentureModal companyId={c.id} onClose={() => setExpansionModal(null)} />}
+    {expansionModal === 'campaign' && <CampaignModal companyId={c.id} onClose={() => setExpansionModal(null)} />}
+    </>
   );
 
   function Row({ label, value, tone }: { label: string; value: string; tone?: 'bad' }) {
@@ -634,6 +844,194 @@ function ManageModal({ companyId, onClose }: { companyId: string; onClose: () =>
       </div>
     );
   }
+}
+
+function FactoryModal({ companyId, onClose }: { companyId: string; onClose: () => void }) {
+  const { state, run } = useGame();
+  const c = state?.companies[companyId];
+  const eligibleCountries = state && c
+    ? [state.countries.find((x) => x.id === c.countryId)!, ...c.internationalOffices.map((o) => state.countries.find((x) => x.id === o.countryId)!).filter(Boolean)]
+    : [];
+  const [countryId, setCountryId] = useState(c?.countryId ?? '');
+  if (!state || !c) return null;
+  const ind = INDUSTRY_BY_ID[c.industryId];
+  const cost = factoryCost(ind?.capitalIntensity ?? 0.5);
+
+  return (
+    <Modal open onClose={onClose} title={`Build a Factory: ${c.name}`}>
+      <p className="text-xs text-slate-400 mb-3">
+        Adds production capacity for an ongoing output dividend each year, and can be upgraded with
+        automation. Foreign factories require an office already open in that country.
+      </p>
+      <Field label="Location">
+        <select
+          value={countryId || c.countryId}
+          onChange={(e) => setCountryId(e.target.value)}
+          className="w-full rounded-2xl bg-slate-100 dark:bg-ink-800 border border-transparent px-4 py-3 text-slate-900 dark:text-white"
+        >
+          {eligibleCountries.map((country) => (
+            <option key={country.id} value={country.id}>{country.flag} {country.name}{country.id === c.countryId ? ' (Home)' : ''}</option>
+          ))}
+        </select>
+      </Field>
+      <Button
+        className="w-full mt-4"
+        size="lg"
+        disabled={cost > c.cash}
+        onClick={() => { const r = run(buildFactory, companyId, countryId || c.countryId); if (r.ok) onClose(); }}
+      >
+        Build for {money(cost)}
+      </Button>
+    </Modal>
+  );
+}
+
+function OfficeModal({ companyId, onClose }: { companyId: string; onClose: () => void }) {
+  const { state, run } = useGame();
+  const c = state?.companies[companyId];
+  const options = state && c ? state.countries.filter((x) => x.id !== c.countryId && !c.internationalOffices.some((o) => o.countryId === x.id)) : [];
+  const [countryId, setCountryId] = useState(options[0]?.id ?? '');
+  if (!state || !c) return null;
+  const dest = state.countries.find((x) => x.id === (countryId || options[0]?.id));
+  const cost = dest ? foreignOfficeCost(dest.economy.gdp) : 0;
+
+  return (
+    <Modal open onClose={onClose} title={`Open a Foreign Office: ${c.name}`}>
+      <p className="text-xs text-slate-400 mb-3">Opens a new international revenue stream that ramps up over time.</p>
+      {options.length === 0 ? (
+        <p className="text-sm text-center text-slate-400 py-4">No new markets available.</p>
+      ) : (
+        <>
+          <Field label="Country">
+            <select
+              value={countryId || options[0].id}
+              onChange={(e) => setCountryId(e.target.value)}
+              className="w-full rounded-2xl bg-slate-100 dark:bg-ink-800 border border-transparent px-4 py-3 text-slate-900 dark:text-white"
+            >
+              {options.map((country) => (
+                <option key={country.id} value={country.id}>{country.flag} {country.name}</option>
+              ))}
+            </select>
+          </Field>
+          <Button
+            className="w-full mt-4"
+            size="lg"
+            disabled={cost > c.cash}
+            onClick={() => { const r = run(openForeignOffice, companyId, countryId || options[0].id); if (r.ok) onClose(); }}
+          >
+            Open for {money(cost)}
+          </Button>
+        </>
+      )}
+    </Modal>
+  );
+}
+
+function VentureModal({ companyId, onClose }: { companyId: string; onClose: () => void }) {
+  const { state, run } = useGame();
+  const c = state?.companies[companyId];
+  const [amount, setAmount] = useState(VENTURE_MIN_INVESTMENT);
+  const [targetId, setTargetId] = useState<string | null>(null);
+  if (!state || !c) return null;
+  const targets = Object.values(state.companies).filter(
+    (t) => t.status === 'active' && !t.playerOwned && !t.isPublic && companyValuation(t) <= VENTURE_TARGET_VALUATION_CEILING,
+  );
+
+  return (
+    <Modal open onClose={onClose} title={`Venture Investment: ${c.name}`}>
+      {!targetId ? (
+        <>
+          <p className="text-xs text-slate-400 mb-3">Pick a small private company to back for an equity stake.</p>
+          <div className="space-y-2 max-h-[50vh] overflow-y-auto">
+            {targets.length === 0 && <p className="text-center text-slate-400 py-6">No eligible startups found right now.</p>}
+            {targets.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setTargetId(t.id)}
+                className="w-full text-left p-3 rounded-2xl bg-slate-100 dark:bg-ink-800 hover:bg-slate-200 dark:hover:bg-ink-700"
+              >
+                <div className="flex justify-between gap-2">
+                  <span className="font-semibold truncate">{t.name}</span>
+                  <span className="text-sm font-bold text-brand-500 shrink-0">{money(companyValuation(t))}</span>
+                </div>
+                <div className="text-xs text-slate-500 dark:text-slate-400 truncate">{INDUSTRY_BY_ID[t.industryId]?.name}</div>
+              </button>
+            ))}
+          </div>
+        </>
+      ) : (
+        <>
+          <button onClick={() => setTargetId(null)} className="text-sm text-brand-500 font-semibold mb-3">← Change target</button>
+          <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Investment: {moneyFull(amount)}</label>
+          <input
+            type="range"
+            min={VENTURE_MIN_INVESTMENT}
+            max={Math.max(VENTURE_MIN_INVESTMENT, Math.round(c.cash))}
+            step={5_000}
+            value={Math.min(amount, Math.round(c.cash))}
+            onChange={(e) => setAmount(Number(e.target.value))}
+            className="w-full mt-1 mb-4"
+          />
+          <Button
+            className="w-full"
+            size="lg"
+            disabled={amount > c.cash}
+            onClick={() => { const r = run(ventureInvest, companyId, targetId, amount); if (r.ok) onClose(); }}
+          >
+            Invest {money(amount)}
+          </Button>
+        </>
+      )}
+    </Modal>
+  );
+}
+
+function CampaignModal({ companyId, onClose }: { companyId: string; onClose: () => void }) {
+  const { state, run } = useGame();
+  const c = state?.companies[companyId];
+  const [channel, setChannel] = useState<AdChannel>('social');
+  const [budget, setBudget] = useState(AD_CAMPAIGN_MIN_BUDGET);
+  const [years, setYears] = useState(2);
+  if (!state || !c) return null;
+  const def = AD_CHANNELS.find((a) => a.id === channel)!;
+
+  return (
+    <Modal open onClose={onClose} title={`Launch a Campaign: ${c.name}`}>
+      <PillRow>
+        {AD_CHANNELS.map((a) => (
+          <Pill key={a.id} label={`${a.icon} ${a.name}`} active={channel === a.id} onClick={() => setChannel(a.id)} />
+        ))}
+      </PillRow>
+      <p className="text-xs text-slate-400 mt-2 mb-3">{def.blurb}</p>
+      <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Total budget: {moneyFull(budget)}</label>
+      <input
+        type="range"
+        min={AD_CAMPAIGN_MIN_BUDGET}
+        max={Math.max(AD_CAMPAIGN_MIN_BUDGET, Math.round(c.cash))}
+        step={5_000}
+        value={Math.min(budget, Math.round(c.cash))}
+        onChange={(e) => setBudget(Number(e.target.value))}
+        className="w-full mt-1 mb-4"
+      />
+      <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Duration: {years} year{years === 1 ? '' : 's'}</label>
+      <input
+        type="range"
+        min={1}
+        max={AD_CAMPAIGN_MAX_YEARS}
+        value={years}
+        onChange={(e) => setYears(Number(e.target.value))}
+        className="w-full mt-1 mb-4"
+      />
+      <Button
+        className="w-full"
+        size="lg"
+        disabled={budget > c.cash}
+        onClick={() => { const r = run(launchAdCampaign, companyId, channel, budget, years); if (r.ok) onClose(); }}
+      >
+        Launch for {money(budget)}
+      </Button>
+    </Modal>
+  );
 }
 
 function TakeoverModal({ companyId, onClose }: { companyId: string; onClose: () => void }) {

@@ -3,7 +3,7 @@
  * fires a weighted random selection each year, resolves placeholders, and
  * applies choice effects (including skill-checked probabilistic outcomes).
  */
-import type { EffectSpec, EventChoice, EventTemplate, FiredEvent, GameState } from './types';
+import type { Company, EffectSpec, EventChoice, EventTemplate, FiredEvent, GameState } from './types';
 import { clamp, clamp100 } from './types';
 import { EVENT_TEMPLATES } from '../data/events';
 import { INDUSTRY_BY_ID } from '../data/industries';
@@ -65,7 +65,29 @@ function conditionsMet(t: EventTemplate, state: GameState): boolean {
   if (c.hasProperty !== undefined && (p.properties.length > 0) !== c.hasProperty) return false;
   if (c.minFollowers !== undefined && p.socialFollowers < c.minFollowers) return false;
   if (c.cancelled !== undefined && (p.cancelledUntilYear !== null && p.cancelledUntilYear >= state.year) !== c.cancelled) return false;
+  // V51: Dynamic World Engine
+  if (c.hasGrudgingRival && !findGrudgingRival(state)) return false;
+  if (c.minAchievements !== undefined && state.achievements.length < c.minAchievements) return false;
+  if (c.momentumState === 'hot' && state.worldMomentum < 50) return false;
+  if (c.momentumState === 'cold' && state.worldMomentum > -50) return false;
+  // V55: Rival Empires — only fires against a grudging rival who has actually settled into one
+  // of the requested strategies (see assignRivalStrategy in business.ts).
+  if (c.rivalStrategy) {
+    const rival = findGrudgingRival(state);
+    if (!rival || !c.rivalStrategy.includes(rival.rivalStrategy!)) return false;
+  }
   return true;
+}
+
+/** Picks the NPC-owned company (any industry, player's own country) holding the most grudge
+ * against the player, if any qualifies — the subject for hasGrudgingRival event templates. */
+function findGrudgingRival(state: GameState): Company | null {
+  const p = state.player;
+  const candidates = Object.values(state.companies).filter(
+    (c) => c.status === 'active' && !c.playerOwned && c.countryId === p.countryId && c.grudgeAgainstPlayer > 35,
+  );
+  if (!candidates.length) return null;
+  return candidates.reduce((best, c) => (c.grudgeAgainstPlayer > best.grudgeAgainstPlayer ? c : best));
 }
 
 function resolveText(text: string, state: GameState, subjectCompanyId: string | null, subjectNpcId: string | null, amount: number): string {
@@ -84,14 +106,17 @@ function resolveText(text: string, state: GameState, subjectCompanyId: string | 
     .replaceAll('{npc}', npc?.name ?? 'someone you know')
     .replaceAll('{industry}', industry?.name ?? 'business')
     .replaceAll('{amount}', `$${Math.round(amount).toLocaleString()}`)
-    .replaceAll('{year}', String(state.year));
+    .replaceAll('{year}', String(state.year))
+    .replaceAll('{achievementCount}', String(state.achievements.length));
 }
 
-/** Pick this year's events (1-3 depending on how eventful life is). */
+/** Pick this year's events (1-3 depending on how eventful life is — V51: a hot streak or cold
+ * streak (state.worldMomentum, computed last tick) nudges how eventful, on top of the jail floor). */
 export function fireEvents(state: GameState, rng: RNG): FiredEvent[] {
   const eligible = EVENT_TEMPLATES.filter((t) => conditionsMet(t, state));
   if (eligible.length === 0) return [];
-  const count = state.player.inJailYears > 0 ? 1 : rng.chance(0.25) ? 3 : 2;
+  const threeChance = state.worldMomentum >= 40 ? 0.4 : state.worldMomentum <= -40 ? 0.15 : 0.25;
+  const count = state.player.inJailYears > 0 ? 1 : rng.chance(threeChance) ? 3 : 2;
   const fired: FiredEvent[] = [];
   const used = new Set<string>();
   for (let i = 0; i < count && used.size < eligible.length; i++) {
@@ -108,7 +133,8 @@ export function fireEvents(state: GameState, rng: RNG): FiredEvent[] {
       activeCompanies = activeCompanies.filter((id) => state.companies[id]?.isPublic === t.conditions!.businessPublic);
     }
     const wantsCompany = t.category === 'business' || t.conditions?.hasBusiness || t.text.includes('{company}');
-    const subjectCompanyId = wantsCompany && activeCompanies.length ? rng.pick(activeCompanies) : null;
+    const grudgingRival = t.conditions?.hasGrudgingRival ? findGrudgingRival(state) : null;
+    const subjectCompanyId = grudgingRival ? grudgingRival.id : wantsCompany && activeCompanies.length ? rng.pick(activeCompanies) : null;
     const livingNpcs = Object.values(state.npcs).filter((n) => n.alive && n.countryId === p.countryId);
     let subjectNpcId: string | null = null;
     if (t.conditions?.hasMentor && p.mentorId && state.npcs[p.mentorId]?.alive) subjectNpcId = p.mentorId;
@@ -199,6 +225,7 @@ export function applyEffects(state: GameState, fx: EffectSpec, event: FiredEvent
     if (fx.companyQuality) co.quality = clamp100(co.quality + fx.companyQuality);
     if (fx.companyMorale) co.morale = clamp100(co.morale + fx.companyMorale);
     if (fx.companySharePctDelta) co.playerSharePct = clamp(co.playerSharePct + fx.companySharePctDelta, 0.05, 1);
+    if (fx.companyGrudgeDelta) co.grudgeAgainstPlayer = clamp(co.grudgeAgainstPlayer + fx.companyGrudgeDelta, 0, 100);
     if (fx.loseCompany) {
       const payout = companyValuation(co) * co.playerSharePct * 0.9;
       p.money += payout;

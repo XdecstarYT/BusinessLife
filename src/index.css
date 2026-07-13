@@ -5,22 +5,29 @@
 
 @theme {
   --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --color-brand-50: #eef6ff;
-  --color-brand-100: #d9ecff;
-  --color-brand-200: #bcdcff;
-  --color-brand-300: #8ec5ff;
-  --color-brand-400: #59a2ff;
-  --color-brand-500: #337dff;
-  --color-brand-600: #1f5ff5;
-  --color-brand-700: #1a4be1;
-  --color-brand-800: #1c3fb6;
-  --color-brand-900: #1d398f;
-  --color-ink-950: #070c17;
-  --color-ink-900: #0b1220;
-  --color-ink-850: #101a2e;
-  --color-ink-800: #16223a;
-  --color-ink-700: #223252;
-  --color-ink-600: #33456b;
+  /* Editorial single accent — sharp indigo against a monochrome field. */
+  --color-brand-50: #f1f1fd;
+  --color-brand-100: #e3e3fb;
+  --color-brand-200: #c7c8f6;
+  --color-brand-300: #a3a4ef;
+  --color-brand-400: #7b7de5;
+  --color-brand-500: #5150d6;
+  --color-brand-600: #4240c0;
+  --color-brand-700: #3634a0;
+  --color-brand-800: #2c2b81;
+  --color-brand-900: #252468;
+  /* True-neutral ink scale — no navy tint, reads as black/gray, not "dark game UI". */
+  --color-ink-950: #08080a;
+  --color-ink-900: #0e0e11;
+  --color-ink-850: #141417;
+  --color-ink-800: #1b1b1f;
+  --color-ink-700: #2a2a2f;
+  --color-ink-600: #45454c;
+  /* Understated elevation: a thin, mostly-flat contact shadow, not a glow. */
+  --shadow-lift: 0 1px 2px rgb(0 0 0 / 0.03), 0 1px 3px rgb(0 0 0 / 0.05);
+  --shadow-lift-lg: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px -12px rgb(0 0 0 / 0.14);
+  --shadow-glow-brand: 0 4px 16px -6px rgb(81 80 214 / 0.35);
+  --shadow-glow-danger: 0 4px 16px -6px rgb(244 63 94 / 0.3);
 }
 
 :root {
@@ -41,6 +48,22 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   overscroll-behavior-y: none;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+}
+
+/* Money, ages, years, prices — every number in the game lines up instead of
+   jittering as digits change width. */
+body {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Ambient background: a faint, restrained accent wash at the top of the page —
+   just enough to keep the flat editorial field from feeling sterile. */
+.app-bg {
+  background-image: radial-gradient(60rem 24rem at 50% -8rem, rgb(81 80 214 / 0.05), transparent 70%);
+}
+.dark .app-bg {
+  background-image: radial-gradient(60rem 24rem at 50% -8rem, rgb(81 80 214 / 0.09), transparent 70%);
 }
 
 /* Thin, theme-aware scrollbars */
@@ -81,6 +104,11 @@ input[type='range']::-webkit-slider-thumb {
   background: var(--color-brand-500);
   cursor: pointer;
   border: 2px solid #fff2;
+  box-shadow: 0 1px 6px rgb(81 80 214 / 0.35);
+  transition: transform 0.15s ease;
+}
+input[type='range']::-webkit-slider-thumb:active {
+  transform: scale(1.2);
 }
 input[type='range']::-moz-range-thumb {
   width: 18px;
@@ -89,6 +117,7 @@ input[type='range']::-moz-range-thumb {
   background: var(--color-brand-500);
   cursor: pointer;
   border: none;
+  box-shadow: 0 1px 6px rgb(81 80 214 / 0.35);
 }
 
 @keyframes floatIn {
@@ -105,10 +134,113 @@ input[type='range']::-moz-range-thumb {
   animation: floatIn 0.25s ease-out;
 }
 
+/* Screen-level entrance: content drifts up with a slight overshoot-free ease.
+   Applied by AppShell to the <main> keyed by screen, so every navigation
+   feels like a transition, not a repaint. */
+@keyframes screenIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.anim-screen {
+  animation: screenIn 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Modal sheet: springs up from the bottom edge with a gentle settle. */
+@keyframes sheetIn {
+  0% {
+    opacity: 0;
+    transform: translateY(48px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.anim-sheet {
+  animation: sheetIn 0.34s cubic-bezier(0.32, 1.25, 0.5, 1);
+}
+
+/* Backdrop fade so the dim layer never pops in. */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.anim-fade {
+  animation: fadeIn 0.25s ease-out;
+}
+
+/* Stat-bar fills catch a moving sheen once when they first render. */
+@keyframes shimmer {
+  from {
+    background-position: -200% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* Confetti piece: falls from the top of the viewport, tumbling and fading out. */
+@keyframes confettiFall {
+  0% {
+    transform: translateY(-16px) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh) rotate(540deg);
+    opacity: 0;
+  }
+}
+.anim-confetti {
+  animation-name: confettiFall;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.7, 1);
+  animation-fill-mode: forwards;
+}
+
+/* A bouncy, overshooting pop-in for achievement unlocks and other big celebratory moments. */
+@keyframes pop {
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+.anim-pop {
+  animation: pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Respect users who ask for less motion. */
+@media (prefers-reduced-motion: reduce) {
+  .anim-in,
+  .anim-screen,
+  .anim-sheet,
+  .anim-fade,
+  .anim-confetti,
+  .anim-pop {
+    animation: none;
+  }
 }

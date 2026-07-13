@@ -67,8 +67,17 @@ export interface FamilyActionResult {
   message: string;
 }
 
+/** Minimum-age guard, mirroring actions.ts's requireAge — duplicated locally rather than
+ * imported to avoid a cross-module dependency between family.ts and actions.ts. */
+function requireAge(state: GameState, minAge: number, activity: string): FamilyActionResult | null {
+  if (state.player.age >= minAge) return null;
+  return { ok: false, message: `You're too young for that — ${activity} opens up at age ${minAge}.` };
+}
+
 /** Propose to a dating candidate; materializes them as a real NPC on success. */
 export function propose(state: GameState, candidate: DatingCandidate, withPrenup = false): FamilyActionResult {
+  const ageGate = requireAge(state, 18, 'getting married');
+  if (ageGate) return ageGate;
   const p = state.player;
   if (p.spouseId) return { ok: false, message: 'You are already married.' };
   // The dowry below plus a prenup's capped settlement makes marry-then-divorce profitable —
@@ -143,6 +152,8 @@ export function divorce(state: GameState): FamilyActionResult {
 }
 
 export function haveChild(state: GameState): FamilyActionResult {
+  const ageGate = requireAge(state, 18, 'having children');
+  if (ageGate) return ageGate;
   const p = state.player;
   if (!p.spouseId) return { ok: false, message: 'You need a spouse first.' };
   if (p.children.length >= 6) return { ok: false, message: 'Your family is already large enough!' };
@@ -185,6 +196,101 @@ export function haveChild(state: GameState): FamilyActionResult {
   log(state, `👶 You welcomed a child: ${child.name}!`, 'milestone');
   if (p.children.length >= 3 && !state.achievements.includes('big_family')) state.achievements.push('big_family');
   return { ok: true, message: `Welcome, ${child.name}!` };
+}
+
+/** Fertility clinic: a single-parent path to a child, no spouse required — a real IVF/donor
+ * treatment can fail, unlike the always-successful haveChild(), so this costs real money whether
+ * or not it works. */
+export function useFertilityClinic(state: GameState): FamilyActionResult {
+  const ageGate = requireAge(state, 18, 'the fertility clinic');
+  if (ageGate) return ageGate;
+  const p = state.player;
+  if (p.children.length >= 6) return { ok: false, message: 'Your family is already large enough!' };
+  const cost = 18_000;
+  if (cost > p.money) return { ok: false, message: `Treatment costs $${cost.toLocaleString()}.` };
+  const rng = new RNG(state.seed);
+  rng.state = state.rngState;
+  p.money -= cost;
+  const success = rng.chance(0.55 + Math.min(0.2, p.health / 500));
+  if (!success) {
+    state.rngState = rng.state;
+    p.happiness = clamp100(p.happiness - 6);
+    log(state, `Your round of fertility treatment did not succeed this time.`, 'bad');
+    return { ok: false, message: 'The treatment was unsuccessful this time. You can try again next year.' };
+  }
+  const gender = rng.chance(0.5) ? 'male' : 'female';
+  const names = { male: ['Milo', 'Theo', 'Jonah', 'Ezra', 'Silas'], female: ['Nora', 'Ivy', 'Wren', 'Luna', 'Rose'] };
+  const first = rng.pick(names[gender]);
+  const lastName = p.name.split(' ').slice(-1)[0];
+  state.rngState = rng.state;
+
+  const child: NPC = {
+    id: freshNpcId(state),
+    name: `${first} ${lastName}`,
+    gender,
+    age: 0,
+    alive: true,
+    countryId: p.countryId,
+    role: 'family',
+    wealth: 0,
+    competence: rng.int(30, 80),
+    charisma: rng.int(30, 80),
+    ambition: rng.int(20, 90),
+    riskTolerance: rng.int(20, 80),
+    ideology: clamp(rng.int(-40, 40) - Math.round((state.culturalProgressivism - 50) * 0.5), -100, 100),
+    integrity: rng.int(40, 90),
+    popularity: 0,
+    opinionOfPlayer: 90,
+    partyId: null,
+    officeKind: null,
+    companyId: null,
+    goal: 'grow up',
+    memory: [],
+    ...randomMindTraits(rng),
+  };
+  state.npcs[child.id] = child;
+  p.children.push(child.id);
+  p.relationships.push({ npcId: child.id, kind: 'child', closeness: 90 });
+  p.happiness = clamp100(p.happiness + 14);
+  log(state, `👶 The fertility treatment worked! You welcomed a child: ${child.name}!`, 'milestone');
+  if (p.children.length >= 3 && !state.achievements.includes('big_family')) state.achievements.push('big_family');
+  return { ok: true, message: `Welcome, ${child.name}!` };
+}
+
+/** Sue a person you know for a personal grievance — distinct from the company-vs-company patent
+ * lawsuit in actions.ts; the target is any NPC the player has a real relationship register with. */
+export function sueSomeone(state: GameState, npcId: string): FamilyActionResult {
+  const ageGate = requireAge(state, 18, 'filing a lawsuit');
+  if (ageGate) return ageGate;
+  const p = state.player;
+  const npc = state.npcs[npcId];
+  if (!npc || !npc.alive) return { ok: false, message: 'That person is unavailable.' };
+  if (onCooldown(state, `sue_${npcId}`)) return { ok: false, message: 'You are already litigating against them.' };
+  const legalFees = 6_000;
+  if (legalFees > p.money) return { ok: false, message: `Legal fees cost $${legalFees.toLocaleString()}.` };
+  const rng = new RNG(state.seed);
+  rng.state = state.rngState;
+  p.money -= legalFees;
+  setCooldown(state, `sue_${npcId}`);
+  const chance = clamp(0.35 + (p.reputation - 50) * 0.003 + (p.smarts - 50) * 0.002 - (npc.integrity - 50) * 0.002, 0.1, 0.75);
+  const win = rng.chance(chance);
+  state.rngState = rng.state;
+  if (win) {
+    const settlement = Math.min(Math.max(2_000, npc.wealth * 0.15), 200_000);
+    npc.wealth = Math.max(0, npc.wealth - settlement);
+    p.money += settlement;
+    p.reputation = clamp100(p.reputation + 2);
+    npc.opinionOfPlayer = Math.max(-100, npc.opinionOfPlayer - 30);
+    pushMemory(npc, `Lost a lawsuit filed by ${p.name} in ${state.year}.`);
+    log(state, `You won a lawsuit against ${npc.name}, awarded a $${Math.round(settlement).toLocaleString()} settlement.`, 'good');
+    return { ok: true, message: `Won! ${npc.name} pays a $${Math.round(settlement).toLocaleString()} settlement.` };
+  }
+  p.happiness = clamp100(p.happiness - 4);
+  p.reputation = clamp100(p.reputation - 1);
+  npc.opinionOfPlayer = Math.max(-100, npc.opinionOfPlayer - 10);
+  pushMemory(npc, `Was sued by ${p.name} in ${state.year} and won the case.`);
+  log(state, `You lost your lawsuit against ${npc.name} and ate the legal fees.`, 'bad');
+  return { ok: false, message: `Lost the case — ${npc.name} successfully defended themselves.` };
 }
 
 /** Adopt a child — no spouse required, and the child starts a little older than a newborn. */

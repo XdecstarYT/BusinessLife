@@ -4,6 +4,7 @@
  * then creates the 18-year-old player character inside it.
  */
 import type { City, Country, CountryState, CrimeFamily, Difficulty, GameState, Gender, NPC, NPCRole, Party, Player } from './types';
+import { clamp100 } from './types';
 import { RNG, hashSeed } from './rng';
 import { COUNTRY_SEEDS } from '../data/countries';
 import { initEconomy } from './economy';
@@ -11,6 +12,7 @@ import { makeCityName, makeCompanyName, makePartyName, makePersonName, makeState
 import { INDUSTRIES } from '../data/industries';
 import { createCompany, nextCompanyId } from './business';
 import { doIPO } from './market';
+import { generateBucketList } from '../data/goals';
 import { SKILLS } from '../data/skills';
 import { randomMindTraits } from './npcMind';
 import { generateCrimeFamilies } from './crime';
@@ -89,6 +91,11 @@ export interface NewGameConfig {
   scenario?: Scenario;
   difficulty?: Difficulty;
   legacyBonus?: number; // starting money bonus carried over from a previous life's Legacy Score
+  bornRoyal?: boolean; // spends a banked #1-leaderboard perk (see net/leaderboard.ts) on a royal start
+  // V55: Prestige Vault — ids of PERMANENT perks owned in the cross-playthrough vault (see
+  // net/prestige.ts), applied fresh to every new life unlike legacyBonus/bornRoyal above which
+  // are each spent/consumed once. Plain string ids so this file stays decoupled from net/.
+  prestigePerks?: string[];
 }
 
 export function generateWorld(config: NewGameConfig): GameState {
@@ -222,6 +229,8 @@ export function generateWorld(config: NewGameConfig): GameState {
       warExhaustion: 0,
       warCasualtiesTotal: 0,
       lastNoConfidenceYear: null,
+      supremeCourt: [],
+      tradeAgreementIds: [],
     };
     countries.push(country);
 
@@ -259,6 +268,7 @@ export function generateWorld(config: NewGameConfig): GameState {
     achievements: [],
     netWorthHistory: [],
     gameOver: null,
+    pendingDeathReason: null,
     worldEvent: null,
     generation: 1,
     calendarDay: 0,
@@ -279,6 +289,11 @@ export function generateWorld(config: NewGameConfig): GameState {
     industryEraMultiplier: {},
     crimeFamilies,
     casinoJackpots: {},
+    bucketList: generateBucketList(rng),
+    athleteTeams: {},
+    worldMomentum: 0,
+    industryDisruptionLegacy: {},
+    domination: null,
   };
 
   // Public + private NPC companies per country (more in the player's home).
@@ -331,23 +346,46 @@ export function generateWorld(config: NewGameConfig): GameState {
   // A few random aptitudes
   for (let i = 0; i < 6; i++) skills[rng.pick(SKILLS).id] = rng.int(5, 25);
 
+  // A #1 leaderboard finish banks a one-life "born into royalty" perk (see net/leaderboard.ts) —
+  // spent here as real starting advantages, not just a cosmetic label: inherited wealth, an
+  // elite upbringing's head start on smarts/charisma, and standing existing reputation/
+  // popularity/influence systems don't otherwise grant an 18-year-old.
+  const royal = !!config.bornRoyal;
+  const royalTreasury = royal ? rng.int(3_000_000, 12_000_000) : 0;
+
+  // V55: Prestige Vault — permanent, cross-playthrough perks (see net/prestige.ts) applied fresh
+  // to this new life exactly like the one-life royal bonuses above, just from a different,
+  // never-consumed source. Kept as plain string ids so this file stays decoupled from net/.
+  const perks = new Set(config.prestigePerks ?? []);
+  if (perks.has('prodigy')) {
+    for (let i = 0; i < 3; i++) {
+      const skillId = rng.pick(SKILLS).id;
+      skills[skillId] = Math.max(skills[skillId] ?? 0, rng.int(10, 30));
+    }
+  }
+
   const player: Player = {
     name: config.playerName,
     gender: config.gender,
-    age: 18,
+    age: 0,
     alive: true,
     countryId: home.id,
     cityId: homeCity.id,
-    health: rng.int(75, 95),
-    happiness: rng.int(60, 85),
-    smarts: rng.int(40, 85),
-    charisma: rng.int(35, 80),
-    reputation: 5,
-    popularity: 0,
+    health: clamp100(rng.int(80, 98) + (perks.has('strong_constitution') ? 12 : 0)),
+    happiness: rng.int(65, 90),
+    // A newborn has no real "smarts"/"charisma" yet — these read as innate temperament that
+    // childhood events and schooling (see tickChildhood in engine.ts) will build up over time.
+    smarts: clamp100((royal ? rng.int(8, 18) : rng.int(0, 8)) + (perks.has('sharp_mind') ? 8 : 0)),
+    charisma: clamp100((royal ? rng.int(8, 18) : rng.int(0, 8)) + (perks.has('natural_charm') ? 8 : 0)),
+    reputation: clamp100((royal ? rng.int(20, 35) : 0) + (perks.has('old_money') ? 15 : 0)),
+    popularity: clamp100((royal ? rng.int(5, 15) : 0) + (perks.has('old_money') ? 5 : 0)),
     influence: 0,
-    karma: 50,
+    karma: clamp100(50 + (perks.has('iron_will') ? 10 : 0)),
     notoriety: 0,
-    money: rng.int(500, 5_000) + Math.max(0, config.legacyBonus ?? 0),
+    money: rng.int(0, 200) + Math.max(0, config.legacyBonus ?? 0) + royalTreasury
+      + (perks.has('family_savings') ? 25_000 : 0) + (perks.has('family_fortune') ? 150_000 : 0),
+    guardianAngelAvailable: perks.has('guardian_angel'),
+    guardianAngelUsed: false,
     criminalRecord: 0,
     inJailYears: 0,
     skills,
@@ -377,9 +415,24 @@ export function generateWorld(config: NewGameConfig): GameState {
     politicalHeirId: null,
     advisors: [],
     campaign: null,
+    vicePresidentId: null,
     lastElectionResult: null,
     casinoTotalWagered: 0,
     casinoBiggestWin: 0,
+    pets: [],
+    lotteryTicketsThisYear: 0,
+    scratchCardsThisYear: 0,
+    athlete: null,
+    military: null,
+    drugOperation: null,
+    entertainmentCareer: null,
+    medicalCareer: null,
+    cult: null,
+    astronaut: null,
+    prisonLife: null,
+    legalCareer: null,
+    culinaryCareer: null,
+    aviation: null,
     hasPrenup: false,
     lobbyingFirmHired: false,
     marginDebt: 0,
@@ -400,6 +453,7 @@ export function generateWorld(config: NewGameConfig): GameState {
     retired: false,
     pensionIncome: 0,
     memoir: null,
+    sponsorshipDeal: null,
     lastFiredYear: null,
     freelanceReputation: 30,
     freelanceGigsCompleted: 0,
@@ -409,7 +463,7 @@ export function generateWorld(config: NewGameConfig): GameState {
     lastSocialPostYear: null,
     actionCooldowns: {},
     yearsServedThisSentence: 0,
-    stress: rng.range(15, 35),
+    stress: rng.range(0, 10),
     burnoutUntilYear: null,
     investigationHeat: 0,
   };
@@ -422,12 +476,22 @@ export function generateWorld(config: NewGameConfig): GameState {
 
   state.player = player;
   state.rngState = rng.state;
-  state.lifeLog.push({
-    year: startYear,
-    age: 18,
-    text: `You turn 18 in ${homeCity.name}, ${home.name}. The world is yours to take — build an empire, run the country, or both.`,
-    kind: 'milestone',
-  });
+  if (royal) {
+    state.achievements.push('born_royal');
+    state.lifeLog.push({
+      year: startYear,
+      age: 0,
+      text: `You are born into the royal family of ${home.name} in ${homeCity.name} — private tutors, palace connections and inherited wealth await, before you can even walk.`,
+      kind: 'milestone',
+    });
+  } else {
+    state.lifeLog.push({
+      year: startYear,
+      age: 0,
+      text: `You are born in ${homeCity.name}, ${home.name}. A whole life is ahead of you — build an empire, run the country, or both, one year at a time.`,
+      kind: 'milestone',
+    });
+  }
   state.netWorthHistory.push({ year: startYear, value: player.money });
   return state;
 }

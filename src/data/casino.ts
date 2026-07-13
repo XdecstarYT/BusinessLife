@@ -66,3 +66,18 @@ export function slotMachineRTP(def: SlotMachineDef): number {
   const v = VOLATILITY_PROFILE[def.volatility];
   return v.smallChance * v.smallMult + v.bigChance * v.bigMult;
 }
+
+// ---------------------------------------------------------------------------
+// Sports Book
+// ---------------------------------------------------------------------------
+
+export const SPORTS = ['Football', 'Basketball', 'Soccer', 'Boxing'] as const;
+export type Sport = (typeof SPORTS)[number];
+
+export const TEAM_CITIES = [
+  'Northgate', 'Harborview', 'Ironvale', 'Silverton', 'Redcliff', 'Duskmere', 'Brightwell', 'Stonebridge',
+  'Ashford', 'Wolfhollow', 'Crestmoor', 'Fallriver',
+];
+export const TEAM_MASCOTS = [
+  'Falcons', 'Titans', 'Wolves', 'Comets', 'Miners', 'Sharks', 'Ravens', 'Bears', 'Rockets', 'Vipers',
+];

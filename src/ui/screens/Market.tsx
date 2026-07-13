@@ -59,8 +59,13 @@ export function Market() {
               .sort((a, b) => Math.abs(yearGain(b)) - Math.abs(yearGain(a)))
               .slice(0, 6)
               .map((c) => ({ name: c.name, price: c.sharePrice, gainPct: yearGain(c) }))}
+            onSelectMover={(name) => {
+              const c = listed.find((x) => x.name === name);
+              if (c) setSelected(c.id);
+            }}
           />
         </Suspense>
+        <div className="text-xs text-slate-400 mt-1">Tap a ticker booth to trade that stock.</div>
       </div>
 
       <LiveTicker companies={listed} />
@@ -148,7 +153,7 @@ function StockRow({ c, onClick }: { c: Company; onClick: () => void }) {
   const ind = INDUSTRY_BY_ID[c.industryId];
   return (
     <Card className="p-3 flex items-center gap-3" onClick={onClick}>
-      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-500 to-violet-500 flex items-center justify-center text-white font-black text-sm shrink-0">
+      <div className="w-10 h-10 rounded-full bg-brand-500 flex items-center justify-center text-white font-black text-sm shrink-0">
         {c.name.charAt(0)}
       </div>
       <div className="min-w-0 flex-1">

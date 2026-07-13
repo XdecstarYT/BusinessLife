@@ -9,7 +9,7 @@ import type { GameState } from './types';
 import { clamp, clamp100 } from './types';
 import { RNG } from './rng';
 import { SK } from '../data/skills';
-import { SLOT_MACHINE_BY_ID, VOLATILITY_PROFILE } from '../data/casino';
+import { SLOT_MACHINE_BY_ID, VOLATILITY_PROFILE, SPORTS, TEAM_CITIES, TEAM_MASCOTS, type Sport } from '../data/casino';
 import { log } from './engine';
 
 // Local copy of actions.ts's RNG-draw pattern (same `seed`/`rngState` fields) — not imported
@@ -217,4 +217,82 @@ export function spinRoulette(state: GameState, bet: RouletteBet, stake: number):
   }
   log(state, `🎡 Roulette landed on ${pocketLabel} — lost $${stake.toLocaleString()}.`, 'bad');
   return { ok: true, message: `Ball landed on ${pocketLabel}. The house took your $${stake.toLocaleString()}.`, outcome: 'bust', payout: 0, landedNumber, landedColor };
+}
+
+// ---------------------------------------------------------------------------
+// Sports Book — a weekly slate of matches with real moneyline odds. The odds
+// aren't a coin flip dressed up: each team gets a true win probability, and
+// the posted payout is that probability's fair odds shaved by a ~7% vig —
+// exactly how a real sportsbook prices a line so it keeps an edge on both
+// sides of the same bet, not just the "wrong" one.
+// ---------------------------------------------------------------------------
+
+export interface SportsMatch {
+  id: string;
+  sport: Sport;
+  home: string;
+  away: string;
+  homeOdds: number; // decimal odds: stake * homeOdds = total payout if home wins
+  awayOdds: number;
+  homeWinProb: number; // true probability used to resolve the match — not shown to the player
+}
+
+const SPORTS_VIG = 0.07;
+
+/** This "week's" slate — deterministic per year+week so it doesn't reshuffle on every render, but
+ * still turns over as the calendar advances (mirrors propertyListings'/datingPool's seeding). */
+export function sportsMatches(state: GameState): SportsMatch[] {
+  const week = Math.floor(state.calendarDay / 7);
+  const rng = new RNG(state.seed ^ (state.year * 92821) ^ (week * 733));
+  const used = new Set<string>();
+  const pickTeam = (): string => {
+    let name = '';
+    let guard = 0;
+    do {
+      name = `${rng.pick(TEAM_CITIES)} ${rng.pick(TEAM_MASCOTS)}`;
+      guard++;
+    } while (used.has(name) && guard < 8);
+    used.add(name);
+    return name;
+  };
+  const matches: SportsMatch[] = [];
+  for (let i = 0; i < 5; i++) {
+    const sport = rng.pick(SPORTS);
+    const home = pickTeam();
+    const away = pickTeam();
+    const homeWinProb = rng.range(0.32, 0.68);
+    const homeOdds = Math.round((1 / homeWinProb) * (1 - SPORTS_VIG) * 100) / 100;
+    const awayOdds = Math.round((1 / (1 - homeWinProb)) * (1 - SPORTS_VIG) * 100) / 100;
+    matches.push({ id: `match_${state.year}_${week}_${i}`, sport, home, away, homeOdds, awayOdds, homeWinProb });
+  }
+  return matches;
+}
+
+export type SportsSide = 'home' | 'away';
+
+export function placeSportsBet(state: GameState, matchId: string, side: SportsSide, stake: number): SlotSpinResult {
+  const p = state.player;
+  if (stake <= 0 || stake > p.money) return { ok: false, message: 'Invalid stake.', outcome: 'bust', payout: 0 };
+  const match = sportsMatches(state).find((m) => m.id === matchId);
+  if (!match) return { ok: false, message: 'That match is off the board.', outcome: 'bust', payout: 0 };
+  const rng = withRng(state);
+  p.money -= stake;
+  p.casinoTotalWagered += stake;
+  const homeWins = rng.chance(match.homeWinProb);
+  const won = (side === 'home' && homeWins) || (side === 'away' && !homeWins);
+  const odds = side === 'home' ? match.homeOdds : match.awayOdds;
+  const payout = won ? Math.round(stake * odds) : 0;
+  if (won) p.money += payout;
+  p.happiness = clamp100(p.happiness + (won ? 3 : -2));
+  if (payout > p.casinoBiggestWin) p.casinoBiggestWin = payout;
+  commit(state, rng);
+  const picked = side === 'home' ? match.home : match.away;
+  const final = `${match.home} ${homeWins ? 'beat' : 'lost to'} ${match.away}`;
+  if (won) {
+    if (payout - stake >= 50_000 && !state.achievements.includes('high_roller')) state.achievements.push('high_roller');
+    log(state, `🏟️ ${final}. Your bet on ${picked} paid $${(payout - stake).toLocaleString()}.`, 'money');
+    return { ok: true, message: `${final}! You collected $${(payout - stake).toLocaleString()}.`, outcome: 'small', payout };
+  }
+  log(state, `🏟️ ${final}. Your bet on ${picked} cost $${stake.toLocaleString()}.`, 'bad');
+  return { ok: true, message: `${final}. The book took your $${stake.toLocaleString()}.`, outcome: 'bust', payout: 0 };
 }
